@@ -34,7 +34,6 @@
 #include <vector>
 
 #include <boost/algorithm/string/case_conv.hpp>
-#include <boost/any.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/xml_iarchive.hpp>
@@ -81,7 +80,6 @@
 #include <boost/type_traits/remove_const.hpp>
 #include <boost/uuid/nil_generator.hpp>
 #include <boost/uuid/uuid.hpp>
-#include <boost/variant.hpp>
 
 // GiGi
 #include <cassert>

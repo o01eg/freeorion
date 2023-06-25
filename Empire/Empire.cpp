@@ -25,11 +25,17 @@
 #include "Government.h"
 
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/unordered_set.hpp>
 
 
 namespace {
     constexpr float EPSILON = 0.01f;
+
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+    constexpr std::string EMPTY_STRING;
+#else
     const std::string EMPTY_STRING;
+#endif
 
     std::string operator+(const std::string_view sv, const char* c) {
         std::string retval;
@@ -123,10 +129,8 @@ std::string Empire::Dump() const {
                          " ID: " + std::to_string(m_id) +
                          " Capital ID: " + std::to_string(m_capital_id);
     retval += " meters:\n";
-    for (const auto& [name, meter] : m_meters) {
-        retval += UserString(name) + ": " +
-                  std::to_string(meter.Initial()) + "\n";
-    }
+    for (const auto& [name, meter] : m_meters)
+        retval += UserString(name) + ": " + std::to_string(meter.Initial()) + "\n";
     return retval;
 }
 
@@ -471,6 +475,26 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_tur
     return true;
 }
 
+double Empire::ThisTurnAdoptedPoliciesCost(const ScriptingContext& context) const {
+    double other_this_turn_adopted_policies_cost = 0.0;
+    for (auto& [adopted_policy_name, adoption_info] : m_adopted_policies) {
+        if (adoption_info.adoption_turn != context.current_turn)
+            continue;
+        const auto* pre_adopted_policy = GetPolicy(adopted_policy_name);
+        if (!pre_adopted_policy) {
+            ErrorLogger() << "Empire::ThisTurnAdoptedPoliciesCost couldn't find policy named "
+                          << adopted_policy_name << " that was supposedly already adopted this turn ("
+                          << context.current_turn << ")";
+            continue;
+        }
+        const auto adopted_cost = pre_adopted_policy->AdoptionCost(m_id, context);
+        TraceLogger() << "Empire::ThisTurnAdoptedPoliciesCost : Already adopted policy this turn: "
+                      << adopted_policy_name << " with cost " << adopted_cost;
+        other_this_turn_adopted_policies_cost += adopted_cost;
+    }
+    return other_this_turn_adopted_policies_cost;
+}
+
 bool Empire::PolicyAffordable(std::string_view name, const ScriptingContext& context) const {
     const Policy* policy_to_adopt = GetPolicy(name);
     if (!policy_to_adopt) {
@@ -478,43 +502,32 @@ bool Empire::PolicyAffordable(std::string_view name, const ScriptingContext& con
         return false;
     }
 
-    double other_this_turn_adopted_policies_cost = 0.0;
-    for (auto& [adopted_policy_name, adoption_info] : m_adopted_policies) {
-        if (adoption_info.adoption_turn != context.current_turn)
-            continue;
-        auto pre_adopted_policy = GetPolicy(adopted_policy_name);
-        if (!pre_adopted_policy) {
-            ErrorLogger() << "Empire::PolicyAffordable couldn't find policy named " << adopted_policy_name << " that was supposedly already adopted this turn (" << context.current_turn << ")";
-            continue;
-        }
-        TraceLogger() << "Empire::PolicyAffordable : Already adopted policy this turn: " << adopted_policy_name
-                      << " with cost " << pre_adopted_policy->AdoptionCost(m_id, context);
-        other_this_turn_adopted_policies_cost += pre_adopted_policy->AdoptionCost(m_id, context);
-    }
-    TraceLogger() << "Empire::PolicyAffordable : Combined already-adopted policies this turn cost " << other_this_turn_adopted_policies_cost;
+    // TODO: include annexation costs in test?
+    const double other_this_turn_adopted_policies_cost = ThisTurnAdoptedPoliciesCost(context);
+    TraceLogger() << "Empire::PolicyAffordable : Combined already-adopted policies this turn cost "
+                  << other_this_turn_adopted_policies_cost;
 
     // if policy not already adopted at start of this turn, it costs its adoption cost to adopt on this turn
     // if it was adopted at the start of this turn, it doens't cost anything to re-adopt this turn.
-    double adoption_cost = 0.0;
-    if (m_initial_adopted_policies.find(name) == m_initial_adopted_policies.end())
-        adoption_cost = policy_to_adopt->AdoptionCost(m_id, context);
+    const float adoption_cost = (m_initial_adopted_policies.find(name) == m_initial_adopted_policies.end()) ?
+                                policy_to_adopt->AdoptionCost(m_id, context) : 0.0f;
 
     if (adoption_cost <= 0) {
         TraceLogger() << "Empire::AdoptPolicy: Zero cost policy ignoring influence available...";
         return true;
-    } else {
-        double total_this_turn_policy_adoption_cost = adoption_cost + other_this_turn_adopted_policies_cost;
-        double available_ip = ResourceStockpile(ResourceType::RE_INFLUENCE);
+    }
 
-        if (available_ip < total_this_turn_policy_adoption_cost) {
-            TraceLogger() << "Empire::AdoptPolicy insufficient ip: " << available_ip
-                          << " / " << total_this_turn_policy_adoption_cost << " to adopt additional policy this turn";
-            return false;
-        } else {
-            TraceLogger() << "Empire::AdoptPolicy sufficient IP: " << available_ip
-                          << " / " << total_this_turn_policy_adoption_cost << " to adopt additional policy this turn";
-            return true;
-        }
+    const double total_this_turn_policy_adoption_cost = adoption_cost + other_this_turn_adopted_policies_cost;
+    const double available_ip = ResourceStockpile(ResourceType::RE_INFLUENCE);
+
+    if (available_ip < total_this_turn_policy_adoption_cost) {
+        TraceLogger() << "Empire::AdoptPolicy insufficient ip: " << available_ip
+                      << " / " << total_this_turn_policy_adoption_cost << " to adopt additional policy this turn";
+        return false;
+    } else {
+        TraceLogger() << "Empire::AdoptPolicy sufficient IP: " << available_ip
+                      << " / " << total_this_turn_policy_adoption_cost << " to adopt additional policy this turn";
+        return true;
     }
 }
 
@@ -591,13 +604,13 @@ bool Empire::HasResearchedPrereqAndUnresearchedPrereq(std::string_view name) con
 }
 
 float Empire::ResearchProgress(const std::string& name, const ScriptingContext& context) const {
-    auto it = m_research_progress.find(name);
+    const auto it = m_research_progress.find(name);
     if (it == m_research_progress.end())
         return 0.0f;
     const Tech* tech = GetTech(it->first);
     if (!tech)
         return 0.0f;
-    float tech_cost = tech->ResearchCost(m_id, context);
+    const float tech_cost = tech->ResearchCost(m_id, context);
     return it->second * tech_cost;
 }
 
@@ -788,18 +801,15 @@ bool Empire::ShipHullAvailable(const std::string& name) const
 float Empire::ProductionStatus(int i, const ScriptingContext& context) const {
     if (0 > i || i >= static_cast<int>(m_production_queue.size()))
         return -1.0f;
-    float item_progress = m_production_queue[i].progress;
-    [[maybe_unused]] auto [item_cost, item_time] = m_production_queue[i].ProductionCostAndTime(context);
-    (void)item_time; // quiet unused variable warning
+    const float item_progress = m_production_queue[i].progress;
+    const auto item_cost = m_production_queue[i].ProductionCostAndTime(context).first;
     return item_progress * item_cost * m_production_queue[i].blocksize;
 }
 
 bool Empire::HasExploredSystem(int ID) const
 { return m_explored_systems.contains(ID); }
 
-bool Empire::ProducibleItem(BuildType build_type, int location_id,
-                            const ScriptingContext& context) const
-{
+bool Empire::ProducibleItem(BuildType build_type, int location_id, const ScriptingContext& context) const {
     if (build_type == BuildType::BT_SHIP)
         throw std::invalid_argument("Empire::ProducibleItem was passed BuildType BT_SHIP with no further parameters, but ship designs are tracked by number");
 
@@ -1590,22 +1600,22 @@ void Empire::SetProductionQuantity(int index, int quantity) {
 void Empire::MoveProductionWithinQueue(int index, int new_index) {
     if (index < new_index)
         --new_index;
-    if (index < 0 || static_cast<int>(m_production_queue.size()) <= index ||
-        new_index < 0 || static_cast<int>(m_production_queue.size()) <= new_index)
-    {
+    const int queue_size{static_cast<int>(m_production_queue.size())};
+    if (index < 0 || queue_size <= index || new_index < 0 || queue_size <= new_index) {
         DebugLogger() << "Empire::MoveProductionWithinQueue index: " << index << "  new index: "
-                      << new_index << "  queue size: " << m_production_queue.size();
+                      << new_index << "  queue size: " << queue_size;
         ErrorLogger() << "Attempted to move a production queue item to or from an invalid index.";
         return;
     }
-    auto build = m_production_queue[index];
+    auto build{m_production_queue[index]};
     m_production_queue.erase(index);
-    m_production_queue.insert(m_production_queue.begin() + new_index, build);
+    m_production_queue.insert(m_production_queue.begin() + new_index, std::move(build));
 }
 
 void Empire::RemoveProductionFromQueue(int index) {
-    if (index < 0 || static_cast<int>(m_production_queue.size()) <= index) {
-        DebugLogger() << "Empire::RemoveProductionFromQueue index: " << index << "  queue size: " << m_production_queue.size();
+    const int queue_size{static_cast<int>(m_production_queue.size())};
+    if (index < 0 || queue_size <= index) {
+        DebugLogger() << "Empire::RemoveProductionFromQueue index: " << index << "  queue size: " << queue_size;
         ErrorLogger() << "Attempted to delete a production queue item with an invalid index.";
         return;
     }
@@ -1613,8 +1623,9 @@ void Empire::RemoveProductionFromQueue(int index) {
 }
 
 void Empire::MarkToBeRemoved(int index) {
-    if (index < 0 || static_cast<int>(m_production_queue.size()) <= index) {
-        DebugLogger() << "Empire::MarkToBeRemoved index: " << index << "  queue size: " << m_production_queue.size();
+    const int queue_size{static_cast<int>(m_production_queue.size())};
+    if (index < 0 || queue_size <= index) {
+        DebugLogger() << "Empire::MarkToBeRemoved index: " << index << "  queue size: " << queue_size;
         ErrorLogger() << "Attempted to mark to be removed a production queue item with an invalid index.";
         return;
     }
@@ -1622,8 +1633,9 @@ void Empire::MarkToBeRemoved(int index) {
 }
 
 void Empire::MarkNotToBeRemoved(int index) {
-    if (index < 0 || static_cast<int>(m_production_queue.size()) <= index) {
-        DebugLogger() << "Empire::MarkNotToBeRemoved index: " << index << "  queue size: " << m_production_queue.size();
+    const int queue_size{static_cast<int>(m_production_queue.size())};
+    if (index < 0 || queue_size <= index) {
+        DebugLogger() << "Empire::MarkNotToBeRemoved index: " << index << "  queue size: " << queue_size;
         ErrorLogger() << "Attempted to mark not to be removed a production queue item with an invalid index.";
         return;
     }
@@ -1631,8 +1643,9 @@ void Empire::MarkNotToBeRemoved(int index) {
 }
 
 void Empire::PauseProduction(int index) {
-    if (index < 0 || static_cast<int>(m_production_queue.size()) <= index) {
-        DebugLogger() << "Empire::PauseProduction index: " << index << "  queue size: " << m_production_queue.size();
+    const int queue_size{static_cast<int>(m_production_queue.size())};
+    if (index < 0 || queue_size <= index) {
+        DebugLogger() << "Empire::PauseProduction index: " << index << "  queue size: " << queue_size;
         ErrorLogger() << "Attempted pause a production queue item with an invalid index.";
         return;
     }
@@ -1640,8 +1653,9 @@ void Empire::PauseProduction(int index) {
 }
 
 void Empire::ResumeProduction(int index) {
-    if (index < 0 || static_cast<int>(m_production_queue.size()) <= index) {
-        DebugLogger() << "Empire::ResumeProduction index: " << index << "  queue size: " << m_production_queue.size();
+    const int queue_size{static_cast<int>(m_production_queue.size())};
+    if (index < 0 || queue_size <= index) {
+        DebugLogger() << "Empire::ResumeProduction index: " << index << "  queue size: " << queue_size;
         ErrorLogger() << "Attempted resume a production queue item with an invalid index.";
         return;
     }
@@ -1649,8 +1663,9 @@ void Empire::ResumeProduction(int index) {
 }
 
 void Empire::AllowUseImperialPP(int index, bool allow) {
-    if (index < 0 || static_cast<int>(m_production_queue.size()) <= index) {
-        DebugLogger() << "Empire::AllowUseImperialPP index: " << index << "  queue size: " << m_production_queue.size();
+    const int queue_size{static_cast<int>(m_production_queue.size())};
+    if (index < 0 || queue_size <= index) {
+        DebugLogger() << "Empire::AllowUseImperialPP index: " << index << "  queue size: " << queue_size;
         ErrorLogger() << "Attempted allow/disallow use of the imperial PP stockpile for a production queue item with an invalid index.";
         return;
     }
@@ -2019,22 +2034,29 @@ namespace {
     }
 }
 
-std::vector<std::string> Empire::CheckResearchProgress(const ScriptingContext& context) {
+std::vector<std::string> Empire::CheckResearchProgress(
+    const ScriptingContext& context, const std::vector<std::tuple<std::string_view, double, int>>& costs_times)
+{
     SanitizeResearchQueue(m_research_queue);
 
-    float spent_rp{0.0f};
-    float total_rp_available = m_research_pool.TotalAvailable();
+    float spent_rp = 0.0f;
+    const float total_rp_available = m_research_pool.TotalAvailable();
 
     // process items on queue
     std::vector<std::string> to_erase_from_queue_and_grant_next_turn;
     for (auto& elem : m_research_queue) {
-        const Tech* tech = GetTech(elem.name);
-        if (!tech) {
-            ErrorLogger() << "Empire::CheckResearchProgress couldn't find tech on queue, even after sanitizing!";
+        if (elem.allocated_rp <= 0.0)
+            continue;
+        const auto ct_it = std::find_if(costs_times.begin(), costs_times.end(),
+                                        [tech_name{elem.name}](const std::tuple<std::string_view, double, int>& ct)
+                                        { return std::get<0>(ct) == tech_name; });
+        if (ct_it == costs_times.end()) {
+            ErrorLogger() << "Missing tech " << elem.name << " cost time in CheckResearchProgress!";
             continue;
         }
+        const float tech_cost = static_cast<float>(std::get<1>(*ct_it));
+
         float& progress = m_research_progress[elem.name];
-        float tech_cost = tech->ResearchCost(m_id, context);
         progress += elem.allocated_rp / std::max(EPSILON, tech_cost);
         spent_rp += elem.allocated_rp;
         if (tech_cost - EPSILON <= progress * tech_cost) {
@@ -2050,12 +2072,16 @@ std::vector<std::string> Empire::CheckResearchProgress(const ScriptingContext& c
 
     // if there are left over RPs, any tech on the queue presumably can't
     // have RP allocated to it
-    std::unordered_set<std::string> techs_not_suitable_for_auto_allocation;
-    for (auto& elem : m_research_queue)
-        techs_not_suitable_for_auto_allocation.insert(elem.name);
+    const auto techs_not_suitable_for_auto_allocation = [this]() {
+        boost::unordered_set<std::string_view> retval;
+        retval.reserve(m_research_queue.size());
+        for (auto& elem : m_research_queue)
+            retval.insert(elem.name);
+        return retval;
+    }();
 
     // for all available and suitable techs, store ordered by cost to complete
-    std::vector<std::pair<double, std::string>> costs_to_complete_available_unpaused_techs;
+    std::vector<std::pair<double, std::string_view>> costs_to_complete_available_unpaused_techs;
     costs_to_complete_available_unpaused_techs.reserve(GetTechManager().size());
     for (const auto& [tech_name, tech] : GetTechManager()) {
         if (techs_not_suitable_for_auto_allocation.count(tech_name) > 0)
@@ -2064,11 +2090,26 @@ std::vector<std::string> Empire::CheckResearchProgress(const ScriptingContext& c
             continue;
         if (!tech.Researchable())
             continue;
-        double progress = this->ResearchProgress(tech_name, context);
-        double total_cost = tech.ResearchCost(m_id, context);
-        if (progress >= total_cost)
+
+        const auto progress_fraction = [this, tech_name{tech_name}]() { // TODO: avoid copy, make m_research_progess use transparent comparator
+            const auto progress_it = m_research_progress.find(tech_name);
+            if (progress_it == m_research_progress.end())
+                return 0.0f;
+            return progress_it->second;
+        }();
+        if (progress_fraction >= 1.0)
             continue;
-        costs_to_complete_available_unpaused_techs.emplace_back(total_cost - progress, tech_name);
+
+        const auto ct_it = std::find_if(costs_times.begin(), costs_times.end(),
+                                        [tech_name{tech_name}](const std::tuple<std::string_view, double, int>& ct)
+                                        { return std::get<0>(ct) == tech_name; });
+        if (ct_it == costs_times.end()) {
+            ErrorLogger() << "Missing tech " << tech_name << " cost time in CheckResearchProgress!";
+            continue;
+        }
+
+        const double remaining_cost = std::get<1>(*ct_it) * (1 - progress_fraction);
+        costs_to_complete_available_unpaused_techs.emplace_back(remaining_cost, tech_name);
     }
     std::sort(costs_to_complete_available_unpaused_techs.begin(),
               costs_to_complete_available_unpaused_techs.end());
@@ -2082,31 +2123,32 @@ std::vector<std::string> Empire::CheckResearchProgress(const ScriptingContext& c
         const Tech* tech = GetTech(tech_name);
         if (!tech)
             continue;
+        std::string tech_name_str{tech_name};
 
         //DebugLogger() << "extra tech: " << cost_tech.second << " needs: " << cost_tech.first << " more RP to finish";
 
-        float RPs_per_turn_limit = tech->PerTurnCost(m_id, context);
-        float progress_fraction = m_research_progress[tech_name];
+        const float RPs_per_turn_limit = tech->PerTurnCost(m_id, context);
+        const float progress_fraction = m_research_progress[tech_name_str];
 
-        float progress_fraction_left = 1.0f - progress_fraction;
-        float max_progress_per_turn = RPs_per_turn_limit / static_cast<float>(tech_cost);
-        float progress_possible_with_available_rp = rp_left_to_spend / static_cast<float>(tech_cost);
+        const float progress_fraction_left = 1.0f - progress_fraction;
+        const float max_progress_per_turn = RPs_per_turn_limit / static_cast<float>(tech_cost);
+        const float progress_possible_with_available_rp = rp_left_to_spend / static_cast<float>(tech_cost);
 
         //DebugLogger() << "... progress left: " << progress_fraction_left
         //              << " max per turn: " << max_progress_per_turn
         //              << " progress possible with available rp: " << progress_possible_with_available_rp;
 
-        float progress_increase = std::min(
+        const float progress_increase = std::min(
             progress_fraction_left,
             std::min(max_progress_per_turn, progress_possible_with_available_rp));
 
-        float consumed_rp = progress_increase * static_cast<float>(tech_cost);
+        const float consumed_rp = progress_increase * static_cast<float>(tech_cost);
 
-        m_research_progress[tech_name] += progress_increase;
+        m_research_progress[tech_name_str] += progress_increase;
         rp_left_to_spend -= consumed_rp;
 
-        if (tech_cost - EPSILON <= m_research_progress[tech_name] * tech_cost)
-            to_erase_from_queue_and_grant_next_turn.push_back(tech_name);
+        if (tech_cost - EPSILON <= m_research_progress[tech_name_str] * tech_cost)
+            to_erase_from_queue_and_grant_next_turn.push_back(std::move(tech_name_str));
 
         //DebugLogger() << "... allocated: " << consumed_rp << " to increase progress by: " << progress_increase;
     }
@@ -2124,7 +2166,9 @@ std::vector<std::string> Empire::CheckResearchProgress(const ScriptingContext& c
     return to_erase_from_queue_and_grant_next_turn;
 }
 
-void Empire::CheckProductionProgress(ScriptingContext& context) {
+void Empire::CheckProductionProgress(
+    ScriptingContext& context, const std::vector<std::tuple<std::string_view, int, float, int>>& costs_times)
+{
     DebugLogger() << "========Empire::CheckProductionProgress=======";
     // following commented line should be redundant, as previous call to
     // UpdateResourcePools should have generated necessary info
@@ -2657,41 +2701,100 @@ void Empire::InitResourcePools(const ObjectMap& objects, const SupplyManager& su
     m_influence_pool.SetConnectedSupplyGroups(sets_set);
 }
 
-void Empire::UpdateResourcePools(const ScriptingContext& context) {
+void Empire::UpdateResourcePools(const ScriptingContext& context,
+                                 const std::vector<std::tuple<std::string_view, double, int>>& research_costs,
+                                 const std::vector<std::pair<int, double>>& annex_costs,
+                                 const std::vector<std::pair<std::string_view, double>>& policy_costs,
+                                 const std::vector<std::tuple<std::string_view, int, float, int>>& prod_costs)
+{
     // updating queues, allocated_rp, distribution and growth each update their
     // respective pools, (as well as the ways in which the resources are used,
     // which needs to be done simultaneously to keep things consistent)
-    UpdateResearchQueue(context);
-    UpdateProductionQueue(context);
-    UpdateInfluenceSpending(context);
+    UpdateResearchQueue(context, research_costs);
+    UpdateProductionQueue(context, prod_costs);
+    UpdateInfluenceSpending(context, annex_costs, policy_costs);
     UpdatePopulationGrowth(context.ContextObjects());
 }
 
-void Empire::UpdateResearchQueue(const ScriptingContext& context) {
+std::vector<std::tuple<std::string_view, double, int>> Empire::TechCostsTimes(const ScriptingContext& context) const {
+    const auto& tm = GetTechManager();
+    std::vector<std::tuple<std::string_view, double, int>> retval;
+    retval.reserve(tm.size());
+
+    // cache costs for empire for techs on queue an that are researchable, which
+    // may be used later when updating the queue
+    const auto should_cache = [this](const auto tech_name, const auto& tech) {
+        return (tech.Researchable() && GetTechStatus(tech_name) == TechStatus::TS_RESEARCHABLE) ||
+            m_research_queue.InQueue(tech_name);
+    };
+
+    for (const auto& [tech_name, tech] : tm) {
+        if (should_cache(tech_name, tech))
+            retval.emplace_back(tech_name, tech.ResearchCost(m_id, context), tech.ResearchTime(m_id, context));
+    }
+
+    return retval;
+}
+
+std::vector<std::tuple<std::string_view, int, float, int>> Empire::ProductionCostsTimes(const ScriptingContext& contest) const {
+    return {};
+}
+
+std::vector<std::pair<int, double>> Empire::PlanetAnnexationCosts(const ScriptingContext& context) const {
+    const auto being_annexed = [](const Planet& p) { return p.IsAboutToBeAnnexed(); };
+    const auto planets = context.ContextObjects().findRaw<Planet>(being_annexed);
+
+    std::vector<std::pair<int, double>> retval;
+    retval.reserve(planets.size());
+
+    for (const auto* p : planets) {
+        if (p->OrderedAnnexedByEmpire() == m_id)
+            retval.emplace_back(p->ID(), p->AnnexationCost(m_id, context));
+    }
+    return retval;
+}
+
+std::vector<std::pair<std::string_view, double>> Empire::PolicyAdoptionCosts(const ScriptingContext& context) const {
+    std::vector<std::pair<std::string_view, double>> retval;
+    retval.reserve(m_adopted_policies.size());
+
+    for (const auto& policy_name : m_adopted_policies) {
+        if (const auto* policy = GetPolicy(policy_name.first))
+            retval.emplace_back(policy_name.first, policy->AdoptionCost(m_id, context));
+    }
+    return retval;
+}
+
+void Empire::UpdateResearchQueue(const ScriptingContext& context,
+                                 const std::vector<std::tuple<std::string_view, double, int>>& costs_times)
+{
     m_research_pool.Update(context.ContextObjects());
-    m_research_queue.Update(m_research_pool.TotalAvailable(),
-                            m_research_progress, context);
+    m_research_queue.Update(m_research_pool.TotalAvailable(), m_research_progress, costs_times, context);
     m_research_pool.ChangedSignal();
 }
 
-void Empire::UpdateProductionQueue(const ScriptingContext& context) {
+void Empire::UpdateProductionQueue(const ScriptingContext& context,
+                                   const std::vector<std::tuple<std::string_view, int, float, int>>& prod_costs)
+{
     DebugLogger() << "========= Production Update for empire: " << EmpireID() << " ========";
 
     m_industry_pool.Update(context.ContextObjects());
-    m_production_queue.Update(context);
+    m_production_queue.Update(context, prod_costs);
     m_industry_pool.ChangedSignal();
 }
 
-void Empire::UpdateInfluenceSpending(const ScriptingContext& context) {
+void Empire::UpdateInfluenceSpending(const ScriptingContext& context,
+                                     const std::vector<std::pair<int, double>>& annex_costs,
+                                     const std::vector<std::pair<std::string_view, double>>& policy_costs) {
     m_influence_pool.Update(context.ContextObjects()); // recalculate total influence production
-    m_influence_queue.Update(context);
+    m_influence_queue.Update(context, annex_costs, policy_costs);
     m_influence_pool.ChangedSignal();
 }
 
 void Empire::UpdatePopulationGrowth(const ObjectMap& objects)
 { m_population_pool.Update(objects); }
 
-void Empire::ResetMeters() {
+void Empire::ResetMeters() noexcept {
     for (auto& entry : m_meters)
         entry.second.ResetCurrent();
 }
@@ -2764,7 +2867,6 @@ void Empire::UpdateOwnedObjectCounters(const Universe& universe) {
     }
 }
 
-
 void Empire::CheckObsoleteGameContent() {
     // remove any unrecognized policies and uncategorized policies
     const auto policies_temp{m_adopted_policies};
@@ -2786,7 +2888,6 @@ void Empire::CheckObsoleteGameContent() {
         }
     }
 }
-
 
 void Empire::SetAuthenticated(bool authenticated)
 { m_authenticated = authenticated; }

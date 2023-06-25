@@ -23,6 +23,7 @@ parse::detail::simple_int_parser_rules::simple_int_parser_rules(const parse::lex
     // "NumShips" should not follow.
     bound_variable_name
         =   tok.Owner_
+        |   tok.OwnerBeforeLastConquered_
         |   tok.SupplyingEmpire_
         |   tok.ID_
         |   tok.CreationTurn_
@@ -42,6 +43,7 @@ parse::detail::simple_int_parser_rules::simple_int_parser_rules(const parse::lex
         |   tok.NumShips_
         |   tok.NumStarlanes_
         |   tok.LastTurnActiveInBattle_
+        |   tok.LastTurnAnnexed_
         |   tok.LastTurnAttackedByShip_
         |   tok.LastTurnBattleHere_
         |   tok.LastTurnColonized_
@@ -49,12 +51,16 @@ parse::detail::simple_int_parser_rules::simple_int_parser_rules(const parse::lex
         |   tok.LastTurnMoveOrdered_
         |   tok.LastTurnResupplied_
         |   tok.Orbit_
+        |   tok.TurnsSinceAnnexation_
         |   tok.TurnsSinceColonization_
         |   tok.TurnsSinceFocusChange_
         |   tok.TurnsSinceLastConquered_
         |   tok.ETA_
         |   tok.LaunchedFrom_
         |   tok.OrderedColonizePlanetID_
+        |   tok.OwnerBeforeLastConquered_
+        |   tok.LastInvadedByEmpire_
+        |   tok.LastColonizedByEmpire_
         ;
 
     free_variable_name

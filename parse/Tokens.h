@@ -18,6 +18,8 @@
     (All)                                       \
     (AllyOf)                                    \
     (And)                                       \
+    (annexationcondition)                       \
+    (annexationcost)                            \
     (AnyEmpire)                                 \
     (Armed)                                     \
     (Armour)                                    \
@@ -213,7 +215,10 @@
 #define TOKEN_SEQ_6                             \
     (label)                                     \
     (Large)                                     \
+    (LastColonizedByEmpire)                     \
+    (LastInvadedByEmpire)                       \
     (LastTurnActiveInBattle)                    \
+    (LastTurnAnnexed)                           \
     (LastTurnAttackedByShip)                    \
     (LastTurnBattleHere)                        \
     (LastTurnColonized)                         \
@@ -318,6 +323,7 @@
     (OutpostsOwned)                             \
     (OwnedBy)                                   \
     (Owner)                                     \
+    (OwnerBeforeLastConquered)                  \
     (OwnerHasShipPartAvailable)                 \
     (OwnerHasTech)                              \
     (parameters)                                \
@@ -437,6 +443,7 @@
     (SetSpecialCapacity)                        \
     (SetSpecies)                                \
     (SetSpeciesOpinion)                         \
+    (SetSpeciesTargetOpinion)                   \
     (SetSpeed)                                  \
     (SetStarType)                               \
     (SetStealth)                                \
@@ -500,8 +507,10 @@
     (SpeciesContentOpinion)                     \
     (SpeciesDislikes)                           \
     (SpeciesEmpireOpinion)                      \
+    (SpeciesEmpireTargetOpinion)                \
     (SpeciesLikes)                              \
     (SpeciesSpeciesOpinion)                     \
+    (SpeciesSpeciesTargetOpinion)               \
     (SpeciesPlanetsBombed)
 
 #define TOKEN_SEQ_15                            \
@@ -570,6 +579,7 @@
     (turn)                                      \
     (Turn)                                      \
     (TurnPolicyAdopted)                         \
+    (TurnsSinceAnnexation)                      \
     (TurnsSinceColonization)                    \
     (TurnsSinceFocusChange)                     \
     (TurnsSinceLastConquered)                   \
@@ -578,6 +588,8 @@
     (TurnTechResearched)                        \
     (type)                                      \
     (Uninhabitable)                             \
+    (UniqueNumberOf)                            \
+    (Unique)                                    \
     (UniverseCentreX)                           \
     (UniverseCentreY)                           \
     (UniverseWidth)                             \

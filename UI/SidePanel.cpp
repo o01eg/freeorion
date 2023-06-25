@@ -30,12 +30,14 @@
 #include "../client/human/GGHumanClientApp.h"
 #include "../Empire/Empire.h"
 #include "../universe/Building.h"
+#include "../universe/Condition.h"
 #include "../universe/Fleet.h"
 #include "../universe/ShipDesign.h"
 #include "../universe/Ship.h"
 #include "../universe/Species.h"
 #include "../universe/System.h"
 #include "../universe/UniverseObjectVisitors.h"
+#include "../universe/ValueRef.h"
 #include "../util/i18n.h"
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
@@ -332,7 +334,7 @@ namespace {
                 if (it == star_definition.attributes.end())
                     continue;
                 const auto& star_type_name = it->second;
-                const auto star_type = StarTypeFromString(star_type_name);
+                const auto star_type = StarTypeFromString(star_type_name, StarType::INVALID_STAR_TYPE);
                 if (star_type == StarType::INVALID_STAR_TYPE)
                     continue;
 
@@ -464,16 +466,98 @@ namespace {
     }
     bool temp_bool = RegisterOptions(&AddOptions);
 
+    /** Returns map from planet ID to issued annex orders affecting it. There
+      * should be only one ship colonzing each planet for this client. */
+    auto PendingAnnexationOrders(const ScriptingContext& context) {
+        std::vector<std::pair<int, int>> retval;
+
+        const ClientApp* app = ClientApp::GetApp();
+        if (!app)
+            return retval;
+
+        for (const auto& [order_id, order] : app->Orders()) {
+            if (auto annex_order = std::dynamic_pointer_cast<AnnexOrder>(order)) {
+                const auto planet_id = annex_order->PlanetID();
+                retval.emplace_back(planet_id, order_id);
+            }
+        }
+        // remove any duplicates.  TODO: limit equality test to planet ID?
+        //std::sort(retval.begin(), retval.end());
+        //auto unique_it = std::unique(retval.begin(), retval.end());
+        //retval.resize(static_cast<size_t>(std::distance(retval.begin(), unique_it)));
+        return retval;
+    }
+
+    double PlanetAnnexationCost(const Planet* planet, const UniverseObject* source_for_empire,
+                                const ScriptingContext& context)
+    {
+        if (!planet || !source_for_empire)
+            return 0.0;
+        const auto* species = context.species.GetSpecies(planet->SpeciesName());
+        if (!species)
+            return 0.0;
+        const auto* ac = species->AnnexationCost();
+        if (!ac)
+            return 0.0;
+        if (ac->ConstantExpr())
+            return ac->Eval();
+        ScriptingContext source_planet_context{source_for_empire, context};
+        source_planet_context.condition_local_candidate = planet;
+        return ac->Eval(source_planet_context);
+    }
+
+    /** Returns map from planet ID to cost to annex. */
+    auto PendingAnnexationPlanetsCosts(const UniverseObject* source_for_empire, const ScriptingContext& context) {
+        std::vector<std::pair<int, double>> retval;
+
+        const ClientApp* app = ClientApp::GetApp();
+        if (!app)
+            return retval;
+        const auto client_empire_id = app->EmpireID();
+        if (!source_for_empire ||
+            source_for_empire->Owner() == ALL_EMPIRES ||
+            source_for_empire->Owner() != client_empire_id)
+        { return retval; }
+        const auto client_empire = context.GetEmpire(client_empire_id);
+        if (!client_empire)
+            return retval;
+
+        for (const auto& [order_id, order] : app->Orders()) {
+            if (auto annex_order = std::dynamic_pointer_cast<AnnexOrder>(order)) {
+                const auto planet_id = annex_order->PlanetID();
+                const auto* annexed_planet = context.ContextObjects().getRaw<Planet>(planet_id);
+                const double cost = PlanetAnnexationCost(annexed_planet, source_for_empire, context);
+                retval.emplace_back(annex_order->PlanetID(), cost);
+            }
+        }
+        // remove any duplicates
+        std::sort(retval.begin(), retval.end());
+        auto unique_it = std::unique(retval.begin(), retval.end(),
+                                     [](const auto& lhs, const auto& rhs) { return lhs.first == rhs.first; });
+        retval.resize(static_cast<size_t>(std::distance(retval.begin(), unique_it)));
+        return retval;
+    }
+
+    double PendingAnnexationOrderCost(const UniverseObject* source_for_empire, const ScriptingContext& context) {
+        // transform reduce
+        double retval = 0.0;
+        for (auto& [ignored, cost] : PendingAnnexationPlanetsCosts(source_for_empire, context)) {
+            retval += cost;
+            (void)ignored;
+        }
+        return retval;
+    }
+
     /** Returns map from planet ID to issued colonize orders affecting it. There
       * should be only one ship colonzing each planet for this client. */
-    std::map<int, int> PendingColonizationOrders() {
+    auto PendingColonizationOrders() {
         std::map<int, int> retval;
         const ClientApp* app = ClientApp::GetApp();
         if (!app)
             return retval;
-        for (const auto& id_and_order : app->Orders()) {
-            if (auto order = std::dynamic_pointer_cast<ColonizeOrder>(id_and_order.second)) {
-                retval[order->PlanetID()] = id_and_order.first;
+        for (const auto& [order_id, order] : app->Orders()) {
+            if (auto col_order = std::dynamic_pointer_cast<ColonizeOrder>(order)) {
+                retval[col_order->PlanetID()] = order_id;
             }
         }
         return retval;
@@ -481,7 +565,7 @@ namespace {
 
     /** Returns map from planet ID to issued invasion orders affecting it. There
       * may be multiple ships invading a single planet. */
-    std::map<int, std::set<int>> PendingInvadeOrders() {
+    auto PendingInvadeOrders() {
         std::map<int, std::set<int>> retval;
         const ClientApp* app = ClientApp::GetApp();
         if (!app)
@@ -496,7 +580,7 @@ namespace {
 
     /** Returns map from planet ID to issued bombard orders affecting it. There
       * may be multiple ships bombarding a single planet. */
-    std::map<int, std::set<int>> PendingBombardOrders() {
+    auto PendingBombardOrders() {
         std::map<int, std::set<int>> retval;
         const ClientApp* app = ClientApp::GetApp();
         if (!app)
@@ -518,7 +602,12 @@ namespace {
   * one time in a SidePanel */
 class SidePanel::PlanetPanel : public GG::Control {
 public:
-    PlanetPanel(GG::X w, int planet_id, StarType star_type);
+    PlanetPanel(GG::X w, int planet_id, StarType star_type) :
+        GG::Control(GG::X0, GG::Y0, w, GG::Y1, GG::INTERACTIVE),
+        m_planet_id(planet_id),
+        m_star_type(star_type)
+    {}
+
     void CompleteConstruction() override;
 
     bool InWindow(GG::Pt pt) const override;
@@ -572,6 +661,7 @@ private:
     void DoLayout();
     void RefreshPlanetGraphic();
     void SetFocus(std::string focus); ///< set the focus of the planet to \a focus
+    void ClickAnnex();                ///< called if annex button is pressed
     void ClickColonize();             ///< called if colonize button is pressed
     void ClickInvade();               ///< called if invade button is pressed
     void ClickBombard();              ///< called if bombard button is pressed
@@ -581,13 +671,14 @@ private:
     int                                     m_planet_id = INVALID_OBJECT_ID;///< id for the planet with is represented by this planet panel
     std::shared_ptr<GG::TextControl>        m_planet_name;                  ///< planet name;
     std::shared_ptr<GG::Label>              m_env_size;                     ///< indicates size and planet environment rating uncolonized planets;
+    std::shared_ptr<GG::Button>             m_annex_button;                 ///< btn which can be pressed to annex this planet;
     std::shared_ptr<GG::Button>             m_colonize_button;              ///< btn which can be pressed to colonize this planet;
     std::shared_ptr<GG::Button>             m_invade_button;                ///< btn which can be pressed to invade this planet;
     std::shared_ptr<GG::Button>             m_bombard_button;               ///< btn which can be pressed to bombard this planet;
     std::shared_ptr<GG::DynamicGraphic>     m_planet_graphic;               ///< image of the planet (can be a frameset); this is now used only for asteroids;
     std::shared_ptr<GG::StaticGraphic>      m_planet_status_graphic;        ///< gives information about the planet status, like supply disconnection
     std::shared_ptr<RotatingPlanetControl>  m_rotating_planet_graphic;      ///< a realtime-rendered planet that rotates, with a textured surface mapped onto it
-    GG::Clr                                 m_empire_colour;                ///< colour to use for empire-specific highlighting.  set based on ownership of planet.
+    GG::Clr                                 m_empire_colour = GG::CLR_ZERO; ///< colour to use for empire-specific highlighting.  set based on ownership of planet.
     std::shared_ptr<GG::DropDownList>       m_focus_drop;                   ///< displays and allows selection of planetary focus;
     std::shared_ptr<PopulationPanel>        m_population_panel;             ///< contains info about population and health
     std::shared_ptr<ResourcePanel>          m_resource_panel;               ///< contains info about resources production and focus selection UI
@@ -597,7 +688,7 @@ private:
     StarType                                m_star_type = StarType::INVALID_STAR_TYPE;
     boost::signals2::scoped_connection      m_planet_connection;
     bool                                    m_selected = false;             ///< is this planet panel selected
-    bool                                    m_order_issuing_enabled = false;///< can orders be issues via this planet panel?
+    bool                                    m_order_issuing_enabled = true; ///< can orders be issues via this planet panel?
 };
 
 /** Container class that holds PlanetPanels.  Creates and destroys PlanetPanel
@@ -875,7 +966,11 @@ namespace {
         return retval;
     }
 
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
     const std::string EMPTY_STRING;
+#endif
 
     const std::string& GetPlanetSizeName(const Planet* planet) {
         if (!planet || planet->Size() == PlanetSize::SZ_ASTEROIDS || planet->Size() == PlanetSize::SZ_GASGIANT)
@@ -913,15 +1008,6 @@ namespace {
         return GG::Pt(GG::X(icon_size), GG::Y(icon_size));
     }
 }
-
-SidePanel::PlanetPanel::PlanetPanel(GG::X w, int planet_id, StarType star_type) :
-    GG::Control(GG::X0, GG::Y0, w, GG::Y1, GG::INTERACTIVE),
-    m_planet_id(planet_id),
-    m_empire_colour(GG::CLR_ZERO),
-    m_star_type(star_type),
-    m_selected(false),
-    m_order_issuing_enabled(true)
-{}
 
 void SidePanel::PlanetPanel::CompleteConstruction() {
     GG::Control::CompleteConstruction();
@@ -1016,6 +1102,9 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     m_env_size->MoveTo(GG::Pt(GG::X(MaxPlanetDiameter()), GG::Y0));
     AttachChild(m_env_size);
 
+    m_annex_button = Wnd::Create<CUIButton>(UserString("PL_ANNEX"));
+    m_annex_button ->LeftClickedSignal.connect(
+        boost::bind(&SidePanel::PlanetPanel::ClickAnnex, this));
 
     m_colonize_button = Wnd::Create<CUIButton>(UserString("PL_COLONIZE"));
     m_colonize_button->LeftClickedSignal.connect(
@@ -1057,6 +1146,11 @@ void SidePanel::PlanetPanel::DoLayout() {
         y += m_env_size->Height() + EDGE_PAD;
     }
 
+    if (m_annex_button && m_annex_button->Parent().get() == this) {
+        m_annex_button->MoveTo(GG::Pt(left, y));
+        m_annex_button->Resize(GG::Pt(GG::X(ClientUI::Pts()*15), m_annex_button->MinUsableSize().y));
+        y += m_annex_button->Height() + EDGE_PAD;
+    }
     if (m_colonize_button && m_colonize_button->Parent().get() == this) {
         m_colonize_button->MoveTo(GG::Pt(left, y));
         m_colonize_button->Resize(GG::Pt(GG::X(ClientUI::Pts()*15), m_colonize_button->MinUsableSize().y));
@@ -1547,6 +1641,7 @@ void SidePanel::PlanetPanel::Clear() {
     DetachChild(m_resource_panel);
     DetachChild(m_military_panel);
     DetachChild(m_buildings_panel);
+    DetachChild(m_annex_button);
     DetachChild(m_colonize_button);
     DetachChild(m_invade_button);
     DetachChild(m_bombard_button);
@@ -1557,19 +1652,21 @@ void SidePanel::PlanetPanel::Clear() {
 void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     Clear();
 
-    const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-
     Universe& u = context.ContextUniverse();
     ObjectMap& objects = context.ContextObjects(); // must be mutable to allow setting species and updating to estimate colonize button numbers
     const SpeciesManager& sm = context.species;
     const SupplyManager& supply = context.supply;
 
-    const auto planet = objects.get<const Planet>(m_planet_id);
+    const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const auto client_empire = context.GetEmpire(client_empire_id);
+    const auto* source_for_empire = client_empire->Source(context.ContextObjects()).get();
+
+
+    auto* planet = objects.getRaw<Planet>(m_planet_id); // not const to allow updates for meter estimates
     if (!planet) {
         RequirePreRender();
         return;
     }
-
 
     // set planet name, formatted to indicate presense of shipyards / homeworlds
 
@@ -1641,14 +1738,15 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     if (bombard_ships.empty())
         bombard_ships = AutomaticallyChosenBombardShips(m_planet_id, context);
 
-    std::string_view colony_ship_species_name = "";
-    if (selected_colony_ship)
-        colony_ship_species_name = selected_colony_ship->SpeciesName();
-    const float colony_ship_capacity{selected_colony_ship ? selected_colony_ship->ColonyCapacity(u) : 0.0f};
+    const std::string_view colony_ship_species_name = selected_colony_ship ? selected_colony_ship->SpeciesName() : std::string_view{""};
+    const float colony_ship_capacity = selected_colony_ship ? selected_colony_ship->ColonyCapacity(u) : 0.0f;
     const Species* colony_ship_species = context.species.GetSpecies(colony_ship_species_name);
-    PlanetEnvironment planet_env_for_colony_species = PlanetEnvironment::PE_UNINHABITABLE;
-    if (colony_ship_species)
-        planet_env_for_colony_species = colony_ship_species->GetPlanetEnvironment(planet->Type());
+    const PlanetEnvironment planet_env_for_colony_species = colony_ship_species ?
+        colony_ship_species->GetPlanetEnvironment(planet->Type()) : PlanetEnvironment::PE_UNINHABITABLE;
+
+    const auto& planet_species_name = planet->SpeciesName();
+    const Species* species = context.species.GetSpecies(planet_species_name); // may be nullptr
+    const auto* annexation_condition = species ? species->AnnexationCondition() : nullptr;
 
 
     // calculate truth tables for planet colonization and invasion
@@ -1667,14 +1765,30 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     const bool colonizable =      habitable && !populated && ( (!has_owner /*&& !shielded*/) || mine) && visible && !being_colonized;
     const bool can_colonize =     selected_colony_ship && (   (colonizable  && (colony_ship_capacity > 0.0f))
                                                            || (outpostable && (colony_ship_capacity == 0.0f)));
-
     const bool at_war_with_me =   !mine && (populated || (has_owner && context.ContextDiploStatus(client_empire_id, planet->Owner()) == DiplomaticStatus::DIPLO_WAR));
+
 
     const bool being_invaded =    planet->IsAboutToBeInvaded();
     const bool invadable =        at_war_with_me && !shielded && visible && !being_invaded && !invasion_ships.empty();
 
+
+    const bool being_annexed =    planet->IsAboutToBeAnnexed();
+    const auto annexability_test = [ac{annexation_condition}, &context, source_for_empire](const auto* planet)
+    { return ac && ac->EvalOne(ScriptingContext{source_for_empire, context}, planet); }; // ignores cost
+    const bool potentially_annexable = annexability_test(planet);
+    const auto this_planet_annexation_cost = PlanetAnnexationCost(planet, source_for_empire, context);
+    const double empire_annexations_cost = PendingAnnexationOrderCost(source_for_empire, context);
+    const double empire_adopted_policies_cost = client_empire->ThisTurnAdoptedPoliciesCost(context);
+    const double total_costs = empire_annexations_cost + empire_adopted_policies_cost + this_planet_annexation_cost;
+    const double available_ip = client_empire->ResourceStockpile(ResourceType::RE_INFLUENCE);
+    const bool annexation_affordable = total_costs <= available_ip;
+    const bool annexable =        !being_annexed && populated && !has_owner && !being_invaded && species && 
+                                  potentially_annexable && annexation_affordable;
+
+
     const bool being_bombarded =  planet->IsAboutToBeBombarded();
     const bool bombardable =      at_war_with_me && visible && !being_bombarded && !bombard_ships.empty();
+
 
     if (populated || SHOW_ALL_PLANET_PANELS) {
         AttachChild(m_population_panel);
@@ -1694,6 +1808,22 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
             m_military_panel->Refresh();
     }
 
+    if (annexable && m_annex_button) {
+        // show annex button, specifying cost
+        AttachChild(m_annex_button);
+
+        if (this_planet_annexation_cost == 0.0)
+            m_annex_button->SetText(UserString("PL_ANNEX_FREE"));
+        else
+            m_annex_button->SetText(boost::io::str(FlexibleFormat(UserString("PL_ANNEX")) %
+                                                   DoubleToString(this_planet_annexation_cost, 2, false)));
+
+    } else if (being_annexed && m_annex_button) {
+        // show cancel annexation button
+        AttachChild(m_annex_button);
+        m_annex_button->SetText(UserString("PL_CANCEL_ANNEX")); // TODO: indicate or tooltip indicating refundable IP?
+    }
+
     if (can_colonize) {
         // show colonize button; in case the chosen colony ship is not actually
         // selected, but has been chosen by AutomaticallyChosenColonyShip, determine
@@ -1705,7 +1835,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
 
         double planet_capacity;
         const std::pair<int, int> ship_id_planet_id{selected_colony_ship->ID(), m_planet_id};
-        auto pair_it = colony_projections.find(ship_id_planet_id);
+        const auto pair_it = colony_projections.find(ship_id_planet_id);
         if (pair_it != colony_projections.end()) {
             planet_capacity = pair_it->second;
 
@@ -1715,7 +1845,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
 
         } else {
             u.InhibitUniverseObjectSignals(true);
-            const auto orig_species{planet->SpeciesName()}; //want to store by value, not reference. should be just ""
+            const auto orig_species{planet_species_name}; //want to store by value, not reference. should be just ""
             const int orig_owner = planet->Owner();
             const float orig_initial_target_pop = planet->GetMeter(MeterType::METER_TARGET_POPULATION)->Initial();
             planet->SetOwner(client_empire_id);
@@ -1808,24 +1938,19 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
             m_bombard_button->SetText(UserString("PL_CANCEL_BOMBARD"));
     }
 
-    const auto* planet_raw = planet.get();
-    const std::string_view planet_species_name = planet_raw->SpeciesName();
-    std::string_view species_name = "";
-    if (!planet_species_name.empty())
-        species_name = planet_species_name;
-    else if (!colony_ship_species_name.empty())
-        species_name = colony_ship_species_name;
+    const std::string_view type_size_species_name =
+        !planet_species_name.empty() ? planet_species_name : colony_ship_species_name; // may be empty
 
     std::string env_size_text{
-        species_name.empty() ?
+        type_size_species_name.empty() ?
             boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE"))
-                           % GetPlanetSizeName(planet_raw)
-                           % GetPlanetTypeName(planet_raw)) :
+                           % GetPlanetSizeName(planet)
+                           % GetPlanetTypeName(planet)) :
             boost::io::str(FlexibleFormat(UserString("PL_TYPE_SIZE_ENV"))
-                           % GetPlanetSizeName(planet_raw)
-                           % GetPlanetTypeName(planet_raw)
-                           % GetPlanetEnvironmentName(planet_raw, species_name, context)
-                           % UserString(species_name))};
+                           % GetPlanetSizeName(planet)
+                           % GetPlanetTypeName(planet)
+                           % GetPlanetEnvironmentName(planet, type_size_species_name, context)
+                           % UserString(type_size_species_name))};
     m_env_size->SetText(std::move(env_size_text));
 
     if (!planet->SpeciesName().empty()) {
@@ -1952,7 +2077,6 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     ClearBrowseInfoWnd();
 
     if (client_empire_id != ALL_EMPIRES) {
-        const auto client_empire = context.GetEmpire(client_empire_id);
         const Visibility visibility = u.GetObjectVisibilityByEmpire(m_planet_id, client_empire_id);
         const auto& visibility_turn_map = u.GetObjectVisibilityTurnMapByEmpire(m_planet_id, client_empire_id);
         const float client_empire_detection_strength = client_empire->GetMeter("METER_DETECTION_STRENGTH")->Current();
@@ -2363,6 +2487,36 @@ namespace {
     }
 }
 
+void SidePanel::PlanetPanel::ClickAnnex() {
+    // order or cancel annexation, depending on whether it has previously
+    // been ordered
+
+    ScriptingContext context;
+    ObjectMap& objects{context.ContextObjects()};
+
+    auto planet = objects.get<Planet>(m_planet_id);
+    if (!planet || !m_order_issuing_enabled)
+        return;
+
+    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    if (empire_id == ALL_EMPIRES)
+        return;
+
+    const auto pending_annex_orders = PendingAnnexationOrders(context);
+    const auto it = std::find_if(pending_annex_orders.begin(), pending_annex_orders.end(),
+                                 [this](const auto& order_id_planet_id)
+                                 { return m_planet_id == order_id_planet_id.first; });
+    if (it != pending_annex_orders.end()) {
+        // cancel previous annex order for planet
+        GGHumanClientApp::GetApp()->Orders().RescindOrder(it->second, context);
+    } else {
+        GGHumanClientApp::GetApp()->Orders().IssueOrder(
+            std::make_shared<AnnexOrder>(empire_id, m_planet_id, context),
+            context);
+    }
+    OrderButtonChangedSignal(m_planet_id);
+}
+
 void SidePanel::PlanetPanel::ClickColonize() {
     // order or cancel colonization, depending on whether it has previously
     // been ordered
@@ -2534,6 +2688,7 @@ void SidePanel::PlanetPanel::FocusDropListSelectionChangedSlot(GG::DropDownList:
 void SidePanel::PlanetPanel::EnableOrderIssuing(bool enable) {
     m_order_issuing_enabled = enable;
 
+    m_annex_button->Disable(!enable);
     m_colonize_button->Disable(!enable);
     m_invade_button->Disable(!enable);
     m_bombard_button->Disable(!enable);

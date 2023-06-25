@@ -92,6 +92,7 @@ public:
     [[nodiscard]] bool        PolicyAvailable(std::string_view name) const;
     [[nodiscard]] bool        PolicyPrereqsAndExclusionsOK(std::string_view name, int current_turn) const;
     [[nodiscard]] bool        PolicyAffordable(std::string_view name, const ScriptingContext& context) const;
+    [[nodiscard]] double      ThisTurnAdoptedPoliciesCost(const ScriptingContext& context) const;
     [[nodiscard]] std::map<std::string_view, int, std::less<>> TotalPolicySlots() const; // how many total slots does this empire have in each category
     [[nodiscard]] std::map<std::string_view, int, std::less<>> EmptyPolicySlots() const; // how many empty slots does this empire have in each category
 
@@ -351,11 +352,13 @@ public:
       * the production queue (which determines how much PP each project receives
       * but does not actually spend them).  This function spends the PP, removes
       * complete items from the queue and creates the results in the universe. */
-    void CheckProductionProgress(ScriptingContext& context);
+    void CheckProductionProgress(
+        ScriptingContext& context, const std::vector<std::tuple<std::string_view, int, float, int>>& costs_times);
 
     /** Checks for tech projects that have been completed, and returns a vector
       * of the techs that should be added to the known techs list. */
-    std::vector<std::string> CheckResearchProgress(const ScriptingContext& context);
+    std::vector<std::string> CheckResearchProgress(
+        const ScriptingContext& context, const std::vector<std::tuple<std::string_view, double, int>>& costs_times);
 
     /** Eventually : Will check for social projects that have been completed and
       * / or process ongoing social projects, and update the empire's influence
@@ -380,24 +383,39 @@ public:
       * to spend.  Actual consumption of resources, removal of items from queue,
       * processing of finished items and population growth happens in various
       * Check(Whatever)Progress functions. */
-    void UpdateResourcePools(const ScriptingContext& context);
+    void UpdateResourcePools(const ScriptingContext& context,
+                             const std::vector<std::tuple<std::string_view, double, int>>& research_costs,
+                             const std::vector<std::pair<int, double>>& annex_costs,
+                             const std::vector<std::pair<std::string_view, double>>& policy_costs,
+                             const std::vector<std::tuple<std::string_view, int, float, int>>& prod_costs);
     /** Calls Update() on empire's research queue, which recalculates the RPs
       * spent on and number of turns left for each tech in the queue. */
-    void UpdateResearchQueue(const ScriptingContext& context);
+    void UpdateResearchQueue(const ScriptingContext& context,
+                             const std::vector<std::tuple<std::string_view, double, int>>& costs_times);
+    std::vector<std::tuple<std::string_view, double, int>> TechCostsTimes(const ScriptingContext& context) const;
+
     /** Calls Update() on empire's production queue, which recalculates the PPs
       * spent on and number of turns left for each project in the queue. */
-    void UpdateProductionQueue(const ScriptingContext& context);
+    void UpdateProductionQueue(const ScriptingContext& context,
+                               const std::vector<std::tuple<std::string_view, int, float, int>>& prod_costs);
     /** Eventually: Calls appropriate subsystem Update to calculate influence
       * spent on social projects and maintenance of buildings.  Later call to
       * CheckInfluenceProgress() will then have the correct allocations of
       * influence. */
-    void UpdateInfluenceSpending(const ScriptingContext& context);
+    std::vector<std::tuple<std::string_view, int, float, int>> ProductionCostsTimes(const ScriptingContext& contest) const;
+
+    void UpdateInfluenceSpending(const ScriptingContext& context,
+                                 const std::vector<std::pair<int, double>>& annex_costs,
+                                 const std::vector<std::pair<std::string_view, double>>& policy_costs);
     /** Has m_population_pool recalculate all PopCenters' and empire's total
       * expected population growth */
+    std::vector<std::pair<int, double>> PlanetAnnexationCosts(const ScriptingContext& context) const;
+    std::vector<std::pair<std::string_view, double>> PolicyAdoptionCosts(const ScriptingContext& context) const;
+
     void UpdatePopulationGrowth(const ObjectMap& objects);
 
     /** Resets empire meters. */
-    void ResetMeters();
+    void ResetMeters() noexcept;
 
     void UpdateOwnedObjectCounters(const Universe& universe);
 
@@ -466,7 +484,7 @@ private:
 
     struct PolicyAdoptionInfo {
         PolicyAdoptionInfo() = default;
-        PolicyAdoptionInfo(int turn, std::string cat, int slot) :
+        PolicyAdoptionInfo(int turn, std::string cat, int slot) noexcept :
             adoption_turn(turn),
             slot_in_category(slot),
             category(std::move(cat))
@@ -476,7 +494,7 @@ private:
         int slot_in_category = INVALID_SLOT_INDEX;
         std::string category;
 
-        bool operator==(const PolicyAdoptionInfo& rhs) const {
+        bool operator==(const PolicyAdoptionInfo& rhs) const noexcept {
             return adoption_turn == rhs.adoption_turn &&
                    slot_in_category == rhs.slot_in_category &&
                    category != rhs.category;
@@ -502,7 +520,7 @@ private:
     MeterMap                        m_meters;                   ///< empire meters
 
     ResearchQueue                   m_research_queue;           ///< the queue of techs being or waiting to be researched
-    std::map<std::string, float>    m_research_progress;        ///< progress of partially-researched techs; fully researched techs are removed
+    std::map<std::string, float>    m_research_progress;        ///< fractional progress (0 to 1) of partially-researched techs; fully researched techs are removed
 
     ProductionQueue                 m_production_queue;         ///< the queue of items being or waiting to be built
     InfluenceQueue                  m_influence_queue;

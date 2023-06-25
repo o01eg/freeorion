@@ -25,7 +25,7 @@ namespace {
     constexpr float HIGH_TILT_THERESHOLD = 45.0f;
     constexpr double MINIMUM_POP_CENTER_POPULATION = 0.01001;  // rounds up to 0.1 when showing 2 digits, down to 0.05 or 50.0 when showing 3
 
-    float SizeRotationFactor(PlanetSize size) {
+    constexpr inline float SizeRotationFactor(PlanetSize size) noexcept {
         switch (size) {
         case PlanetSize::SZ_TINY:     return 1.5f;
         case PlanetSize::SZ_SMALL:    return 1.25f;
@@ -37,10 +37,14 @@ namespace {
         }
     }
 
-    static const std::string EMPTY_STRING;
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
+    const std::string EMPTY_STRING;
+#endif
 
     /** @content_tag{CTRL_STAT_SKIP_DEPOP} Do not count Planets with this tag for SpeciesPlanetsDepoped stat */
-    const std::string TAG_STAT_SKIP_DEPOP = "CTRL_STAT_SKIP_DEPOP";
+    constexpr std::string_view TAG_STAT_SKIP_DEPOP = "CTRL_STAT_SKIP_DEPOP";
 }
 
 
@@ -112,6 +116,7 @@ void Planet::Copy(const Planet& copied_planet, const Universe& universe, int emp
         this->m_axial_tilt =                copied_planet.m_axial_tilt;
         this->m_turn_last_conquered =       copied_planet.m_turn_last_conquered;
         this->m_turn_last_colonized =       copied_planet.m_turn_last_colonized;
+        this->m_turn_last_annexed =         copied_planet.m_turn_last_annexed;
 
         if (vis >= Visibility::VIS_PARTIAL_VISIBILITY) {
             this->m_species_name =                          copied_planet.m_species_name;
@@ -119,13 +124,18 @@ void Planet::Copy(const Planet& copied_planet, const Universe& universe, int emp
             this->m_last_turn_focus_changed =               copied_planet.m_last_turn_focus_changed;
             this->m_focus_turn_initial =                    copied_planet.m_focus_turn_initial;
             this->m_last_turn_focus_changed_turn_initial =  copied_planet.m_last_turn_focus_changed_turn_initial;
+            this->m_last_turn_attacked_by_ship =            copied_planet.m_last_turn_attacked_by_ship;
+            this->m_ordered_annexed_by_empire_id =          copied_planet.m_ordered_annexed_by_empire_id;
+            this->m_is_about_to_be_colonized =              copied_planet.m_is_about_to_be_colonized;
+            this->m_is_about_to_be_invaded =                copied_planet.m_is_about_to_be_invaded;
+            this->m_is_about_to_be_bombarded =              copied_planet.m_is_about_to_be_bombarded;
+            this->m_owner_before_last_conquered =           copied_planet.m_owner_before_last_conquered;
+            this->m_last_invaded_by_empire_id =             copied_planet.m_last_invaded_by_empire_id;
+            this->m_last_colonized_by_empire_id =           copied_planet.m_last_colonized_by_empire_id;
 
             if (vis >= Visibility::VIS_FULL_VISIBILITY) {
-                this->m_is_about_to_be_colonized =  copied_planet.m_is_about_to_be_colonized;
-                this->m_is_about_to_be_invaded   =  copied_planet.m_is_about_to_be_invaded;
-                this->m_is_about_to_be_bombarded =  copied_planet.m_is_about_to_be_bombarded;
-                this->m_ordered_given_to_empire_id =copied_planet.m_ordered_given_to_empire_id;
-                this->m_last_turn_attacked_by_ship= copied_planet.m_last_turn_attacked_by_ship;
+                this->m_ordered_given_to_empire_id = copied_planet.m_ordered_given_to_empire_id;
+
             } else {
                 // copy system name if at partial visibility, as it won't be copied
                 // by UniverseObject::Copy unless at full visibility, but players
@@ -155,7 +165,7 @@ bool Planet::HostileToEmpire(int empire_id, const EmpireManager& empires) const 
 
 UniverseObject::TagVecs Planet::Tags(const ScriptingContext& context) const {
     if (const Species* species = context.species.GetSpecies(SpeciesName()))
-        return species->Tags();
+        return TagVecs{species->Tags()};
     return {};
 }
 
@@ -181,18 +191,27 @@ std::string Planet::Dump(uint8_t ntabs) const {
         ++it;
         retval.append(std::to_string(building_id)).append(it == m_buildings.end() ? "" : ", ");
     }
+    if (m_ordered_annexed_by_empire_id != ALL_EMPIRES)
+        retval.append(" (About to be Annexed by ").append(std::to_string(m_ordered_annexed_by_empire_id)).append(")");
     if (m_is_about_to_be_colonized)
         retval.append(" (About to be Colonized)");
     if (m_is_about_to_be_invaded)
         retval.append(" (About to be Invaded)");
 
-    retval.append(" colonized on turn: ").append(std::to_string(m_turn_last_colonized))
-          .append(" conquered on turn: ").append(std::to_string(m_turn_last_conquered));
+    retval.append(" annexed on turn: ").append(std::to_string(m_turn_last_annexed))
+          .append(" colonized on turn: ").append(std::to_string(m_turn_last_colonized))
+          .append(" conquered on turn: ").append(std::to_string(m_turn_last_conquered))
+          .append(" owner before being conquered: ").append(std::to_string(m_owner_before_last_conquered))
+          .append(" last invaded by: ").append(std::to_string(m_last_invaded_by_empire_id))
+          .append(" last colonized by: ").append(std::to_string(m_last_colonized_by_empire_id));
+
     if (m_is_about_to_be_bombarded)
         retval.append(" (About to be Bombarded)");
+
     if (m_ordered_given_to_empire_id != ALL_EMPIRES)
         retval.append(" (Ordered to be given to empire with id: ")
               .append(std::to_string(m_ordered_given_to_empire_id)).append(")");
+
     retval.append(" last attacked on turn: ").append(std::to_string(m_last_turn_attacked_by_ship));
 
     return retval;
@@ -566,9 +585,7 @@ std::vector<std::string_view> Planet::AvailableFoci(const ScriptingContext& cont
     return retval;
 }
 
-const std::string& Planet::FocusIcon(std::string_view focus_name,
-                                     const ScriptingContext& context) const
-{
+const std::string& Planet::FocusIcon(std::string_view focus_name, const ScriptingContext& context) const {
     if (const Species* species = context.species.GetSpecies(this->SpeciesName())) {
         for (const FocusType& focus_type : species->Foci()) {
             if (focus_type.Name() == focus_name)
@@ -591,6 +608,24 @@ std::map<int, double> Planet::EmpireGroundCombatForces() const {
     return empire_troops;
 }
 
+double Planet::AnnexationCost(int empire_id, const ScriptingContext& context) const {
+    if (m_species_name.empty())
+        return 0.0;
+    const auto* species = context.species.GetSpecies(m_species_name);
+    if (!species)
+        return 0.0;
+    const auto* ac = species->AnnexationCost();
+    if (!ac)
+        return 0.0;
+    if (ac->ConstantExpr())
+        return ac->Eval();
+
+    const auto* source_for_empire = context.Empires().GetSource(empire_id, context.ContextObjects()).get();
+    ScriptingContext source_planet_context{source_for_empire, context};
+    source_planet_context.condition_local_candidate = this;
+    return ac->Eval(source_planet_context);
+}
+
 int Planet::TurnsSinceColonization(int current_turn) const {
     if (m_turn_last_colonized == INVALID_GAME_TURN)
         return 0;
@@ -606,6 +641,15 @@ int Planet::TurnsSinceLastConquered(int current_turn) const {
         return 0;
     return current_turn - m_turn_last_conquered;
 }
+
+int Planet::TurnsSinceLastAnnexed(int current_turn) const {
+    if (m_turn_last_annexed == INVALID_GAME_TURN)
+        return 0;
+    if (current_turn == INVALID_GAME_TURN)
+        return 0;
+    return current_turn - m_turn_last_annexed;
+}
+
 
 void Planet::SetType(PlanetType type) {
     if (type <= PlanetType::INVALID_PLANET_TYPE)
@@ -690,20 +734,23 @@ void Planet::Reset(ObjectMap& objects) {
     GetMeter(MeterType::METER_DETECTION)->Reset();
     GetMeter(MeterType::METER_REBEL_TROOPS)->Reset();
 
-    if (m_is_about_to_be_colonized && !OwnedBy(ALL_EMPIRES)) {
-        for (const auto& building : objects.find<Building>(m_buildings)) {
-            if (!building)
-                continue;
-            building->Reset();
+    if (m_is_about_to_be_colonized) {
+        for (auto* building : objects.findRaw<Building>(m_buildings)) {
+            if (building)
+                building->Reset();
         }
     }
 
+    //m_last_turn_annexed left unchanged
     //m_turn_last_colonized left unchanged
     //m_turn_last_conquered left unchanged
+    m_ordered_annexed_by_empire_id = ALL_EMPIRES;
     m_is_about_to_be_colonized = false;
     m_is_about_to_be_invaded = false;
     m_is_about_to_be_bombarded = false;
     m_ordered_given_to_empire_id = ALL_EMPIRES;
+    m_last_invaded_by_empire_id = ALL_EMPIRES;
+    m_last_colonized_by_empire_id = ALL_EMPIRES;
     SetOwner(ALL_EMPIRES);
 }
 
@@ -720,6 +767,7 @@ void Planet::Depopulate(int current_turn) {
 
 void Planet::Conquer(int conquerer, ScriptingContext& context) {
     m_turn_last_conquered = context.current_turn;
+    m_owner_before_last_conquered = this->Owner();
 
     // deal with things on production queue located at this planet
     Empire::ConquerProductionQueueItemsAtLocation(ID(), conquerer, context.Empires());
@@ -753,6 +801,7 @@ void Planet::Conquer(int conquerer, ScriptingContext& context) {
 
     // replace ownership
     SetOwner(conquerer);
+    m_last_invaded_by_empire_id = conquerer;
     ClearGiveToEmpire();
 
     if (conquerer == ALL_EMPIRES) {
@@ -871,10 +920,12 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
                 continue;
             building->Reset();
         }
+        m_ordered_annexed_by_empire_id = ALL_EMPIRES;
         m_is_about_to_be_colonized = false;
         m_is_about_to_be_invaded = false;
         m_is_about_to_be_bombarded = false;
         m_ordered_given_to_empire_id = ALL_EMPIRES;
+        m_last_invaded_by_empire_id = ALL_EMPIRES;
         SetOwner(ALL_EMPIRES);
     }
 
@@ -912,6 +963,7 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
 
     // set specified empire as owner
     SetOwner(empire_id);
+    m_last_colonized_by_empire_id = empire_id;
 
     // if there are buildings on the planet, set the specified empire as their owner too
     for (auto* building : objects.findRaw<Building>(BuildingIDs()))
@@ -919,6 +971,18 @@ bool Planet::Colonize(int empire_id, std::string species_name, double population
 
     return true;
 }
+
+void Planet::SetIsOrderAnnexedByEmpire(int empire_id) {
+    const auto initial_empire = m_ordered_annexed_by_empire_id;
+    if (empire_id == initial_empire)
+        return;
+
+    m_ordered_annexed_by_empire_id = empire_id;
+    StateChangedSignal();
+}
+
+void Planet::ResetBeingAnnxed()
+{ SetIsOrderAnnexedByEmpire(ALL_EMPIRES); }
 
 void Planet::SetIsAboutToBeColonized(bool b) {
     bool initial_status = m_is_about_to_be_colonized;
@@ -930,6 +994,20 @@ void Planet::SetIsAboutToBeColonized(bool b) {
 void Planet::ResetIsAboutToBeColonized()
 { SetIsAboutToBeColonized(false); }
 
+void Planet::SetLastColonizedByEmpire(int id) {
+    const auto initial_empire_id = m_last_colonized_by_empire_id;
+    if (initial_empire_id == id) return;
+    m_last_colonized_by_empire_id = id;
+    StateChangedSignal();
+}
+
+void Planet::SetTurnLastColonized(int turn) {
+    const auto initial_turn = m_turn_last_colonized;
+    if (initial_turn == turn) return;
+    m_turn_last_colonized = turn;
+    StateChangedSignal();
+}
+
 void Planet::SetIsAboutToBeInvaded(bool b) {
     bool initial_status = m_is_about_to_be_invaded;
     if (b == initial_status) return;
@@ -939,6 +1017,13 @@ void Planet::SetIsAboutToBeInvaded(bool b) {
 
 void Planet::ResetIsAboutToBeInvaded()
 { SetIsAboutToBeInvaded(false); }
+
+void Planet::SetLastInvadedByEmpire(int id) {
+    const auto initial_empire_id = m_last_invaded_by_empire_id;
+    if (initial_empire_id == id) return;
+    m_last_invaded_by_empire_id = id;
+    StateChangedSignal();
+}
 
 void Planet::SetIsAboutToBeBombarded(bool b) {
     bool initial_status = m_is_about_to_be_bombarded;
@@ -960,8 +1045,11 @@ void Planet::SetGiveToEmpire(int empire_id) {
 void Planet::ClearGiveToEmpire()
 { SetGiveToEmpire(ALL_EMPIRES); }
 
-void Planet::SetLastTurnAttackedByShip(int turn)
+void Planet::SetLastTurnAttackedByShip(int turn) noexcept
 { m_last_turn_attacked_by_ship = turn; }
+
+void Planet::SetLastTurnAnnexed(int turn) noexcept
+{ m_turn_last_annexed = turn; }
 
 void Planet::SetSurfaceTexture(const std::string& texture) {
     m_surface_texture = texture;
@@ -1051,12 +1139,13 @@ void Planet::ClampMeters() {
 
 namespace {
     // sorted pair, so order of empire IDs specified doesn't matter
-    std::pair<int, int> DiploKey(int id1, int ind2)
+    constexpr std::pair<int, int> DiploKey(int id1, int ind2)
+        noexcept(noexcept(std::max(1, -3)) && noexcept(std::min(-124, 0)))
     { return {std::max(id1, ind2), std::min(id1, ind2)}; }
 }
 
 void Planet::ResolveGroundCombat(std::map<int, double>& empires_troops,
-                                 const EmpireManager::DiploStatusMap& diplo_statuses)
+                                 const DiploStatusMap& diplo_statuses)
 {
     if (empires_troops.empty() || empires_troops.size() == 1)
         return;
@@ -1079,22 +1168,21 @@ void Planet::ResolveGroundCombat(std::map<int, double>& empires_troops,
     for (const auto& entry : effective_empires_troops)
         inverted_empires_troops.emplace(entry.second, entry.first);
 
-    int victor_id;
-    float victor_effective_troops;
-    std::tie(victor_effective_troops, victor_id) = *inverted_empires_troops.rbegin();
+    const auto [victor_self_troops, victor_id] = *inverted_empires_troops.rbegin();
+    static_assert(std::is_integral_v<decltype(victor_id)>);
 
 
     // victor has effective troops reduced by the effective troop count of
     // the strongest enemy combatant (allied and at-peace co-combatants are
     // ignored for this reduction)
-    float highest_loser_enemy_effective_troops = 0.0f;
+    double highest_loser_enemy_effective_troops = 0.0f;
     for (auto highest_loser_it = inverted_empires_troops.rbegin();
          highest_loser_it != inverted_empires_troops.rend(); ++highest_loser_it)
     {
         const auto [loser_effective_troops, loser_id] = *highest_loser_it;
         if (loser_id == victor_id)
             continue;
-        auto it = diplo_statuses.find(DiploKey(loser_id, victor_id));
+        const auto it = diplo_statuses.find(DiploKey(loser_id, victor_id));
         if (it != diplo_statuses.end() && it->second == DiplomaticStatus::DIPLO_PEACE)
             continue;
 
@@ -1103,8 +1191,8 @@ void Planet::ResolveGroundCombat(std::map<int, double>& empires_troops,
         break;
     }
 
-    victor_effective_troops -= highest_loser_enemy_effective_troops;
-    float victor_starting_troops = empires_troops[victor_id];
+    const auto victor_effective_troops = victor_self_troops - highest_loser_enemy_effective_troops;
+    const auto victor_starting_troops = empires_troops[victor_id];
 
     // every other combatant loses all troops
     empires_troops.clear();

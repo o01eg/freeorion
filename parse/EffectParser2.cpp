@@ -126,22 +126,27 @@ namespace parse { namespace detail {
             ;
 
         set_species_opinion
-            =    tok.SetSpeciesOpinion_
+            = (
+                (tok.SetSpeciesOpinion_ [ _d = false ]) |
+                (tok.SetSpeciesTargetOpinion_ [ _d = true ])
+              )
             >    label(tok.species_) >   string_grammar [ _a = _1 ]
             > (
                 (   label(tok.empire_) >  int_rules.expr [ _c = _1 ]
-                    >  label(tok.opinion_) > double_rules.expr
+                 >  label(tok.opinion_) > double_rules.expr
                     [ _val = construct_movable_(new_<Effect::SetSpeciesEmpireOpinion>(
                             deconstruct_movable_(_a, _pass),
                             deconstruct_movable_(_c, _pass),
-                            deconstruct_movable_(_1, _pass))) ])
+                            deconstruct_movable_(_1, _pass),
+                            _d)) ])
                 |
                 (   label(tok.species_) > string_grammar [ _b = _1 ]
-                    >   label(tok.opinion_) > double_rules.expr
+                 >  label(tok.opinion_) > double_rules.expr
                     [ _val = construct_movable_(new_<Effect::SetSpeciesSpeciesOpinion>(
                             deconstruct_movable_(_a, _pass),
                             deconstruct_movable_(_b, _pass),
-                            deconstruct_movable_(_1, _pass))) ])
+                            deconstruct_movable_(_1, _pass),
+                            _d)) ])
             )
             ;
 

@@ -1,4 +1,5 @@
 from common.misc import PLANET_DEFENSE_FACTOR, PLANET_SHIELD_FACTOR
+from species.common.empire_opinions import COMMON_OPINION_EFFECTS
 from species.common.env import RADIATED_STANDARD_EP
 from species.common.focus import (
     HAS_ADVANCED_FOCI,
@@ -64,9 +65,18 @@ Species(
         *GREAT_STOCKPILE,
         *AVERAGE_POPULATION,
         *AVERAGE_HAPPINESS,
+        COMMON_OPINION_EFFECTS("SP_ACIREMA"),
         *GREAT_SUPPLY,
         *AVERAGE_DEFENSE_TROOPS,
         # not for description
+        EffectsGroup(
+            scope=IsSource,
+            activation=Turn(low=1, high=1),
+            effects=[
+                CreateBuilding(type="BLD_SHIPYARD_BASE"),
+                CreateBuilding(type="BLD_SHIPYARD_ENRG_COMP"),
+            ],
+        ),
         EffectsGroup(
             scope=IsSource,
             activation=Planet()

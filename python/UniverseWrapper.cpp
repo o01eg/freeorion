@@ -97,7 +97,7 @@ namespace {
         auto it = species_homeworlds.find(species.Name());
         if (it == species_homeworlds.end())
             return {};
-        return it->second;
+        return {it->second.begin(), it->second.end()};
     }
 
     void UpdateMetersWrapper(Universe& universe, const py::object&)
@@ -731,13 +731,16 @@ namespace FreeOrionPython {
             .add_property("counterClockwiseNextPlanetType", &Planet::CounterClockwiseNextPlanetType)
             .add_property("nextLargerPlanetSize",           &Planet::NextLargerPlanetSize)
             .add_property("nextSmallerPlanetSize",          &Planet::NextSmallerPlanetSize)
-            .add_property("OrbitalPeriod",                  &Planet::OrbitalPeriod)
-            .add_property("InitialOrbitalPosition",         &Planet::InitialOrbitalPosition)
+            .add_property("orbitalPeriod",                  &Planet::OrbitalPeriod)
+            .add_property("initialOrbitalPosition",         &Planet::InitialOrbitalPosition)
             .def("OrbitalPositionOnTurn",                   &Planet::OrbitalPositionOnTurn)
-            .add_property("RotationalPeriod",               &Planet::RotationalPeriod)
-            .add_property("LastTurnAttackedByShip",         &Planet::LastTurnAttackedByShip)
-            .add_property("LastTurnColonized",              &Planet::LastTurnColonized)
-            .add_property("LastTurnConquered",              &Planet::LastTurnConquered)
+            .add_property("rotationalPeriod",               &Planet::RotationalPeriod)
+            .add_property("lastTurnAttackedByShip",         &Planet::LastTurnAttackedByShip)
+            .add_property("lastTurnColonized",              &Planet::LastTurnColonized)
+            .add_property("lastTurnConquered",              &Planet::LastTurnConquered)
+            .add_property("ownerBeforeLastConquered",       &Planet::OwnerBeforeLastConquered)
+            .add_property("lastInvadedByEmpire",            &Planet::LastInvadedByEmpire)
+            .add_property("lastColonizedByEmpire",          &Planet::LastColonizedByEmpire)
             .add_property("buildingIDs",                    +[](const Planet& planet) { return ToVec(planet.BuildingIDs()); })
             .add_property("habitableSize",                  &Planet::HabitableSize)
         ;
@@ -802,7 +805,7 @@ namespace FreeOrionPython {
         py::class_<Species, boost::noncopyable>("species", py::no_init)
             .add_property("name",               make_function(&Species::Name,           py::return_value_policy<py::copy_const_reference>()))
             .add_property("description",        make_function(&Species::Description,    py::return_value_policy<py::copy_const_reference>()))
-            .add_property("homeworlds",         &SpeciesHomeworlds)
+            .add_property("homeworlds",         &SpeciesHomeworlds) // TODO: SpeciesManager::SpeciesShipsDestroyed, GetSpeciesEmpireOpinionsMap, GetSpeciesSpeciesOpinionsMap
             .add_property("foci",               &SpeciesFoci)
             .add_property("preferredFocus",     make_function(&Species::DefaultFocus,   py::return_value_policy<py::copy_const_reference>()))
             .add_property("canColonize",        make_function(&Species::CanColonize,    py::return_value_policy<py::return_by_value>()))

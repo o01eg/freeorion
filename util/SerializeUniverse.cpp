@@ -10,7 +10,6 @@
 #include "../universe/Ship.h"
 #include "../universe/Planet.h"
 #include "../universe/ShipDesign.h"
-#include "../universe/Species.h"
 #include "../universe/System.h"
 #include "../universe/Field.h"
 #include "../universe/Universe.h"
@@ -296,12 +295,7 @@ namespace {
         "ful", "shd", "str", "def", "sup", "sto", "trp", // unpaired meters
         "reb", "siz", "slt", "det", "spd",
         "num"}; // num meter types
-    static_assert([]() -> bool {
-        for (const auto& tag : tags)
-            if (tag.size() != 3)
-                return false;
-        return true;
-    }());
+    static_assert(std::all_of(tags.begin(), tags.end(), [](const auto tag) { return tag.size() == 3; }));
 
     constexpr std::string_view MeterTypeTag(MeterType mt) {
         using mt_under = std::underlying_type_t<MeterType>;
@@ -662,7 +656,7 @@ void serialize(Archive& ar, UniverseObject& o, unsigned int const version)
 
 namespace {
     template <integral T>
-    constexpr std::size_t Digits(T t) {
+    consteval std::size_t Digits(T t) {
         if constexpr (std::is_same_v<T, bool>) {
             return 5u; // for "false"
 
@@ -904,6 +898,13 @@ void serialize(Archive& ar, Planet& obj, unsigned int const version)
     } else {
         Serialize(ar, "m_buildings", obj.m_buildings);
     }
+    if (Archive::is_loading::value && version < 6) {
+        obj.m_turn_last_annexed = INVALID_GAME_TURN;
+        obj.m_ordered_annexed_by_empire_id = ALL_EMPIRES;
+    } else {
+        ar  & make_nvp("m_turn_last_annexed", obj.m_turn_last_annexed)
+            & make_nvp("m_ordered_annexed_by_empire_id", obj.m_ordered_annexed_by_empire_id);
+    }
     ar  & make_nvp("m_turn_last_colonized", obj.m_turn_last_colonized);
     ar  & make_nvp("m_turn_last_conquered", obj.m_turn_last_conquered);
     ar  & make_nvp("m_is_about_to_be_colonized", obj.m_is_about_to_be_colonized)
@@ -911,10 +912,25 @@ void serialize(Archive& ar, Planet& obj, unsigned int const version)
         & make_nvp("m_is_about_to_be_bombarded", obj.m_is_about_to_be_bombarded)
         & make_nvp("m_ordered_given_to_empire_id", obj.m_ordered_given_to_empire_id)
         & make_nvp("m_last_turn_attacked_by_ship", obj.m_last_turn_attacked_by_ship);
+    if (Archive::is_loading::value && version < 7) {
+        obj.m_owner_before_last_conquered = obj.Owner();
+    } else {
+        ar  & make_nvp("m_owner_before_last_conquered", obj.m_owner_before_last_conquered);
+    }
+    if (Archive::is_loading::value && version < 8) {
+        obj.m_last_invaded_by_empire_id = ALL_EMPIRES;
+    } else {
+        ar  & make_nvp("m_last_invaded_by_empire_id", obj.m_last_invaded_by_empire_id);
+    }
+    if (Archive::is_loading::value && version < 9) {
+        obj.m_last_colonized_by_empire_id = ALL_EMPIRES;
+    } else {
+        ar  & make_nvp("m_last_colonized_by_empire_id", obj.m_last_colonized_by_empire_id);
+    }
 }
 
 BOOST_CLASS_EXPORT(Planet)
-BOOST_CLASS_VERSION(Planet, 5)
+BOOST_CLASS_VERSION(Planet, 9)
 
 
 template <typename Archive>
@@ -1045,50 +1061,6 @@ void serialize(Archive& ar, ShipDesign& obj, unsigned int const version)
 
 BOOST_CLASS_EXPORT(ShipDesign)
 BOOST_CLASS_VERSION(ShipDesign, 2)
-
-
-template <typename Archive>
-void serialize(Archive& ar, SpeciesManager& sm, unsigned int const version)
-{
-    // Don't need to send all the data about species, as this is derived from
-    // content data files in scripting/species that should be available to any
-    // client or server.  Instead, just need to send the gamestate portion of
-    // species: their homeworlds in the current game, and their opinions of
-    // empires and eachother
-
-    std::map<std::string, std::set<int>>                species_homeworlds;
-    std::map<std::string, std::map<int, float>>         empire_opinions;
-    std::map<std::string, std::map<std::string, float>> other_species_opinions;
-    std::map<std::string, std::map<int, float>>         species_object_populations;
-    std::map<std::string, std::map<std::string, int>>   species_ships_destroyed;
-
-    if constexpr (Archive::is_saving::value) {
-        species_homeworlds = sm.GetSpeciesHomeworldsMap();
-        empire_opinions = sm.GetSpeciesEmpireOpinionsMap();
-        other_species_opinions = sm.GetSpeciesSpeciesOpinionsMap();
-        species_object_populations = sm.SpeciesObjectPopulations();
-        species_ships_destroyed = sm.SpeciesShipsDestroyed();
-    }
-
-    ar  & BOOST_SERIALIZATION_NVP(species_homeworlds)
-        & BOOST_SERIALIZATION_NVP(empire_opinions)
-        & BOOST_SERIALIZATION_NVP(other_species_opinions)
-        & BOOST_SERIALIZATION_NVP(species_object_populations)
-        & BOOST_SERIALIZATION_NVP(species_ships_destroyed);
-
-    if constexpr (Archive::is_loading::value) {
-        sm.SetSpeciesHomeworlds(std::move(species_homeworlds));
-        sm.SetSpeciesEmpireOpinions(std::move(empire_opinions));
-        sm.SetSpeciesSpeciesOpinions(std::move(other_species_opinions));
-        sm.SetSpeciesObjectPopulations(std::move(species_object_populations));
-        sm.SetSpeciesShipsDestroyed(std::move(species_ships_destroyed));
-    }
-}
-
-template void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, SpeciesManager&, unsigned int const);
-template void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive&, SpeciesManager&, unsigned int const);
-template void serialize<freeorion_bin_iarchive>(freeorion_bin_iarchive&, SpeciesManager&, unsigned int const);
-template void serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, SpeciesManager&, unsigned int const);
 
 template <typename Archive>
 void Serialize(Archive& oa, const Universe& universe)

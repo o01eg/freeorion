@@ -518,17 +518,6 @@ void Universe::ResetAllObjectMeters(bool target_max_unpaired, bool active) {
     }
 }
 
-void Universe::ResetObjectMeters(const std::vector<std::shared_ptr<UniverseObject>>& objects,
-                                 bool target_max_unpaired, bool active)
-{
-    for (const auto& object : objects) {
-        if (target_max_unpaired)
-            object->ResetTargetMaxUnpairedMeters();
-        if (active)
-            object->ResetPairedActiveMeters();
-    }
-}
-
 void Universe::ApplyAllEffectsAndUpdateMeters(ScriptingContext& context, bool do_accounting) {
     CheckContextVsThisUniverse(*this, context);
     ScopedTimer timer("Universe::ApplyAllEffectsAndUpdateMeters");
@@ -556,8 +545,10 @@ void Universe::ApplyAllEffectsAndUpdateMeters(ScriptingContext& context, bool do
         (void)empire_id;    // quieting unused variable warning
         empire->ResetMeters();
     }
+    context.species.ResetSpeciesOpinions(true, true);
 
     ExecuteEffects(source_effects_targets_causes, context, do_accounting, false, false, true);
+
     // clamp max meters to [DEFAULT_VALUE, LARGE_VALUE] and current meters to [DEFAULT_VALUE, max]
     // clamp max and target meters to [DEFAULT_VALUE, LARGE_VALUE] and current meters to [DEFAULT_VALUE, max]
     for (const auto& object : context.ContextObjects().allRaw())
@@ -587,10 +578,13 @@ void Universe::ApplyMeterEffectsAndUpdateMeters(const std::vector<int>& object_i
     // value can be calculated (by accumulating all effects' modifications this
     // turn) and active meters have the proper baseline from which to
     // accumulate changes from effects
-    ResetObjectMeters(objects, true, true);
-    // could also reset empire meters here, but unless all objects have meters
-    // recalculated, some targets that lead to empire meters being modified may
-    // be missed, and estimated empire meters would be inaccurate
+    for (const auto& object : context.ContextObjects().findRaw(object_ids)) {
+        object->ResetTargetMaxUnpairedMeters();
+        object->ResetPairedActiveMeters();
+    }
+    // could also reset empire and species meters here, but unless all objects
+    // have meters recalculated, some targets that lead to empire meters being
+    // modified may be missed, and estimated empire meters would be inaccurate
 
     ExecuteEffects(source_effects_targets_causes, context, do_accounting, true);
 
@@ -624,6 +618,8 @@ void Universe::ApplyMeterEffectsAndUpdateMeters(ScriptingContext& context, bool 
         (void)empire_id;    // quieting unused variable warning
         empire->ResetMeters();
     }
+    context.species.ResetSpeciesOpinions(true, true);
+
     ExecuteEffects(source_effects_targets_causes, context, do_accounting, true, false, true);
 
     for (const auto& object : context.ContextObjects().allRaw())
@@ -836,7 +832,8 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
     ObjectMap& objects{*m_objects};
 
     auto number_text = std::to_string(objects_vec.empty() ?
-                                      objects.allExisting().size() : objects_vec.size());
+                                      objects.allExisting().size() : objects_vec.size()) + 
+        (objects_vec.empty() ? " (all)" : "");
     ScopedTimer timer("Universe::UpdateMeterEstimatesImpl on " + number_text + " objects", true);
 
 
@@ -860,6 +857,7 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
         obj->ResetTargetMaxUnpairedMeters();
         obj->ResetPairedActiveMeters();
     }
+    context.species.ResetSpeciesOpinions(true, true);
 
     if (do_accounting) {
         for (auto& obj : object_ptrs) {
@@ -1067,12 +1065,11 @@ namespace {
     /** Collect info for scope condition evaluations and dispatch those
       * evaluations to \a thread_pool. Not thread-safe, but the individual
       * condition evaluations should be safe to evaluate in parallel. */
-    template <typename EffectsGroups>
     void DispatchEffectsGroupScopeEvaluations(
         EffectsCauseType effect_cause_type,
         std::string_view specific_cause_name,
         const Condition::ObjectSet& source_objects,
-        const EffectsGroups& effects_groups,
+        const std::vector<Effect::EffectsGroup>& effects_groups,
         bool only_meter_effects,
         ScriptingContext context,
         const Condition::ObjectSet& potential_targets,
@@ -1098,20 +1095,8 @@ namespace {
         std::vector<std::pair<std::size_t, std::future<Condition::ObjectSet>>> futures;
         futures.reserve(active_sources.size());
 
-        auto get_eg = [&effects_groups](std::size_t i) -> const Effect::EffectsGroup& {
-            using eg_t = std::decay_t<decltype(effects_groups.front())>;
-            if constexpr (std::is_same_v<std::shared_ptr<Effect::EffectsGroup>, eg_t> ||
-                          std::is_same_v<std::unique_ptr<Effect::EffectsGroup>, eg_t>)
-            {
-                return *(effects_groups[i]);
-            } else {
-                static_assert(std::is_same_v<Effect::EffectsGroup, eg_t>);
-                return effects_groups[i];
-            }
-        };
-
         for (std::size_t i = 0; i < effects_groups.size(); ++i) {
-            const Effect::EffectsGroup& effects_group = get_eg(i);
+            const Effect::EffectsGroup& effects_group = effects_groups[i];
 
             if (only_meter_effects && !effects_group.HasMeterEffects())
                 continue;
@@ -1155,14 +1140,11 @@ namespace {
                     activation->Eval(source_context, retval, rejected, Condition::SearchDomain::MATCHES);
 
                 } else {
-                    // need to apply separately to each source object
-                    ScriptingContext source_context{context};
+                    // need to apply separately to each source object, using a context with the object as source
                     retval.reserve(source_objects.size());
-                    for (auto& obj : source_objects) {
-                        source_context.source = obj;
-                        if (activation->EvalOne(source_context, obj))
-                            retval.push_back(std::move(source_context.source));
-                    }
+                    std::copy_if(source_objects.begin(), source_objects.end(), std::back_inserter(retval),
+                                 [&context, activation](const UniverseObject* obj)
+                                 { return activation->EvalOne(ScriptingContext{obj, context}, obj); });
                 }
 
                 return retval;
@@ -1180,7 +1162,7 @@ namespace {
 
         // loop over effects groups again, copying the cached results
         for (std::size_t i = 0; i < effects_groups.size(); ++i) {
-            const Effect::EffectsGroup& effects_group = get_eg(i);
+            const Effect::EffectsGroup& effects_group = effects_groups[i];
             if (only_meter_effects && !effects_group.HasMeterEffects())
                 continue;
             if (!effects_group.Scope() || !effects_group.Activation())
@@ -1227,7 +1209,7 @@ namespace {
             TraceLogger(effects) << "Handing active sources set of size: " << active_sources[i].size();
 
             // can assume these pointers are non-null due to previous use
-            const Effect::EffectsGroup& effects_group = get_eg(i);
+            const Effect::EffectsGroup& effects_group = effects_groups[i];
             auto* scope = effects_group.Scope();
 
 
@@ -2198,13 +2180,17 @@ namespace {
     /** for each empire: for each position, what objects have low enough stealth
       * that the empire could detect them if an detector owned by the empire is in
       * range? */
-    std::map<int, std::map<std::pair<double, double>, std::vector<int>>>
-        GetEmpiresPositionsPotentiallyDetectableObjects(const ObjectMap& objects, const EmpireManager& empires,
-                                                        int empire_id = ALL_EMPIRES)
+    auto GetEmpiresPositionsPotentiallyDetectableObjects(
+        const ObjectMap& objects, const EmpireManager& empires, int empire_id = ALL_EMPIRES)
     {
-        std::map<int, std::map<std::pair<double, double>, std::vector<int>>> retval;
-
-        auto empire_detection_strengths = GetEmpiresDetectionStrengths(empires, empire_id);
+        const auto obj_count = objects.size();
+        const auto empire_detection_strengths = GetEmpiresDetectionStrengths(empires, empire_id);
+        boost::container::flat_map<int, boost::container::flat_map<std::pair<double, double>, std::vector<int>>> retval;
+        retval.reserve(empire_detection_strengths.size());
+        for (const auto& [loop_empire_id, ds] : empire_detection_strengths) {
+            (void)ds;
+            retval[loop_empire_id].reserve(obj_count);
+        }
 
         // filter objects as detectors for this empire or detectable objects
         for (const auto& obj : objects.allRaw()) {
@@ -2228,9 +2214,9 @@ namespace {
 
     /** filters set of objects at locations by which of those locations are
       * within range of a set of detectors and ranges */
-    std::vector<int> FilterObjectPositionsByDetectorPositionsAndRanges(
-        const std::map<std::pair<double, double>, std::vector<int>>& object_positions,
-        const std::map<std::pair<double, double>, float>& detector_position_ranges)
+    auto FilterObjectPositionsByDetectorPositionsAndRanges(
+        const auto& object_positions,
+        const auto& detector_position_ranges)
     {
         std::vector<int> retval;
         // check each detector position and range against each object position
@@ -2329,10 +2315,8 @@ namespace {
       * potentially detectable objects (if in range) and and input empire
       * detection ranges at locations. */
     void SetEmpireObjectVisibilitiesFromRanges(
-        const std::map<int, std::map<std::pair<double, double>, float>>&
-            empire_location_detection_ranges,
-        const std::map<int, std::map<std::pair<double, double>, std::vector<int>>>&
-            empire_location_potentially_detectable_objects,
+        const auto& empire_location_detection_ranges,
+        const auto& empire_location_potentially_detectable_objects,
         Universe& universe)
     {
         for (const auto& [detecting_empire_id, detector_position_ranges] : empire_location_detection_ranges) {

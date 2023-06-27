@@ -294,10 +294,13 @@ class FO_COMMON_API SetSpeciesEmpireOpinion final : public Effect {
 public:
     SetSpeciesEmpireOpinion(std::unique_ptr<ValueRef::ValueRef<std::string>>&& species_name,
                             std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
-                            std::unique_ptr<ValueRef::ValueRef<double>>&& opinion);
+                            std::unique_ptr<ValueRef::ValueRef<double>>&& opinion,
+                            bool target_opinion);
 
     void Execute(ScriptingContext& context) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
+    [[nodiscard]] bool IsMeterEffect() const noexcept override { return true; }
+    [[nodiscard]] bool IsEmpireMeterEffect() const noexcept override { return true; }
     void SetTopLevelContent(const std::string& content_name) override;
     [[nodiscard]] uint32_t GetCheckSum() const override;
 
@@ -307,6 +310,7 @@ private:
     std::unique_ptr<ValueRef::ValueRef<std::string>>    m_species_name;
     std::unique_ptr<ValueRef::ValueRef<int>>            m_empire_id;
     std::unique_ptr<ValueRef::ValueRef<double>>         m_opinion;
+    bool                                                m_target;
 };
 
 /** Sets the opinion of Species \a opinionated_species for other species
@@ -315,10 +319,13 @@ class FO_COMMON_API SetSpeciesSpeciesOpinion final : public Effect {
 public:
     SetSpeciesSpeciesOpinion(std::unique_ptr<ValueRef::ValueRef<std::string>>&& opinionated_species_name,
                              std::unique_ptr<ValueRef::ValueRef<std::string>>&& rated_species_name,
-                             std::unique_ptr<ValueRef::ValueRef<double>>&& opinion);
+                             std::unique_ptr<ValueRef::ValueRef<double>>&& opinion,
+                             bool target_opinion);
 
     void Execute(ScriptingContext& context) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
+    [[nodiscard]] bool IsMeterEffect() const noexcept override { return true; }
+    [[nodiscard]] bool IsEmpireMeterEffect() const noexcept override { return true; }
     void SetTopLevelContent(const std::string& content_name) override;
     [[nodiscard]] uint32_t GetCheckSum() const override;
 
@@ -328,6 +335,7 @@ private:
     std::unique_ptr<ValueRef::ValueRef<std::string>>    m_opinionated_species_name;
     std::unique_ptr<ValueRef::ValueRef<std::string>>    m_rated_species_name;
     std::unique_ptr<ValueRef::ValueRef<double>>         m_opinion;
+    bool                                                m_target;
 };
 
 /** Creates a new Planet with specified \a type and \a size at the system with

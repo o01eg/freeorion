@@ -301,56 +301,69 @@ std::string ValueRefBase::InvariancePattern() const {
         .append(ConstantExpr()                  ? "C" : "c");
 }
 
-constexpr MeterType NameToMeterCX(std::string_view name) noexcept {
-    for (int i = 0; i < static_cast<int>(NAME_BY_METER.size()); i++) {
-        if (NAME_BY_METER[i] == name)
-            return static_cast<MeterType>(i - 1);
-    }
+namespace {
+    constexpr MeterType NameToMeterCX(std::string_view name) noexcept {
+        for (int i = 0; i < static_cast<int>(NAME_BY_METER.size()); i++) {
+            if (NAME_BY_METER[i] == name)
+                return static_cast<MeterType>(i - 1);
+        }
 
-    return MeterType::INVALID_METER_TYPE;
+        return MeterType::INVALID_METER_TYPE;
+    }
+    static_assert(NameToMeterCX("not a meter") == MeterType::INVALID_METER_TYPE, "Name to Meter conversion failed for invalid meter type!");
+    static_assert(NameToMeterCX("Population") == MeterType::METER_POPULATION, "Name to Meter conversion failed for 'Population' meter!");
+    static_assert(NameToMeterCX("Speed") == MeterType::METER_SPEED, "Name to Meter conversion failed for 'Speed' meter!");
 }
+
 MeterType NameToMeter(std::string_view name) noexcept { return NameToMeterCX(name); }
 
-static_assert(NameToMeterCX("not a meter") == MeterType::INVALID_METER_TYPE, "Name to Meter conversion failed for invalid meter type!");
-static_assert(NameToMeterCX("Population") == MeterType::METER_POPULATION, "Name to Meter conversion failed for 'Population' meter!");
-static_assert(NameToMeterCX("Speed") == MeterType::METER_SPEED, "Name to Meter conversion failed for 'Speed' meter!");
-
-constexpr std::string_view MeterToNameCX(MeterType meter) noexcept {
-    // NOTE: INVALID_METER_TYPE (enum's -1 position) <= meter < NUM_METER_TYPES (enum's final position)
-    return NAME_BY_METER[static_cast<std::underlying_type_t<MeterType>>(meter) + 1];
+namespace {
+    constexpr std::string_view MeterToNameCX(MeterType meter) noexcept {
+        // NOTE: INVALID_METER_TYPE (enum's -1 position) <= meter < NUM_METER_TYPES (enum's final position)
+        return NAME_BY_METER[static_cast<std::underlying_type_t<MeterType>>(meter) + 1];
+    }
 }
+
 std::string_view MeterToName(MeterType meter) noexcept { return MeterToNameCX(meter); }
 
-constexpr std::string_view PlanetTypeToStringCX(PlanetType planet) noexcept {
-    // NOTE: INVALID_PLANET_TYPE (enum's -1 position) <= planet < NUM_PLANET_TYPES (enum's final position)
-    return NAME_BY_PLANET[static_cast<std::underlying_type_t<PlanetType>>(planet) + 1]; 
+namespace {
+    constexpr std::string_view PlanetTypeToStringCX(PlanetType planet) noexcept {
+        // NOTE: INVALID_PLANET_TYPE (enum's -1 position) <= planet < NUM_PLANET_TYPES (enum's final position)
+        return NAME_BY_PLANET[static_cast<std::underlying_type_t<PlanetType>>(planet) + 1]; 
+    }
 }
+
 std::string_view PlanetTypeToString(PlanetType planet) noexcept { return PlanetTypeToStringCX(planet); }
 
-// @return the correct PlanetType enum for a user friendly planet type string (e.g. "Ocean"), else it returns PlanetType::INVALID_PLANET_TYPE
-constexpr PlanetType StringToPlanetTypeCX(std::string_view name) noexcept {
-    for (int i = 0; i < static_cast<int>(NAME_BY_PLANET.size()); i++) {
-        if (NAME_BY_PLANET[i] == name)
-            return static_cast<PlanetType>(i - 1);
+namespace {
+    // @return the correct PlanetType enum for a user friendly planet type string (e.g. "Ocean"), else it returns PlanetType::INVALID_PLANET_TYPE
+    constexpr PlanetType StringToPlanetTypeCX(std::string_view name) noexcept {
+        for (int i = 0; i < static_cast<int>(NAME_BY_PLANET.size()); i++) {
+            if (NAME_BY_PLANET[i] == name)
+                return static_cast<PlanetType>(i - 1);
+        }
+        return PlanetType::INVALID_PLANET_TYPE;
     }
-    return PlanetType::INVALID_PLANET_TYPE;
+    static_assert(StringToPlanetTypeCX("not a planet") == PlanetType::INVALID_PLANET_TYPE, "Name to Planet conversion failed for invalid planet type!");
+    static_assert(StringToPlanetTypeCX("Swamp") == PlanetType::PT_SWAMP, "Name to Planet conversion failed for 'Swamp' planet!");
+    static_assert(StringToPlanetTypeCX("GasGiant") == PlanetType::PT_GASGIANT, "Name to Planet conversion failed for 'GasGiant' planet!");
 }
+
 PlanetType StringToPlanetType(std::string_view name) noexcept { return StringToPlanetTypeCX(name); }
 
-static_assert(StringToPlanetTypeCX("not a planet") == PlanetType::INVALID_PLANET_TYPE, "Name to Planet conversion failed for invalid planet type!");
-static_assert(StringToPlanetTypeCX("Swamp") == PlanetType::PT_SWAMP, "Name to Planet conversion failed for 'Swamp' planet!");
-static_assert(StringToPlanetTypeCX("GasGiant") == PlanetType::PT_GASGIANT, "Name to Planet conversion failed for 'GasGiant' planet!");
-
-constexpr std::string_view PlanetEnvironmentToStringCX(PlanetEnvironment env) noexcept {
-    switch (env) {
-    case PlanetEnvironment::PE_UNINHABITABLE: return "Uninhabitable";
-    case PlanetEnvironment::PE_HOSTILE:       return "Hostile";
-    case PlanetEnvironment::PE_POOR:          return "Poor";
-    case PlanetEnvironment::PE_ADEQUATE:      return "Adequate";
-    case PlanetEnvironment::PE_GOOD:          return "Good";
-    default:                                  return "?";
+namespace {
+    constexpr std::string_view PlanetEnvironmentToStringCX(PlanetEnvironment env) noexcept {
+        switch (env) {
+        case PlanetEnvironment::PE_UNINHABITABLE: return "Uninhabitable";
+        case PlanetEnvironment::PE_HOSTILE:       return "Hostile";
+        case PlanetEnvironment::PE_POOR:          return "Poor";
+        case PlanetEnvironment::PE_ADEQUATE:      return "Adequate";
+        case PlanetEnvironment::PE_GOOD:          return "Good";
+        default:                                  return "?";
+        }
     }
 }
+
 std::string_view PlanetEnvironmentToString(PlanetEnvironment env) noexcept { return PlanetEnvironmentToStringCX(env); }
 
 std::string ReconstructName(const std::vector<std::string>& property_name,
@@ -660,8 +673,8 @@ std::string Constant<std::string>::Dump(uint8_t ntabs) const
 #define IF_CURRENT_VALUE(T)                                            \
 if (m_ref_type == ReferenceType::EFFECT_TARGET_VALUE_REFERENCE) {      \
     try {                                                              \
-        return boost::get<T>(context.current_value);                   \
-    } catch (const boost::bad_get&) {                                  \
+        return std::get<T>(context.current_value);                     \
+    } catch (const std::bad_variant_access&) {                         \
         throw std::runtime_error(                                      \
             "Variable<" #T ">::Eval(): Value could not be evaluated, " \
             "because the provided current value is not an " #T ".");   \
@@ -1004,6 +1017,8 @@ int Variable<int>::Eval(const ScriptingContext& context) const
             return IApp::GetApp()->SelectedFleetID();
         if (property_name == "SelectedPlanetID")
             return IApp::GetApp()->SelectedPlanetID();
+        if (property_name == "ThisClientEmpireID")
+            return IApp::GetApp()->EmpireID();
 
         // add more non-object reference int functions here
 
@@ -1020,30 +1035,21 @@ int Variable<int>::Eval(const ScriptingContext& context) const
         return 0;
     }
 
-    if (property_name == "Owner") {
+    if (property_name == "Owner")
         return object->Owner();
-    }
-    else if (property_name == "SystemID") {
+    else if (property_name == "SystemID")
         return object->SystemID();
-
-    }
-    else if (property_name == "ContainerID") {
+    else if (property_name == "ContainerID")
         return object->ContainerObjectID();
-
-    }
-    else if (property_name == "SupplyingEmpire") {
+    else if (property_name == "SupplyingEmpire")
         return context.supply.EmpireThatCanSupplyAt(object->SystemID());
-    }
-    else if (property_name == "ID") {
+    else if (property_name == "ID")
         return object->ID();
-    }
-    else if (property_name == "CreationTurn") {
+    else if (property_name == "CreationTurn")
         return object->CreationTurn();
-    }
-    else if (property_name == "Age") {
+    else if (property_name == "Age")
         return object->AgeInTurns(context.current_turn);
 
-    }
 
     std::function<int (const Ship&)> ship_property{nullptr};
 
@@ -1095,6 +1101,16 @@ int Variable<int>::Eval(const ScriptingContext& context) const
         planet_property = &Planet::LastTurnColonized;
     else if (property_name == "LastTurnConquered")
         planet_property = &Planet::LastTurnConquered;
+    else if (property_name == "LastTurnAnnexed")
+        planet_property = &Planet::LastTurnAnnexed;
+    else if (property_name == "OrderedGivenToEmpire")
+        planet_property = &Planet::OrderedGivenToEmpire;
+    else if (property_name == "OwnerBeforeLastConquered")
+        planet_property = &Planet::OwnerBeforeLastConquered;
+    else if (property_name == "LastInvadedByEmpire")
+        planet_property = &Planet::LastInvadedByEmpire;
+    else if (property_name == "LastColonizedByEmpire")
+        planet_property = &Planet::LastColonizedByEmpire;
 
     if (planet_property) {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
@@ -1109,8 +1125,14 @@ int Variable<int>::Eval(const ScriptingContext& context) const
             auto planet = static_cast<const Planet*>(object);
             return planet->TurnsSinceFocusChange(context.current_turn);
         }
+        return 0; // here, not using planet_property, so that fallback is 0
+    }
+    else if (property_name == "TurnsSinceAnnexation") {
+        if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
+            auto planet = static_cast<const Planet*>(object);
+            return planet->TurnsSinceLastAnnexed(context.current_turn);
+        }
         return 0;
-
     }
     else if (property_name == "TurnsSinceColonization") {
         if (object->ObjectType() == UniverseObjectType::OBJ_PLANET) {
@@ -1623,7 +1645,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 
     using boost::container::flat_map;
     // empire properties indexed by strings
-    std::function<const std::map<std::string, int>&              (const Empire&)> empire_property_string_key {nullptr};
+    std::function<const std::map<std::string, int>& (const Empire&)> empire_property_string_key {nullptr};
     std::function<const std::map<std::string, int, std::less<>>& (const Empire&)> empire_property_string_key2{nullptr};
     std::function<const flat_map<std::string, int, std::less<>>& (const Empire&)> empire_property_string_key3{nullptr};
 
@@ -1672,7 +1694,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             empire = context.GetEmpire(empire_id);
         }
 
-        std::function<bool (const std::map<std::string, int>::value_type&)> key_filter{nullptr};
+        std::function<bool(const std::map<std::string, int>::value_type&)> key_filter{nullptr};
         key_filter = [](auto e) -> bool { return true; };
 
         if (m_string_ref1) {
@@ -1690,9 +1712,11 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             int key_int = m_int_ref2->Eval(context);
             if (key_int <= int(ShipPartClass::INVALID_SHIP_PART_CLASS) ||
                 key_int >= int(ShipPartClass::NUM_SHIP_PART_CLASSES))
-            { return 0; }
+            {
+                return 0;
+            }
 
-            auto key_filter_class = [part_class = ShipPartClass(key_int)](const std::map<ShipPartClass, int>::value_type& e){ return e.first == part_class; };
+            auto key_filter_class = [part_class = ShipPartClass(key_int)](const std::map<ShipPartClass, int>::value_type& e) { return e.first == part_class; };
 
             if (empire)
                 return boost::accumulate(empire->ShipPartClassOwned() | filtered(key_filter_class) | map_values, 0);
@@ -1759,7 +1783,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             empire = context.GetEmpire(empire_id);
         }
 
-        std::function<bool (const std::map<int, int>::value_type&)> key_filter{nullptr};
+        std::function<bool(const std::map<int, int>::value_type&)> key_filter{nullptr};
         key_filter = [](auto e) -> bool { return true; };
 
         // if a key integer specified, get just that entry (for single empire or sum of all empires)
@@ -1807,7 +1831,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
                 return 0;
         }
 
-        std::function<int (const Empire*)> empire_property{nullptr};
+        std::function<int(const Empire*)> empire_property{nullptr};
         empire_property = &Empire::OutpostsOwned;
 
         using namespace boost::adaptors;
@@ -1815,7 +1839,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
 
         if (!empire) {
             return boost::accumulate(context.Empires() | map_values | transformed(GetRawPtr) |
-                                     transformed(empire_property), 0);
+                transformed(empire_property), 0);
         }
 
         return empire_property(empire.get());
@@ -1849,7 +1873,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             default:
                 break;
             }
-        } catch (...) {
+        }
+        catch (...) {
         }
         return 0;
     }
@@ -1859,7 +1884,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             design_id = m_int_ref1->Eval(context);
             if (design_id == INVALID_DESIGN_ID)
                 return 0;
-        } else {
+        }
+        else {
             return 0;
         }
 
@@ -1887,7 +1913,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             design_id = m_int_ref1->Eval(context);
             if (design_id == INVALID_DESIGN_ID)
                 return 0;
-        } else {
+        }
+        else {
             return 0;
         }
 
@@ -1898,13 +1925,15 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         std::string part_class_name;
         if (m_string_ref1) {
             part_class_name = m_string_ref1->Eval(context);
-        } else {
+        }
+        else {
             return 0;
         }
         ShipPartClass part_class = ShipPartClass::INVALID_SHIP_PART_CLASS;
         try {
             part_class = boost::lexical_cast<ShipPartClass>(part_class_name);
-        } catch (...) {
+        }
+        catch (...) {
             return 0;
         }
 
@@ -1963,7 +1992,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             ship_hull = GetShipHull(hull_name);
             if (!ship_hull)
                 return 0;
-        } else {
+        }
+        else {
             return 0;
         }
         return ship_hull->Slots().size();
@@ -1974,7 +2004,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             design_id = m_int_ref1->Eval(context);
             if (design_id == INVALID_DESIGN_ID)
                 return 0;
-        } else {
+        }
+        else {
             return 0;
         }
 
@@ -2048,7 +2079,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             }
             return count;
 
-        } else {
+        }
+        else {
             for (auto& [cat_name, policy_names_turns] : empire->CategoriesSlotsPoliciesAdopted()) {
                 if (cat_name == policy_category_name) {
                     for (auto& [ignored_turn, policy_name] : policy_names_turns) {
@@ -2067,10 +2099,12 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         if (m_int_ref1) {
             int pt_int1 = m_int_ref1->Eval(context);
             pt1 = PlanetType(pt_int1);
-        } else if (m_string_ref1) {
+        }
+        else if (m_string_ref1) {
             const std::string pt_name1 = m_string_ref1->Eval(context);
             pt1 = StringToPlanetTypeCX(pt_name1);
-        } else {
+        }
+        else {
             return 0;
         }
 
@@ -2078,14 +2112,38 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         if (m_int_ref2) {
             int pt_int2 = m_int_ref2->Eval(context);
             pt2 = PlanetType(pt_int2);
-        } else if (m_string_ref2) {
+        }
+        else if (m_string_ref2) {
             const std::string pt_name2 = m_string_ref2->Eval(context);
             pt2 = StringToPlanetTypeCX(pt_name2);
-        } else {
+        }
+        else {
             return 0;
         }
 
         return Planet::TypeDifference(pt1, pt2);
+    }
+    else if (variable_name == "EmpireObjectVisibilityTurn") {
+        if (!m_int_ref1 || !m_int_ref2)
+            return 0;
+        const auto& vis_turn_map{ context.empire_object_vis_turns };
+
+        const int empire_id = m_int_ref1->Eval(context);
+        const auto empire_it = vis_turn_map.find(empire_id);
+        if (empire_it == vis_turn_map.end())
+            return 0;
+        const auto& object_vis_turns_map = empire_it->second;
+
+        const int object_id = m_int_ref2->Eval(context);
+        const auto object_it = object_vis_turns_map.find(object_id);
+        if (object_it == object_vis_turns_map.end())
+            return 0;
+
+        const auto& vis_turns = object_it->second;
+        const auto vis_it = vis_turns.find(Visibility::VIS_BASIC_VISIBILITY);
+        if (vis_it == vis_turns.end())
+            return 0;
+        return vis_it->second;
     }
 
     return 0;
@@ -2369,28 +2427,22 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         { return 0.0; }
 
     }
-    else if (variable_name == "SpeciesEmpireOpinion") {
-        int empire_id = ALL_EMPIRES;
-        if (m_int_ref1)
-            empire_id = m_int_ref1->Eval(context);
+    else if (variable_name == "SpeciesEmpireOpinion" || variable_name == "SpeciesEmpireTargetOpinion") {
+        const int empire_id = m_int_ref1 ? m_int_ref1->Eval(context) : ALL_EMPIRES;
+        const std::string species_name = m_string_ref1 ? m_string_ref1->Eval(context) : "";
+        const bool target = variable_name == "SpeciesEmpireTargetOpinion";
+        static constexpr bool current_value = false;
 
-        std::string species_name;
-        if (m_string_ref1)
-            species_name = m_string_ref1->Eval(context);
-
-        return context.species.SpeciesEmpireOpinion(species_name, empire_id);
+        return context.species.SpeciesEmpireOpinion(species_name, empire_id, target, current_value);
 
     }
-    else if (variable_name == "SpeciesSpeciesOpinion") {
-        std::string opinionated_species_name;
-        if (m_string_ref1)
-            opinionated_species_name = m_string_ref1->Eval(context);
+    else if (variable_name == "SpeciesSpeciesOpinion" || variable_name == "SpeciesSpeciesTargetOpinion") {
+        const std::string opinionated_species_name = m_string_ref1 ? m_string_ref1->Eval(context) : "";
+        const std::string rated_species_name = m_string_ref2 ? m_string_ref2->Eval(context) : "";
+        const bool target = variable_name == "SpeciesSpeciesTargetOpinion";
+        static constexpr bool current_value = false;
 
-        std::string rated_species_name;
-        if (m_string_ref2)
-            rated_species_name = m_string_ref2->Eval(context);
-
-        return context.species.SpeciesSpeciesOpinion(opinionated_species_name, rated_species_name);
+        return context.species.SpeciesSpeciesOpinion(opinionated_species_name, rated_species_name, target, current_value);
 
     }
     else if (variable_name == "SpecialCapacity") {

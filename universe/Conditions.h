@@ -28,7 +28,8 @@ enum class SortingMethod : uint8_t {
     SORT_MAX,       ///< Objects with the largest sort key will be selected
     SORT_MIN,       ///< Objects with the smallest sort key will be selected
     SORT_MODE,      ///< Objects with the most common sort key will be selected
-    SORT_RANDOM     ///< Objects will be selected randomly, without consideration of property values
+    SORT_RANDOM,    ///< Objects will be selected randomly, without consideration of property values
+    SORT_UNIQUE     ///< Objects will be sorted by the sort key and one object per unique sort key will be selected
 };
 
 enum class ComparisonType : int8_t {
@@ -147,6 +148,10 @@ struct FO_COMMON_API SortedNumberOf final : public Condition {
                    std::unique_ptr<ValueRef::ValueRef<double>>&& sort_key_ref,
                    SortingMethod sorting_method,
                    std::unique_ptr<Condition>&& condition);
+    SortedNumberOf(std::unique_ptr<ValueRef::ValueRef<int>>&& number,
+                   std::unique_ptr<ValueRef::ValueRef<std::string>>&& sort_key_ref,
+                   SortingMethod sorting_method,
+                   std::unique_ptr<Condition>&& condition);
 
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -163,12 +168,14 @@ struct FO_COMMON_API SortedNumberOf final : public Condition {
 private:
     std::unique_ptr<ValueRef::ValueRef<int>> m_number;
     std::unique_ptr<ValueRef::ValueRef<double>> m_sort_key;
+    std::unique_ptr<ValueRef::ValueRef<std::string>> m_sort_key_string;
     SortingMethod m_sorting_method;
     std::unique_ptr<Condition> m_condition;
 };
 
-/** Matches no objects. Currently only has an experimental use for efficient immediate rejection as the top-line condition.
- *  Essentially the entire point of this Condition is to provide the specialized GetDefaultInitialCandidateObjects() */
+/** Matches no objects. Currently only has an experimental use for efficient
+  * immediate rejection as the top-line condition. Essentially, the entire point
+  * of this Condition is to provide the specialized GetDefaultInitialCandidateObjects() */
 struct FO_COMMON_API None final : public Condition {
     constexpr None() noexcept : Condition(true, true, true) {}
     bool operator==(const Condition& rhs) const override;
@@ -479,7 +486,9 @@ private:
 
 /** Matches all objects that have the tag \a tag. */
 struct FO_COMMON_API HasTag final : public Condition {
-    HasTag();
+    constexpr HasTag() noexcept :
+        Condition(true, true, true)
+    {}
     explicit HasTag(std::string name);
     explicit HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
 
@@ -1541,7 +1550,9 @@ private:
 
 /** Matches objects whose species has the ability to found new colonies. */
 struct FO_COMMON_API CanColonize final : public Condition {
-    CanColonize();
+    constexpr CanColonize() :
+        Condition(true, true, true)
+    {}
 
     bool operator==(const Condition& rhs) const override;
     [[nodiscard]] bool EvalOne(const ScriptingContext& parent_context, const UniverseObject* candidate) const override
@@ -1601,6 +1612,25 @@ private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
     std::unique_ptr<Condition> m_by_object_condition;
+};
+
+struct FO_COMMON_API OrderedAnnexed final : public Condition {
+    constexpr OrderedAnnexed() :
+        Condition(true, true, true)
+    {}
+
+    bool operator==(const Condition& rhs) const override;
+    [[nodiscard]] bool EvalOne(const ScriptingContext& parent_context, const UniverseObject* candidate) const override
+    { return Match(ScriptingContext{parent_context, candidate}); }
+
+    [[nodiscard]] std::string Description(bool negated = false) const override;
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
+    [[nodiscard]] uint32_t GetCheckSum() const override;
+
+    [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
+
+private:
+    [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 };
 
 /** Matches all objects if the comparisons between values of ValueRefs meet the

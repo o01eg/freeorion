@@ -183,10 +183,13 @@ std::string System::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-std::string System::ApparentName(int empire_id, const Universe& u,
-                                 bool blank_unexplored_and_none) const
-{
-    static const std::string EMPTY_STRING;
+std::string System::ApparentName(int empire_id, const Universe& u, bool blank_unexplored_and_none) const {
+    // this one line requires a higher __GNUC__ version to compile for several Docker / Fedora test builds. No idea why it's different from the other similar cases.
+#if defined(__cpp_lib_constexpr_string) && (!defined(__GNUC__) || (__GNUC__ > 13)) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
+    const std::string EMPTY_STRING;
+#endif
 
     const ObjectMap& o = u.Objects();
 
@@ -257,21 +260,6 @@ bool System::HasStarlaneTo(int id) const {
 bool System::HasWormholeTo(int id) const {
     auto it = m_starlanes_wormholes.find(id);
     return (it == m_starlanes_wormholes.end() ? false : it->second == true);
-}
-
-int System::EffectiveOwner(const ObjectMap& objects) const {
-    // Check if all of the owners are the same empire.
-    int first_owner_found = ALL_EMPIRES;
-    for (const auto* planet : objects.findRaw<Planet>(m_planets)) {
-        const int owner = planet->Owner();
-        if (owner == ALL_EMPIRES)
-            continue;
-        if (first_owner_found == ALL_EMPIRES)
-            first_owner_found = owner;
-        if (first_owner_found != owner)
-            return ALL_EMPIRES;
-    }
-    return first_owner_found;
 }
 
 bool System::Contains(int object_id) const {

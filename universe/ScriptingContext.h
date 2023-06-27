@@ -2,19 +2,18 @@
 #define _ScriptingContext_h_
 
 
-#include <boost/variant.hpp>
 #include "Universe.h"
 #include "../Empire/EmpireManager.h"
 #include "../util/AppInterface.h"
+#include <variant>
 
 struct CombatInfo;
 
 struct [[nodiscard]] ScriptingContext {
-    typedef boost::variant<
+    using CurrentValueVariant = std::variant<
         int, double, PlanetType, PlanetSize, ::PlanetEnvironment, StarType,
-        UniverseObjectType, Visibility, std::string, std::vector<std::string>
-    > CurrentValueVariant;
-    inline static const CurrentValueVariant DEFAULT_CURRENT_VALUE{0};
+        UniverseObjectType, Visibility, std::string, std::vector<std::string>>;
+    inline static CONSTEXPR_VEC const CurrentValueVariant DEFAULT_CURRENT_VALUE{0};
 
     ScriptingContext() noexcept :
         ScriptingContext(GetUniverse(), ::Empires(), GetGalaxySetupData(),
@@ -435,7 +434,7 @@ private:
     EmpireManager*                                 empires = nullptr;
     const EmpireManager&                           const_empires{empires ? *empires : (::Empires())};
 public:
-    const EmpireManager::DiploStatusMap&           diplo_statuses{::Empires().GetDiplomaticStatuses()};
+    const DiploStatusMap&                          diplo_statuses{::Empires().GetDiplomaticStatuses()};
 };
 
 

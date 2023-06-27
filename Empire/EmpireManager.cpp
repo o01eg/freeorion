@@ -14,7 +14,11 @@ namespace {
     std::pair<int, int> DiploKey(int id1, int ind2)
     { return std::pair(std::max(id1, ind2), std::min(id1, ind2)); }
 
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
     const std::string EMPTY_STRING;
+#endif
 }
 
 EmpireManager& EmpireManager::operator=(EmpireManager&& other) noexcept {
@@ -102,7 +106,7 @@ void EmpireManager::BackPropagateMeters() {
 }
 
 void EmpireManager::CreateEmpire(int empire_id, std::string name, std::string player_name,
-                                 const EmpireColor& color, bool authenticated)
+                                 EmpireColor color, bool authenticated)
 {
     auto empire = std::make_shared<Empire>(std::move(name), std::move(player_name),
                                            empire_id, color, authenticated);
@@ -374,7 +378,7 @@ namespace {
         return val0 + val1;
     };
 
-    EmpireColor HexStringToEmpireColor(std::string_view hex_colour) {
+    constexpr EmpireColor HexStringToEmpireColor(std::string_view hex_colour) noexcept {
         const auto sz = hex_colour.size();
         return {{
             (sz >= 2) ? HexCharsToUInt8(hex_colour.substr(0, 2)) : uint8_t{0u},

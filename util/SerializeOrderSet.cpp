@@ -19,6 +19,7 @@ BOOST_CLASS_VERSION(NewFleetOrder, 2)
 BOOST_CLASS_EXPORT(FleetMoveOrder)
 BOOST_CLASS_VERSION(FleetMoveOrder, 2)
 BOOST_CLASS_EXPORT(FleetTransferOrder)
+BOOST_CLASS_EXPORT(AnnexOrder)
 BOOST_CLASS_EXPORT(ColonizeOrder)
 BOOST_CLASS_EXPORT(InvadeOrder)
 BOOST_CLASS_EXPORT(BombardOrder)
@@ -95,6 +96,13 @@ void FleetTransferOrder::serialize(Archive& ar, const unsigned int version)
     ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(Order)
         & BOOST_SERIALIZATION_NVP(m_dest_fleet)
         & BOOST_SERIALIZATION_NVP(m_add_ships);
+}
+
+template <typename Archive>
+void AnnexOrder::serialize(Archive& ar, const unsigned int version)
+{
+    ar  & BOOST_SERIALIZATION_BASE_OBJECT_NVP(Order)
+        & BOOST_SERIALIZATION_NVP(m_planet);
 }
 
 template <typename Archive>

@@ -55,11 +55,16 @@ struct Availability {
 class CUIEdit;
 
 namespace {
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
+    const std::string EMPTY_STRING;
+#endif
+
     constexpr std::string_view PART_CONTROL_DROP_TYPE_STRING = "Part Control";
     constexpr std::string_view HULL_PARTS_ROW_DROP_TYPE_STRING = "Hull and Parts Row";
     constexpr std::string_view COMPLETE_DESIGN_ROW_DROP_STRING = "Complete Design Row";
     constexpr std::string_view SAVED_DESIGN_ROW_DROP_STRING = "Saved Design Row";
-    const     std::string      EMPTY_STRING;
     constexpr std::string_view DES_PEDIA_WND_NAME = "design.pedia";
     constexpr std::string_view DES_MAIN_WND_NAME = "design.edit";
     constexpr std::string_view DES_BASE_SELECTOR_WND_NAME = "design.selector";
@@ -1146,10 +1151,7 @@ void ShipDesignManager::StartGame(int empire_id, bool is_new_game) {
         // server should have added the default design ids to an empire's known
         // designs. Loop over these, and add them to "current" designs.
         DebugLogger() << "Add default designs to empire's current designs";
-        const auto& ids = empire->ShipDesigns();
-        std::set<int> ordered_ids(ids.begin(), ids.end());
-
-        displayed_designs->InsertOrderedIDs(ordered_ids);
+        displayed_designs->InsertOrderedIDs(empire->ShipDesigns());
 
     } else {
         // Remove the default designs from the empire's current designs.
@@ -1192,7 +1194,7 @@ ShipDesignManager::Designs* ShipDesignManager::DisplayedDesigns() {
 
 ShipDesignManager::Designs* ShipDesignManager::SavedDesigns() {
     auto retval = m_saved_designs.get();
-    if (retval == nullptr) {
+    if (!retval) {
         ErrorLogger() << "ShipDesignManager m_saved_designs was not correctly initialized "
                       << "with ShipDesignManager::GameStart().";
         m_saved_designs = std::make_unique<SavedDesignsManager>();

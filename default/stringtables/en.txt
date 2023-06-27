@@ -1317,13 +1317,31 @@ RULE_HABITABLE_SIZE_GASGIANT
 Gas Giants Habitable size
 
 RULE_HABITABLE_SIZE_DESC
-Value used to adjust for [[METER_POPULATION]] changes on a planet of this size.
+Value used to adjust for [[METER_POPULATION]] changes on a planet of this size
 
 RULE_BASELINE_PLANET_STABILITY
 Planet Stability Baseline
 
 RULE_BASELINE_PLANET_STABILITY_DESC
 Baseline level of planet [[METER_HAPPINESS]].
+
+RULE_INVASION_OPINION_PENALTY_SCALING
+Planet invasion species opinion scaling
+
+RULE_INVASION_OPINION_PENALTY_SCALING_DESC
+Scales penalty to species opinion of an empire that was the most recent invader of planets with species
+
+RULE_SHIPS_LOST_DESTROYED_PENALTY_SCALING
+Ship loss or destruction species opinion scaling
+
+RULE_SHIPS_LOST_DESTROYED_PENALTY_SCALING_DESC
+Scales penalty to species opinion of an empire that loses or destroys in combat ships of a species
+
+RULE_COLONIES_FOUNDED_BONUS_SCALING
+Colonies founded opinion scaling
+
+RULE_COLONIES_FOUNDED_BONUS_SCALING_DESC
+Scales bonus to species opinion of an empire that founds colonies with that species
 
 RULE_PROTECTION_FOCUS_STABILITY
 Protection Focus Stability Bonus
@@ -3873,6 +3891,16 @@ Planet Panel
 PL_ASTEROID_BELT_OF_SYSTEM
 %1% Asteroids
 
+# %1% cost in IP to annex this planet
+PL_ANNEX
+Annex (%1% IP)
+
+PL_ANNEX_FREE
+Annex
+
+PL_CANCEL_ANNEX
+Cancel Annexation
+
 # %1% size of the population this planet is colonized with.
 # %2% maximum population this planet can support.
 PL_COLONIZE
@@ -3909,6 +3937,12 @@ PL_TYPE_SIZE
 # %4% species name for which suitability applies (Human, Trith, ...).
 PL_TYPE_SIZE_ENV
 %1% %2% (%4%: %3%)
+
+VISIBILITY
+Visibility
+
+LAST_VISIBILITY_TURN
+Last Turn Visible
 
 PL_NO_VISIBILITY
 Planet is not currently visible.
@@ -5470,6 +5504,12 @@ Empire ID
 EMPIRE_METERS
 Meters:
 
+UNKNOWN_SPECIES
+Unknown Species
+
+UNKNOWN_EMPIRE
+Unknown Empire (%1%)
+
 RESEARCHED_TECHS
 '''Researched Techs: '''
 
@@ -5490,6 +5530,9 @@ Fleet Move %1% to %2%
 
 ORDER_FLEET_TRANSFER
 Fleet Transfer %1% to %2%
+
+ORDER_ANNEX
+Annex %1%
 
 ORDER_COLONIZE
 Colonize %1% with %2%
@@ -7771,6 +7814,18 @@ The population of %planet% has died out entirely!
 SITREP_PLANET_DEPOPULATED_LABEL
 Planet Destroyed
 
+SITREP_PLANET_ANNEXED
+%planet% has been annexed by %empire%.
+
+SITREP_PLANET_ANNEXED_LABEL
+Neutral Planet Annexed
+
+SITREP_PLANET_ANNEXED_FROM_OTHER_EMPIRE
+%planet% has been annexed by %empire% from %empire%.
+
+SITREP_PLANET_ANNEXED_FROM_OTHER_EMPIRE_LABEL
+Empire Planet Annexed
+
 SITREP_PLANET_COLONIZED
 %planet% has been colonized with %species%.
 
@@ -8472,6 +8527,9 @@ Opinions of Empires:
 
 OPINIONS_OF_OTHER_SPECIES
 Opinions of Other Species:
+
+SPECIES_OPINIONS
+Species Opinions:
 
 
 ##
@@ -11339,6 +11397,12 @@ DESC_NONE_NOT
 DESC_NOOP
 (NoOp)
 
+DESC_EMPIRE_HAS_ADOPTED_POLICY
+''' that belongs to an empire that has adopted %1%'''
+
+DESC_EMPIRE_HAS_ADOPTED_POLICY_NOT
+''' that belongs to an empire that has not adopted %1%'''
+
 # %1% name of the empire this condition applies to.
 DESC_EMPIRE_AFFILIATION_SELF
 ''' that belongs to %1% empire'''
@@ -11859,6 +11923,12 @@ DESC_ORDERED_BOMBARDED
 DESC_ORDERED_BOMBARDED_NOT
 ''' that is not being bombarded by an object %1%'''
 
+DESC_ORDERED_ANNEXED
+''' that is being annexed'''
+
+DESC_ORDERED_ANNEXED_NOT
+''' that is not being annexed'''
+
 # %1% content type description, eg. species, building, focus, tech
 # %2% name of specific scripted content, eg. Human, Imperial Palace, Industry Focus, The Physicsal Brain
 DESC_LOCATION
@@ -12050,17 +12120,29 @@ DESC_MIN_NUMBER_OF
 DESC_MIN_NUMBER_OF_NOT
 ''' that is not one of %1% objects with the smallest value of%2% and%3%'''
 
-# %1% FIXME
-# %2% FIXME
-# %3% FIXME
+# %1% number of objects to match (upper limit)
+# %2% description of the sort key determined for each object
+# %3% description of the selection condition for potentially matched objects
 DESC_MODE_NUMBER_OF
-''' that is one of %1% objects with the most common value of%2% and%3%'''
+''' that is one of %1% objects with the most common value(s) of%2% and%3%'''
 
-# %1% FIXME
-# %2% FIXME
-# %3% FIXME
+# %1% number of objects to match (upper limit)
+# %2% description of the sort key determined for each object
+# %3% description of the selection condition for potentially matched objects
 DESC_MODE_NUMBER_OF_NOT
-''' that is not one of %1% objects with the most common value of%2% and%3%'''
+''' that is not one of %1% objects with the most common value(s) of%2% and%3%'''
+
+# %1% number of objects to match (upper limit)
+# %2% description of the sort key determined for each object
+# %3% description of the selection condition for potentially matched objects
+DESC_UNIQUE_OF
+''' that is one of %1% objects with distinct values of of%2% and%3%'''
+
+# %1% number of objects to match (upper limit)
+# %2% description of the sort key determined for each object
+# %3% description of the selection condition for potentially matched objects
+DESC_UNIQUE_OF_NOT
+''' that is not one of %1% objects with distinct values of%2% and%3%'''
 
 # %1% FIXME
 DESC_VALUE_TEST
@@ -16755,6 +16837,12 @@ Dragon Body
 
 SH_STRONG_MONSTER_BODY_DESC
 Large strong body with fearsome natural weapons and strong natural armor.
+
+SH_GUARD_ACIREMA_BODY
+Acirema Guard Hull
+
+SH_GUARD_ACIREMA_BODY_DESC
+[[SH_ENERGY_FRIGATE_DESC]]
 
 SH_GUARD_MONSTER_BODY
 Guard Hull

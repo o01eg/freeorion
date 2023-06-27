@@ -32,6 +32,12 @@
 
 namespace {
     DeclareThreadSafeLogger(combat);
+
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr const std::string EMPTY_STRING;
+#else
+    const std::string EMPTY_STRING;
+#endif
 }
 
 ////////////////////////////////////////////////
@@ -40,7 +46,7 @@ namespace {
 CombatInfo::CombatInfo(int system_id_, int turn_,
                        Universe& universe_mutable_in,
                        EmpireManager& empires_,
-                       const EmpireManager::DiploStatusMap& diplo_statuses_,
+                       const DiploStatusMap& diplo_statuses_,
                        const GalaxySetupData& galaxy_setup_data_,
                        SpeciesManager& species_,
                        const SupplyManager& supply_) :
@@ -117,12 +123,12 @@ float CombatInfo::GetMonsterDetection() const {
 
 namespace {
     // collect detection strengths of all empires (and neutrals) in \a combat_info
-    std::map<int, float> GetEmpiresDetectionStrengths(const CombatInfo& combat_info) {
-        std::map<int, float> retval;
+    auto GetEmpiresDetectionStrengths(const CombatInfo& combat_info) {
+        std::vector<std::pair<int, float>> retval;
+        retval.reserve(combat_info.empire_ids.size());
         for (auto empire_id : combat_info.empire_ids) { // loop over participating empires
-            retval.emplace(empire_id, 0.0f);   // to be replaced...
             if (empire_id == ALL_EMPIRES) {
-                retval[ALL_EMPIRES] = combat_info.GetMonsterDetection();
+                retval.emplace_back(ALL_EMPIRES, combat_info.GetMonsterDetection());
                 continue;
             }
             const auto empire = combat_info.GetEmpire(empire_id);
@@ -134,9 +140,11 @@ namespace {
             if (!meter)
                 ErrorLogger() << "GetEmpiresDetectionStrengths(CombatInfo) found empire with no detection meter?";
             else
-                retval[empire_id] = meter->Current();
+                retval.emplace_back(empire_id, meter->Current());
         }
 
+        std::sort(retval.begin(), retval.end(),
+                  [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first;});
         return retval;
     }
 
@@ -152,15 +160,20 @@ namespace {
 void CombatInfo::InitializeObjectVisibility() {
     // initialize combat-local visibility of objects by empires and combat-local
     // empire ObjectMaps with object state info that empires know at start of battle
-    auto det_strengths = GetEmpiresDetectionStrengths(*this);
+    const auto det_strengths = GetEmpiresDetectionStrengths(*this);
 
     for (int empire_id : empire_ids) {
         DebugLogger() << "Initializing CombatInfo object visibility and known objects for empire: " << empire_id;
 
-        float empire_detection = det_strengths[empire_id];
+        float empire_detection = [empire_id, &det_strengths]() {
+            const auto it = std::find_if(det_strengths.begin(), det_strengths.end(),
+                                         [empire_id](auto& id_ds) { return empire_id == id_ds.first; });
+            if (it != det_strengths.end())
+                return it->second;
+            return 0.0f;
+        }();
 
         for (const auto* obj : objects.allRaw()) {
-
             if (obj->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
                 // systems always visible to empires with objects in them
                 empire_object_visibility[empire_id][obj->ID()] = Visibility::VIS_PARTIAL_VISIBILITY;
@@ -1002,7 +1015,7 @@ namespace {
     // how many base-10 digits are needed to represent a number as text
     // note that numeric_limits<>::digits10 is how many base 10 digits can be represented by this type
     template <typename T> requires (std::is_integral_v<T>)
-    constexpr std::size_t Digits(T t) {
+    consteval std::size_t Digits(T t) {
         std::size_t retval = 1;
 
         if constexpr (std::is_same_v<T, bool>) {
@@ -1573,7 +1586,6 @@ namespace {
 
         auto attacker_ship = dynamic_cast<Ship*>(attacker);
         const auto& species_name = [&attacker, &attacker_ship]() {
-            static const std::string EMPTY_STRING;
             if (attacker_ship)
                 return attacker_ship->SpeciesName();
             else if (auto attacker_planet = dynamic_cast<Planet*>(attacker))

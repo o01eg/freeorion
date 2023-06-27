@@ -103,18 +103,27 @@ public:
 
     [[nodiscard]] const auto& BuildingIDs() const noexcept          { return m_buildings; }
 
+    [[nodiscard]] bool IsAboutToBeAnnexed() const noexcept          { return m_ordered_annexed_by_empire_id != ALL_EMPIRES; }
     [[nodiscard]] bool IsAboutToBeColonized() const noexcept        { return m_is_about_to_be_colonized; }
     [[nodiscard]] bool IsAboutToBeInvaded() const noexcept          { return m_is_about_to_be_invaded; }
     [[nodiscard]] bool IsAboutToBeBombarded() const noexcept        { return m_is_about_to_be_bombarded; }
+    [[nodiscard]] int OrderedAnnexedByEmpire() const noexcept       { return m_ordered_annexed_by_empire_id; }
+    [[nodiscard]] double AnnexationCost(int empire_id, const ScriptingContext& context) const;
     [[nodiscard]] int OrderedGivenToEmpire() const noexcept         { return m_ordered_given_to_empire_id; }
     [[nodiscard]] int LastTurnAttackedByShip() const noexcept       { return m_last_turn_attacked_by_ship; }
     [[nodiscard]] int LastTurnColonized() const noexcept            { return m_turn_last_colonized; }
     [[nodiscard]] int TurnsSinceColonization(int current_turn) const;
+    [[nodiscard]] int LastColonizedByEmpire() const                 { return m_last_colonized_by_empire_id; }
     [[nodiscard]] int LastTurnConquered() const noexcept            { return m_turn_last_conquered; }
     [[nodiscard]] int TurnsSinceLastConquered(int current_turn) const;
+    [[nodiscard]] int OwnerBeforeLastConquered() const noexcept     { return m_owner_before_last_conquered; }
+    [[nodiscard]] int LastInvadedByEmpire() const noexcept          { return m_last_invaded_by_empire_id; }
+    [[nodiscard]] int LastTurnAnnexed() const noexcept              { return m_turn_last_annexed; }
+    [[nodiscard]] int TurnsSinceLastAnnexed(int current_turn) const;
 
-    [[nodiscard]] const std::string& SurfaceTexture() const noexcept{ return m_surface_texture; }
-    [[nodiscard]] std::string        CardinalSuffix(const ObjectMap& objects) const; ///< returns a roman number representing this planets orbit in relation to other planets
+
+    [[nodiscard]] const auto& SurfaceTexture() const noexcept       { return m_surface_texture; }
+    [[nodiscard]] std::string CardinalSuffix(const ObjectMap& objects) const; ///< returns a roman number representing this planets orbit in relation to other planets
 
     [[nodiscard]] std::map<int, double> EmpireGroundCombatForces() const;
 
@@ -145,14 +154,20 @@ public:
                   double population, ScriptingContext& context);
     void SetIsAboutToBeColonized(bool b);   ///< Called during colonization when a planet is about to be colonized
     void ResetIsAboutToBeColonized();       ///< Called after colonization, to reset the number of prospective colonizers to 0
+    void SetLastColonizedByEmpire(int id);  ///< Records the empire (or no empire) that most recently colonized this planet.
+    void SetTurnLastColonized(int turn);    ///< Sets the last turn this planet was colonized
     void SetIsAboutToBeInvaded(bool b);     ///< Marks planet as being invaded or not, depending on whether \a b is true or false
+    void SetLastInvadedByEmpire(int id);    ///< Records the empire (or no empire) that most recently invaded a planet.
     void ResetIsAboutToBeInvaded();         ///< Marks planet as not being invaded
+    void SetIsOrderAnnexedByEmpire(int empire_id);
+    void ResetBeingAnnxed();
     void SetIsAboutToBeBombarded(bool b);   ///< Marks planet as being bombarded or not, depending on whether \a b is true or false
     void ResetIsAboutToBeBombarded();       ///< Marks planet as not being bombarded
     void SetGiveToEmpire(int empire_id);    ///< Marks planet to be given to empire
     void ClearGiveToEmpire();               ///< Marks planet not to be given to any empire
 
-    void SetLastTurnAttackedByShip(int turn);///< Sets the last turn this planet was attacked by a ship
+    void SetLastTurnAttackedByShip(int turn) noexcept;///< Sets the last turn this planet was attacked by a ship
+    void SetLastTurnAnnexed(int turn) noexcept;
     void SetSurfaceTexture(const std::string& texture);
     void ResetTargetMaxUnpairedMeters() override;
 
@@ -161,7 +176,7 @@ public:
     /** Given initial set of ground forces on planet, determine ground forces on
       * planet after a turn of ground combat. */
     static void ResolveGroundCombat(std::map<int, double>& empires_troops,
-                                    const EmpireManager::DiploStatusMap& diplo_statuses);
+                                    const DiploStatusMap& diplo_statuses);
 
     /** Create planet from @p type and @p size. */
     Planet(PlanetType type, PlanetSize size, int creation_turn);
@@ -182,29 +197,36 @@ private:
 
     void ClampMeters() override;
 
-    std::string     m_species_name;
+    std::string m_species_name;
 
-    std::string     m_focus;
-    int             m_last_turn_focus_changed = INVALID_GAME_TURN;
-    std::string     m_focus_turn_initial;
-    int             m_last_turn_focus_changed_turn_initial = INVALID_GAME_TURN;
+    std::string m_focus;
+    int         m_last_turn_focus_changed = INVALID_GAME_TURN;
+    std::string m_focus_turn_initial;
+    int         m_last_turn_focus_changed_turn_initial = INVALID_GAME_TURN;
 
-    PlanetType      m_type = PlanetType::PT_SWAMP;
-    PlanetType      m_original_type = PlanetType::PT_SWAMP;
-    PlanetSize      m_size = PlanetSize::SZ_TINY;
-    float           m_orbital_period = 1.0f;
-    float           m_initial_orbital_position = 0.0f;
-    float           m_rotational_period = 1.0f;
-    float           m_axial_tilt = 23.0f;
+    PlanetType  m_type = PlanetType::PT_SWAMP;
+    PlanetType  m_original_type = PlanetType::PT_SWAMP;
+    PlanetSize  m_size = PlanetSize::SZ_TINY;
+    float       m_orbital_period = 1.0f;
+    float       m_initial_orbital_position = 0.0f;
+    float       m_rotational_period = 1.0f;
+    float       m_axial_tilt = 23.0f;
 
     IDSet       m_buildings;
 
+    int         m_owner_before_last_conquered = ALL_EMPIRES;
+    int         m_last_invaded_by_empire_id = ALL_EMPIRES;
+    int         m_last_colonized_by_empire_id = ALL_EMPIRES;
+
+    int         m_turn_last_annexed = INVALID_GAME_TURN;
     int         m_turn_last_colonized = INVALID_GAME_TURN;
     int         m_turn_last_conquered = INVALID_GAME_TURN;
     int         m_ordered_given_to_empire_id = ALL_EMPIRES;
     int         m_last_turn_attacked_by_ship = -1;
 
     std::string m_surface_texture;  // intentionally not serialized; set by local effects
+
+    int         m_ordered_annexed_by_empire_id = ALL_EMPIRES;
 
     bool        m_is_about_to_be_colonized = false;
     bool        m_is_about_to_be_invaded = false;

@@ -375,61 +375,45 @@ GG::Clr ClientUI::CategoryColor(std::string_view category_name) {
     return {};
 }
 
-std::string_view ClientUI::PlanetTypeFilePrefix(PlanetType planet_type) {
-    static const std::map<PlanetType, std::string_view> prefixes{
-        {PlanetType::PT_SWAMP,   "Swamp"},
-        {PlanetType::PT_TOXIC,   "Toxic"},
-        {PlanetType::PT_INFERNO, "Inferno"},
-        {PlanetType::PT_RADIATED,"Radiated"},
-        {PlanetType::PT_BARREN,  "Barren"},
-        {PlanetType::PT_TUNDRA,  "Tundra"},
-        {PlanetType::PT_DESERT,  "Desert"},
-        {PlanetType::PT_TERRAN,  "Terran"},
-        {PlanetType::PT_OCEAN,   "Ocean"},
-        {PlanetType::PT_GASGIANT,"GasGiant"}
-    };
-    auto it = prefixes.find(planet_type);
-    if (it != prefixes.end())
-        return it->second;
-    return "";
+namespace {
+    static_assert(static_cast<int>(PlanetType::INVALID_PLANET_TYPE) + 1 == 0);
+    static_assert(static_cast<int>(PlanetType::NUM_PLANET_TYPES) == 11);
+    constexpr std::array<std::string_view, 13> planet_prefixes {
+        "", "Swamp", "Toxic", "Inferno","Radiated", "Barren",
+        "Tundra", "Desert", "Terran", "Ocean", "", "GasGiant", ""};
+    constexpr auto PlanetPrefix(PlanetType star_type)
+    { return planet_prefixes[static_cast<size_t>(static_cast<int>(star_type)+1)]; }
+    static_assert(PlanetPrefix(PlanetType::PT_SWAMP) == "Swamp");
+    static_assert(PlanetPrefix(PlanetType::PT_GASGIANT) == "GasGiant");
+
+    static_assert(static_cast<int>(StarType::INVALID_STAR_TYPE) + 1 == 0);
+    static_assert(static_cast<int>(StarType::NUM_STAR_TYPES) == 8);
+    constexpr std::array<std::string_view, 10> star_prefixes{
+        "unknown", "blue", "white", "yellow", "orange",
+        "red", "neutron", "blackhole", "nostar", ""};
+    constexpr auto StarPrefix(StarType star_type)
+    { return star_prefixes[static_cast<size_t>(static_cast<int>(star_type)+1)]; }
+    static_assert(StarPrefix(StarType::INVALID_STAR_TYPE) == "unknown");
+    static_assert(StarPrefix(StarType::STAR_RED) == "red");
+    static_assert(StarPrefix(StarType::NUM_STAR_TYPES).empty());
+
+    constexpr std::array<std::string_view, 10> halo_prefixes{
+        "halo_unknown", "halo_blue", "halo_white", "halo_yellow", "halo_orange",
+        "halo_red", "halo_neutron", "halo_blackhole", "halo_nostar", "halo_unknown"};
+    constexpr auto HaloPrefix(StarType star_type)
+    { return halo_prefixes[static_cast<size_t>(static_cast<int>(star_type)+1)]; }
+    static_assert(HaloPrefix(StarType::INVALID_STAR_TYPE) == "halo_unknown");
+    static_assert(HaloPrefix(StarType::STAR_NONE) == "halo_nostar");
 }
 
-std::string_view ClientUI::StarTypeFilePrefix(StarType star_type) {
-    static const std::map<StarType, std::string_view> prefixes{
-        {StarType::INVALID_STAR_TYPE, "unknown"},
-        {StarType::STAR_BLUE,         "blue"},
-        {StarType::STAR_WHITE,        "white"},
-        {StarType::STAR_YELLOW,       "yellow"},
-        {StarType::STAR_ORANGE,       "orange"},
-        {StarType::STAR_RED,          "red"},
-        {StarType::STAR_NEUTRON,      "neutron"},
-        {StarType::STAR_BLACK,        "blackhole"},
-        {StarType::STAR_NONE,         "nostar"}
-    };
-    auto it = prefixes.find(star_type);
-    if (it != prefixes.end())
-        return it->second;
-    return "";
-}
+std::string_view ClientUI::PlanetTypeFilePrefix(PlanetType planet_type) noexcept
+{ return PlanetPrefix(planet_type); }
 
-std::string_view ClientUI::HaloStarTypeFilePrefix(StarType star_type) {
-    static const std::map<StarType, std::string_view> prefixes{
-        {StarType::INVALID_STAR_TYPE, "halo_unknown"},
-        {StarType::STAR_BLUE,         "halo_blue"},
-        {StarType::STAR_WHITE,        "halo_white"},
-        {StarType::STAR_YELLOW,       "halo_yellow"},
-        {StarType::STAR_ORANGE,       "halo_orange"},
-        {StarType::STAR_RED,          "halo_red"},
-        {StarType::STAR_NEUTRON,      "halo_neutron"},
-        {StarType::STAR_BLACK,        "halo_blackhole"},
-        {StarType::STAR_NONE,         "halo_nostar"}
-    };
-    auto it = prefixes.find(star_type);
-    if (it != prefixes.end())
-        return it->second;
-    return "";
-}
+std::string_view ClientUI::StarTypeFilePrefix(StarType star_type) noexcept
+{ return StarPrefix(star_type); }
 
+std::string_view ClientUI::HaloStarTypeFilePrefix(StarType star_type) noexcept
+{ return HaloPrefix(star_type); }
 
 ClientUI* ClientUI::s_the_UI = nullptr;
 
@@ -439,13 +423,13 @@ std::ostream& operator<< (std::ostream& os, const GG::UnicodeCharset& chset) {
 }
 
 namespace {
-    const std::vector<GG::UnicodeCharset>& RequiredCharsets() {
+    const auto& RequiredCharsets() {
         static std::vector<GG::UnicodeCharset> retval;
         if (retval.empty()) {
             // Basic Latin, Latin-1 Supplement, and Latin Extended-A
             // (character sets needed to display the credits page)
-            const std::string CREDITS_STR = "AöŁ";
-            std::set<GG::UnicodeCharset> credits_charsets = GG::UnicodeCharsetsToRender(CREDITS_STR);
+            const std::string_view CREDITS_STR = "AöŁ";
+            const auto credits_charsets = GG::UnicodeCharsetsToRender(CREDITS_STR);
 
             std::set<GG::UnicodeCharset> stringtable_charsets;
             {
@@ -458,7 +442,8 @@ namespace {
                     stringtable_str += line;
                     stringtable_str += '\n';
                 }
-                stringtable_charsets = GG::UnicodeCharsetsToRender(stringtable_str);
+                const auto stcs = GG::UnicodeCharsetsToRender(stringtable_str);
+                stringtable_charsets.insert(stcs.begin(), stcs.end());
                 DebugLogger() << "loading " << stringtable_charsets.size() << " charsets for current stringtable characters";
             }
 
@@ -473,10 +458,10 @@ namespace {
                     stringtable_str += line;
                     stringtable_str += '\n';
                 }
-                std::set<GG::UnicodeCharset> default_stringtable_charsets = GG::UnicodeCharsetsToRender(stringtable_str);
+                const auto default_stringtable_charsets = GG::UnicodeCharsetsToRender(stringtable_str);
                 DebugLogger() << "loading " << default_stringtable_charsets.size() << " charsets for default stringtable characters";
 
-                stringtable_charsets.merge(default_stringtable_charsets); // insert(default_stringtable_charsets.begin(), default_stringtable_charsets.end());
+                stringtable_charsets.insert(default_stringtable_charsets.begin(), default_stringtable_charsets.end());
                 DebugLogger() << "combined stringtable charsets have " << stringtable_charsets.size() << " charsets";
             }
 
@@ -486,7 +471,7 @@ namespace {
 
             std::string message_text = "Loading " + std::to_string(retval.size()) + " Unicode charsets: ";
             for (const GG::UnicodeCharset& cs : retval)
-                message_text += cs.m_script_name + ", ";
+                message_text.append(cs.m_script_name).append(", ");
 
             DebugLogger() << message_text;
         }
@@ -1123,41 +1108,49 @@ std::shared_ptr<GG::Texture> ClientUI::GetTexture(const boost::filesystem::path&
 }
 
 std::shared_ptr<GG::Font> ClientUI::GetFont(int pts) {
-     try {
-        return GG::GUI::GetGUI()->GetFont(GetOptionsDB().Get<std::string>("ui.font.path"), pts,
-                                          RequiredCharsets().begin(), RequiredCharsets().end());
-     } catch (...) {
-         try {
-            return GG::GUI::GetGUI()->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.path"),
-                                              pts, RequiredCharsets().begin(), RequiredCharsets().end());
+    const auto& rqcs = RequiredCharsets();
+    auto* gui = GG::GUI::GetGUI();
+    try {
+       return gui->GetFont(GetOptionsDB().Get<std::string>("ui.font.path"),
+                           pts, rqcs.begin(), rqcs.end());
+    } catch (...) {
+        try {
+            return gui->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.path"),
+                                pts, rqcs.begin(), rqcs.end());
         } catch (...) {
-             return GG::GUI::GetGUI()->GetStyleFactory()->DefaultFont(pts);
+             return gui->GetStyleFactory()->DefaultFont(pts);
         }
     }
 }
 
 std::shared_ptr<GG::Font> ClientUI::GetBoldFont(int pts) {
+    const auto& rqcs = RequiredCharsets();
+    auto* gui = GG::GUI::GetGUI();
     try {
-        return GG::GUI::GetGUI()->GetFont(GetOptionsDB().Get<std::string>("ui.font.bold.path"), pts, RequiredCharsets().begin(), RequiredCharsets().end());
+        return gui->GetFont(GetOptionsDB().Get<std::string>("ui.font.bold.path"),
+                            pts, rqcs.begin(), rqcs.end());
     } catch (...) {
         try {
-             return GG::GUI::GetGUI()->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.bold.path"),
-                                               pts, RequiredCharsets().begin(), RequiredCharsets().end());
+             return gui->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.bold.path"),
+                                 pts, rqcs.begin(), rqcs.end());
         } catch (...) {
-             return GG::GUI::GetGUI()->GetStyleFactory()->DefaultFont(pts);
+             return gui->GetStyleFactory()->DefaultFont(pts);
         }
     }
 }
 
 std::shared_ptr<GG::Font> ClientUI::GetTitleFont(int pts) {
+    const auto& rqcs = RequiredCharsets();
+    auto* gui = GG::GUI::GetGUI();
     try {
-        return GG::GUI::GetGUI()->GetFont(GetOptionsDB().Get<std::string>("ui.font.title.path"), pts, RequiredCharsets().begin(), RequiredCharsets().end());
+        return gui->GetFont(GetOptionsDB().Get<std::string>("ui.font.title.path"),
+                            pts, rqcs.begin(), rqcs.end());
     } catch (...) {
         try {
-            return GG::GUI::GetGUI()->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.title.path"),
-                                              pts, RequiredCharsets().begin(), RequiredCharsets().end());
+            return gui->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.title.path"),
+                                pts, rqcs.begin(), rqcs.end());
         } catch (...) {
-             return GG::GUI::GetGUI()->GetStyleFactory()->DefaultFont(pts);
+             return gui->GetStyleFactory()->DefaultFont(pts);
         }
    }
 }
@@ -1168,7 +1161,7 @@ const std::vector<std::shared_ptr<GG::Texture>>& ClientUI::GetPrefixedTextures(
     namespace fs = boost::filesystem;
     if (!fs::is_directory(dir)) {
         ErrorLogger() << "GetPrefixedTextures passed invalid dir: " << dir;
-        static const std::vector<std::shared_ptr<GG::Texture>> EMPTY_VEC;
+        static CONSTEXPR_VEC const std::vector<std::shared_ptr<GG::Texture>> EMPTY_VEC;
         return EMPTY_VEC;
     }
 

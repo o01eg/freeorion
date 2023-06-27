@@ -37,8 +37,12 @@ enum class Availability : uint8_t {
 };
 
 namespace {
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
+    const std::string EMPTY_STRING;
+#endif
     constexpr std::string_view  POLICY_CONTROL_DROP_TYPE_STRING = "Policy Control";
-    const std::string           EMPTY_STRING;
     constexpr GG::X             POLICY_CONTROL_WIDTH{120};
     constexpr GG::Y             POLICY_CONTROL_HEIGHT{180};
     constexpr GG::X             SLOT_CONTROL_WIDTH{120};
@@ -124,7 +128,7 @@ namespace {
         const auto [show_adopted, show_adoptable, show_unaffordable, show_restricted, show_locked] = m_availabilities;
 
         const ScriptingContext context;
-        auto empire = context.GetEmpire(empire_id);
+        const auto* empire = context.GetEmpire(empire_id).get();
         if (!empire)
             return true;
         const ScriptingContext source_context{empire->Source(context.ContextObjects()).get()};
@@ -504,14 +508,13 @@ void PoliciesListBox::Populate() {
     GG::Pt slot_size = GG::Pt(SLOT_CONTROL_WIDTH, SLOT_CONTROL_HEIGHT);
 
     auto policy_palette = Parent();
-    auto gov_wnd = std::dynamic_pointer_cast<GovernmentWnd>(policy_palette->Parent());
-    if (gov_wnd)
+    if (auto gov_wnd = std::dynamic_pointer_cast<GovernmentWnd>(policy_palette->Parent()))
         slot_size = gov_wnd->GetPolicySlotSize();
 
     const GG::X TOTAL_WIDTH = ClientWidth() - ClientUI::ScrollWidth();
     const int MAX_COLUMNS = std::max(1, Value(TOTAL_WIDTH / (slot_size.x + GG::X(PAD))));
 
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const Empire* empire = GetEmpire(empire_id);  // may be nullptr
 
     m_empire_policies_changed_signal_connection.disconnect();
@@ -1377,14 +1380,15 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
 void GovernmentWnd::MainPanel::PostChangeBigUpdate() {
     ScriptingContext context;
 
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     auto empire = context.GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy has no empire to set policies for";
         return;
     }
 
-    empire->UpdateInfluenceSpending(context);
+    empire->UpdateInfluenceSpending(context, empire->PlanetAnnexationCosts(context),
+                                    empire->PolicyAdoptionCosts(context));
     Populate();
     DoLayout();
     if (auto gov_wnd = std::dynamic_pointer_cast<GovernmentWnd>(Parent()))
@@ -1397,8 +1401,8 @@ void GovernmentWnd::MainPanel::PostChangeBigUpdate() {
 void GovernmentWnd::MainPanel::SetPolicies(const std::vector<std::string>& policies) {
     ClearPolicies();
 
-    unsigned int num_policies = std::min(policies.size(), m_slots.size());
-    for (unsigned int slot = 0; slot < num_policies; ++slot)
+    const auto num_policies = std::min(policies.size(), m_slots.size());
+    for (decltype(policies.size()) slot = 0u; slot < num_policies; ++slot)
         this->SetPolicy(policies[slot], slot, false);
 
     PostChangeBigUpdate();
@@ -1422,7 +1426,7 @@ int GovernmentWnd::MainPanel::FindEmptySlotForPolicy(const Policy* policy) const
         return -1;
 
     const ScriptingContext context;
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     auto empire = context.GetEmpire(empire_id);
 
     // reject unavailable and already-adopted policies
@@ -1435,9 +1439,8 @@ int GovernmentWnd::MainPanel::FindEmptySlotForPolicy(const Policy* policy) const
         if (m_slots[i]->GetPolicy())
             continue;   // slot already occupied
         auto& slot_category = m_slots[i]->SlotCategory();
-        if (policy->Category() != slot_category)
-            continue;
-        return i;
+        if (policy->Category() == slot_category)
+            return i;
     }
 
     return -1;
@@ -1446,7 +1449,7 @@ int GovernmentWnd::MainPanel::FindEmptySlotForPolicy(const Policy* policy) const
 void GovernmentWnd::MainPanel::RevertPolicies() {
     ScriptingContext context;
 
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     auto empire = context.GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
         ErrorLogger() << "GovernmentWnd::MainPanel::RevertPolicies has no empire to revert policies for";
@@ -1489,12 +1492,12 @@ void GovernmentWnd::MainPanel::Populate() {
     ScriptingContext context;
 
     // loop over policy slots the empire's government has, add slot controls
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     auto empire = context.GetEmpire(empire_id);
     if (!empire)
         return;
 
-    auto all_slot_cats = ConcatenatedCategorySlots(empire.get());
+    const auto all_slot_cats = ConcatenatedCategorySlots(empire.get());
     auto categories_slots_policies = empire->CategoriesSlotsPoliciesAdopted();
 
     for (unsigned int n = 0; n < all_slot_cats.size(); ++n) {

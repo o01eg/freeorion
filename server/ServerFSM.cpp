@@ -3546,14 +3546,7 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
                 }
             }
             if (has_slowpokes) {
-                std::thread([last_player_names] {
-                    std::vector<std::string> args{"/usr/bin/curl",
-                        "http://localhost:8083/",
-                        "-H", "X-XMPP-Muc: smac",
-                        "-d", last_player_names};
-                    Process sendxmpp = Process("/usr/bin/curl", args);
-                    std::this_thread::sleep_for(std::chrono::seconds(3));
-                }).detach();
+                server.m_networking.SendXMPPMessageMUC(last_player_names);
             }
         }
 
@@ -3563,13 +3556,10 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
 
     // check if only one player have to make orders and he wasn't notified about it before
     std::set<int> last_empires_id = server.LastNotReadyEmpires();
-    std::string last_player_names{"Slowpokes:\n"};
     for (int last_empire_id : last_empires_id) {
         const Empire* empire = server.GetEmpire(last_empire_id);
         if (empire != nullptr && !empire->Eliminated()) {
             const auto& player_name = empire->PlayerName();
-            last_player_names += player_name;
-            last_player_names += '\n';
             if (m_last_empire_ids.count(last_empire_id) == 0 && last_empires_id.size() <= 2) {
                 m_last_empire_ids.insert(last_empire_id);
                 server.SendOutboundChatMessage((boost::format("Hello, %s. You are last to end %d turn.") % empire->PlayerName() % server.CurrentTurn()).str(), player_name, GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
@@ -3584,15 +3574,6 @@ sc::result WaitingForTurnEnd::react(const CheckTurnEndConditions& c) {
             GetAutoSaveFileName(server.CurrentTurn(), server.GetGalaxySetupData())),
             dummy_connection));
     }
-    std::thread([last_player_names] {
-        std::vector<std::string> args{"/usr/bin/curl",
-            "http://localhost:8083/",
-            "-H", "X-XMPP-Muc: smac",
-            "-H", "X-XMPP-Presence: chat",
-            "-d", last_player_names};
-        Process sendxmpp = Process("/usr/bin/curl", args);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-    }).detach();
 
     return discard_event();
 }
@@ -3697,6 +3678,8 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
     server.ProcessCombats();
     server.PostCombatProcessTurns();
 
+    bool have_winner = false;
+    std::string winner_names{"Empire(s) "};
     // update players that other empires are now playing their turn
     for (const auto& empire : server.Empires()) {
         // inform all players that this empire is playing a turn if not eliminated
@@ -3710,13 +3693,23 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
                                                                       Message::PlayerStatus::PLAYING_TURN,
                                                                   empire.first));
         }
+
+        if (empire.second->Won()) {
+            if (have_winner)
+                winner_names += ", ";
+            winner_names += empire.second->PlayerName();
+            have_winner = true;
+        }
     }
 
     // open statistics if the game ended
-    if (server.IsHaveWinner()) {
+    if (have_winner) {
         GetOptionsDB().Set<bool>("network.server.publish-statistics", true);
         GetOptionsDB().Set<bool>("network.server.publish-seed", true);
         GetOptionsDB().Set<bool>("network.server.allow-observers", true);
+
+        winner_names += " won game.";
+        server.m_networking.SendXMPPMessageMUC(winner_names);
     }
 
     if (server.IsHostless() && GetOptionsDB().Get<bool>("save.auto.hostless.enabled") && server.CurrentTurn() > 0) {

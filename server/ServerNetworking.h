@@ -306,6 +306,8 @@ public:
     /** Clean up expired cookies. */
     void CleanupCookies();
 
+    void SendXMPPMessageMUC(std::string message);
+
     /** Signal to notify if message sent successfully or failed for empire about turn. */
     mutable boost::signals2::signal<void (bool, int, int)> MessageSentSignal;
 

@@ -10,6 +10,8 @@ import sys
 from math import cos, pi, sin
 from random import choice, random, uniform
 
+import asyncio
+import aiohttp
 import psycopg2
 import psycopg2.extensions
 
@@ -18,7 +20,16 @@ from universe_tables import MONSTER_FREQUENCY
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-import urllib.request
+
+async def send_xmpp(text: str):
+    try:
+        async with aiohttp.ClientSession() as session:
+            info(f"Sending {text} to chat...")
+            await session.post("http://localhost:8083/", data=text, headers={"X-XMPP-Muc": "smac"})
+        info("Chat notification was send via XMPP")
+    except Exception:
+         exctype, value = sys.exc_info()[:2]
+         error(f"Cann't send chat notification: {exctype} {value}")
 
 
 def execute_turn_events():
@@ -26,13 +37,8 @@ def execute_turn_events():
 
     if fo.get_options_db_option_bool("network.server.send-turn-chat"):
         try:
-            req = urllib.request.Request(
-                "http://localhost:8083/",
-                ("%s: Turn %d has come to an end." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())).encode(),
-            )
-            req.add_header("X-XMPP-Muc", "smac")
-            urllib.request.urlopen(req).read()
-            info("Chat notification was send via XMPP")
+            loop = asyncio.get_event_loop()
+            loop.create_task(send_xmpp("%s: Turn %d has come to an end." % (fo.get_galaxy_setup_data().gameUID, fo.current_turn())), name="XMPPTurn")
         except Exception:
             exctype, value = sys.exc_info()[:2]
             error(f"Cann't send chat notification: {exctype} {value}")

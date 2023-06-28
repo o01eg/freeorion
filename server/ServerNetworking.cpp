@@ -3,6 +3,7 @@
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
 #include "../util/Version.h"
+#include "../util/Process.h"
 #include "../universe/ValueRefs.h"
 #include "../parse/Parse.h"
 
@@ -738,6 +739,18 @@ void ServerNetworking::CleanupCookies() {
 
     for (const auto& cookie : to_delete)
         m_cookies.erase(cookie);
+}
+
+void ServerNetworking::SendXMPPMessageMUC(std::string message) {
+    // ToDo: replace with Boost.Beast
+    std::thread([message] {
+        std::vector<std::string> args{"/usr/bin/curl",
+            "http://localhost:8083/",
+            "-H", "X-XMPP-Muc: smac",
+            "-d", message};
+        Process sendxmpp = Process("/usr/bin/curl", args);
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+    }).detach();
 }
 
 void ServerNetworking::Init() {

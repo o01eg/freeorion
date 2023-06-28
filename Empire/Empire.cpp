@@ -997,14 +997,6 @@ void Empire::Win(const std::string& reason, const EmpireManager::container_type&
         for (auto& entry : empires)
             entry.second->AddSitRepEntry(CreateVictorySitRep(reason, EmpireID(), current_turn));
     }
-            std::async(std::launch::async, [this] {
-                std::vector<std::string> args{"/usr/bin/curl",
-                "http://localhost:8083/",
-                "-H", "X-XMPP-Muc: smac",
-                "-d", " Empire " + this->m_name + " won the game."};
-                Process sendxmpp = Process("/usr/bin/curl", args);
-                std::this_thread::sleep_for(std::chrono::seconds(3));
-            });
 }
 
 void Empire::SetReady(bool ready)

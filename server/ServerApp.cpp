@@ -389,6 +389,14 @@ void ServerApp::UpdateEmpireTurnReceived(bool success, int empire_id, int turn) 
         if (auto empire = m_empires.GetEmpire(empire_id)) {
             empire->SetLastTurnReceived(turn);
         }
+    } else if (turn != INVALID_GAME_TURN) {
+        if (auto empire = m_empires.GetEmpire(empire_id)) {
+            if (!empire->Eliminated()) {
+                // Send notification if turn message failed
+                SendOutboundChatMessage((boost::format("Hello, %s. New turn %d started") % empire->PlayerName() % (turn+1)).str(), empire->PlayerName(), GetOptionsDB().Get<bool>("network.server.allow-email.new-turn"));
+                WarnLogger() << "ServerApp::UpdateEmpireTurnReceived: player " << empire->PlayerName() << " failed to receive message about turn " << turn;
+            }
+        }
     }
 }
 

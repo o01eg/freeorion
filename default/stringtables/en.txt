@@ -1219,6 +1219,30 @@ Experimentors spawn base turn
 RULE_EXPERIMENTORS_SPAWN_BASE_TURN_DESC
 Minimum turn experimentors spawn. Modified by galaxy size and AI Agression.
 
+RULE_NESTS_ALWAYS_SPAWN_WILD
+Nests always spawn wild monsters
+
+RULE_NESTS_ALWAYS_SPAWN_WILD_DESC
+Monster nests will always spawn wild monsters, even when outposted
+
+RULE_WANDERING_MONSTERS_CAN_STOP_INSYSTEM
+Wandering monsters ocassionally stop insystem
+
+RULE_WANDERING_MONSTERS_CAN_STOP_INSYSTEM_DESC
+Wandering monsters ocassionally stop insystem
+
+RULE_WILD_NEST_MONSTER_SPAWN_FACTOR
+Wild nest monster spawn factor
+
+RULE_WILD_NEST_MONSTER_SPAWN_FACTOR_DESC
+Multiplies the probability of a nest spawning a wild monster
+
+RULE_DOMESTIC_NEST_MONSTER_SPAWN_FACTOR
+Domestic nest monster spawn factor
+
+RULE_DOMESTIC_NEST_MONSTER_SPAWN_FACTOR_DESC
+Multiplies the probability of a nest spawning a domesticated monster
+
 RULE_ENABLE_SUPER_TESTER
 Enable Super-Tester Takeover
 
@@ -16595,9 +16619,9 @@ SH_ORGANIC_DESC
 '''A living hull with one external slot and one internal slot.
 Organic Growth: starts with 24 [[metertype METER_STRUCTURE]], but grows an additional 24 structure over 25 turns.
 
-[[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is low and [[metertype METER_SPEED]] is high.
+[[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is high.
 
-Cheap and versatile hull able to carry out many fleet roles but likely to become obsolete as technology develops. Low detection makes it poorly suited in a scouting role but it can make a capable warship.
+Cheap and versatile hull able to carry out many fleet roles. Fuel regeneration and high [[encyclopedia FUEL_EFFICIENCY_TITLE]] makes the organic hull well suited for deep space exploration.
 
 [[LIVING_HULL_AUTO_REGEN]]
 

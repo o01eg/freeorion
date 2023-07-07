@@ -82,6 +82,7 @@ class AuthProvider:
                 use_tls=True,
                 username=self.mailconf.get("mail", "login"),
                 password=self.mailconf.get("mail", "passwd"),
+                validate_certs=self.mailconf.getboolean("mail", "validate_certs", fallback=True)
             )
             info("OTP was send to %s via email" % player_name)
         except Exception:

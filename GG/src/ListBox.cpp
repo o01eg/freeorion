@@ -1028,10 +1028,10 @@ void ListBox::DeselectAll(bool signal)
         SelRowsChangedSignal(m_selections);
 }
 
-ListBox::iterator ListBox::begin()
+ListBox::iterator ListBox::begin() noexcept
 { return m_rows.begin(); }
 
-ListBox::iterator ListBox::end()
+ListBox::iterator ListBox::end() noexcept
 { return m_rows.end(); }
 
 ListBox::Row& ListBox::GetRow(std::size_t n)
@@ -1142,10 +1142,10 @@ void ListBox::SetHScrollWheelIncrement(unsigned int increment)
     AdjustScrolls(false);
 }
 
-void ListBox::SetInteriorColor(Clr c)
+void ListBox::SetInteriorColor(Clr c) noexcept
 { m_int_color = c; }
 
-void ListBox::SetHiliteColor(Clr c)
+void ListBox::SetHiliteColor(Clr c) noexcept
 { m_hilite_color = c; }
 
 void ListBox::SetStyle(Flags<ListBoxStyle> s)

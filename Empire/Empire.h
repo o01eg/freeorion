@@ -93,8 +93,8 @@ public:
     [[nodiscard]] bool        PolicyPrereqsAndExclusionsOK(std::string_view name, int current_turn) const;
     [[nodiscard]] bool        PolicyAffordable(std::string_view name, const ScriptingContext& context) const;
     [[nodiscard]] double      ThisTurnAdoptedPoliciesCost(const ScriptingContext& context) const;
-    [[nodiscard]] std::map<std::string_view, int, std::less<>> TotalPolicySlots() const; // how many total slots does this empire have in each category
-    [[nodiscard]] std::map<std::string_view, int, std::less<>> EmptyPolicySlots() const; // how many empty slots does this empire have in each category
+    [[nodiscard]] std::vector<std::pair<std::string_view, int>> TotalPolicySlots() const; // how many total slots does this empire have in each category
+    [[nodiscard]] std::vector<std::pair<std::string_view, int>> EmptyPolicySlots() const; // how many empty slots does this empire have in each category
 
     /** Returns the set of Tech names available to this empire and the turns on
       * which they were researched. */
@@ -204,6 +204,8 @@ public:
 
     [[nodiscard]] const auto& GetPopulationPool() const noexcept { return m_population_pool; }
     [[nodiscard]] float       Population() const;                                 ///< returns total Population of empire
+
+    [[nodiscard]] virtual std::size_t SizeInMemory() const;
 
     /** If the object with id \a id is a planet owned by this empire, sets that
       * planet to be this empire's capital, and otherwise does nothing. */
@@ -501,7 +503,7 @@ private:
         }
 
         friend class boost::serialization::access;
-        template <class Archive>
+        template <typename Archive>
         void serialize(Archive& ar, const unsigned int version);
     };
     std::map<std::string, PolicyAdoptionInfo, std::less<>> m_adopted_policies;                 ///< map from policy name to turn, category, and slot in/on which it was adopted

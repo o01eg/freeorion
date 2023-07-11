@@ -24,6 +24,9 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/unordered_set.hpp>
 
+#include <concepts>
+#include <numeric>
+#include <type_traits>
 
 namespace {
     constexpr float EPSILON = 0.01f;
@@ -212,7 +215,15 @@ void Empire::AdoptPolicy(const std::string& name, const std::string& category,
     }
 
     // get slots for category requested for policy to be adopted in
-    const auto total_slots_in_category = TotalPolicySlots()[category];
+    const auto total_slots = TotalPolicySlots();
+    const auto cat_slot_it = std::find_if(total_slots.begin(), total_slots.end(),
+                                          [category](const auto& cat_slots) { return cat_slots.first == category; });
+    if (cat_slot_it == total_slots.end()) {
+        ErrorLogger() << "Empire::AdoptPolicy can't adopt policy: " << name
+                      << " into unrecognized category " << category;
+        return;
+    }
+    const auto total_slots_in_category = cat_slot_it->second;
     if (total_slots_in_category < 1 || slot >= total_slots_in_category) {
         ErrorLogger() << "Empire::AdoptPolicy can't adopt policy: " << name
                       << "  into category: " << category << "  in slot: " << slot
@@ -308,7 +319,11 @@ void Empire::UpdatePolicies(bool update_cumulative_adoption_time, int current_tu
         const auto& [adoption_turn, slot_in_category, category] = adoption_info;
         (void)adoption_turn; // quiet warning
         const auto& slot_count = category_slot_policy_counts[category][slot_in_category]++; // count how many policies in this slot of this category...
-        if (slot_count > 1 || slot_in_category >= total_category_slot_counts[category])     // if multiple policies in a slot, or slot a policy is in is too high, mark category as problematic...
+        const auto cat_slot_it = std::find_if(total_category_slot_counts.begin(), total_category_slot_counts.end(),
+                                              [cat{std::string_view{category}}](const auto& cat_slots)
+                                              { return cat_slots.first == cat; });
+        const auto cat_slots_count = (cat_slot_it != total_category_slot_counts.end()) ? cat_slot_it->second : 0;
+        if (slot_count > 1 || slot_in_category >= cat_slots_count) // if multiple policies in a slot, or slot a policy is in is too high, mark category as problematic...
             categories_needing_rearrangement.insert(category);
     }
 
@@ -316,6 +331,9 @@ void Empire::UpdatePolicies(bool update_cumulative_adoption_time, int current_tu
     // and remove the excess policies
     for (const auto& cat : categories_needing_rearrangement) {
         DebugLogger() << "Rearranging poilicies in category " << cat << ":";
+        const auto cat_slots_it = std::find_if(total_category_slot_counts.begin(), total_category_slot_counts.end(),
+                                               [cat](const auto& cat_slots){ return cat == cat_slots.first; });
+        const auto cat_slot_count = (cat_slots_it != total_category_slot_counts.end()) ? cat_slots_it->second : 0;
 
         auto policies_temp{m_adopted_policies};
 
@@ -344,7 +362,7 @@ void Empire::UpdatePolicies(bool update_cumulative_adoption_time, int current_tu
         int added = 0;
         for (auto& [ignored, turn, policy_name] : slots_turns_policies) {
             (void)ignored;
-            if (added >= total_category_slot_counts[cat])
+            if (added >= cat_slot_count)
                 break;  // can't add more...
             int new_slot = added++;
             DebugLogger() << "... Policy " << policy_name << " re-added in slot " << new_slot;
@@ -528,29 +546,38 @@ bool Empire::PolicyAffordable(std::string_view name, const ScriptingContext& con
     }
 }
 
-std::map<std::string_view, int, std::less<>> Empire::TotalPolicySlots() const { // TODO: return flat_map
-    std::map<std::string_view, int, std::less<>> retval;
+std::vector<std::pair<std::string_view, int>> Empire::TotalPolicySlots() const {
+    const auto cats_slot_meters = PolicyCategoriesSlotsMeters();
+    std::vector<std::pair<std::string_view, int>> retval;
+    retval.reserve(cats_slot_meters.size());
+
     // collect policy slot category meter values and return
-    for (auto& cat_and_slot_strings : PolicyCategoriesSlotsMeters()) {
+    for (auto& [cat, cat_slots_meter_string] : cats_slot_meters) {
+        const std::string_view csms{cat_slots_meter_string};
         auto it = std::find_if(m_meters.begin(), m_meters.end(),
-                               [&](const auto& e) { return e.first == cat_and_slot_strings.second; });
+                               [csms](const auto& e) { return e.first == csms; });
         if (it == m_meters.end()) {
-            ErrorLogger() << "Empire doesn't have policy category slot meter with name: " << cat_and_slot_strings.second;
+            ErrorLogger() << "Empire doesn't have policy category slot meter with name: " << cat_slots_meter_string;
             continue;
         }
-        retval[cat_and_slot_strings.first] = static_cast<int>(it->second.Initial());
+        retval.emplace_back(cat, static_cast<int>(it->second.Initial()));
     }
+    std::sort(retval.begin(), retval.end());
     return retval;
 }
 
-std::map<std::string_view, int, std::less<>> Empire::EmptyPolicySlots() const {
+std::vector<std::pair<std::string_view, int>> Empire::EmptyPolicySlots() const {
     // get total slots empire has available
     auto retval = TotalPolicySlots();
 
     // subtract used policy categories
     for (auto& [ignored, adoption_info] : m_adopted_policies) {
         (void)ignored; // quiet warning
-        retval[adoption_info.category]--;
+        const std::string_view cat = adoption_info.category;
+        const auto it = std::find_if(retval.begin(), retval.end(),
+                                     [cat](const auto& rv) { return rv.first == cat; });
+        if (it != retval.end())
+            it->second--;
     }
 
     // return difference
@@ -1269,9 +1296,10 @@ void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
 void Empire::RecordPendingLaneUpdate(int start_system_id, int dest_system_id, const ObjectMap& objects) {
     if (!m_supply_unobstructed_systems.contains(start_system_id)) {
         m_pending_system_exit_lanes[start_system_id].insert(dest_system_id);
-    } else { // if the system is unobstructed, mark all its lanes as avilable
-        for (const auto& lane : objects.getRaw<System>(start_system_id)->StarlanesWormholes())
-            m_pending_system_exit_lanes[start_system_id].insert(lane.first); // will add both starlanes and wormholes
+    } else if (const auto* sys = objects.getRaw<System>(start_system_id)) {
+        // if the system is unobstructed, mark all its lanes as avilable
+        const auto& lanes = sys->Starlanes();
+        m_pending_system_exit_lanes[start_system_id].insert(lanes.begin(), lanes.end());
     }
 }
 
@@ -1310,7 +1338,7 @@ std::map<int, std::set<int>> Empire::KnownStarlanes(const Universe& universe) co
     auto& known_destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(this->EmpireID());
     for (const auto& sys : universe.Objects().allRaw<System>()) {
         int start_id = sys->ID();
-        TraceLogger(supply) << "system " << start_id << " has up to " << sys->StarlanesWormholes().size() << " lanes / wormholes";
+        TraceLogger(supply) << "system " << start_id << " has up to " << sys->NumStarlanes() << " lanes / wormholes";
 
         // exclude lanes starting at systems known to be destroyed
         if (known_destroyed_objects.contains(start_id)) {
@@ -1318,10 +1346,8 @@ std::map<int, std::set<int>> Empire::KnownStarlanes(const Universe& universe) co
             continue;
         }
 
-        for (const auto& lane : sys->StarlanesWormholes()) {
-            int end_id = lane.first;
-            bool is_wormhole = lane.second;
-            if (is_wormhole || known_destroyed_objects.contains(end_id))
+        for (const auto& end_id : sys->Starlanes()) {
+            if (known_destroyed_objects.contains(end_id))
                 continue;   // is a wormhole, not a starlane, or is connected to a known destroyed system
             retval[start_id].insert(end_id);
             retval[end_id].insert(start_id);
@@ -1334,22 +1360,20 @@ std::map<int, std::set<int>> Empire::KnownStarlanes(const Universe& universe) co
     return retval;
 }
 
-std::map<int, std::set<int>> Empire::VisibleStarlanes(const Universe& universe) const {
+std::map<int, std::set<int>> Empire::VisibleStarlanes(const Universe& universe) const { // TODO: return better type
     std::map<int, std::set<int>> retval;   // compile starlanes leading into or out of each system
 
     const ObjectMap& objects = universe.Objects();
 
-    for (const auto& sys : objects.allRaw<System>()) {
-        int start_id = sys->ID();
+    for (const auto* sys : objects.allRaw<System>()) {
+        const auto start_id = sys->ID();
 
         // is system visible to this empire?
         if (universe.GetObjectVisibilityByEmpire(start_id, m_id) <= Visibility::VIS_NO_VISIBILITY)
             continue;
 
         // get system's visible lanes for this empire
-        for (auto& [other_end_id, is_wormhole] : sys->VisibleStarlanesWormholes(m_id, universe)) {
-            if (is_wormhole)
-                continue;   // is a wormhole, not a starlane
+        for (const auto& other_end_id : sys->VisibleStarlanes(m_id, universe)) {
             retval[start_id].insert(other_end_id);
             retval[other_end_id].insert(start_id);
         }
@@ -1382,6 +1406,158 @@ float Empire::ResourceAvailable(ResourceType type) const
 
 float Empire::Population() const
 { return m_population_pool.Population(); }
+
+namespace {
+    template <typename X>
+        requires (std::is_arithmetic_v<X> || std::is_enum_v<X>)
+    std::size_t SizeOfContents(const X& x)
+    { return 0u; }
+
+    template <typename F, typename S>
+    std::size_t SizeOfContents(const std::pair<F, S>& p);
+
+    template <typename X, typename Fx>
+        requires requires(X x, Fx f) { {f(x)} -> std::same_as<std::size_t>; }
+    std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents);
+
+    template <typename X>
+        requires requires(X x) { x.begin(); x.end(); }
+    std::size_t SizeOfContents(const X& x)
+    {
+        if constexpr (requires { x.capacity(); }) {
+            const std::size_t retval = sizeof(*x.begin())*x.capacity();
+            return std::transform_reduce(x.begin(), x.end(), retval, std::plus<std::size_t>{},
+                                         [](const auto& v) { return SizeOfContents(v); });
+
+        } else if constexpr (requires { x.size(); }) {
+            const std::size_t retval = sizeof(*x.begin())*x.size();
+            return std::transform_reduce(x.begin(), x.end(), retval, std::plus<std::size_t>{},
+                                         [](const auto& v) { return SizeOfContents(v); });
+        }
+    }
+
+    template <typename F, typename S>
+    std::size_t SizeOfContents(const std::pair<F, S>& p)
+    { return SizeOfContents(p.first) + SizeOfContents(p.second); }
+
+    // takes custom sz_of_contents as function eg. a lambda
+    template <typename X, typename Fx>
+        requires requires(X x, Fx f) { {f(x)} -> std::same_as<std::size_t>; }
+    std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents)
+    { return sz_of_contents(x); }
+
+    template <typename X, typename Fx>
+        requires requires(X x, Fx f) { {f(*x.begin())} -> std::same_as<std::size_t>; x.begin(); x.end(); }
+    std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents)
+    {
+        if constexpr (requires { x.capacity(); }) {
+            const std::size_t retval = (sizeof(*x.begin()) + sizeof(void*))*x.capacity();
+            return std::transform_reduce(x.begin(), x.end(), retval, std::plus<std::size_t>{}, sz_of_contents);
+        } else if constexpr (requires { x.size(); }) {
+            const std::size_t retval = (sizeof(*x.begin()) + sizeof(void*))*x.size();
+            return std::transform_reduce(x.begin(), x.end(), retval, std::plus<std::size_t>{}, sz_of_contents);
+        }
+    }
+
+    template <typename K, typename V, typename A, typename Fx>
+        requires requires(std::map<K,V,A> m, Fx f) { {f(*m.begin())} -> std::same_as<std::size_t>; }
+    std::size_t SizeOfContents(const std::map<K,V,A>& m, const Fx& sz_of_contents)
+    {
+        using value_type = typename std::decay_t<decltype(m)>::value_type;
+        const std::size_t retval = (sizeof(value_type) + sizeof(void*))*m.size(); // extra pointer space estimate for map node overhead
+        return std::transform_reduce(m.begin(), m.end(), retval, std::plus<std::size_t>{}, sz_of_contents);
+    }
+
+    template <typename K, typename V, typename A>
+    std::size_t SizeOfContents(const std::map<K,V,A>& m)
+    { return SizeOfContents(m, [](const auto& kv) { return SizeOfContents(kv); }); }
+
+    template <typename K, typename A, typename Fx>
+        requires requires(std::set<K,A> s, Fx f) { {f(*s.begin())} -> std::same_as<std::size_t>; }
+    std::size_t SizeOfContents(const std::set<K,A>& s, const Fx& sz_of_contents)
+    {
+        using value_type = typename std::decay_t<decltype(s)>::value_type;
+        const std::size_t retval = (sizeof(value_type) + sizeof(void*))*s.size(); // extra pointer space estimate for set node overhead
+        return std::transform_reduce(s.begin(), s.end(), retval, std::plus<std::size_t>{}, sz_of_contents);
+    }
+
+    template <typename K, typename A>
+    std::size_t SizeOfContents(const std::set<K,A>& s)
+    { return SizeOfContents(s, [](const auto& k) { return SizeOfContents(k); }); }
+
+    template <typename X>
+    std::size_t SizeOfContents(const std::shared_ptr<X>& p)
+    { return p ? SizeOfContents(*p) : 0u; }
+
+    template <typename X>
+    std::size_t SizeOfContents(const std::unique_ptr<X>& p)
+    { return p ? SizeOfContents(*p) : 0u; }
+
+    template <typename X>
+    std::size_t SizeOfContents(const X* p)
+    { return p ? SizeOfContents(*p) : 0u; }
+}
+
+std::size_t Empire::SizeInMemory() const {
+    std::size_t retval = sizeof(Empire);
+
+    retval += SizeOfContents(m_name);
+    retval += SizeOfContents(m_player_name);
+    constexpr auto soc_adpols = [](const decltype(m_adopted_policies)::value_type& val) { return SizeOfContents(val.first) + SizeOfContents(val.second.category); };
+    retval += SizeOfContents(m_adopted_policies, soc_adpols);
+    retval += SizeOfContents(m_initial_adopted_policies, soc_adpols);
+    retval += SizeOfContents(m_policy_adoption_total_duration);
+    retval += SizeOfContents(m_policy_adoption_current_duration);
+    retval += SizeOfContents(m_available_policies);
+    retval += SizeOfContents(m_victories);
+    retval += SizeOfContents(m_newly_researched_techs);
+    retval += SizeOfContents(m_techs);
+    retval += SizeOfContents(m_meters, [](const MeterMap::value_type& str_meter) { return SizeOfContents(str_meter.first); }); // .second is a Meter which has no non-POD contents
+    retval += SizeOfContents(m_research_queue, [](const ResearchQueue::Element& e) { return SizeOfContents(e.name); }); // rest of Element is POD
+    retval += SizeOfContents(m_research_progress);
+    retval += SizeOfContents(m_production_queue, [](const ProductionQueue::Element& e) { return SizeOfContents(e.item.name); }); // rest of Element is POD
+    retval += SizeOfContents(m_influence_queue, [](const InfluenceQueue::Element& e) { return SizeOfContents(e.name); }); // rest of Element is POD
+    retval += SizeOfContents(m_available_building_types);
+    retval += SizeOfContents(m_available_ship_parts);
+    retval += SizeOfContents(m_available_ship_hulls);
+    retval += SizeOfContents(m_explored_systems);
+    retval += SizeOfContents(m_known_ship_designs);
+    retval += SizeOfContents(m_sitrep_entries, [](const SitRepEntry& r) { return SizeOfContents(r.GetIcon()) + SizeOfContents(r.GetLabelString()); });
+    constexpr auto soc_rpool = [](const ResourcePool& rp) { return SizeOfContents(rp.ObjectIDs()) + SizeOfContents(rp.Output()) + SizeOfContents(rp.Target()) + SizeOfContents(rp.Groups()); };
+    retval += SizeOfContents(m_research_pool, soc_rpool);
+    retval += SizeOfContents(m_industry_pool, soc_rpool);
+    retval += SizeOfContents(m_influence_pool, soc_rpool);
+    retval += SizeOfContents(m_population_pool, [](const PopulationPool& pp) { return SizeOfContents(pp.PopCenterIDs()); });
+    retval += SizeOfContents(m_ship_names_used);
+    retval += SizeOfContents(m_species_ships_owned);
+    retval += SizeOfContents(m_ship_designs_owned);
+    retval += SizeOfContents(m_ship_parts_owned);
+    retval += SizeOfContents(m_ship_part_class_owned);
+    retval += SizeOfContents(m_species_colonies_owned);
+    retval += SizeOfContents(m_building_types_owned);
+    retval += SizeOfContents(m_ship_designs_in_production);
+    retval += SizeOfContents(m_ships_destroyed); // TODO: overload for unordered_set
+    retval += SizeOfContents(m_empire_ships_destroyed);
+    retval += SizeOfContents(m_ship_designs_destroyed);
+    retval += SizeOfContents(m_species_ships_destroyed);
+    retval += SizeOfContents(m_species_planets_invaded);
+    retval += SizeOfContents(m_species_ships_produced);
+    retval += SizeOfContents(m_ship_designs_produced);
+    retval += SizeOfContents(m_species_ships_lost);
+    retval += SizeOfContents(m_ship_designs_lost);
+    retval += SizeOfContents(m_species_ships_scrapped);
+    retval += SizeOfContents(m_ship_designs_scrapped);
+    retval += SizeOfContents(m_species_planets_depoped);
+    retval += SizeOfContents(m_species_planets_bombed);
+    retval += SizeOfContents(m_building_types_produced);
+    retval += SizeOfContents(m_building_types_scrapped);
+    retval += SizeOfContents(m_supply_system_ranges);
+    retval += SizeOfContents(m_supply_unobstructed_systems);
+    retval += SizeOfContents(m_preserved_system_exit_lanes);
+    retval += SizeOfContents(m_pending_system_exit_lanes);
+
+    return retval;
+}
 
 void Empire::SetResourceStockpile(ResourceType type, float stockpile) {
     switch (type) {

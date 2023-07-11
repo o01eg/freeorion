@@ -6,6 +6,7 @@ from common.priorities import (
     TARGET_POPULATION_OVERRIDE_PRIORITY,
     TARGET_POPULATION_SCALING_PRIORITY,
 )
+from focs._effects import Abs, EffectsGroup, GasGiantType, IsSource, Planet, SetTargetPopulation, Value
 from species.common.advanced_focus import ADVANCED_FOCUS_EFFECTS
 from species.common.general import (
     FOCUS_CHANGE_PENALTY,
@@ -223,3 +224,39 @@ BASIC_POPULATION = [
 ]
 
 AVERAGE_POPULATION = BASIC_POPULATION
+
+VERY_BAD_POPULATION = [
+    *BASIC_POPULATION,
+    EffectsGroup(
+        description="VERY_BAD_POPULATION_DESC",
+        scope=IsSource,
+        activation=Planet(),
+        accountinglabel="VERY_BAD_POPULATION_LABEL",
+        priority=TARGET_POPULATION_SCALING_PRIORITY,
+        effects=SetTargetPopulation(value=Value - 0.5 * Abs(float, Value)),
+    ),
+]
+
+GOOD_POPULATION = [
+    *BASIC_POPULATION,
+    EffectsGroup(
+        description="GOOD_POPULATION_DESC",
+        scope=IsSource,
+        activation=Planet(),
+        accountinglabel="GOOD_POPULATION_LABEL",
+        priority=TARGET_POPULATION_SCALING_PRIORITY,
+        effects=SetTargetPopulation(value=Value + 0.25 * Abs(float, Value)),
+    ),
+]
+
+BAD_POPULATION = [
+    *BASIC_POPULATION,
+    EffectsGroup(
+        description="BAD_POPULATION_DESC",
+        scope=IsSource,
+        activation=Planet(),
+        accountinglabel="BAD_POPULATION_LABEL",
+        priority=TARGET_POPULATION_SCALING_PRIORITY,
+        effects=SetTargetPopulation(value=Value - 0.25 * Abs(float, Value)),
+    ),
+]

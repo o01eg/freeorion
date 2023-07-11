@@ -14,7 +14,7 @@
 #include <boost/serialization/version.hpp>
 
 
-template <class Archive>
+template <typename Archive>
 void Empire::PolicyAdoptionInfo::serialize(Archive& ar, const unsigned int version)
 {
     ar  & BOOST_SERIALIZATION_NVP(adoption_turn)
@@ -28,7 +28,7 @@ template void Empire::PolicyAdoptionInfo::serialize<freeorion_xml_oarchive>(free
 template void Empire::PolicyAdoptionInfo::serialize<freeorion_xml_iarchive>(freeorion_xml_iarchive&, const unsigned int);
 
 
-template <class Archive>
+template <typename Archive>
 void Empire::serialize(Archive& ar, const unsigned int version)
 {
     ar  & BOOST_SERIALIZATION_NVP(m_id)
@@ -366,6 +366,8 @@ void serialize(Archive& ar, EmpireManager& em, unsigned int const version)
             }
         }
     }
+
+    DebugLogger() << "EmpireManager takes at least: " << em.SizeInMemory()/1024 << " kB";
 }
 
 template void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive&, EmpireManager&, unsigned int const);

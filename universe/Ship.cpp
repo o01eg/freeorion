@@ -43,22 +43,20 @@ Ship::Ship(int empire_id, int design_id, std::string species_name,
         DebugLogger() << "Ship created with invalid species name: " << m_species_name;
 
 
-    UniverseObject::Init();
-
-    AddMeter(MeterType::METER_FUEL);
-    AddMeter(MeterType::METER_MAX_FUEL);
-    AddMeter(MeterType::METER_SHIELD);
-    AddMeter(MeterType::METER_MAX_SHIELD);
-    AddMeter(MeterType::METER_DETECTION);
-    AddMeter(MeterType::METER_STRUCTURE);
-    AddMeter(MeterType::METER_MAX_STRUCTURE);
-    AddMeter(MeterType::METER_SPEED);
-    AddMeter(MeterType::METER_TARGET_INDUSTRY);
-    AddMeter(MeterType::METER_INDUSTRY);
-    AddMeter(MeterType::METER_TARGET_RESEARCH);
-    AddMeter(MeterType::METER_RESEARCH);
-    AddMeter(MeterType::METER_TARGET_INFLUENCE);
-    AddMeter(MeterType::METER_INFLUENCE);
+    static constexpr auto ship_meter_types = []() {
+        std::array<MeterType, 15> retval{{
+            MeterType::METER_FUEL, MeterType::METER_MAX_FUEL, MeterType::METER_SHIELD, MeterType::METER_MAX_SHIELD,
+            MeterType::METER_DETECTION, MeterType::METER_STRUCTURE, MeterType::METER_MAX_STRUCTURE,
+            MeterType::METER_SPEED, MeterType::METER_TARGET_INDUSTRY, MeterType::METER_INDUSTRY,
+            MeterType::METER_TARGET_RESEARCH, MeterType::METER_RESEARCH, MeterType::METER_TARGET_INFLUENCE,
+            MeterType::METER_INFLUENCE, MeterType::METER_STEALTH  // stealth here means Universe::Init not needed
+        }};
+#if defined(__cpp_lib_constexpr_algorithms)
+        std::sort(retval.begin(), retval.end());
+#endif
+        return retval;
+    }();
+    AddMeters(ship_meter_types);
 
     if (!design)
         return;
@@ -550,6 +548,20 @@ std::vector<float> Ship::AllWeaponsMaxShipDamage(const ScriptingContext& context
 
     return Combat::WeaponDamageImpl(context, std::static_pointer_cast<const Ship>(shared_from_this()),
                                     shield_DR, true, launch_fighters);
+}
+
+std::size_t Ship::SizeInMemory() const {
+    std::size_t retval = UniverseObject::SizeInMemory();
+    retval += sizeof(Ship) - sizeof(UniverseObject);
+
+    retval += sizeof(PartMeterMap::value_type)*m_part_meters.capacity();
+    for (const auto& [name_type, ignored] : m_part_meters) {
+        (void)ignored;
+        retval += name_type.first.capacity()*sizeof(decltype(name_type.first)::value_type);
+    }
+    retval += sizeof(decltype(m_species_name)::value_type)*m_species_name.capacity();
+
+    return retval;
 }
 
 void Ship::SetFleetID(int fleet_id) {

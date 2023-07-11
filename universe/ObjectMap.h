@@ -34,7 +34,7 @@ class Field;
 /** Contains a set of objects that make up a (known or complete) Universe. */
 class FO_COMMON_API ObjectMap {
 public:
-    template <typename T>
+    template <typename T = UniverseObject>
     using container_type = std::map<int, std::shared_ptr<T>>;
 
 
@@ -158,7 +158,7 @@ public:
 
     /** Returns all the ids and objects of type T */
     template <typename T> requires (std::is_const_v<T>)
-    [[nodiscard]] auto allWithIDs()
+    [[nodiscard]] const auto& allWithIDs()
     {
         const auto& const_this = *this;
         return const_this.allWithIDs<T>();
@@ -302,7 +302,7 @@ private:
     void CopyObjectsToSpecializedMaps();
 
     // returns const container of mutable T ... may need further adapting for fully const safe use
-    template <typename T>
+    template <typename T = UniverseObject>
     [[nodiscard]] const container_type<std::decay_t<T>>& Map() const noexcept
     {
         static_assert(!std::is_const_v<T>, "type for Map() should not be const");
@@ -328,7 +328,7 @@ private:
         }
     }
 
-    template <typename T>
+    template <typename T = UniverseObject>
     [[nodiscard]] container_type<std::decay_t<T>>& Map() noexcept
     {
         static_assert(!std::is_const_v<T>, "type for Map() should not be const");

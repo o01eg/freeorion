@@ -169,6 +169,8 @@ public:
     [[nodiscard]] int                         CreationTurn() const noexcept { return m_created_on_turn; }; ///< returns game turn on which object was created
     [[nodiscard]] int                         AgeInTurns(int current_turn) const;   ///< returns elapsed number of turns between turn object was created and current game turn
 
+    [[nodiscard]] virtual std::size_t         SizeInMemory() const;
+
     mutable StateChangedSignalType StateChangedSignal; ///< emitted when the UniverseObject is altered in any way
 
     /** copies data from \a copied_object to this object, limited to only copy
@@ -205,7 +207,6 @@ public:
     void RemoveSpecial(const std::string& name);                    ///< removes the Special \a name from this object, if it is already present
     void SetSpecialCapacity(std::string name, float capacity, int turn);
 
-public:
     /** Sets current value of max, target and unpaired meters in in this
       * UniverseObject to Meter::DEFAULT_VALUE.  This should be done before any
       * Effects that alter these meter(s) act on the object. */
@@ -253,8 +254,16 @@ protected:
 
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
-    void AddMeter(MeterType meter_type); ///< inserts a meter into object as the \a meter_type meter.  Should be used by derived classes to add their specialized meters to objects
-    void Init();                         ///< adds stealth meter
+    void AddMeter(MeterType meter_type) { m_meters[meter_type]; }
+
+    void AddMeters(const auto& meter_types)
+        requires requires { meter_types.begin(); }
+    {
+        for (MeterType mt : meter_types)
+            AddMeter(mt);
+    }
+
+    void Init();
 
     /** Used by public UniverseObject::Copy and derived classes' ::Copy methods. */
     void Copy(const UniverseObject& copied_object, Visibility vis,

@@ -20,6 +20,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/uuid/nil_generator.hpp>
 
+#include <numeric>
 #if __has_include(<charconv>)
 #include <charconv>
 #else
@@ -207,9 +208,9 @@ void serialize(Archive& ar, Universe& u, unsigned int const version)
     timer.EnterSection("latest known objects");
     ar  & make_nvp("empire_latest_known_objects", empire_latest_known_objects);
     DebugLogger() << "Universe::serialize : " << serializing_label << " empire known objects for " << empire_latest_known_objects.size() << " empires";
-    if constexpr (Archive::is_loading::value) {
+    if constexpr (Archive::is_loading::value)
         u.m_empire_latest_known_objects.swap(empire_latest_known_objects);
-    }
+
 
     timer.EnterSection("id allocator");
     if (version >= 1) {
@@ -260,7 +261,21 @@ void serialize(Archive& ar, Universe& u, unsigned int const version)
                 elko.second.UpdateCurrentDestroyedObjects(destroyed_ids_it->second);
         }
     }
-    DebugLogger() << "Universe " << serializing_label << " done";
+    static constexpr auto objects_mem_size = [](const ObjectMap& o) {
+        const auto& all_objs = o.allWithIDs<UniverseObject>();
+        return std::transform_reduce(all_objs.begin(), all_objs.end(), 0u, std::plus<>{},
+                                     [](const auto& id_obj) { return sizeof(id_obj) + id_obj.second->SizeInMemory(); });
+    };
+
+    const auto& eo = u.m_empire_latest_known_objects;
+    const auto empire_objects_mem_sz =
+        std::transform_reduce(eo.begin(), eo.end(), 0u, std::plus<>{},
+                              [](auto& o) { return objects_mem_size(o.second) + sizeof(o); });
+
+    DebugLogger() << "Universe " << serializing_label << " done. UniverseObjects take at least: "
+                  << objects_mem_size(u.Objects())/1024 << " kB and empire known objects at least: "
+                  << empire_objects_mem_sz/1024 << " kB";
+    DebugLogger() << "Universe other stuff takes at least: " << u.SizeInMemory()/1024u << " kB";
 }
 
 
@@ -785,14 +800,24 @@ void serialize(Archive& ar, System& obj, unsigned int const version)
     };
     std::for_each(id_sets.begin(), id_sets.end(), serialize_flat_set);
 
-    ar  & make_nvp("m_starlanes_wormholes", obj.m_starlanes_wormholes);
+    if (Archive::is_loading::value && version < 2) {
+        obj.m_starlanes.clear();
+        std::map<int, bool> lanes_wormholes;
+        ar  & make_nvp("m_starlanes_wormholes", lanes_wormholes);
+        std::transform(lanes_wormholes.begin(), lanes_wormholes.end(),
+                       std::inserter(obj.m_starlanes, obj.m_starlanes.end()),
+                       [](const auto& id_w) { return id_w.first; });
+    } else {
+        Serialize(ar, "m_starlanes", obj.m_starlanes);
+    }
+
     ar  & make_nvp("m_last_turn_battle_here", obj.m_last_turn_battle_here);
     if constexpr (Archive::is_loading::value)
         obj.m_system_id = obj.ID(); // override old value that was stored differently previously...
 }
 
 BOOST_CLASS_EXPORT(System)
-BOOST_CLASS_VERSION(System, 1)
+BOOST_CLASS_VERSION(System, 2)
 
 template void serialize<freeorion_bin_oarchive>(freeorion_bin_oarchive& ar, System&, unsigned int const);
 template void serialize<freeorion_xml_oarchive>(freeorion_xml_oarchive& ar, System&, unsigned int const);

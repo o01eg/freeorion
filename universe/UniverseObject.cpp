@@ -224,13 +224,6 @@ const Meter* UniverseObject::GetMeter(MeterType type) const noexcept {
     return nullptr;
 }
 
-void UniverseObject::AddMeter(MeterType meter_type) {
-    if (MeterType::INVALID_METER_TYPE == meter_type)
-        ErrorLogger() << "UniverseObject::AddMeter asked to add invalid meter type!";
-    else
-        m_meters[meter_type];
-}
-
 Visibility UniverseObject::GetVisibility(int empire_id, const EmpireIDtoObjectIDtoVisMap& v) const {
     auto empire_it = v.find(empire_id);
     if (empire_it == v.end())
@@ -342,6 +335,18 @@ void UniverseObject::SetSpecialCapacity(std::string name, float capacity, int tu
         m_specials.emplace(std::piecewise_construct,
                            std::forward_as_tuple(std::move(name)),
                            std::forward_as_tuple(turn, capacity));
+}
+
+std::size_t UniverseObject::SizeInMemory() const {
+    std::size_t retval = 0;
+    retval += sizeof(UniverseObject);
+    retval += sizeof(MeterMap::value_type)*m_meters.capacity();
+    retval += sizeof(SpecialMap::value_type)*m_specials.capacity();
+    for (const auto& [name, ignored] : m_specials) {
+        (void)ignored;
+        retval += sizeof(decltype(name)::value_type)*name.capacity();
+    }
+    return retval;
 }
 
 void UniverseObject::RemoveSpecial(const std::string& name)

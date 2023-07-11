@@ -338,8 +338,8 @@ public:
     void DeselectAll(bool signal = false);               ///< deselects all rows
     void SetSelections(const SelectionSet& s, bool signal = false);  ///< sets the set of selected rows to \a s
 
-    iterator    begin();                                ///< returns an iterator to the first list row
-    iterator    end();                                  ///< returns an iterator to the imaginary row one past the last one
+    iterator    begin() noexcept;                       ///< returns an iterator to the first list row
+    iterator    end() noexcept;                         ///< returns an iterator to the imaginary row one past the last one
 
     Row& GetRow(std::size_t n);                         ///< returns a reference to the Row at row index \a n; not range-checked.  \note This function is O(n).
 
@@ -351,8 +351,8 @@ public:
     void SetVScrollWheelIncrement(unsigned int increment);
     void SetHScrollWheelIncrement(unsigned int increment);
 
-    void SetInteriorColor(Clr c);                       ///< sets the color painted into the client area of the control
-    void SetHiliteColor(Clr c);                         ///< sets the color behind selected line items
+    void SetInteriorColor(Clr c) noexcept;              ///< sets the color painted into the client area of the control
+    void SetHiliteColor(Clr c) noexcept;                ///< sets the color behind selected line items
 
     /** sets the style flags for the ListBox to \a s. \see GG::ListBoxStyle */
     void SetStyle(Flags<ListBoxStyle> s);

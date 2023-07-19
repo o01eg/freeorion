@@ -5,6 +5,31 @@ from common.priorities import (
     FOCUS_CHANGE_PENALTY_PRIORITY,
     LATE_AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
 )
+from focs._effects import (
+    Abs,
+    CurrentTurn,
+    EffectsGroup,
+    Focus,
+    IsSource,
+    LocalCandidate,
+    MaxOf,
+    MinOf,
+    Planet,
+    Population,
+    SetConstruction,
+    SetIndustry,
+    SetInfluence,
+    SetResearch,
+    SetStockpile,
+    SetTargetConstruction,
+    SetTargetIndustry,
+    SetTargetInfluence,
+    SetTargetResearch,
+    Ship,
+    Target,
+    TargetPopulation,
+    Value,
+)
 
 STANDARD_METER_GROWTH = [
     # increase or decrease towards target meter of planets, when not recently conquered
@@ -191,3 +216,4 @@ FOCUS_CHANGE_PENALTY = [
 # FAST_COLONIZATION and SLOW_COLONIZATION are stubs for applying the
 # fast colonization building speed description to a species.
 FAST_COLONIZATION = DESCRIPTION_EFFECTSGROUP_MACRO("FAST_COLONIZATION_DESC")
+SLOW_COLONIZATION = DESCRIPTION_EFFECTSGROUP_MACRO("SLOW_COLONIZATION_DESC")

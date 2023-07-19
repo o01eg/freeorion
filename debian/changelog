@@ -1,3 +1,9 @@
+freeorion (0.5.0.9999.fo0025+git20230718.3e4785dppa1~jammy) jammy; urgency=medium
+
+  * Update weekly-test-build to 2023-07-18.3e4785d.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Wed, 19 Jul 2023 09:14:15 +0300
+
 freeorion (0.5.0.9999.fo0025+git20230710.c17e43dppa1~jammy) jammy; urgency=medium
 
   * Update weekly-test-build.

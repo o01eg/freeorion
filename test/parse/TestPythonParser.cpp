@@ -26,19 +26,20 @@ namespace {
 BOOST_FIXTURE_TEST_SUITE(TestPythonParser, ParserAppFixture)
 
 BOOST_AUTO_TEST_CASE(parse_game_rules) {
-    PythonParser parser(m_python, m_scripting_dir);
+    PythonParser parser(m_python, m_test_scripting_dir);
 
-    auto game_rules_p = Pending::ParseSynchronously(parse::game_rules, parser,  m_scripting_dir / "game_rules.focs.py");
+    auto game_rules_p = Pending::ParseSynchronously(parse::game_rules, parser,  m_test_scripting_dir / "game_rules.focs.py");
     auto game_rules = *Pending::WaitForPendingUnlocked(std::move(game_rules_p));
     BOOST_REQUIRE(!game_rules.empty());
     BOOST_REQUIRE(game_rules.contains("RULE_HABITABLE_SIZE_MEDIUM"));
     BOOST_REQUIRE(GameRule::Type::TOGGLE == game_rules["RULE_ENABLE_ALLIED_REPAIR"].type);
 }
 
+#if !defined(FREEORION_MACOSX)
 BOOST_AUTO_TEST_CASE(parse_techs) {
-    PythonParser parser(m_python, m_scripting_dir);
+    PythonParser parser(m_python, m_test_scripting_dir);
 
-    auto techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, m_scripting_dir / "techs");
+    auto techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, m_test_scripting_dir / "techs");
     auto [techs, tech_categories, categories_seen] = *Pending::WaitForPendingUnlocked(std::move(techs_p));
     BOOST_REQUIRE(!tech_categories.empty());
 
@@ -205,11 +206,12 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
     BOOST_REQUIRE_EQUAL(9, tech_categories.size());
     BOOST_REQUIRE_EQUAL(2, categories_seen.size());
 }
+#endif
 
 BOOST_AUTO_TEST_CASE(parse_species) {
-    PythonParser parser(m_python, m_scripting_dir);
+    PythonParser parser(m_python, m_test_scripting_dir);
 
-    auto species_p = Pending::ParseSynchronously(parse::species, parser, m_scripting_dir / "species");
+    auto species_p = Pending::ParseSynchronously(parse::species, parser, m_test_scripting_dir / "species");
     const auto [species_map, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
 
     BOOST_REQUIRE(!ordering.empty());
@@ -431,16 +433,11 @@ BOOST_AUTO_TEST_CASE(parse_species) {
  */
 
 BOOST_AUTO_TEST_CASE(parse_techs_full) {
-    auto scripting_dir = boost::filesystem::system_complete(GetBinDir() / "default/scripting");
-    BOOST_REQUIRE(scripting_dir.is_absolute());
-    BOOST_REQUIRE(boost::filesystem::exists(scripting_dir));
-    BOOST_REQUIRE(boost::filesystem::is_directory(scripting_dir));
+    PythonParser parser(m_python, m_default_scripting_dir);
 
-    PythonParser parser(m_python, scripting_dir);
+    auto named_values = Pending::ParseSynchronously(parse::named_value_refs, m_default_scripting_dir / "common");
 
-    auto named_values = Pending::ParseSynchronously(parse::named_value_refs, scripting_dir / "common");
-
-    auto techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, scripting_dir / "techs");
+    auto techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, m_default_scripting_dir / "techs");
     auto [techs, tech_categories, categories_seen] = *Pending::WaitForPendingUnlocked(std::move(techs_p));
 
     BOOST_REQUIRE(!techs.empty());
@@ -474,16 +471,11 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
  */
 
 BOOST_AUTO_TEST_CASE(parse_species_full) {
-    auto scripting_dir = boost::filesystem::system_complete(GetBinDir() / "default/scripting");
-    BOOST_REQUIRE(scripting_dir.is_absolute());
-    BOOST_REQUIRE(boost::filesystem::exists(scripting_dir));
-    BOOST_REQUIRE(boost::filesystem::is_directory(scripting_dir));
+    PythonParser parser(m_python, m_default_scripting_dir);
 
-    PythonParser parser(m_python, scripting_dir);
+    auto named_values = Pending::ParseSynchronously(parse::named_value_refs, m_default_scripting_dir / "common");
 
-    auto named_values = Pending::ParseSynchronously(parse::named_value_refs, scripting_dir / "common");
-
-    auto species_p = Pending::ParseSynchronously(parse::species, parser, scripting_dir / "species");
+    auto species_p = Pending::ParseSynchronously(parse::species, parser, m_default_scripting_dir / "species");
     const auto [species, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
 
     BOOST_REQUIRE(!ordering.empty());

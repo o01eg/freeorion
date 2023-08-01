@@ -1251,8 +1251,7 @@ namespace {
             for (const auto* obj : combat_info.objects.allRaw())
                 empire_ids_with_objects.insert(obj->Owner());
 
-            for (auto& [empire_id, ignored] : empire_infos) {
-                (void)ignored;
+            for (const auto empire_id : empire_infos | range_keys) {
                 if (!empire_ids_with_objects.contains(empire_id)) {
                     temp.erase(empire_id);
                     DebugLogger(combat) << "No objects left for empire with id: " << empire_id;
@@ -1821,7 +1820,7 @@ namespace {
         // they won't get any chance to attack during this combat
         if (combat_info.bout < NUM_COMBAT_ROUNDS) {
             auto launches_event = std::make_shared<FighterLaunchesEvent>();
-            for (const auto& attacker : combat_info.objects.findRaw<Ship>(shuffled_attackers)) {
+            for (auto* attacker : combat_info.objects.findRaw<Ship>(shuffled_attackers)) {
                 if (!attacker)
                     continue;
                 if (!ObjectCanAttack(attacker, context)) {

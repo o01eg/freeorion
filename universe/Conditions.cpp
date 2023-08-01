@@ -71,9 +71,15 @@ namespace {
         in_out.insert(in_out.end(), all_t.begin(), all_t.end());
     }
 
-    template <typename T = UniverseObject>
-    Condition::ObjectSet AllObjectsSet(const ObjectMap& objects)
-    { return objects.allExistingRaw<T>(); }
+    template <typename T = UniverseObject, bool cast = false>
+    decltype(auto) AllObjectsSet(const ObjectMap& objects) noexcept
+    {
+        const auto& objs = objects.allExistingRaw<T>();
+        if constexpr (cast)
+            return Condition::ObjectSet(objs.begin(), objs.end());
+        else
+            return objs;
+    }
 
 
     /** Used by 4-parameter Condition::Eval function, and some of its overrides,
@@ -792,9 +798,7 @@ namespace {
 
             // transfer objects with the most common keys
             uint32_t number_transferred = 0;
-            for (auto& [ignored, cur_sort_key] : inv_histogram) {
-                (void)ignored;
-
+            for (const auto cur_sort_key : inv_histogram | range_values) {
                 for (auto& [obj_sort_key, object_to_transfer] : sort_key_objects) {
                     if (obj_sort_key != cur_sort_key)
                         continue;
@@ -1811,7 +1815,7 @@ bool Homeworld::Match(const ScriptingContext& local_context) const {
 }
 
 ObjectSet Homeworld::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{ return AllObjectsSet<Planet>(parent_context.ContextObjects()); }
+{ return AllObjectsSet<Planet, true>(parent_context.ContextObjects()); }
 
 void Homeworld::SetTopLevelContent(const std::string& content_name) {
     for (auto& name : m_names) {
@@ -1979,17 +1983,8 @@ bool Capital::Match(const ScriptingContext& local_context) const {
     }
 }
 
-ObjectSet Capital::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const {
-    ObjectSet retval;
-    const auto capital_ids{parent_context.Empires().CapitalIDs()};
-    retval.reserve(capital_ids.size());
-    for (const auto& [obj_id, obj] : parent_context.ContextObjects().allExisting()) {
-        if (std::any_of(capital_ids.begin(), capital_ids.end(),
-                        [o_id{obj_id}](const int cap_id) { return o_id == cap_id; }))
-        { retval.push_back(obj.get()); }
-    }
-    return retval;
-}
+ObjectSet Capital::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
+{ return parent_context.ContextObjects().findExistingRaw(parent_context.Empires().CapitalIDs()); }
 
 uint32_t Capital::GetCheckSum() const {
     uint32_t retval{0};
@@ -2039,7 +2034,7 @@ bool Monster::Match(const ScriptingContext& local_context) const {
 }
 
 ObjectSet Monster::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{ return AllObjectsSet<Ship>(parent_context.ContextObjects()); }
+{ return AllObjectsSet<Ship, true>(parent_context.ContextObjects()); }
 
 uint32_t Monster::GetCheckSum() const {
     uint32_t retval{0};
@@ -2218,22 +2213,22 @@ ObjectSet Type::GetDefaultInitialCandidateObjects(const ScriptingContext& parent
 
     switch (m_type->Eval(parent_context)) {
         case UniverseObjectType::OBJ_BUILDING:
-            return AllObjectsSet<::Building>(parent_context.ContextObjects());
+            return AllObjectsSet<::Building, true>(parent_context.ContextObjects());
             break;
         case UniverseObjectType::OBJ_FIELD:
-            return AllObjectsSet<::Field>(parent_context.ContextObjects());
+            return AllObjectsSet<::Field, true>(parent_context.ContextObjects());
             break;
         case UniverseObjectType::OBJ_FLEET:
-            return AllObjectsSet<Fleet>(parent_context.ContextObjects());
+            return AllObjectsSet<Fleet, true>(parent_context.ContextObjects());
             break;
         case UniverseObjectType::OBJ_PLANET:
-            return AllObjectsSet<Planet>(parent_context.ContextObjects());
+            return AllObjectsSet<Planet, true>(parent_context.ContextObjects());
             break;
         case UniverseObjectType::OBJ_SHIP:
-            return AllObjectsSet<Ship>(parent_context.ContextObjects());
+            return AllObjectsSet<Ship, true>(parent_context.ContextObjects());
             break;
         case UniverseObjectType::OBJ_SYSTEM:
-            return AllObjectsSet<System>(parent_context.ContextObjects());
+            return AllObjectsSet<System, true>(parent_context.ContextObjects());
             break;
         case UniverseObjectType::OBJ_FIGHTER:   // shouldn't exist outside of combat as a separate object
         default:
@@ -2403,7 +2398,7 @@ std::string Building::Dump(uint8_t ntabs) const {
 }
 
 ObjectSet Building::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{ return AllObjectsSet<::Building>(parent_context.ContextObjects()); }
+{ return AllObjectsSet<::Building, true>(parent_context.ContextObjects()); }
 
 bool Building::Match(const ScriptingContext& local_context) const {
     const auto* candidate = local_context.condition_local_candidate;
@@ -2563,7 +2558,7 @@ std::string Field::Dump(uint8_t ntabs) const {
 }
 
 ObjectSet Field::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{ return AllObjectsSet<::Field>(parent_context.ContextObjects()); }
+{ return AllObjectsSet<::Field, true>(parent_context.ContextObjects()); }
 
 bool Field::Match(const ScriptingContext& local_context) const {
     const auto* candidate = local_context.condition_local_candidate;
@@ -3785,7 +3780,7 @@ std::string OnPlanet::Dump(uint8_t ntabs) const {
 ObjectSet OnPlanet::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const {
     if (!m_planet_id) {
         // only buildings can be on planets
-        return AllObjectsSet<::Building>(parent_context.ContextObjects());
+        return AllObjectsSet<::Building, true>(parent_context.ContextObjects());
     }
 
     const bool simple_eval_safe = m_planet_id->ConstantExpr() ||
@@ -3793,7 +3788,7 @@ ObjectSet OnPlanet::GetDefaultInitialCandidateObjects(const ScriptingContext& pa
          (parent_context.condition_root_candidate || RootCandidateInvariant()));
     if (!simple_eval_safe) {
         // only buildings can be on planets
-        return AllObjectsSet<::Building>(parent_context.ContextObjects());
+        return AllObjectsSet<::Building, true>(parent_context.ContextObjects());
     }
 
     // simple case of a single specified system id; can add just objects in that system
@@ -4810,7 +4805,7 @@ namespace {
         const auto m_end = mask.end();
 
         for (; m_it != m_end; ++m_it) {
-            if (*m_it != test_val)
+            if (static_cast<bool>(*m_it) != test_val)
                 *to_dest++ = *o_it++;       // put at next position in to set and move to next object to test
             else
                 *from_dest++ = *o_it++;     // put at next output position in from set and move to next object to check mask for
@@ -4886,45 +4881,44 @@ void SpeciesOpinion::Eval(const ScriptingContext& parent_context,
     const auto& sm{parent_context.species};
 
     if (m_content && m_content->LocalCandidateInvariant()) {
-        auto process_objects_with_different_species =
+        const auto process_objects_with_different_species =
             [&sm, search_domain, &matches, &non_matches, this]
-            (const auto& species_for_objects, std::string content)
+            (auto species_for_objects, const std::string_view content)
         {
             // determine all unique species
-            std::vector<std::string_view> unique_species(species_for_objects.begin(), species_for_objects.end());
-            std::sort(unique_species.begin(), unique_species.end());
-            auto unique_it = std::unique(unique_species.begin(), unique_species.end());
-            unique_species.resize(std::distance(unique_species.begin(), unique_it));
+            std::sort(species_for_objects.begin(), species_for_objects.end());
+            auto unique_it = std::unique(species_for_objects.begin(), species_for_objects.end());
+            species_for_objects.resize(std::distance(species_for_objects.begin(), unique_it));
 
             // get set of species that match the criteron about liking or disliking the content
             std::vector<std::string_view> matching_species;
-            matching_species.reserve(unique_species.size());
+            matching_species.reserve(species_for_objects.size());
 
             if (sm.empty()) // forces check for pending species
                 DebugLogger() << "SpeciesOpinion found no species...";
 
             if (m_comp == ComparisonType::GREATER_THAN) {
                 // find species that like content
-                std::copy_if(unique_species.begin(), unique_species.end(), std::back_inserter(matching_species),
+                std::copy_if(species_for_objects.begin(), species_for_objects.end(), std::back_inserter(matching_species),
                              [content, &sm](const std::string_view sv) -> bool {
                                  const auto* species = sm.GetSpeciesUnchecked(sv); //GetSpecies(sv); //sm.GetSpeciesUnchecked(sv);
                                  if (!species)
                                      return false;
                                  const auto& likes = species->Likes();
                                  return std::any_of(likes.begin(), likes.end(),
-                                                    [&content](const auto l) { return l == content; });
+                                                    [content](const auto l) { return l == content; });
                              });
 
             } else if (m_comp == ComparisonType::LESS_THAN) {
                 // find species that dislike content
-                std::copy_if(unique_species.begin(), unique_species.end(), std::back_inserter(matching_species),
+                std::copy_if(species_for_objects.begin(), species_for_objects.end(), std::back_inserter(matching_species),
                              [content, &sm](const std::string_view sv) -> bool {
                                  const auto* species = sm.GetSpeciesUnchecked(sv); //GetSpecies(sv); // sm.GetSpeciesUnchecked(sv);
                                  if (!species)
                                      return false;
                                  const auto& dislikes = species->Dislikes();
                                  return std::any_of(dislikes.begin(), dislikes.end(),
-                                                    [&content](const auto d) { return d == content; });
+                                                    [content](const auto d) { return d == content; });
                              });
             }
 
@@ -4984,7 +4978,7 @@ void SpeciesOpinion::Eval(const ScriptingContext& parent_context,
             std::transform(from.begin(), from.end(), std::back_inserter(species_for_objects),
                            get_species_for_object);
 
-            process_objects_with_different_species(species_for_objects, m_content->Eval(parent_context));
+            process_objects_with_different_species(std::move(species_for_objects), m_content->Eval(parent_context));
 
         } else if (!m_species->LocalCandidateInvariant()) {
             auto eval_object_species = [&parent_context, this](const UniverseObject* obj) -> std::string {
@@ -4999,7 +4993,7 @@ void SpeciesOpinion::Eval(const ScriptingContext& parent_context,
             std::transform(from.begin(), from.end(), std::back_inserter(species_for_objects),
                            eval_object_species);
 
-            process_objects_with_different_species(species_for_objects, m_content->Eval(parent_context));
+            process_objects_with_different_species(std::move(species_for_objects), m_content->Eval(parent_context));
 
         } else {
             process_objects_with_same_species(m_species->Eval(parent_context), m_content->Eval(parent_context));
@@ -5409,7 +5403,7 @@ bool Enqueued::Match(const ScriptingContext& local_context) const {
 }
 
 ObjectSet Enqueued::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{ return AllObjectsSet<Planet>(parent_context.ContextObjects()); }
+{ return AllObjectsSet<Planet, true>(parent_context.ContextObjects()); }
 
 void Enqueued::SetTopLevelContent(const std::string& content_name) {
     if (m_name)
@@ -5886,7 +5880,7 @@ bool DesignHasHull::Match(const ScriptingContext& local_context) const {
 }
 
 ObjectSet DesignHasHull::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{ return AllObjectsSet<Ship>(parent_context.ContextObjects()); }
+{ return AllObjectsSet<Ship, true>(parent_context.ContextObjects()); }
 
 void DesignHasHull::SetTopLevelContent(const std::string& content_name) {
     if (m_name)
@@ -6070,7 +6064,7 @@ bool DesignHasPart::Match(const ScriptingContext& local_context) const {
 }
 
 ObjectSet DesignHasPart::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{ return AllObjectsSet<Ship>(parent_context.ContextObjects()); }
+{ return AllObjectsSet<Ship, true>(parent_context.ContextObjects()); }
 
 void DesignHasPart::SetTopLevelContent(const std::string& content_name) {
     if (m_low)
@@ -6251,7 +6245,7 @@ bool DesignHasPartClass::Match(const ScriptingContext& local_context) const {
 }
 
 ObjectSet DesignHasPartClass::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
-{ return AllObjectsSet<Ship>(parent_context.ContextObjects()); }
+{ return AllObjectsSet<Ship, true>(parent_context.ContextObjects()); }
 
 void DesignHasPartClass::SetTopLevelContent(const std::string& content_name) {
     if (m_low)

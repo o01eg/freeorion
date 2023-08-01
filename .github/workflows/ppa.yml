@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        dist: [jammy, kinetic, lunar, mantic]
+        dist: [jammy, lunar, mantic]
 
     steps:
       - name: Checkout sources

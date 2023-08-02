@@ -113,7 +113,7 @@ std::shared_ptr<const UniverseObject> Empire::Source(const ObjectMap& objects) c
     // Find any planet / ship owned by the empire
     auto owned = [this](const auto& o) { return o.second->OwnedBy(m_id); };
 
-    const auto& planets = objects.allExisting<Planet>();
+    const auto& planets = objects.allExisting<Planet>(); // TODO: provide a FindAny function to do this...
     auto p_it = std::find_if(planets.begin(), planets.end(), owned);
     if (p_it != planets.end())
         return p_it->second;
@@ -317,9 +317,7 @@ void Empire::UpdatePolicies(bool update_cumulative_adoption_time, int current_tu
     auto total_category_slot_counts = TotalPolicySlots(); // how many slots in each category
     std::set<std::string_view> categories_needing_rearrangement;                 // which categories have a problem
     std::map<std::string_view, std::map<int, int>> category_slot_policy_counts;   // how many policies in each slot of each category
-    for (auto& [policy_name, adoption_info] : m_adopted_policies) {
-        (void)policy_name; // quiet warning
-        const auto& [adoption_turn, slot_in_category, category] = adoption_info;
+    for (auto& [adoption_turn, slot_in_category, category] : m_adopted_policies | range_values) {
         (void)adoption_turn; // quiet warning
         const auto& slot_count = category_slot_policy_counts[category][slot_in_category]++; // count how many policies in this slot of this category...
         const auto cat_slot_it = std::find_if(total_category_slot_counts.begin(), total_category_slot_counts.end(),
@@ -460,8 +458,7 @@ bool Empire::PolicyPrereqsAndExclusionsOK(std::string_view name, int current_tur
     const auto& to_adopt_exclusions = policy_to_adopt->Exclusions();
 
     // is there an exclusion conflict?
-    for (auto& [already_adopted_policy_name, ignored] : m_adopted_policies) {
-        (void)ignored; // quiet warning
+    for (auto& already_adopted_policy_name : m_adopted_policies | range_keys) {
         if (std::any_of(to_adopt_exclusions.begin(), to_adopt_exclusions.end(),
                         [a{already_adopted_policy_name}](auto& x) { return x == a; }))
         {
@@ -574,11 +571,11 @@ std::vector<std::pair<std::string_view, int>> Empire::EmptyPolicySlots() const {
     auto retval = TotalPolicySlots();
 
     // subtract used policy categories
-    for (auto& [ignored, adoption_info] : m_adopted_policies) {
-        (void)ignored; // quiet warning
-        const std::string_view cat = adoption_info.category;
+    for (const auto& cat : m_adopted_policies | range_values
+         | range_transform([](auto& pai) { return pai.category; }))
+    {
         const auto it = std::find_if(retval.begin(), retval.end(),
-                                     [cat](const auto& rv) { return rv.first == cat; });
+                                     [&cat](const auto& rv) { return rv.first == cat; });
         if (it != retval.end())
             it->second--;
     }
@@ -1046,22 +1043,13 @@ void Empire::UpdateSystemSupplyRanges(const std::set<int>& known_objects, const 
     TraceLogger(supply) << "Empire::UpdateSystemSupplyRanges() for empire " << this->Name();
     m_supply_system_ranges.clear();
 
-    // as of this writing, only planets can generate supply propagation
-    std::vector<const UniverseObject*> owned_planets;
-    owned_planets.reserve(known_objects.size());
-    for (auto* planet: objects.findRaw<Planet>(known_objects)) {
-        if (!planet)
-            continue;
-        if (planet->OwnedBy(this->EmpireID()))
-            owned_planets.push_back(planet);
-    }
-
-    //std::cout << "... empire owns " << owned_planets.size() << " planets" << std::endl;
-    for (auto* obj : owned_planets) {
+    const auto owned = [owner_id{this->EmpireID()}](const Planet* plt) { return plt->OwnedBy(owner_id); };
+    const auto known_planets = objects.findRaw<Planet>(known_objects);
+    for (const Planet* obj : known_planets | range_filter(owned)) {
         //std::cout << "... considering owned planet: " << obj->Name() << std::endl;
 
         // ensure object is within a system, from which it can distribute supplies
-        int system_id = obj->SystemID();
+        const int system_id = obj->SystemID();
         if (system_id == INVALID_OBJECT_ID)
             continue;   // TODO: consider future special case if current object is itself a system
 
@@ -1099,7 +1087,7 @@ void Empire::UpdateSystemSupplyRanges(const Universe& universe) {
 }
 
 void Empire::UpdateUnobstructedFleets(ObjectMap& objects, const std::unordered_set<int>& known_destroyed_objects) {
-    for (const auto& system : objects.find<System>(m_supply_unobstructed_systems)) {
+    for (const auto* system : objects.findRaw<System>(m_supply_unobstructed_systems)) {
         if (!system)
             continue;
 
@@ -1242,7 +1230,7 @@ void Empire::UpdateSupplyUnobstructedSystems(const ScriptingContext& context,
 
 
     // check each potential supplyable system for whether it can propagate supply.
-    for (const auto& sys : objects.find<System>(known_systems)) {
+    for (const auto* sys : objects.findRaw<System>(known_systems)) {
         if (!sys)
             continue;
 
@@ -2839,9 +2827,9 @@ void Empire::InitResourcePools(const ObjectMap& objects, const SupplyManager& su
     planets.reserve(objects.allExisting<Planet>().size());
     planets_and_ships.reserve(objects.allExisting<Planet>().size() + objects.allExisting<Ship>().size());
 
-    for (const auto& [res_id, res] : objects.allExisting<Planet>()) {
-        if (res->OwnedBy(m_id))
-            planets.push_back(res_id);
+    for (const auto& [planet_id, planet] : objects.allExisting<Planet>()) {
+        if (planet->OwnedBy(m_id))
+            planets.push_back(planet_id);
     }
     planets_and_ships.insert(planets_and_ships.end(), planets.begin(), planets.end());
     m_population_pool.SetPopCenters(std::move(planets));
@@ -2861,9 +2849,8 @@ void Empire::InitResourcePools(const ObjectMap& objects, const SupplyManager& su
 
     // set non-blockadeable resource pools to share resources between all systems
     std::set<std::set<int>> sets_set;
-    std::set<int> all_systems_set;
-    for (const auto& entry : objects.allExisting<System>())
-        all_systems_set.insert(entry.first);
+    auto system_ids = objects.allExisting<System>() | range_keys;
+    std::set<int> all_systems_set{system_ids.begin(), system_ids.end()};
     sets_set.insert(std::move(all_systems_set));
     m_research_pool.SetConnectedSupplyGroups(sets_set);
     m_influence_pool.SetConnectedSupplyGroups(sets_set);
@@ -2891,7 +2878,7 @@ std::vector<std::tuple<std::string_view, double, int>> Empire::TechCostsTimes(co
 
     // cache costs for empire for techs on queue an that are researchable, which
     // may be used later when updating the queue
-    const auto should_cache = [this](const auto tech_name, const auto& tech) {
+    const auto should_cache = [this](const auto& tech_name, const Tech& tech) {
         return (tech.Researchable() && GetTechStatus(tech_name) == TechStatus::TS_RESEARCHABLE) ||
             m_research_queue.InQueue(tech_name);
     };
@@ -2904,33 +2891,28 @@ std::vector<std::tuple<std::string_view, double, int>> Empire::TechCostsTimes(co
     return retval;
 }
 
-std::vector<std::tuple<std::string_view, int, float, int>> Empire::ProductionCostsTimes(const ScriptingContext& contest) const {
-    return {};
-}
+std::vector<std::tuple<std::string_view, int, float, int>>
+Empire::ProductionCostsTimes(const ScriptingContext& contest) const
+{ return {}; } // TODO: implement this and use within UpdateProductionQueue
 
 std::vector<std::pair<int, double>> Empire::PlanetAnnexationCosts(const ScriptingContext& context) const {
-    const auto being_annexed = [](const Planet& p) { return p.IsAboutToBeAnnexed(); };
-    const auto planets = context.ContextObjects().findRaw<Planet>(being_annexed);
-
-    std::vector<std::pair<int, double>> retval;
-    retval.reserve(planets.size());
-
-    for (const auto* p : planets) {
-        if (p->OrderedAnnexedByEmpire() == m_id)
-            retval.emplace_back(p->ID(), p->AnnexationCost(m_id, context));
-    }
-    return retval;
+    const auto being_annexed_by_empire = [this](const Planet* p) { return p->OrderedAnnexedByEmpire() == m_id; };
+    const auto to_id_annex_cost = [&context, this](const Planet* p)
+    { return std::pair<int, double>{p->ID(), p->AnnexationCost(m_id, context)}; };
+    auto rng = context.ContextObjects().allRaw<Planet>() | range_filter(being_annexed_by_empire)
+        | range_transform(to_id_annex_cost);
+    return {rng.begin(), rng.end()};
 }
 
 std::vector<std::pair<std::string_view, double>> Empire::PolicyAdoptionCosts(const ScriptingContext& context) const {
-    std::vector<std::pair<std::string_view, double>> retval;
-    retval.reserve(m_adopted_policies.size());
-
-    for (const auto& policy_name : m_adopted_policies) {
-        if (const auto* policy = GetPolicy(policy_name.first))
-            retval.emplace_back(policy_name.first, policy->AdoptionCost(m_id, context));
-    }
-    return retval;
+    using name_pair = std::pair<std::string_view, const Policy*>;
+    const auto get_policy = [](std::string_view name) -> name_pair { return {name, GetPolicy(name)}; };
+    const auto isnt_nullptr = [](const name_pair& p) -> bool { return p.second; };
+    const auto to_cost = [&context, this](const name_pair& p) -> std::pair<std::string_view, double>
+    { return {p.first, p.second->AdoptionCost(m_id, context)}; };
+    auto rng = m_adopted_policies | range_keys | range_transform(get_policy)
+        | range_filter(isnt_nullptr) | range_transform(to_cost);
+    return {rng.begin(), rng.end()};
 }
 
 void Empire::UpdateResearchQueue(const ScriptingContext& context,
@@ -2972,11 +2954,8 @@ void Empire::UpdateOwnedObjectCounters(const Universe& universe) {
     // ships of each species and design
     m_species_ships_owned.clear();
     m_ship_designs_owned.clear();
-    for (const auto& entry : objects.allExisting<Ship>()) {
-        if (!entry.second->OwnedBy(m_id))
-            continue;
-        const auto* ship = static_cast<const Ship*>(entry.second.get());
-        if (!ship)
+    for (const Ship* ship : objects.allExistingRaw<Ship>()) {
+        if (!ship->OwnedBy(m_id))
             continue;
         if (!ship->SpeciesName().empty())
             m_species_ships_owned[ship->SpeciesName()]++;
@@ -3011,11 +2990,8 @@ void Empire::UpdateOwnedObjectCounters(const Universe& universe) {
     // colonies of each species, and unspecified outposts
     m_species_colonies_owned.clear();
     m_outposts_owned = 0;
-    for (const auto& entry : objects.allExisting<Planet>()) {
-        if (!entry.second->OwnedBy(this->EmpireID()))
-            continue;
-        const auto* planet = static_cast<const Planet*>(entry.second.get());
-        if (!planet)
+    for (const auto* planet : objects.allExistingRaw<Planet>()) {
+        if (!planet || !planet->OwnedBy(this->EmpireID()))
             continue;
         if (planet->SpeciesName().empty())
             m_outposts_owned++;
@@ -3025,13 +3001,9 @@ void Empire::UpdateOwnedObjectCounters(const Universe& universe) {
 
     // buildings of each type
     m_building_types_owned.clear();
-    for (const auto& entry : objects.allExisting<Building>()) {
-        if (!entry.second->OwnedBy(this->EmpireID()))
-            continue;
-        const auto building = static_cast<const Building*>(entry.second.get());
-        if (!building)
-            continue;
-        m_building_types_owned[building->BuildingTypeName()]++;
+    for (const Building* building: objects.allExistingRaw<Building>()) {
+        if (building->OwnedBy(this->EmpireID()))
+            m_building_types_owned[building->BuildingTypeName()]++;
     }
 }
 

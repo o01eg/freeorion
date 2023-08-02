@@ -1975,7 +1975,8 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
 
     // empire elimination
     empire->Eliminate(m_empires, m_current_turn);
-    const auto empire_ids{m_empires.EmpireIDs()};
+    const auto& ids_as_flatset{m_empires.EmpireIDs()};
+    const std::vector<int> empire_ids{ids_as_flatset.begin(), ids_as_flatset.end()}; // TODO: avoid copy
 
     // destroy owned ships
     for (auto* obj : m_universe.Objects().findRaw<Ship>(is_owned)) {
@@ -2350,11 +2351,11 @@ namespace {
                                  const ObjectMap& objects)
     {
         empire_fleets.clear();
-        auto system = objects.get<System>(system_id);
+        auto* system = objects.getRaw<System>(system_id);
         if (!system)
             return;
         for (auto* fleet : objects.findRaw<const Fleet>(system->FleetIDs()))
-            empire_fleets[fleet->Owner()].emplace(fleet->ID());
+            empire_fleets[fleet->Owner()].insert(fleet->ID());
     }
 
     void GetEmpirePlanetsAtSystem(std::map<int, std::set<int>>& empire_planets, int system_id,
@@ -2421,7 +2422,7 @@ namespace {
             if (!fleet)
                 continue;
             if (fleet->Unowned()) {
-                visible_fleets.emplace(fleet->ID());   // fleet is monster, so can be sen by monsters
+                visible_fleets.insert(fleet->ID());   // fleet is monster, so can be seen by monsters
                 continue;
             }
 
@@ -2677,7 +2678,8 @@ namespace {
         // gamestate. Standard visibility updating will then transfer the
         // modified objects / combat results to empires' known gamestate
         // ObjectMaps.
-        const auto& empire_ids = empires.EmpireIDs();
+        const auto& ids_as_flatset{empires.EmpireIDs()};
+        const std::vector<int> empire_ids{ids_as_flatset.begin(), ids_as_flatset.end()}; // TODO: avoid copy?
 
         for (const CombatInfo& combat_info : combats) {
             // update visibilities from combat, in case anything was revealed
@@ -2995,7 +2997,8 @@ namespace {
     [[nodiscard]] std::pair<std::vector<int>, std::vector<int>> HandleColonization(ScriptingContext& context) {
         Universe& universe = context.ContextUniverse();
         ObjectMap& objects = context.ContextObjects();
-        const auto empire_ids{context.EmpireIDs()};
+        const auto& ids_as_flatset{context.EmpireIDs()};
+        const std::vector<int> empire_ids{ids_as_flatset.begin(), ids_as_flatset.end()}; // TODO: avoid copy?
 
         // collect, for each planet, what ships have been ordered to colonize it
         std::map<int, std::map<int, std::set<int>>> planet_empire_colonization_ship_ids; // map from planet ID to map from empire ID to set of ship IDs
@@ -3171,7 +3174,8 @@ namespace {
         Universe& universe = context.ContextUniverse();
         ObjectMap& objects = context.ContextObjects();
         EmpireManager& empires = context.Empires();
-        const auto& empire_ids = context.EmpireIDs();
+        const auto& ids_as_flatset{context.EmpireIDs()};
+        const std::vector<int> empire_ids{ids_as_flatset.begin(), ids_as_flatset.end()}; // TODO: avoid copy?
 
         // collect ships that are invading and the troops they carry
         for (auto* ship : objects.findRaw<Ship>([&universe](const Ship& s) {
@@ -3247,8 +3251,7 @@ namespace {
                 continue;
 
             std::set<int> all_involved_empires;
-            for (auto& [empire_id, ignored]: empires_troops) {
-                (void)ignored; // quiet warning
+            for (const auto empire_id : empires_troops | range_keys) {
                 if (empire_id != ALL_EMPIRES)
                     all_involved_empires.insert(empire_id);
             }
@@ -3422,7 +3425,7 @@ namespace {
                     empire_gifted_ships[recipient_empire_id].push_back(ship);
             }
         }
-        for (auto& fleet : objects.all<Fleet>())
+        for (auto* fleet : objects.allRaw<Fleet>())
             fleet->ClearGiveToEmpire(); // in case things fail, to avoid potential inconsistent state
 
 
@@ -3513,7 +3516,8 @@ namespace {
                          const IDsT& gifted_ids, const IDsT& annexed_planet_ids) // TODO: disallow scrapping during annexation
     {
         ObjectMap& objects{universe.Objects()};
-        const auto& empire_ids = empires.EmpireIDs();
+        const auto& ids_as_flatset{empires.EmpireIDs()};
+        const std::vector<int> empire_ids{ids_as_flatset.begin(), ids_as_flatset.end()}; // TODO: avoid copy?
 
         // only scap ships that aren't being gifted and that aren't invading or colonizing this turn
         const auto scrapped_ships = objects.findRaw<Ship>(
@@ -3598,7 +3602,7 @@ namespace {
             const auto annexer_empire_id = planet->OrderedAnnexedByEmpire();
             empire_annexed_planets[annexer_empire_id].push_back(planet);
         }
-        for (auto& fleet : objects.all<Planet>())
+        for (auto* fleet : objects.allRaw<Planet>())
             fleet->ResetBeingAnnxed(); // in case things fail, to avoid potential inconsistent state
 
 
@@ -3671,7 +3675,8 @@ namespace {
         std::vector<Fleet*> empty_fleets;
         Universe& universe{context.ContextUniverse()};
         ObjectMap& objects{context.ContextObjects()};
-        const auto& empire_ids = context.EmpireIDs();
+        const auto& ids_as_flatset{context.EmpireIDs()};
+        const std::vector<int> empire_ids{ids_as_flatset.begin(), ids_as_flatset.end()}; // TODO: avoid copy?
 
         for (auto* fleet : objects.allRaw<Fleet>()) {
             if (fleet->Empty())
@@ -3847,11 +3852,8 @@ void ServerApp::PreCombatProcessTurns() {
     m_networking.SendMessageAll(TurnProgressMessage(Message::TurnProgressPhase::FLEET_MOVEMENT));
 
     // Update system-obstruction after orders, colonization, invasion, gifting, scrapping
-    for (auto& [ignored, empire] : m_empires) {
-        if (!empire->Eliminated())
-            empire->UpdateSupplyUnobstructedSystems(context, true);
-        (void)ignored;
-    }
+    for (auto& empire : m_empires | range_values | range_filter([](auto e) { return !e->Eliminated(); }))
+        empire->UpdateSupplyUnobstructedSystems(context, true);
 
 
     // fleet movement

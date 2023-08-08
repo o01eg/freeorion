@@ -288,13 +288,12 @@ namespace {
                                                           str));
             }
 
-            for ([[maybe_unused]] auto& [category_name, article_vec] : encyclopedia.Articles()) {
+            for (const auto& category_name : encyclopedia.Articles() | range_keys) {
                 // Do not add sub-categories
                 const EncyclopediaArticle& article = encyclopedia.GetArticleByKey(category_name);
                 // No article found or specifically a top-level category
                 if (!article.category.empty() && article.category != "ENC_INDEX")
                     continue;
-                (void)article_vec; // quiet unused variable warning
                 auto& us_name{UserString(category_name)};
                 retval.emplace_back(std::piecewise_construct,
                                     std::forward_as_tuple(us_name),
@@ -398,8 +397,7 @@ namespace {
         else if (dir_name == "ENC_SPECIES") {
             // directory populated with list of links to other articles that list species
             if (!exclude_custom_categories_from_dir_name) {
-                for (const auto& [species_name, species] : GetSpeciesManager()) {
-                    (void)species; // quiet warning
+                for (const auto& species_name : GetSpeciesManager() | range_keys) {
                     auto& us_name{UserString(species_name)};
                     retval.emplace_back(std::piecewise_construct,
                                         std::forward_as_tuple(us_name),
@@ -1278,7 +1276,7 @@ namespace {
         futures.reserve(sorted_entries.size());
 
         for (auto& [readable_article_name, link_key] : sorted_entries) {
-            const auto& [link_text, key] = link_key;
+            auto& [link_text, key] = link_key;
 
             if (!utf8::is_valid(readable_article_name.begin(), readable_article_name.end())) {
                 ErrorLogger() << "GetSubDirs invalid article name: " << readable_article_name
@@ -1294,7 +1292,7 @@ namespace {
                                          key, exclude_custom_categories_from_dir_name, depth));
 
             retval.emplace(std::pair{key, dir_name}, // don't move from key as it's viewed by the above future
-                           std::pair{std::string{readable_article_name}, std::move(link_text)});
+                           std::pair{std::move(readable_article_name), std::move(link_text)});
         }
 
         for (auto& fut : futures)

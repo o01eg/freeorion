@@ -295,32 +295,30 @@ ObjectMap& Universe::EmpireKnownObjects(int empire_id) {
     return empty_map;
 }
 
-std::set<int> Universe::EmpireVisibleObjectIDs(int empire_id, const EmpireManager& empires) const {
-    std::set<int> retval;
-
+Universe::IDSet Universe::EmpireVisibleObjectIDs(int empire_id, const EmpireManager& empires) const {
     // get id(s) of all empires to consider visibility of...
-    std::set<int> empire_ids;
-    if (empire_id != ALL_EMPIRES) {
-        empire_ids.insert(empire_id);
-    } else {
-        for ([[maybe_unused]] auto& [loop_empire_id, empire] : empires) {
-            (void)empire;   // quieting unused variable warning
-            empire_ids.insert(loop_empire_id);
-        }
-    }
+    const auto& all_empire_ids = empires.EmpireIDs();
+    const auto empire_ids = (empire_id != ALL_EMPIRES) ?
+        std::vector<int>{empire_id} : std::vector<int>{all_empire_ids.begin(), all_empire_ids.end()};
 
-    // check each object's visibility against all empires, including the object
-    // if an empire has visibility of it
-    for (const auto& obj : m_objects->all()) {
-        for (int detector_empire_id : empire_ids) {
-            Visibility vis = GetObjectVisibilityByEmpire(obj->ID(), detector_empire_id);
-            if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
-                retval.insert(obj->ID());
-                break;
-            }
-        }
-    }
+    // check each object's visibility by the requested empire / all empires
+    const auto is_visible_to_an_empire = [&empire_ids, this](const auto obj_id) {
+        return std::any_of(empire_ids.begin(), empire_ids.end(),
+                           [obj_id, this](auto e_id)
+                           { return GetObjectVisibilityByEmpire(obj_id, e_id) >= Visibility::VIS_BASIC_VISIBILITY; });
+    };
 
+    auto ids_rng = m_objects->allWithIDs() | range_keys | range_filter(is_visible_to_an_empire);
+    Universe::IDSet retval;
+#if BOOST_VERSION > 107400
+    retval.reserve(m_objects->size());
+    retval.insert(boost::container::ordered_unique_range, ids_rng.begin(), ids_rng.end());
+#else
+    Empire::IntSet::sequence_type scratch;
+    scratch.reserve(m_objects->size());
+    range_copy(ids_rng, std::back_inserter(scratch));
+    retval.adopt_sequence(boost::container::ordered_unique_range, std::move(scratch));
+#endif
     return retval;
 }
 
@@ -367,12 +365,10 @@ void Universe::RenameShipDesign(int design_id, std::string name, std::string des
 const ShipDesign* Universe::GetGenericShipDesign(std::string_view name) const {
     if (name.empty())
         return nullptr;
-    for (const auto& [design_id, design] : m_ship_designs) {
-        (void)design_id;
-        if (name == design.Name(false))
-            return &design;
-    }
-    return nullptr;
+    const auto has_name = [name](const auto& design) { return name == design.Name(false); };
+    const auto rng = m_ship_designs | range_values;
+    const auto it = range_find_if(rng, has_name);
+    return it != rng.end() ? &(*it) : nullptr;
 }
 
 const std::set<int>& Universe::EmpireKnownShipDesignIDs(int empire_id) const {
@@ -541,10 +537,8 @@ void Universe::ApplyAllEffectsAndUpdateMeters(ScriptingContext& context, bool do
     // turn) and active meters have the proper baseline from which to
     // accumulate changes from effects
     ResetAllObjectMeters(true, true);
-    for ([[maybe_unused]] auto& [empire_id, empire] : context.Empires().GetEmpires()) {
-        (void)empire_id;    // quieting unused variable warning
+    for (auto& empire : context.Empires().GetEmpires() | range_values)
         empire->ResetMeters();
-    }
     context.species.ResetSpeciesOpinions(true, true);
 
     ExecuteEffects(source_effects_targets_causes, context, do_accounting, false, false, true);
@@ -614,10 +608,8 @@ void Universe::ApplyMeterEffectsAndUpdateMeters(ScriptingContext& context, bool 
         for (auto const& [meter_type, meter] : object->Meters())
             TraceLogger(effects) << "    meter: " << meter_type << "  value: " << meter.Current();
     }
-    for ([[maybe_unused]] auto& [empire_id, empire] : context.Empires()) {
-        (void)empire_id;    // quieting unused variable warning
+    for (auto& empire : context.Empires() | range_values)
         empire->ResetMeters();
-    }
     context.species.ResetSpeciesOpinions(true, true);
 
     ExecuteEffects(source_effects_targets_causes, context, do_accounting, true, false, true);
@@ -867,7 +859,6 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
             account_map.reserve(meters.size());
 
             for (auto& [type, meter] : meters) {
-                (void)type; // quiet warning
                 float meter_change = meter.Current() - Meter::DEFAULT_VALUE;
                 if (meter_change != 0.0f)
                     account_map[type].emplace_back(INVALID_OBJECT_ID, EffectsCauseType::ECT_INHERENT,
@@ -1479,8 +1470,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     std::vector<Condition::ObjectSet> tech_sources; // for each empire, a set with a single source object for all its techs
     tech_sources.reserve(context.Empires().NumEmpires());
     // select a source object for each empire and dispatch condition evaluations
-    for (auto& [empire_id, empire] : context.Empires()) {
-        (void)empire_id;    // quiet unused variable warning
+    for (auto& empire : context.Empires() | range_values) {
         auto source = empire->Source(context.ContextObjects()).get();
         if (!source)
             continue;
@@ -1488,10 +1478,9 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         // unlike species and special effectsgroups, all techs for an empire have the same source object
         const auto& source_objects = tech_sources.emplace_back(1U, source);
 
-        for ([[maybe_unused]] auto& [tech_name, researched_turn] : empire->ResearchedTechs()) {
+        for (const auto& tech_name : empire->ResearchedTechs() | range_keys) {
             const Tech* tech = GetTech(tech_name);
             if (!tech) continue;
-            (void)researched_turn;  // quiet unused variable warning
 
             DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_TECH, tech_name,
                                                  source_objects, tech->Effects(),
@@ -1508,8 +1497,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     TraceLogger(effects) << "Universe::GetEffectsAndTargets for POLICIES";
     std::vector<Condition::ObjectSet> policy_sources; // for each empire, a set with a single source object for all its policies
     policy_sources.reserve(context.Empires().NumEmpires());
-    for (const auto& [empire_id, empire] : context.Empires()) {
-        (void)empire_id;    // quiet unused varianle warning
+    for (const auto& empire : context.Empires() | range_values) {
         auto source = empire->Source(context.ContextObjects()).get();
         if (!source)
             continue;
@@ -1729,8 +1717,6 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
 
     // within each priority group, execute effects in dispatch order
     for (auto& [priority, setc] : source_effects_targets_causes) {
-        (void)priority; // quiet unused variable warning
-
         // check each effects group to see if it should execute...
         std::vector<bool> executed_effects_group_flags(setc.size(), false);
 
@@ -2300,17 +2286,15 @@ namespace {
         const auto empire_detection_strengths = GetEmpiresDetectionStrengths(empires, empire_id);
         boost::container::flat_map<int, boost::container::flat_map<std::pair<double, double>, std::vector<int>>> retval;
         retval.reserve(empire_detection_strengths.size());
-        for (const auto& [loop_empire_id, ds] : empire_detection_strengths) {
-            (void)ds;
+        for (const int loop_empire_id : empire_detection_strengths | range_keys)
             retval[loop_empire_id].reserve(obj_count);
-        }
 
         // filter objects as detectors for this empire or detectable objects
         for (const auto& obj : objects.allRaw()) {
             const Meter* stealth_meter = obj->GetMeter(MeterType::METER_STEALTH);
             if (!stealth_meter)
                 continue;
-            float object_stealth = stealth_meter->Current();
+            const float object_stealth = stealth_meter->Current();
             std::pair<double, double> object_pos(obj->X(), obj->Y());
 
             // for each empire being checked for, check if each object could be
@@ -2564,9 +2548,8 @@ namespace {
                 //DebugLogger() << " ... contained object (" << contained_obj_id << ")";
 
                 // for each empire with a visibility map
-                for (auto& [empire_id, vis_map] : empire_object_visibility) {
+                for (auto& vis_map : empire_object_visibility | range_values) {
                     //DebugLogger() << " ... ... empire id " << empire_entry.first;
-                    (void)empire_id;
 
                     // find current empire's visibility entry for current container object
                     auto container_vis_it = vis_map.find(container_obj->ID());
@@ -2635,29 +2618,22 @@ namespace {
             int system_id = system->ID();
 
             // for each empire with a visibility map
-            for (auto& [empire_id, vis_map] : empire_object_visibility) {
-                (void)empire_id;
-
+            for (auto& vis_map : empire_object_visibility | range_values) {
                 // find current system's visibility
-                auto system_vis_it = vis_map.find(system_id);
+                const auto system_vis_it = vis_map.find(system_id);
                 if (system_vis_it == vis_map.end())
                     continue;
 
                 // skip systems that aren't at least partially visible; they can't propagate visibility along starlanes
-                Visibility system_vis = system_vis_it->second;
+                const Visibility system_vis = system_vis_it->second;
                 if (system_vis <= Visibility::VIS_BASIC_VISIBILITY)
                     continue;
 
                 // get all starlanes emanating from this system, and loop through them
                 for (const auto lane_end_sys_id : system->Starlanes()) {
-                    // find entry for system on other end of starlane in visibility
-                    // map, and upgrade to basic visibility if not already at that
-                    // leve, so that starlanes will be visible if either system it
-                    // ends at is partially visible or better
-                    const auto lane_end_vis_it = vis_map.find(lane_end_sys_id);
-                    if (lane_end_vis_it == vis_map.end())
-                        vis_map[lane_end_sys_id] = Visibility::VIS_BASIC_VISIBILITY;
-                    else if (lane_end_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
+                    // ensure all endpoint systems are at least basically visible
+                    auto [lane_end_vis_it, inserted] = vis_map.try_emplace(lane_end_sys_id, Visibility::VIS_BASIC_VISIBILITY);
+                    if (!inserted && lane_end_vis_it->second < Visibility::VIS_BASIC_VISIBILITY)
                         lane_end_vis_it->second = Visibility::VIS_BASIC_VISIBILITY;
                 }
             }
@@ -2759,8 +2735,7 @@ namespace {
         auto input_eov_copy{empire_object_visibility};
         auto input_eovs_copy{empire_object_visible_specials};
 
-        for ([[maybe_unused]] auto& [empire_id, empire] : empires) {
-            (void)empire;   // quieting unused variable warning
+        for (const auto empire_id : empires | range_keys) {
             // output maps for this empire
             auto& obj_vis_map = empire_object_visibility[empire_id];
             auto& obj_specials_map = empire_object_visible_specials[empire_id];
@@ -2769,7 +2744,7 @@ namespace {
                 empire_id, DiplomaticStatus::DIPLO_ALLIED))
             {
                 if (empire_id == allied_empire_id) {
-                    ErrorLogger() << "ShareVisbilitiesBetweenAllies : Empire apparent allied with itself!";
+                    ErrorLogger() << "ShareVisbilitiesBetweenAllies : Empire apparently allied with itself!";
                     continue;
                 }
 
@@ -2791,8 +2766,7 @@ namespace {
                     }
                 }
 
-                // add allied visibilities of specials to outer-loop empire
-                // visibilities as well
+                // add allied visibilities of specials to outer-loop empire visibilities
                 for (const auto& [obj_id, specials] : allied_obj_specials_map)
                     obj_specials_map[obj_id].insert(specials.begin(), specials.end());
             }

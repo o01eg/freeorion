@@ -102,28 +102,39 @@ namespace {
             return nullptr;
         }
 
-        while (first != last) {
+        while (obj && first != last) {
             std::string_view property_name = *first;
             if (property_name == "Planet") {
-                if (obj->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-                    auto b = static_cast<const Building*>(obj);
+                if (obj->ObjectType() == UniverseObjectType::OBJ_BUILDING) [[likely]] {
+                    const auto b = static_cast<const Building*>(obj);
                     obj = context.ContextObjects().getRaw<Planet>(b->PlanetID());
                 } else {
                     ErrorLogger() << "FollowReference : object not a building, so can't get its planet.";
-                    obj = nullptr;
+                    return nullptr;
                 }
+                if (!obj) {
+                    ErrorLogger() << "FollowReference : Unable to get planet for building";
+                    return nullptr;
+                }
+
             } else if (property_name == "System") {
-                if (obj)
-                    obj = context.ContextObjects().getRaw<System>(obj->SystemID());
-                if (!obj)
+                obj = context.ContextObjects().getRaw<System>(obj->SystemID());
+                if (!obj) {
                     ErrorLogger() << "FollowReference : Unable to get system for object";
+                    return nullptr;
+                }
+
             } else if (property_name == "Fleet") {
-                if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-                    auto s = static_cast<const Ship*>(obj);
+                if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) [[likely]] {
+                    const auto s = static_cast<const Ship*>(obj);
                     obj = context.ContextObjects().getRaw<Fleet>(s->FleetID());
                 } else {
                     ErrorLogger() << "FollowReference : object not a ship, so can't get its fleet";
-                    obj = nullptr;
+                    return nullptr;
+                }
+                if (!obj) {
+                    ErrorLogger() << "FollowReference : Unable to get fleet for ship";
+                    return nullptr;
                 }
             }
             ++first;
@@ -168,34 +179,37 @@ namespace {
             retval += UserString(to_string(obj->ObjectType())) + " "
                     + std::to_string(obj->ID()) + " ( " + obj->Name() + " ) ";
             initial_obj = obj;
+        } else {
+            retval += "(no object)";
         }
         retval += " | ";
 
         auto first = property_name.begin();
         const auto last = property_name.end();
-        while (first != last) {
+        while (obj && first != last) {
             std::string property_name_part = *first;
             retval.append(" ").append(property_name_part).append(" ");
             if (property_name_part == "Planet") {
                 if (obj->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-                    auto b = static_cast<const Building*>(obj);
+                    const auto b = static_cast<const Building*>(obj);
                     retval.append("(").append(std::to_string(b->PlanetID())).append("): ");
                     obj = context.ContextObjects().getRaw<Planet>(b->PlanetID());
                 } else {
                     obj = nullptr;
                 }
+
             } else if (property_name_part == "System") {
-                if (obj) {
-                    retval.append("(").append(std::to_string(obj->SystemID())).append("): ");
-                    obj = context.ContextObjects().getRaw<System>(obj->SystemID());
-                }
+                retval.append("(").append(std::to_string(obj->SystemID())).append("): ");
+                obj = context.ContextObjects().getRaw<System>(obj->SystemID());
+
             } else if (property_name_part == "Fleet") {
                 if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-                    auto s = static_cast<const Ship*>(obj);
+                    const auto s = static_cast<const Ship*>(obj);
                     retval.append("(").append(std::to_string(s->FleetID())).append("): ");
                     obj = context.ContextObjects().getRaw<Fleet>(s->FleetID());
-                } else
+                } else {
                     obj = nullptr;
+                }
             }
 
             ++first;
@@ -1202,7 +1216,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
     else if (property_name == "NumShips") {
         if (object->ObjectType() == UniverseObjectType::OBJ_FLEET) {
             auto fleet = static_cast<const Fleet*>(object);
-            return fleet->NumShips();
+            return static_cast<int>(fleet->NumShips());
         }
         return 0;
 
@@ -1211,7 +1225,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
         if (object->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
             auto system = static_cast<const System*>(object);
             return system->NumStarlanes();
-            }
+        }
         return 0;
 
     }
@@ -1722,9 +1736,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             }
 
             int sum = 0;
-            for ([[maybe_unused]] auto& [ignored_id, loop_empire] : context.Empires()) {
-                (void)ignored_id; // quiet unused variable warning
-                auto filtered_values = empire->ShipPartClassOwned() | range_filter(key_filter_class) | range_values;
+            for (const auto& loop_empire : context.Empires() | range_values) {
+                auto filtered_values = loop_empire->ShipPartClassOwned() | range_filter(key_filter_class) | range_values;
                 sum += std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
             }
             return sum;
@@ -1746,18 +1759,17 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         }
 
         int sum = 0;
-        for ([[maybe_unused]] auto& [ignored_id, loop_empire] : context.Empires()) {
-            (void)ignored_id; // quiet unused variable warning
+        for (const auto& loop_empire : context.Empires() | range_values) {
             if (empire_property_string_key) {
                 auto filtered_values = empire_property_string_key(*loop_empire) | range_filter(key_filter) | range_values;
                 sum += std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
 
             } else if (empire_property_string_key2) {
-                auto filtered_values = empire_property_string_key2(*empire) | range_filter(key_filter) | range_values;
+                auto filtered_values = empire_property_string_key2(*loop_empire) | range_filter(key_filter) | range_values;
                 sum += std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
 
             } else if (empire_property_string_key3) {
-                auto filtered_values = empire_property_string_key3(*empire) | range_filter(key_filter) | range_values;
+                auto filtered_values = empire_property_string_key3(*loop_empire) | range_filter(key_filter) | range_values;
                 sum += std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
             }
         }
@@ -1823,8 +1835,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         }
 
         int sum = 0;
-        for ([[maybe_unused]] auto& [ignored_id, loop_empire] : context.Empires()) {
-            (void)ignored_id; // quiet unused variable warning
+        for (const auto& loop_empire : context.Empires() | range_values) {
             auto filtered_values = empire_property_int_key(*loop_empire) | range_filter(key_filter) | range_values;
             sum += std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
         }
@@ -2083,9 +2094,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         }
         else {
             for (auto& [cat_name, policy_names_turns] : empire->CategoriesSlotsPoliciesAdopted()) {
-                if (cat_name == policy_category_name) {
-                    for (auto& [ignored_turn, policy_name] : policy_names_turns) {
-                        (void)ignored_turn;
+                if (cat_name == policy_category_name) { // TODO: could further rangify this...
+                    for (const auto policy_name : policy_names_turns | range_values) {
                         if (!policy_name.empty())
                             ++count;
                     }
@@ -2205,16 +2215,15 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
                 return 0.0;
 
         } else {
-            float empires_max = 0.0f;
             // no empire ID specified, use max of all empires' ranges at specified system
-            for ([[maybe_unused]] auto& [unused_id, loop_empire] : context.Empires()) {
-                (void)unused_id; // quiet unused variable warning
-                const auto& empire_data = loop_empire->SystemSupplyRanges();
-                auto it = empire_data.find(system_id);
-                if (it != empire_data.end())
-                    empires_max = std::max(empires_max, it->second);
-            }
-            return empires_max;
+            const auto to_sys_supply_range = [system_id](const auto& e) {
+                const auto& ssr = e->SystemSupplyRanges();
+                const auto it = ssr.find(system_id);
+                return (it != ssr.end()) ? it->second : 0.0f;
+            };
+            auto sup_rng_rng = context.Empires() | range_values | range_transform(to_sys_supply_range);
+            auto max_it = range_max_element(sup_rng_rng);
+            return (max_it != sup_rng_rng.end()) ? *max_it : 0.0f;
         }
     }
 
@@ -2243,10 +2252,11 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
         empire_property = [res_type](const Empire* empire) { return empire->ResourceStockpile(res_type); };
 
-        static constexpr auto GetRawPtr = [](const auto& smart_ptr){ return smart_ptr.get(); };
+        static constexpr auto to_raw_ptr = [](const auto& smart_ptr){ return smart_ptr.get(); };
 
         if (!empire) {
-            auto empire_props = context.Empires() | range_values | range_transform(GetRawPtr) | range_transform(empire_property);
+            auto empire_props = context.Empires() | range_values | range_transform(to_raw_ptr)
+                | range_transform(empire_property);
             return std::accumulate(empire_props.begin(), empire_props.end(), 0);
         }
 
@@ -2496,8 +2506,6 @@ namespace {
     [[nodiscard]] std::vector<std::string> TechsResearchedByEmpire(int empire_id, const ScriptingContext& context) {
         auto empire = context.GetEmpire(empire_id);
         if (!empire) return {};
-
-        using xxx = std::decay_t<decltype(empire->ResearchedTechs())>::const_iterator::value_type;
         auto researched_techs_range = empire->ResearchedTechs() | range_keys;
         return {researched_techs_range.begin(), researched_techs_range.end()};
     }
@@ -2505,9 +2513,6 @@ namespace {
     [[nodiscard]] std::vector<std::string> TechsResearchableByEmpire(int empire_id, const ScriptingContext& context) {
         auto empire = context.GetEmpire(empire_id);
         if (!empire) return {};
-
-        using xxx = std::decay_t<decltype(GetTechManager())>::iterator::value_type;
-
         const auto res_tech = [&empire](const auto& name_tech) { return empire->ResearchableTech(name_tech.first); };
         auto res_techs = GetTechManager() | range_filter(res_tech) | range_keys;
         return {res_techs.begin(), res_techs.end()};

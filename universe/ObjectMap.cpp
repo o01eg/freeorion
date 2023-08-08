@@ -37,6 +37,19 @@ namespace {
     using const_const_planet_raw_range_t2 = decltype(std::declval<ObjectMap>().allRaw<const Planet>());
     using const_const_planet_raw_t2 = decltype(std::declval<const_const_planet_raw_range_t2>().front());
     static_assert(std::is_same_v<const_const_planet_raw_t2, const Planet*>);
+
+    using const_planet_raw_ptr_t0 = decltype(std::declval<const ObjectMap>().getRaw<Planet>(INVALID_OBJECT_ID));
+    static_assert(std::is_same_v<const_planet_raw_ptr_t0, const Planet*>);
+    using const_planet_raw_ptr_t1 = decltype(std::declval<const ObjectMap>().getRaw<Planet>([](auto) { return true; }));
+    static_assert(std::is_same_v<const_planet_raw_ptr_t1, const Planet*>);
+    using const_planet_raw_ptr_t2 = decltype(std::declval<const ObjectMap>().getRaw<Planet>([](const auto&) { return true; }));
+    static_assert(std::is_same_v<const_planet_raw_ptr_t2, const Planet*>);
+    using const_planet_raw_ptr_t3 = decltype(std::declval<ObjectMap>().getRaw<Planet>([](const std::pair<int, const Planet>&) { return true; }));
+    static_assert(std::is_same_v<const_planet_raw_ptr_t3, const Planet*>);
+    using const_planet_raw_ptr_t4 = decltype(std::declval<ObjectMap>().getRaw<Planet>([](const std::pair<int, Planet>&) { return true; }));
+    static_assert(std::is_same_v<const_planet_raw_ptr_t4, const Planet*>);
+    using const_planet_raw_ptr_t5 = decltype(std::declval<ObjectMap>().getRaw<Planet>([](const std::shared_ptr<const Planet>&) { return true; }));
+    static_assert(std::is_same_v<const_planet_raw_ptr_t5, const Planet*>);
 }
 
 namespace ObjectMapPredicateTypeTraits {
@@ -77,7 +90,7 @@ namespace ObjectMapPredicateTypeTraits {
     static_assert(fsiv == std::array{false, false, false, false, false, false, false, false, false, false, true});
 
     static constexpr auto fcuifs = ObjectMap::CheckTypes<UniverseObject, boost::container::flat_set<int>>();
-    static_assert(fsiv == std::array{false, false, false, false, false, false, false, false, false, false, true});
+    static_assert(fcuifs == std::array{false, false, false, false, false, false, false, false, false, false, true});
 
     static constexpr auto ship_p_lambda = [](const Ship*) -> bool { return false; };
     static constexpr auto lspbicsp = ObjectMap::CheckTypes<Ship, decltype(ship_p_lambda)>();
@@ -295,13 +308,8 @@ void ObjectMap::clear() {
 }
 
 std::vector<int> ObjectMap::FindExistingObjectIDs() const {
-    std::vector<int> result;
-    result.reserve(m_existing_objects.size());
-    for ([[maybe_unused]] auto& [id, ignored_obj] : m_existing_objects) {
-        (void)ignored_obj;
-        result.push_back(id);
-    }
-    return result;
+    auto key_rng = m_existing_objects | range_keys;
+    return {key_rng.begin(), key_rng.end()};
 }
 
 void ObjectMap::UpdateCurrentDestroyedObjects(const std::unordered_set<int>& destroyed_object_ids) {

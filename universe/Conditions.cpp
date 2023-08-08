@@ -782,10 +782,8 @@ namespace {
             // compile histogram of of number of times each sort key occurs
             boost::container::flat_map<SortKeyType, uint32_t> histogram; // TODO: should this be a string_view if SortKeyType is string?
             histogram.reserve(sort_key_objects.size());
-            for ([[maybe_unused]] auto& [key, ignored_object] : sort_key_objects) {
-                (void)ignored_object;
-                histogram[key]++; // TODO: maybe redo with iteration over ranges of each unique key and distance?
-            }
+            for (const auto& key : sort_key_objects | range_keys)
+                histogram[key]++;
 
             // invert histogram to index by number of occurances
             std::vector<std::pair<uint32_t, SortKeyType>> inv_histogram; // TODO: should this be a string_view if SortKeyType is string?
@@ -1720,7 +1718,7 @@ namespace {
             return false;
         }
 
-        using homeworlds_t = decltype(std::declval<const SpeciesManager>().GetSpeciesHomeworldsMap());
+        using homeworlds_t = std::decay_t<decltype(std::declval<const SpeciesManager>().GetSpeciesHomeworldsMap())>;
         const std::vector<std::string>& m_names;
         const ObjectMap&                m_objects;
         const homeworlds_t&             m_species_homeworlds;
@@ -5236,15 +5234,14 @@ namespace {
             int count = 0;
 
             if (m_empire_id == ALL_EMPIRES) {
-                for ([[maybe_unused]] auto& [ignored_empire_id, empire] : m_context.Empires()) {
-                    (void)ignored_empire_id; // quiet unused variable warning
+                for (const auto& empire : m_context.Empires() | range_values) {
                     count += NumberOnQueue(empire->GetProductionQueue(), m_build_type,
                                            candidate->ID(), m_context.ContextUniverse(),
                                            m_name, m_design_id);
                 }
 
             } else {
-                auto empire = m_context.GetEmpire(m_empire_id);
+                const auto& empire = m_context.GetEmpire(m_empire_id);
                 if (!empire) return false;
                 count = NumberOnQueue(empire->GetProductionQueue(), m_build_type,
                                       candidate->ID(), m_context.ContextUniverse(),
@@ -9544,6 +9541,8 @@ bool ResourceSupplyConnectedByEmpire::operator==(const Condition& rhs) const {
 }
 
 namespace {
+    constexpr auto not_null = [](const auto* o) -> bool { return o; };
+
     struct ResourceSupplySimpleMatch {
         ResourceSupplySimpleMatch(int empire_id, const ObjectSet& from_objects,
                                   const ObjectMap& objects, const SupplyManager& supply) :
@@ -9568,31 +9567,26 @@ namespace {
             const bool is_isolated = std::none_of(groups.begin(), groups.end(),
                                                   [sys_id{candidate->SystemID()}](const auto& group)
                                                   { return group.contains(sys_id); });
-            if (is_isolated) {
-                // planets are still supply-connected to themselves even if blockaded
-                const auto* candidate_planet = candidate->ObjectType() == UniverseObjectType::OBJ_PLANET ?
-                    static_cast<const ::Planet*>(candidate) : nullptr;
-                if (!candidate_planet && candidate->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-                    const auto plt_id = static_cast<const ::Building*>(candidate)->PlanetID();
-                    candidate_planet = m_objects.getRaw<Planet>(plt_id);
-                }
-                if (candidate_planet) {
-                    int candidate_planet_id = candidate_planet->ID();
-                    // can only match if the from_object is (or is on) the same planet
-                    for (const auto* from_object : m_from_objects) {
-                        const auto* from_obj_planet = from_object->ObjectType() == UniverseObjectType::OBJ_PLANET ?
-                            static_cast<const ::Planet*>(from_object) : nullptr;
-                        if (!from_obj_planet && from_object->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
-                            const auto plt_id = static_cast<const ::Building*>(from_object)->PlanetID();
-                            from_obj_planet = m_objects.getRaw<Planet>(plt_id);
-                        }
-                        if (from_obj_planet && from_obj_planet->ID() == candidate_planet_id)
-                            return true;
-                    }
-                }
+            if (is_isolated) { // planets are still supply-connected to themselves even if blockaded
+                static constexpr auto planet_id_from_obj = [](const auto* obj) {
+                    const auto candidate_type = obj->ObjectType();
+                    return candidate_type == UniverseObjectType::OBJ_PLANET ?
+                        obj->ID() : candidate_type == UniverseObjectType::OBJ_BUILDING ?
+                        static_cast<const ::Building*>(obj)->PlanetID() :
+                        INVALID_OBJECT_ID;
+                };
+
+                const auto candidate_planet_id = planet_id_from_obj(candidate);
+                if (candidate_planet_id == INVALID_OBJECT_ID)
+                    return false;
+
+                // can only match if the from_object is (or is on) the same planet. otherwise,
                 // candidate is isolated, but did not match planet for any test object
-                return false;
+                return range_any_of(m_from_objects | range_filter(not_null) | range_transform(planet_id_from_obj)
+                                    | range_filter([](const auto id) { return id != INVALID_OBJECT_ID; }),
+                                    [candidate_planet_id](const auto id) { return candidate_planet_id == id; });
             }
+
             // candidate is not blockaded, so check for system group matches
             for (auto* from_object : m_from_objects) {
                 for (const auto& group : groups) {

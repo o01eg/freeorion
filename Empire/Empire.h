@@ -3,6 +3,7 @@
 
 
 #include <array>
+#include <compare>
 #include <string>
 #include <unordered_set>
 #include <boost/container/flat_set.hpp>
@@ -48,7 +49,7 @@ FO_ENUM(
   * server, Empires are managed by a subclass of EmpireManager, and can be
   * accessed from other modules by using the EmpireManager::Lookup() method to
   * obtain a pointer. */
-class FO_COMMON_API Empire {
+class FO_COMMON_API Empire final {
 public:
     // EmpireManagers must be friends so that they can have access to the constructor and keep it hidden from others
     friend class EmpireManager;
@@ -183,13 +184,27 @@ public:
      * is determined in Empire::UpdateSupplyUnobstructedSystems(). */
     [[nodiscard]] bool                         PreservedLaneTravel(int start_system_id, int dest_system_id) const;
 
-    [[nodiscard]] std::set<int>                ExploredSystems() const;     ///< returns set of ids of systems that this empire has explored
-    [[nodiscard]] int                          TurnSystemExplored(int system_id) const;
-    [[nodiscard]] std::map<int, std::set<int>> KnownStarlanes(const Universe& universe) const;     ///< returns map from system id (start) to set of system ids (endpoints) of all starlanes known to this empire
-    [[nodiscard]] std::map<int, std::set<int>> VisibleStarlanes(const Universe& universe) const;   ///< returns map from system id (start) to set of system ids (endpoints) of all starlanes visible to this empire this turn
+    using IntSet = boost::container::flat_set<int>;
+    struct LaneEndpoints {
+        int start = INVALID_OBJECT_ID;
+        int end = INVALID_OBJECT_ID;
+        auto operator<=>(const LaneEndpoints&) const = default;
+#if (defined(__clang_major__) && (__clang_major__ < 16))
+        LaneEndpoints() = default;
+        LaneEndpoints(int s, int e) noexcept : start(s), end(e) {};
+        LaneEndpoints(LaneEndpoints&&) noexcept = default;
+        LaneEndpoints(const LaneEndpoints&) noexcept = default;
+        LaneEndpoints& operator=(LaneEndpoints&&) noexcept = default;
+        LaneEndpoints& operator=(const LaneEndpoints&) noexcept = default;
+#endif
+    };
+    using LaneSet = boost::container::flat_set<LaneEndpoints>;
 
+    [[nodiscard]] IntSet      ExploredSystems() const;     ///< ids of systems that this empire has explored
+    [[nodiscard]] int         TurnSystemExplored(int system_id) const;
+    [[nodiscard]] LaneSet     KnownStarlanes(const Universe& universe) const;     ///< map from system id (start) to set of system ids (endpoints) of all starlanes known to this empire
+    [[nodiscard]] LaneSet     VisibleStarlanes(const Universe& universe) const;   ///< map from system id (start) to set of system ids (endpoints) of all starlanes visible to this empire this turn
     [[nodiscard]] const auto& SitReps() const noexcept { return m_sitrep_entries; }
-
     [[nodiscard]] float       ProductionPoints() const;    ///< Returns the empire's current production point output (this is available industry not including stockpile)
 
     /** Returns ResourcePool for \a resource_type or 0 if no such ResourcePool exists. */
@@ -205,7 +220,7 @@ public:
     [[nodiscard]] const auto& GetPopulationPool() const noexcept { return m_population_pool; }
     [[nodiscard]] float       Population() const;                                 ///< returns total Population of empire
 
-    [[nodiscard]] virtual std::size_t SizeInMemory() const;
+    [[nodiscard]] std::size_t SizeInMemory() const;
 
     /** If the object with id \a id is a planet owned by this empire, sets that
       * planet to be this empire's capital, and otherwise does nothing. */

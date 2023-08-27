@@ -26,15 +26,15 @@ Species(
     gameplay_description="SP_CELESTEPHYTE_GAMEPLAY_DESC",
     native=True,
     tags=[
-        "PHOTOTROPHIC"
-        "TELEPATHIC"
-        "VERY_BAD_POPULATION"
-        "BAD_HAPPINESS"
-        "BAD_SUPPLY"
-        "VERY_BAD_INDUSTRY"
-        "NO_OFFENSE_TROOPS"
-        "PEDIA_PHOTOTROPHIC_SPECIES_CLASS"
-        "PEDIA_TELEPATHIC_TITLE"
+        "PHOTOTROPHIC",
+        "TELEPATHIC",
+        "VERY_BAD_POPULATION",
+        "BAD_HAPPINESS",
+        "BAD_SUPPLY",
+        "VERY_BAD_INDUSTRY",
+        "NO_OFFENSE_TROOPS",
+        "PEDIA_PHOTOTROPHIC_SPECIES_CLASS",
+        "PEDIA_TELEPATHIC_TITLE",
     ],
     foci=[
         HAS_INDUSTRY_FOCUS,
@@ -45,18 +45,18 @@ Species(
     ],
     defaultfocus="FOCUS_GROWTH",
     likes=[
-        "BLD_LIGHTHOUSE"  # if there were a greenhouse they would like that too
-        "FOCUS_GROWTH"  # what else would a plant want?
-        "PLC_POPULATION"  # grow, grow, grow your load, gently down the ..
+        "BLD_LIGHTHOUSE",  # if there were a greenhouse they would like that too
+        "FOCUS_GROWTH",  # what else would a plant want?
+        "PLC_POPULATION",  # grow, grow, grow your load, gently down the ..
     ],
     dislikes=[  # dislikes anything disturbing their fragile habitat or irritating their telepathic minds
-        "PLC_NO_GROWTH"  # is a plant, they like to grow
-        "BLD_SHIPYARD_AST"  # disturbs the rocks
-        "BLD_SHIPYARD_AST_REF"  # same
-        "JUGGERNAUT_NEST_SPECIAL"  # compete for rocks
-        "ECCENTRIC_ORBIT_SPECIAL"  # messes up all those orbital resonances, quite inharmonious
-        "FLD_METEOR_BLIZZARD"  # same
-        "FLD_VOID_RIFT"  # same
+        "PLC_NO_GROWTH",  # is a plant, they like to grow
+        "BLD_SHIPYARD_AST",  # disturbs the rocks
+        "BLD_SHIPYARD_AST_REF",  # same
+        "JUGGERNAUT_NEST_SPECIAL",  # compete for rocks
+        "ECCENTRIC_ORBIT_SPECIAL",  # messes up all those orbital resonances, quite inharmonious
+        "FLD_METEOR_BLIZZARD",  # same
+        "FLD_VOID_RIFT",  # same
     ],
     effectsgroups=[
         *VERY_BAD_INDUSTRY,

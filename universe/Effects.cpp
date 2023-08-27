@@ -3747,19 +3747,16 @@ GiveEmpireContent::GiveEmpireContent(std::unique_ptr<ValueRef::ValueRef<std::str
                                      std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id) :
     m_content_name(std::move(content_name)),
     m_unlock_type(unlock_type),
-    m_empire_id(std::move(empire_id))
-{
-    if (!m_empire_id)
-        m_empire_id.reset(new ValueRef::Variable<int>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner"));
-}
+    m_empire_id(empire_id ?
+                    std::move(empire_id) :
+                    std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner")
+               )
+{}
 
 void GiveEmpireContent::Execute(ScriptingContext& context) const {
-    if (!m_empire_id) return;
+    if (!m_empire_id || !m_content_name) return;
     auto empire = context.GetEmpire(m_empire_id->Eval(context));
     if (!empire) return;
-
-    if (!m_content_name)
-        return;
 
     switch (m_unlock_type) {
     case UnlockableItemType::UIT_BUILDING:  empire->AddBuildingType(m_content_name->Eval(context), context.current_turn); break;
@@ -3908,7 +3905,7 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
 
     const auto not_recipient = [recipient_id](const auto empire_id) { return recipient_id != empire_id; };
     const auto to_id_status = [&context, recipient_id](const auto empire_id)
-    { return std::make_pair(empire_id, context.ContextDiploStatus(recipient_id, empire_id)); };
+    { return std::pair(empire_id, context.ContextDiploStatus(recipient_id, empire_id)); };
 
     // whom to send to?
     std::set<int> recipient_empire_ids;
@@ -4203,7 +4200,7 @@ void SetVisibility::Execute(ScriptingContext& context) const {
     if (!context.effect_target)
         return;
 
-    // Note: currently ignoring upgrade-only flag
+    // Note: TODO: currently ignoring upgrade-only flag
 
     if (!m_vis)
         return; // nothing to evaluate!
@@ -4211,7 +4208,7 @@ void SetVisibility::Execute(ScriptingContext& context) const {
     const int main_empire_id = m_empire_id ? m_empire_id->Eval(context) : ALL_EMPIRES;
     const auto not_main_empire = [main_empire_id](const auto other_id) { return main_empire_id != other_id; };
     const auto to_id_status = [&context, main_empire_id](const auto other_empire_id)
-    { return std::make_pair(other_empire_id, context.ContextDiploStatus(main_empire_id, other_empire_id)); };
+    { return std::pair(other_empire_id, context.ContextDiploStatus(main_empire_id, other_empire_id)); };
 
 
     // whom to set visbility for?

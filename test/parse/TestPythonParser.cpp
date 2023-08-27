@@ -9,6 +9,7 @@
 #include "universe/UnlockableItem.h"
 #include "universe/ValueRefs.h"
 #include "universe/NamedValueRefManager.h"
+#include "util/i18n.h"
 #include "util/CheckSums.h"
 #include "util/Directories.h"
 #include "util/GameRules.h"
@@ -157,7 +158,7 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
                         ),
                         std::string("ORBITAL_HAB_LABEL")));
 
-        auto effect_group = std::shared_ptr<Effect::EffectsGroup>(new Effect::EffectsGroup(
+        auto effect_group = std::make_shared<Effect::EffectsGroup>(
                 std::make_unique<Condition::And>(
                     std::make_unique<Condition::Species>(),
                     std::make_unique<Condition::EmpireAffiliation>(
@@ -171,7 +172,7 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
                 17,
                 "",
                 ""
-        ));
+        );
 
         Tech tech{
             "CON_ORBITAL_HAB",
@@ -285,7 +286,7 @@ BOOST_AUTO_TEST_CASE(parse_species) {
         BOOST_TEST_MESSAGE("Dump " << species.Name() << ":");
         BOOST_TEST_MESSAGE(species.Dump(0));
 
-        BOOST_REQUIRE_EQUAL(4493747, species.GetCheckSum());
+        BOOST_REQUIRE_EQUAL(6533633, species.GetCheckSum());
 
         const Species test_species{"SP_ABADDONI",
             "SP_ABADDONI_DESC",
@@ -488,6 +489,13 @@ BOOST_AUTO_TEST_CASE(parse_species_full) {
     for (const auto& s : species) {
         for (const auto& effects : s.second.Effects()) {
             BOOST_REQUIRE_MESSAGE(effects.Scope(), s.second.Name());
+        }
+        BOOST_CHECK_MESSAGE(UserStringExists(s.second.Name()), s.second.Name());
+        for (const auto& l : s.second.Likes()) {
+            BOOST_CHECK_MESSAGE(UserStringExists(l), l);
+        }
+        for (const auto& l : s.second.Dislikes()) {
+            BOOST_CHECK_MESSAGE(UserStringExists(l), l);
         }
     }
 

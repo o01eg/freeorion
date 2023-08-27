@@ -1349,6 +1349,12 @@ Planet Stability Baseline
 RULE_BASELINE_PLANET_STABILITY_DESC
 Baseline level of planet [[METER_HAPPINESS]].
 
+RULE_BASELINE_SPECIES_EMPIRE_OPINION
+Species Empire Opinion Baseline
+
+RULE_BASELINE_SPECIES_EMPIRE_OPINION_DESC
+Baseline level of species opinions of empires.
+
 RULE_INVASION_OPINION_PENALTY_SCALING
 Planet invasion species opinion scaling
 
@@ -1486,6 +1492,24 @@ All Allowed
 
 RULE_DIPLOMACY_FORBIDDEN_FOR_ALL
 All Forbidden
+
+RULE_ANNEX_COST_EXP_BASE
+Annex Cost Exponential Base
+
+RULE_ANNEX_COST_EXP_BASE_DESC
+Base of exponential determining how annexation costs scale with species empire opinion.
+
+RULE_ANNEX_COST_SCALING
+Annex Cost Scaling
+
+RULE_ANNEX_COST_SCALING_DESC
+Scaling factor for how annexation costs scale with planet population.
+
+RULE_ANNEX_COST_MINIMUM
+Annex Cost Minimum
+
+RULE_ANNEX_COST_MINIMUM_DESC
+Minimum cost to annex a planet.
 
 
 ##
@@ -3916,8 +3940,16 @@ Annex (%1% IP)
 PL_ANNEX_FREE
 Annex
 
+# %1% cost in IP to annex this planet
+PL_ANNEXABLE
+Annexable for %1% IP
+
+PL_ANNEXATION_RESTRICTED
+Not Annexable
+
+# %1% cost in IP to annex this planet
 PL_CANCEL_ANNEX
-Cancel Annexation
+Cancel Annexation (%1% IP)
 
 # %1% size of the population this planet is colonized with.
 # %2% maximum population this planet can support.
@@ -14539,7 +14571,7 @@ Improved Engine Couplings
 SHP_IMPROVED_ENGINE_COUPLINGS_DESC
 '''[[COLONY_BUILDING_TIME_DECREASE]]
 
-Better engine parts equate to better engines. Increases [[metertype METER_SPEED]] by 20.'''
+Better engine parts equate to better engines.'''
 
 SHP_N_DIMENSIONAL_ENGINE_MATRIX
 N-Dimensional Engine Matrix
@@ -14547,7 +14579,7 @@ N-Dimensional Engine Matrix
 SHP_N_DIMENSIONAL_ENGINE_MATRIX_DESC
 '''[[COLONY_BUILDING_TIME_DECREASE]]
 
-N-Dimensional subspace research resulted in a more efficient engine matrix. Increases [[metertype METER_SPEED]] by 40.'''
+N-Dimensional subspace research resulted in a more efficient engine matrix.'''
 
 SHP_SINGULARITY_ENGINE_CORE
 Singularity Engine Core
@@ -14555,7 +14587,7 @@ Singularity Engine Core
 SHP_SINGULARITY_ENGINE_CORE_DESC
 '''[[COLONY_BUILDING_TIME_DECREASE]]
 
-A smaller cousin of the [[buildingtype BLD_HYPER_DAM]] outfitted for ships, the Singularity Engine Core drastically boosts power generation. Increases [[metertype METER_SPEED]] by 80.'''
+A smaller cousin of the [[buildingtype BLD_HYPER_DAM]] outfitted for ships, the Singularity Engine Core drastically boosts power generation.'''
 
 SHP_DEUTERIUM_TANK
 Deuterium Fuel

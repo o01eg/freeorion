@@ -334,7 +334,7 @@ MeterType NameToMeter(std::string_view name) noexcept { return NameToMeterCX(nam
 namespace {
     constexpr std::string_view MeterToNameCX(MeterType meter) noexcept {
         // NOTE: INVALID_METER_TYPE (enum's -1 position) <= meter < NUM_METER_TYPES (enum's final position)
-        return NAME_BY_METER[static_cast<std::underlying_type_t<MeterType>>(meter) + 1];
+        return NAME_BY_METER[static_cast<std::size_t>(static_cast<std::underlying_type_t<MeterType>>(meter)) + 1u];
     }
 }
 
@@ -1724,11 +1724,10 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             int key_int = m_int_ref2->Eval(context);
             if (key_int <= int(ShipPartClass::INVALID_SHIP_PART_CLASS) ||
                 key_int >= int(ShipPartClass::NUM_SHIP_PART_CLASSES))
-            {
-                return 0;
-            }
+            { return 0; }
 
-            auto key_filter_class = [part_class = ShipPartClass(key_int)](const std::map<ShipPartClass, int>::value_type& e) { return e.first == part_class; };
+            using map_val_t = const std::map<ShipPartClass, int>::value_type;
+            auto key_filter_class = [part_class = ShipPartClass(key_int)](map_val_t& e) { return e.first == part_class; };
 
             if (empire) {
                 auto filtered_values = empire->ShipPartClassOwned() | range_filter(key_filter_class) | range_values;
@@ -1915,9 +1914,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return 0;
         }
 
-        std::string ship_part_name;
-        if (m_string_ref1)
-            ship_part_name = m_string_ref1->Eval(context);
+        const std::string ship_part_name = m_string_ref1 ? m_string_ref1->Eval(context) : std::string{};
 
         const ShipDesign* design = context.ContextUniverse().GetShipDesign(design_id);
         if (!design)
@@ -1926,12 +1923,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         if (ship_part_name.empty())
             return design->PartCount();
 
-        int count = 0;
-        for (const std::string& part : design->Parts()) {
-            if (ship_part_name == part)
-                count++;
-        }
-        return count;
+        const auto& parts = design->Parts();
+        return std::count_if(parts.begin(), parts.end(), [&ship_part_name](const auto& part) { return part == ship_part_name; });
     }
     else if (variable_name == "PartOfClassInShipDesign") {
         int design_id = INVALID_DESIGN_ID;
@@ -2200,30 +2193,29 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
         if (m_int_ref1) {
             // single empire ID specified
-            int empire_id = m_int_ref1->Eval(context);
+            const int empire_id = m_int_ref1->Eval(context);
             if (empire_id == ALL_EMPIRES)
                 return 0.0;
-            auto empire = context.GetEmpire(empire_id);
+            const auto empire = context.GetEmpire(empire_id);
             if (!empire)
                 return 0.0;
             const auto& data = empire->SystemSupplyRanges();
 
-            auto it = data.find(system_id);
-            if (it != data.end())
-                return it->second;
-            else
-                return 0.0;
+            const auto it = data.find(system_id);
+            return (it != data.end()) ? it->second : 0.0f;
 
         } else {
+            const auto& empires{context.Empires()};
+            if (empires.NumEmpires() < 1)
+                return 0.0f;
             // no empire ID specified, use max of all empires' ranges at specified system
             const auto to_sys_supply_range = [system_id](const auto& e) {
-                const auto& ssr = e->SystemSupplyRanges();
+                const auto& ssr = e.second->SystemSupplyRanges();
                 const auto it = ssr.find(system_id);
                 return (it != ssr.end()) ? it->second : 0.0f;
             };
-            auto sup_rng_rng = context.Empires() | range_values | range_transform(to_sys_supply_range);
-            auto max_it = range_max_element(sup_rng_rng);
-            return (max_it != sup_rng_rng.end()) ? *max_it : 0.0f;
+            auto sup_rng_rng = empires | range_transform(to_sys_supply_range);
+            return *range_max_element(sup_rng_rng);
         }
     }
 

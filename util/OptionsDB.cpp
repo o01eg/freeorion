@@ -590,12 +590,12 @@ void OptionsDB::GetXML(XMLDoc& doc, bool non_default_only, bool include_version)
             std::string::size_type pos = 0;
             while ((pos = section_name.find('.', last_pos)) != std::string::npos) {
                 XMLElement temp(section_name.substr(last_pos, pos - last_pos));
-                elem_stack.back()->children.push_back(temp);
+                elem_stack.back()->AddChild(temp);
                 elem_stack.push_back(&elem_stack.back()->Child(temp.Tag()));
                 last_pos = pos + 1;
             }
             XMLElement temp(section_name.substr(last_pos));
-            elem_stack.back()->children.push_back(temp);
+            elem_stack.back()->AddChild(temp);
             elem_stack.push_back(&elem_stack.back()->Child(temp.Tag()));
         }
 
@@ -606,7 +606,7 @@ void OptionsDB::GetXML(XMLDoc& doc, bool non_default_only, bool include_version)
             if (!boost::any_cast<bool>(option.second.value))
                 continue;
         }
-        elem_stack.back()->children.push_back(temp);
+        elem_stack.back()->AddChild(temp);
         elem_stack.push_back(&elem_stack.back()->Child(temp.Tag()));
     }
 }
@@ -665,7 +665,7 @@ void OptionsDB::SetToDefault(std::string_view name) {
 void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
     //bool option_changed = false;
 
-    for (unsigned int i = 1; i < args.size(); ++i) {
+    for (std::size_t i = 1u; i < args.size(); ++i) {
         std::string_view current_token{args[i]};
 
         if (current_token.find("--") == 0) {
@@ -680,8 +680,8 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
                 // unrecognized option: may be registered later on so we'll store it for now
                 // Check for more parameters (if this is the last one, assume that it is a flag).
                 std::string_view value_str{"-"};
-                if (i + 1 < static_cast<unsigned int>(args.size()))
-                    value_str = StripQuotation(args[i + 1]);
+                if ((i + 1) < static_cast<unsigned int>(args.size()))
+                    value_str = StripQuotation(args[i + 1u]);
 
                 if (value_str.front() == '-') {
                     // this is either the last parameter or the next parameter is another option, assume this one is a flag
@@ -793,8 +793,8 @@ void OptionsDB::SetFromFile(const boost::filesystem::path& file_path, std::strin
 }
 
 void OptionsDB::SetFromXML(const XMLDoc& doc) {
-    for (const XMLElement& child : doc.root_node.children)
-    { SetFromXMLRecursive(child, ""); }
+    for (const XMLElement& child : doc.root_node.Children())
+        SetFromXMLRecursive(child, "");
 }
 
 void OptionsDB::SetFromXMLRecursive(const XMLElement& elem, std::string_view section_name) {
@@ -802,8 +802,8 @@ void OptionsDB::SetFromXMLRecursive(const XMLElement& elem, std::string_view sec
     if (option_name == "version.string")
         return;
 
-    if (!elem.children.empty()) {
-        for (const XMLElement& child : elem.children)
+    if (!elem.Children().empty()) {
+        for (const XMLElement& child : elem.Children())
             SetFromXMLRecursive(child, option_name);
     }
 

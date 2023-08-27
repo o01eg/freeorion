@@ -373,16 +373,16 @@ GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, st
 
 void GGHumanClientApp::ConnectKeyboardAcceleratorSignals() {
     // Add global hotkeys
-    HotkeyManager *hkm = HotkeyManager::GetManager();
+    auto& hkm = HotkeyManager::GetManager();
 
-    hkm->Connect(boost::bind(&GGHumanClientApp::HandleHotkeyExitApp, this), "exit",
-                 NoModalWndsOpenCondition);
-    hkm->Connect(boost::bind(&GGHumanClientApp::HandleHotkeyResetGame, this), "quit",
-                 NoModalWndsOpenCondition);
-    hkm->Connect(boost::bind(&GGHumanClientApp::ToggleFullscreen, this), "video.fullscreen",
-                 NoModalWndsOpenCondition);
+    hkm.Connect(boost::bind(&GGHumanClientApp::HandleHotkeyExitApp, this), "exit",
+                NoModalWndsOpenCondition);
+    hkm.Connect(boost::bind(&GGHumanClientApp::HandleHotkeyResetGame, this), "quit",
+                NoModalWndsOpenCondition);
+    hkm.Connect(boost::bind(&GGHumanClientApp::ToggleFullscreen, this), "video.fullscreen",
+                NoModalWndsOpenCondition);
 
-    hkm->RebuildShortcuts();
+    hkm.RebuildShortcuts();
 }
 
 GGHumanClientApp::~GGHumanClientApp() {
@@ -959,7 +959,7 @@ boost::intrusive_ptr<const boost::statechart::event_base> GGHumanClientApp::GetD
     std::scoped_lock lock(m_event_queue_guard);
     if (m_posted_event_queue.empty())
         return nullptr;
-    auto retval = std::move(m_posted_event_queue.front());
+    auto retval{std::move(m_posted_event_queue.front())};
     m_posted_event_queue.pop();
     return retval;
 }
@@ -1462,7 +1462,7 @@ void GGHumanClientApp::ExitSDL(int exit_code)
 void GGHumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_code ) {
     DebugLogger() << "GGHumanClientApp::ResetOrExitApp(" << reset << ", " << skip_savegame << ", " << exit_code << ")";
     if (m_exit_handled) {
-        static int repeat_count = 0;
+        static constinit int repeat_count = 0;
         if (repeat_count++ > 2) {
             m_exit_handled = false;
             skip_savegame = true;

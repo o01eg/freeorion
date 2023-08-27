@@ -31,7 +31,7 @@
 namespace {
     constexpr float EPSILON = 0.01f;
 
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
     constexpr std::string EMPTY_STRING;
 #else
     const std::string EMPTY_STRING;
@@ -108,17 +108,11 @@ std::shared_ptr<const UniverseObject> Empire::Source(const ObjectMap& objects) c
     }
 
     // Find any planet / ship owned by the empire
-    auto owned = [this](const auto& o) { return o.second->OwnedBy(m_id); };
-
-    const auto& planets = objects.allExisting<Planet>(); // TODO: provide a FindAny function to do this...
-    auto p_it = std::find_if(planets.begin(), planets.end(), owned);
-    if (p_it != planets.end())
-        return p_it->second;
-
-    const auto& ships = objects.allExisting<Ship>();
-    auto s_it = std::find_if(ships.begin(), ships.end(), owned);
-    if (s_it != ships.end())
-        return s_it->second;
+    auto owned = [this](const auto* o) { return o->OwnedBy(m_id); };
+    if (auto owned_planet = objects.get<Planet>(owned))
+        return owned_planet;
+    if (auto owned_ship = objects.get<Ship>(owned))
+        return owned_ship;
 
     m_source_id = INVALID_OBJECT_ID;
     return nullptr;
@@ -2036,17 +2030,17 @@ void Empire::AddExploredSystem(int ID, int turn, const ObjectMap& objects) {
 }
 
 std::string Empire::NewShipName() {
-    static std::vector<std::string> ship_names = UserStringList("SHIP_NAMES");
-    if (ship_names.empty())
-        ship_names.push_back(UserString("OBJ_SHIP"));
+    auto retval = []() {
+        const auto ship_names = UserStringList("SHIP_NAMES");
+        if (ship_names.empty())
+            return UserString("OBJ_SHIP");
+        // select name randomly from list
+        const int ship_name_idx = RandInt(0, static_cast<int>(ship_names.size()) - 1);
+        return ship_names[ship_name_idx];
+    }();
 
-    // select name randomly from list
-    const int ship_name_idx = RandInt(0, static_cast<int>(ship_names.size()) - 1);
-    std::string retval = ship_names[ship_name_idx];
     const int times_name_used = ++m_ship_names_used[retval];
-    if (1 < times_name_used)
-        retval += " " + RomanNumber(times_name_used);
-    return retval;
+    return (times_name_used > 1) ? (retval + " " + RomanNumber(times_name_used)) : retval;
 }
 
 void Empire::AddShipDesign(int ship_design_id, const Universe& universe, int next_design_id) {

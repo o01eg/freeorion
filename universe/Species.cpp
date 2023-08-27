@@ -11,6 +11,7 @@
 #include "ValueRefs.h"
 #include "../util/AppInterface.h"
 #include "../util/CheckSums.h"
+#include "../util/GameRules.h"
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
 #include "../util/Random.h"
@@ -76,38 +77,55 @@ uint32_t FocusType::GetCheckSum() const {
 // Species                                     //
 /////////////////////////////////////////////////
 namespace {
-    std::string ConcatenateAsString(auto&& stringset1, auto&& stringset2, auto&& stringset3) {
-        std::string retval;
+    void AddRules(GameRules& rules) {
+        rules.Add<double>(UserStringNop("RULE_ANNEX_COST_EXP_BASE"),
+                          UserStringNop("RULE_ANNEX_COST_EXP_BASE_DESC"),
+                          "BALANCE_STABILITY", 1.2, true, RangedValidator<double>(0.0, 3.0));
+        rules.Add<double>(UserStringNop("RULE_ANNEX_COST_SCALING"),
+                          UserStringNop("RULE_ANNEX_COST_SCALING_DESC"),
+                          "BALANCE_STABILITY", 5.0, true, RangedValidator<double>(0.0, 50.0));
+        rules.Add<double>(UserStringNop("RULE_ANNEX_COST_MINIMUM"),
+                          UserStringNop("RULE_ANNEX_COST_MINIMUM_DESC"),
+                          "BALANCE_STABILITY", 5.0, true, RangedValidator<double>(0.0, 50.0));
+    }
+    bool temp_bool = RegisterGameRules(&AddRules);
+
+    auto ConcatenateAsVector(auto&& stringset1, auto&& stringset2, auto&& stringset3) {
+        std::vector<std::string::value_type> retval;
+        retval.reserve((stringset1.size() + stringset2.size() + stringset3.size())*30); // guesstimate
         for (const auto& s : {stringset1, stringset2, stringset3})
-            for (const auto& t : s)
-                retval += boost::to_upper_copy<std::string>(t);
+            for (const auto& t : s) {
+                const auto upperized_t = boost::to_upper_copy<std::string>(t);
+                retval.insert(retval.end(), upperized_t.begin(), upperized_t.end());
+            }
         return retval;
     }
 
-    std::vector<std::string_view> StringViewsForTags(auto&& tags, std::string_view concat_tags) {
+    std::vector<std::string_view> StringViewsForTags(const auto& tags, std::string_view concat_tags) {
         std::vector<std::string_view> retval;
         retval.reserve(tags.size());
         std::size_t next_idx = 0;
 
         // store views into concatenated tags/likes string
-        std::for_each(tags.begin(), tags.end(), [&next_idx, &retval, concat_tags](const auto t) {
+        std::for_each(tags.begin(), tags.end(), [&next_idx, &retval, concat_tags](const auto tag) {
             // determine how much space each tag takes up after being converted to upper case
-            const auto upper_sz = boost::to_upper_copy<std::string>(t).size();
+            const auto upperized_tag = boost::to_upper_copy<std::string>(tag);
+            const auto upper_sz = upperized_tag.size();
             retval.push_back(concat_tags.substr(next_idx, upper_sz));
             next_idx += upper_sz;
         });
         return retval;
     }
 
-    std::vector<std::string_view> StringViewsForPediaTags(auto&& tags, std::string_view concat_tags) {
+    std::vector<std::string_view> StringViewsForPediaTags(const auto& tags, std::string_view concat_tags) {
         std::vector<std::string_view> retval;
         retval.reserve(tags.size());
-
         std::size_t next_idx = 0;
 
         // store views into concatenated tags/likes string
         std::for_each(tags.begin(), tags.end(), [&next_idx, &retval, concat_tags] (const auto tag) {
-            const auto upper_sz = boost::to_upper_copy<std::string>(tag).size();
+            const auto upperized_tag = boost::to_upper_copy<std::string>(tag);
+            const auto upper_sz = upperized_tag.size();
             static constexpr auto len{TAG_PEDIA_PREFIX.length()};
             if (tag.substr(0, len) == TAG_PEDIA_PREFIX) {
                 // store string views into the pedia tag after the "PEDIA" prefix
@@ -174,19 +192,35 @@ namespace {
     auto DefaultAnnexationCost() {
         return std::make_unique<ValueRef::Operation<double>>(
             ValueRef::OpType::MAXIMUM,
-            std::make_unique<ValueRef::Constant<double>>(5.0),
             std::make_unique<ValueRef::ComplexVariable<double>>(
-                "SpeciesEmpireOpinion",
-                std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "Owner"),
-                nullptr, nullptr,
-                std::make_unique<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE,
-                                                                  "Species")
-            ),
+                "GameRule", nullptr, nullptr, nullptr,
+                std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_MINIMUM")),
             std::make_unique<ValueRef::Operation<double>>(
                 ValueRef::OpType::TIMES,
-                std::make_unique<ValueRef::Constant<double>>(5.0),
-                std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE,
-                                                             "Population"))
+                std::make_unique<ValueRef::Operation<double>>(
+                    ValueRef::OpType::EXPONENTIATE,
+                    std::make_unique<ValueRef::ComplexVariable<double>>(
+                        "GameRule", nullptr, nullptr, nullptr,
+                        std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_EXP_BASE")),
+                    std::make_unique<ValueRef::Operation<double>>(
+                        ValueRef::OpType::NEGATE,
+                        std::make_unique<ValueRef::ComplexVariable<double>>(
+                            "SpeciesEmpireOpinion",
+                            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "Owner"),
+                            nullptr, nullptr,
+                            std::make_unique<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE,
+                                                                              "Species")
+                        )
+                    )
+                ),
+                std::make_unique<ValueRef::Operation<double>>(
+                    ValueRef::OpType::TIMES,
+                    std::make_unique<ValueRef::ComplexVariable<double>>(
+                        "GameRule", nullptr, nullptr, nullptr,
+                        std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_SCALING")),
+                    std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE,
+                                                                 "Population"))
+            )
         );
     }
 }
@@ -243,14 +277,14 @@ Species::Species(std::string&& name, std::string&& desc,
     m_can_produce_ships(can_produce_ships),
     m_spawn_rate(spawn_rate),
     m_spawn_limit(spawn_limit),
-    m_tags_concatenated(ConcatenateAsString(tags, likes, dislikes)),
-    m_tags(StringViewsForTags(tags, m_tags_concatenated)),
-    m_pedia_tags(StringViewsForPediaTags(tags, m_tags_concatenated)),
+    m_tags_concatenated(ConcatenateAsVector(tags, likes, dislikes)),
+    m_tags(StringViewsForTags(tags, m_tags_concatenated.data())),
+    m_pedia_tags(StringViewsForPediaTags(tags, m_tags_concatenated.data())),
     m_likes([&likes, this]() {
         std::vector<std::string_view> retval;
         retval.reserve(likes.size());
 
-        const std::string_view sv{m_tags_concatenated};
+        const std::string_view sv{m_tags_concatenated.data(), m_tags_concatenated.size()};
         std::size_t next_idx = 0;
         // find starting point for first like, after end of tags, within m_tags_concatenated
         std::for_each(m_tags.begin(), m_tags.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
@@ -268,7 +302,7 @@ Species::Species(std::string&& name, std::string&& desc,
         std::vector<std::string_view> retval;
         retval.reserve(dislikes.size());
 
-        const std::string_view sv{m_tags_concatenated};
+        const std::string_view sv{m_tags_concatenated.data(), m_tags_concatenated.size()};
         std::size_t next_idx = 0;
         // find starting point for first dislike, after end of tags and likes, within m_tags_concatenated
         std::for_each(m_tags.begin(), m_tags.end(), [&next_idx](const auto& t) { next_idx += t.size(); });
@@ -385,6 +419,21 @@ std::string Species::Dump(uint8_t ntabs) const {
             retval += focus.Dump(ntabs+2);
         retval += DumpIndent(ntabs+1) + "]\n";
     }
+    retval += DumpIndent(ntabs+1) + "defaultfocus = \"" + m_default_focus + "\"\n";
+    retval += DumpIndent(ntabs+1) + "likes = [";
+    for (const auto& entry : m_likes) {
+        retval += "\"";
+        retval += entry;
+        retval += "\" ";
+    }
+    retval += "]\n";
+    retval += DumpIndent(ntabs+1) + "dislikes = [";
+    for (const auto& entry : m_dislikes) {
+        retval += "\"";
+        retval += entry;
+        retval += "\" ";
+    }
+    retval += "]\n";
     if (m_effects.size() == 1) {
         retval += DumpIndent(ntabs+1) + "effectsgroups =\n";
         retval += m_effects.front().Dump(ntabs+2);
@@ -559,6 +608,8 @@ uint32_t Species::GetCheckSum() const {
     // opinions and homeworlds are per-game specific, so not included in checksum
     CheckSums::CheckSumCombine(retval, m_foci);
     CheckSums::CheckSumCombine(retval, m_default_focus);
+    CheckSums::CheckSumCombine(retval, m_likes);
+    CheckSums::CheckSumCombine(retval, m_dislikes);
     CheckSums::CheckSumCombine(retval, m_planet_environments);
     CheckSums::CheckSumCombine(retval, m_combat_targets);
     CheckSums::CheckSumCombine(retval, m_annexation_condition);

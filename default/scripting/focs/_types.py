@@ -1,6 +1,5 @@
 # mypy: disable-error-code="empty-body"
-from functools import total_ordering
-from typing import Generic, TypeVar
+from typing import TypeVar, Union
 
 from typing_extensions import Self
 
@@ -61,60 +60,21 @@ class _PlanetId(_ID):
     ...
 
 
+class _DesignID(_ID):
+    ...
+
+
 _T = TypeVar("_T", str, int, float)
 
 
-@total_ordering
-class _Value(Generic[_T]):
-    def __add__(self, other) -> Self:
-        ...
+class _Condition(bool):  # type: ignore
+    """
+    This value represent an expression that is resolved to boolean.
 
-    def __radd__(self, other) -> Self:
-        ...
+    We need to have a special "class" because we use integer operands with it (& | ~),
+    which return int type, that breaks linter logic.
+    """
 
-    def __sub__(self, other) -> Self:
-        ...
-
-    def __rsub__(self, other) -> Self:
-        ...
-
-    def __mul__(self, other) -> Self:
-        ...
-
-    def __rmul__(self, other) -> Self:
-        ...
-
-    def __floordiv__(self, other) -> Self:
-        ...
-
-    def __rfloordiv__(self, other) -> Self:
-        ...
-
-    def __truediv__(self, other) -> Self:
-        ...
-
-    def __rtruediv__(self, other) -> Self:
-        ...
-
-    def __pow__(self, other) -> Self:
-        ...
-
-    def __rpow__(self, other) -> Self:
-        ...
-
-    def __gt__(self, other) -> bool:
-        ...
-
-    def __eq__(self, other) -> bool:
-        ...
-
-
-_FloatValue = _Value[float]
-_IntValue = _Value[int]
-_SpeciesValue = _Value[str]
-
-
-class _Condition:
     def __and__(self, other) -> Self:
         ...
 
@@ -124,24 +84,53 @@ class _Condition:
     def __invert__(self) -> Self:
         ...
 
+    def __mul__(self, other: _T) -> _T:
+        """
+        Support for boolean multiplication.
+        """
+        return other
 
-class _FocusType:
+    def __rmul__(self, other: _T) -> _T:
+        """
+        Support for boolean multiplication.
+        """
+        return other
+
+
+class _ConditionalComposition:
+    """
+    Base class to type that return conditions when used in comparison operations.
+    """
+
+    def __eq__(self, other) -> _Condition:  # type: ignore[override]
+        ...
+
+    def __ne__(self, other) -> _Condition:  # type: ignore[override]
+        ...
+
+    def __lt__(self, other) -> _Condition:
+        ...
+
+    def __gt__(self, other) -> _Condition:
+        ...
+
+    def __le__(self, other) -> _Condition:
+        ...
+
+    def __ge__(self, other) -> _Condition:
+        ...
+
+
+_SpeciesValue = str
+
+
+# Type hints for function arguments.  This could be a literal or _Value returned by other function.
+_StringParam = str
+_IntParam = int
+# We assume that we accept int anywhere we could accept float
+_FloatParam = Union[int, float]
+_ValueParam = Union[int, float, str]
+
+
+class _BuildingType:
     ...
-
-
-@total_ordering
-class _Turn(_Condition):
-    def __lt__(self, other) -> _Condition:
-        ...
-
-    def __eq__(self, other) -> _Condition:  # type: ignore[override]
-        ...
-
-
-@total_ordering
-class _IntComparableCondition(_Condition):
-    def __eq__(self, other) -> _Condition:  # type: ignore[override]
-        ...
-
-    def __lt__(self, other) -> _Condition:
-        ...

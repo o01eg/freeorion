@@ -2028,7 +2028,7 @@ void MapWnd::RenderSystems() {
 
 
     std::vector<std::pair<int, int>> colony_count_by_empire_id;
-    colony_count_by_empire_id.reserve(empires.NumEmpires() + 1);
+    colony_count_by_empire_id.reserve(static_cast<std::size_t>(empires.NumEmpires()) + 1u);
     auto increment_empire_colony_count = [&colony_count_by_empire_id](int col_empire_id) {
         auto it = std::find_if(colony_count_by_empire_id.begin(), colony_count_by_empire_id.end(),
                                [col_empire_id](const auto& e) { return e.first == col_empire_id; });
@@ -6832,19 +6832,19 @@ void MapWnd::RefreshTurnButtonTooltip() {
 }
 
 void MapWnd::RefreshInfluenceResourceIndicator() {
-    Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+    const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire) {
         m_influence->SetValue(0.0);
         return;
     }
-    double total_IP_spent = empire->GetInfluenceQueue().TotalIPsSpent();
-    double total_IP_output = empire->GetInfluencePool().TotalOutput();
-    double total_IP_target_output = empire->GetInfluencePool().TargetOutput();
-    float  stockpile = empire->GetInfluencePool().Stockpile();
-    float  stockpile_used = empire->GetInfluenceQueue().AllocatedStockpileIP();
-    float  expected_stockpile = empire->GetInfluenceQueue().ExpectedNewStockpileAmount();
+    const double total_IP_spent = empire->GetInfluenceQueue().TotalIPsSpent();
+    const double total_IP_output = empire->GetInfluencePool().TotalOutput();
+    const double total_IP_target_output = empire->GetInfluencePool().TargetOutput();
+    const float  stockpile = empire->GetInfluencePool().Stockpile();
+    const float  stockpile_used = empire->GetInfluenceQueue().AllocatedStockpileIP();
+    const float  expected_stockpile = empire->GetInfluenceQueue().ExpectedNewStockpileAmount();
 
-    float  stockpile_plusminus_next_turn = expected_stockpile - stockpile;
+    const float  stockpile_plusminus_next_turn = expected_stockpile - stockpile;
 
     m_influence->SetValue(stockpile);
     m_influence->SetValue(stockpile_plusminus_next_turn, 1);
@@ -7105,253 +7105,155 @@ bool MapWnd::ZoomToHomeSystem() {
 }
 
 namespace {
-    struct CustomRowCmp {
-        bool operator()(const std::pair<std::string, int>& lhs,
-                        const std::pair<std::string, int>& rhs) const
-        { return GetLocale().operator()(lhs.first, rhs.first); } // todo: use .second values to break ties
+    struct AllTrue { constexpr bool operator()(const auto*) { return true; } };
+
+    template <typename T, typename P = AllTrue>
+        requires std::is_base_of_v<UniverseObject, T> &&
+                 requires(P p, const T* t) { {p(t)} -> std::same_as<bool>; }
+    auto IDsSortedByName(P&& pred = P{}) {
+        constexpr auto to_id_name = [](const auto* obj) -> std::pair<int, std::string_view> { return {obj->ID(), obj->Name()}; };
+
+        const auto objs = [pred]() -> decltype(auto) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(pred)>, AllTrue>)
+                return Objects().allExistingRaw<const T>();
+            else
+                return Objects().findExistingRaw<const T>(pred);
+        }();
+        // collect ids and corresponding names
+        std::vector<std::pair<int, std::string_view>> ids_names;
+        ids_names.reserve(Objects().size<T>());
+        range_copy(objs | range_transform(to_id_name), std::back_inserter(ids_names));
+        // alphabetize, with empty names at end
+        auto not_empty_it = std::partition(ids_names.begin(), ids_names.end(),
+                                           [](const auto& id_name) { return !id_name.second.empty(); });
+        std::sort(ids_names.begin(), not_empty_it,
+                  [](const auto& lhs, const auto& rhs) { return lhs.second < rhs.second; });
+        // extract ordered ids
+        std::vector<int> retval;
+        retval.reserve(ids_names.size());
+        range_copy(ids_names | range_keys, std::back_inserter(retval));
+        return retval;
+    }
+
+    template <typename It>
+    constexpr auto LoopNext(const It begin_it, const It from_it, const It end_it) {
+        if (from_it != end_it) {
+            auto it = std::next(from_it);
+            if (it != end_it)
+                return it;
+        }
+        return begin_it;
     };
 
-    std::set<std::pair<std::string, int>, CustomRowCmp> GetSystemNamesIDs() {
-        // get systems, store alphabetized
-        std::set<std::pair<std::string, int>, CustomRowCmp> system_names_ids;
-        for (auto* system : Objects().allRaw<System>())
-            system_names_ids.emplace(system->Name(), system->ID());
-        return system_names_ids;
+    constexpr std::array<int, 10> test_nums = {1,2,3,4,5,6,7,8,9,10};
+    constexpr auto tnsb = test_nums.begin(), tnsrt = std::next(test_nums.begin(), 5), tnsnd = test_nums.end();
+    static_assert(*tnsrt == 6 && *LoopNext(tnsb, tnsrt, tnsnd) == 7);
+    static_assert(LoopNext(tnsb, tnsnd, tnsnd) == tnsb);
+
+    enum class SearchDir : bool { FORWARD, REVERSE };
+
+    // gets id of loop-next id in \a ids
+    int GetNext(const auto& ids, const int start_from_id, SearchDir dir = SearchDir::FORWARD) {
+        if (ids.empty()) [[unlikely]]
+            return INVALID_OBJECT_ID;
+
+        if (ids.size() == 1u) [[unlikely]]
+            return *ids.begin(); // forward and backwards are the same in this case...
+
+        if (dir == SearchDir::FORWARD)
+            return *LoopNext(ids.begin(), std::find(ids.begin(), ids.end(), start_from_id), ids.end());
+        else
+            return *LoopNext(ids.rbegin(), std::find(ids.rbegin(), ids.rend(), start_from_id), ids.rend());
     }
 
-    std::set<std::pair<std::string, int>, CustomRowCmp> GetOwnedSystemNamesIDs(int empire_id) {
-        auto owned_planets = Objects().findRaw<const Planet>(
-            [empire_id](const Planet* p) { return p->OwnedBy(empire_id); });
+    bool ZoomToPrevOrNextOwnedSystem(SearchDir dir, MapWnd& mw) {
+        const auto contains_owned_by_empire = [empire_id{GGHumanClientApp::GetApp()->EmpireID()}](const System* sys) {
+            auto is_owned_and_contained = [empire_id, sys_id{sys->ID()}](const Planet* obj)
+            { return obj && obj->ContainedBy(sys_id) && obj->OwnedBy(empire_id); };
+            return Objects().check_if_any<Planet, decltype(is_owned_and_contained), false>(is_owned_and_contained);
+        };
 
-        // get IDs of systems that contain any owned planets
-        std::vector<int> system_ids;
-        system_ids.reserve(owned_planets.size());
-        std::transform(owned_planets.begin(), owned_planets.end(), std::back_inserter(system_ids),
-                       [](const auto* p) { return p->SystemID(); });
-        std::sort(system_ids.begin(), system_ids.end());
-        auto it = std::unique(system_ids.begin(), system_ids.end());
-        system_ids.erase(it, system_ids.end());
+        const auto next_sys_id = GetNext(IDsSortedByName<System>(contains_owned_by_empire), SidePanel::SystemID(), dir);
+        if (next_sys_id == INVALID_OBJECT_ID)
+            return false;
 
-        // store systems, sorted alphabetically
-        const auto sys = Objects().findRaw<const System>(system_ids);
-        std::set<std::pair<std::string, int>, CustomRowCmp> system_names_ids;
-        std::transform(sys.begin(), sys.end(), std::inserter(system_names_ids, system_names_ids.end()),
-                       [](const System* s) -> std::pair<std::string, int> { return {s->Name(), s->ID()}; });
+        mw.CenterOnObject(next_sys_id);
+        mw.SelectSystem(next_sys_id);
 
-        return system_names_ids;
+        return true;
+    }
+
+    bool ZoomToPrevOrNextSystem(SearchDir dir, MapWnd& mw) {
+        const auto next_sys_id = GetNext(IDsSortedByName<System>(), SidePanel::SystemID(), dir);
+        if (next_sys_id == INVALID_OBJECT_ID)
+            return false;
+
+        mw.CenterOnObject(next_sys_id);
+        mw.SelectSystem(next_sys_id);
+
+        return true;
+    }
+
+    bool ZoomToPrevOrNextOwnedFleet(SearchDir dir, MapWnd& mw) {
+        const auto is_owned_fleet = [client_empire_id{GGHumanClientApp::GetApp()->EmpireID()}](const Fleet* fleet)
+        { return client_empire_id == ALL_EMPIRES || fleet->OwnedBy(client_empire_id); };
+
+        const auto next_fleet_id = GetNext(IDsSortedByName<Fleet>(is_owned_fleet), mw.SelectedFleetID(), dir);
+        if (next_fleet_id == INVALID_OBJECT_ID)
+            return false;
+
+        mw.CenterOnObject(next_fleet_id);
+        mw.SelectFleet(next_fleet_id);
+
+        return true;
+    }
+
+    bool ZoomToPrevOrNextIdleFleet(SearchDir dir, MapWnd& mw) {
+        auto is_stationary_owned_fleet = [client_empire_id{GGHumanClientApp::GetApp()->EmpireID()}](const Fleet* fleet) {
+            return (fleet->FinalDestinationID() == INVALID_OBJECT_ID || fleet->TravelRoute().empty()) &&
+                    (client_empire_id == ALL_EMPIRES ||
+                    (!fleet->Unowned() && fleet->Owner() == client_empire_id));
+        };
+
+        const auto next_fleet_id = GetNext(IDsSortedByName<Fleet>(is_stationary_owned_fleet), mw.SelectedFleetID(), dir);
+        if (next_fleet_id == INVALID_OBJECT_ID)
+            return false;
+
+        mw.CenterOnObject(next_fleet_id);
+        mw.SelectFleet(next_fleet_id);
+        return true;
     }
 }
 
-bool MapWnd::ZoomToPrevOwnedSystem() {
-    // get planets owned by client's player, sorted alphabetically
-    auto system_names_ids = GetOwnedSystemNamesIDs(GGHumanClientApp::GetApp()->EmpireID());
-    if (system_names_ids.empty())
-        return false;
+bool MapWnd::ZoomToPrevOwnedSystem()
+{ return ZoomToPrevOrNextOwnedSystem(SearchDir::REVERSE, *this); }
 
-    // find currently selected system in list
-    auto it = system_names_ids.rend();
-    auto sel_sys = Objects().get<System>(SidePanel::SystemID());
-    if (sel_sys) {
-        it = std::find(system_names_ids.rbegin(), system_names_ids.rend(),
-                       std::pair(sel_sys->Name(), sel_sys->ID()));
-        if (it != system_names_ids.rend())
-            ++it;
-    }
-    if (it == system_names_ids.rend())
-        it = system_names_ids.rbegin();
+bool MapWnd::ZoomToNextOwnedSystem()
+{ return ZoomToPrevOrNextOwnedSystem(SearchDir::FORWARD, *this); }
 
-    if (it != system_names_ids.rend()) {
-        CenterOnObject(it->second);
-        SelectSystem(it->second);
-    }
+bool MapWnd::ZoomToPrevSystem()
+{ return ZoomToPrevOrNextSystem(SearchDir::REVERSE, *this); }
 
-    return true;
-}
+bool MapWnd::ZoomToNextSystem()
+{ return ZoomToPrevOrNextSystem(SearchDir::FORWARD, *this); }
 
-bool MapWnd::ZoomToNextOwnedSystem() {
-    // get planets owned by client's player, sorted alphabetically
-    auto system_names_ids = GetOwnedSystemNamesIDs(GGHumanClientApp::GetApp()->EmpireID());
-    if (system_names_ids.empty())
-        return false;
+bool MapWnd::ZoomToPrevIdleFleet()
+{ return ZoomToPrevOrNextIdleFleet(SearchDir::REVERSE, *this); }
 
-    auto it = system_names_ids.end();
+bool MapWnd::ZoomToNextIdleFleet()
+{ return ZoomToPrevOrNextIdleFleet(SearchDir::FORWARD, *this); }
 
-    // find currently selected system in list
-    auto sel_sys = Objects().get<System>(SidePanel::SystemID());
-    if (sel_sys) {
-        it = std::find(system_names_ids.begin(), system_names_ids.end(),
-                       std::pair(sel_sys->Name(), sel_sys->ID()));
-        if (it != system_names_ids.end())
-            ++it;
-    }
-    if (it == system_names_ids.end())
-        it = system_names_ids.begin();
+bool MapWnd::ZoomToPrevFleet()
+{ return ZoomToPrevOrNextOwnedFleet(SearchDir::REVERSE, *this); }
 
-    if (it != system_names_ids.end()) {
-        CenterOnObject(it->second);
-        SelectSystem(it->second);
-    }
-
-    return true;
-}
-
-bool MapWnd::ZoomToPrevSystem() {
-    auto system_names_ids = GetSystemNamesIDs();
-    if (system_names_ids.empty())
-        return false;
-
-    // find currently selected system in list
-    auto it = system_names_ids.rend();
-    auto sel_sys = Objects().get<System>(SidePanel::SystemID());
-    if (sel_sys) {
-        it = std::find(system_names_ids.rbegin(), system_names_ids.rend(),
-                       std::pair(sel_sys->Name(), sel_sys->ID()));
-        if (it != system_names_ids.rend())
-            ++it;
-    }
-    if (it == system_names_ids.rend())
-        it = system_names_ids.rbegin();
-
-    if (it != system_names_ids.rend()) {
-        CenterOnObject(it->second);
-        SelectSystem(it->second);
-    }
-
-    return true;
-}
-
-bool MapWnd::ZoomToNextSystem() {
-    auto system_names_ids = GetSystemNamesIDs();
-    if (system_names_ids.empty())
-        return false;
-
-    auto it = system_names_ids.end();
-
-    // find currently selected system in list
-    auto sel_sys = Objects().get<System>(SidePanel::SystemID());
-    if (sel_sys) {
-        it = std::find(system_names_ids.begin(), system_names_ids.end(),
-                       std::pair(sel_sys->Name(), sel_sys->ID()));
-        if (it != system_names_ids.end())
-            ++it;
-    }
-    if (it == system_names_ids.end())
-        it = system_names_ids.begin();
-
-    if (it != system_names_ids.end()) {
-        CenterOnObject(it->second);
-        SelectSystem(it->second);
-    }
-
-    return true;
-}
-
-bool MapWnd::ZoomToPrevIdleFleet() {
-    const auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto is_stationary_client_empire_fleet = [client_empire_id](const Fleet* fleet) {
-        return (fleet->FinalDestinationID() == INVALID_OBJECT_ID || fleet->TravelRoute().empty()) &&
-                (client_empire_id == ALL_EMPIRES ||
-                (!fleet->Unowned() && fleet->Owner() == client_empire_id));
-    };
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(is_stationary_client_empire_fleet);
-
-    auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
-    const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
-    if (it != vec.begin())
-        --it;
-    else
-        it = vec.end();
-    while (it != vec.begin() && (it == vec.end() || destroyed_object_ids.contains(*it)))
-        --it;
-    m_current_fleet_id = it != vec.end() ? *it : vec.empty() ? INVALID_OBJECT_ID : vec.back();
-
-    if (m_current_fleet_id != INVALID_OBJECT_ID) {
-        CenterOnObject(m_current_fleet_id);
-        SelectFleet(m_current_fleet_id);
-    }
-
-    return true;
-}
-
-bool MapWnd::ZoomToNextIdleFleet() {
-    const auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto is_stationary_client_empire_fleet = [client_empire_id](const Fleet* fleet) {
-        return (fleet->FinalDestinationID() == INVALID_OBJECT_ID || fleet->TravelRoute().empty()) &&
-                (client_empire_id == ALL_EMPIRES ||
-                (!fleet->Unowned() && fleet->Owner() == client_empire_id));
-    };
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(is_stationary_client_empire_fleet);
-
-    auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
-    const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
-    if (it != vec.end())
-        ++it;
-    while (it != vec.end() && destroyed_object_ids.contains(*it))
-        ++it;
-    m_current_fleet_id = it != vec.end() ? *it : vec.empty() ? INVALID_OBJECT_ID : vec.front();
-
-    if (m_current_fleet_id != INVALID_OBJECT_ID) {
-        CenterOnObject(m_current_fleet_id);
-        SelectFleet(m_current_fleet_id);
-    }
-
-    return true;
-}
-
-bool MapWnd::ZoomToPrevFleet() {
-    auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto is_owned_fleet = [client_empire_id](const Fleet* fleet)
-    { return client_empire_id == ALL_EMPIRES || fleet->OwnedBy(client_empire_id); };
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(is_owned_fleet);
-
-    auto it = std::find(vec.begin(), vec.end(), m_current_fleet_id);
-    const auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
-    if (it != vec.begin())
-        --it;
-    else
-        it = vec.end();
-    while (it != vec.begin() && (it == vec.end() || destroyed_object_ids.contains(*it)))
-        --it;
-    m_current_fleet_id = it != vec.end() ? *it : vec.empty() ? INVALID_OBJECT_ID : vec.back();
-
-    if (m_current_fleet_id != INVALID_OBJECT_ID) {
-        CenterOnObject(m_current_fleet_id);
-        SelectFleet(m_current_fleet_id);
-    }
-
-    return true;
-}
-
-bool MapWnd::ZoomToNextFleet() {
-    auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto is_owned_fleet = [client_empire_id](const Fleet* fleet)
-    { return client_empire_id == ALL_EMPIRES || fleet->OwnedBy(client_empire_id); };
-    auto vec = GetUniverse().Objects().findIDs<Fleet>(is_owned_fleet);
-
-    auto it = std::find_if(vec.begin(), vec.end(),
-        [cur_id{this->m_current_fleet_id}](int o_id){ return o_id == cur_id; });
-    auto& destroyed_object_ids = GetUniverse().DestroyedObjectIds();
-    if (it != vec.end())
-        ++it;
-    while (it != vec.end() && destroyed_object_ids.contains(*it))
-        ++it;
-    m_current_fleet_id = it != vec.end() ? *it : vec.empty() ? INVALID_OBJECT_ID : vec.front();
-
-    if (m_current_fleet_id != INVALID_OBJECT_ID) {
-        CenterOnObject(m_current_fleet_id);
-        SelectFleet(m_current_fleet_id);
-    }
-
-    return true;
-}
+bool MapWnd::ZoomToNextFleet()
+{ return ZoomToPrevOrNextOwnedFleet(SearchDir::FORWARD, *this); }
 
 bool MapWnd::ZoomToSystemWithWastedPP() {
     const ScriptingContext context;
-
     const Empire* empire = GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
     if (!empire)
         return false;
-
     const ProductionQueue& queue = empire->GetProductionQueue();
     const auto& pool = empire->GetIndustryPool();
     auto wasted_PP_objects(queue.ObjectsWithWastedPP(pool));
@@ -7377,109 +7279,104 @@ bool MapWnd::ZoomToSystemWithWastedPP() {
 }
 
 namespace {
-    /// On when the MapWnd window is visible and not covered
-    //  by one of the full screen covering windows
-    class NotCoveredMapWndCondition {
-    protected:
-        const MapWnd& target;
-
-    public:
+    /// On when the MapWnd window is visible and not covered by one of the full screen covering windows
+    struct NotCoveredMapWndCondition {
         NotCoveredMapWndCondition(const MapWnd& tg) : target(tg) {}
-        bool operator()() const {
-            return target.Visible() && !target.InResearchViewMode() && !target.InDesignViewMode();
-        };
+        bool operator()() const
+        { return target.Visible() && !target.InResearchViewMode() && !target.InDesignViewMode(); };
+        const MapWnd& target;
     };
 }
 
 void MapWnd::ConnectKeyboardAcceleratorSignals() {
-    HotkeyManager* hkm = HotkeyManager::GetManager();
+    HotkeyManager& hkm = HotkeyManager::GetManager();
 
-    hkm->Connect(boost::bind(&MapWnd::ReturnToMap, this), "ui.map.open",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::EndTurn, this), "ui.turn.end",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ToggleSitRep, this), "ui.map.sitrep",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect([this]() { return ToggleResearch(ScriptingContext{}); }, "ui.research",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ToggleProduction, this), "ui.production",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ToggleGovernment, this), "ui.government",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ToggleDesign, this), "ui.design",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ToggleObjects, this), "ui.map.objects",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ToggleMessages, this), "ui.map.messages",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ToggleEmpires, this), "ui.map.empires",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::TogglePedia, this), "ui.pedia",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ShowGraphs, this), "ui.map.graphs",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ShowMenu, this), "ui.gamemenu",
-                 AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::KeyboardZoomIn, this), "ui.zoom.in",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::KeyboardZoomIn, this), "ui.zoom.in.alt",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::KeyboardZoomOut, this), "ui.zoom.out",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::KeyboardZoomOut, this), "ui.zoom.out.alt",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ZoomToHomeSystem, this), "ui.map.system.zoom.home",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ZoomToPrevSystem, this), "ui.map.system.zoom.prev",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ZoomToNextSystem, this), "ui.map.system.zoom.next",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ZoomToPrevOwnedSystem, this), "ui.map.system.owned.zoom.prev",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ZoomToNextOwnedSystem, this), "ui.map.system.owned.zoom.next",
-                 AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ReturnToMap, this), "ui.map.open",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::EndTurn, this), "ui.turn.end",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ToggleSitRep, this), "ui.map.sitrep",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect([this]() { return ToggleResearch(ScriptingContext{}); }, "ui.research",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ToggleProduction, this), "ui.production",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ToggleGovernment, this), "ui.government",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ToggleDesign, this), "ui.design",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ToggleObjects, this), "ui.map.objects",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ToggleMessages, this), "ui.map.messages",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ToggleEmpires, this), "ui.map.empires",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::TogglePedia, this), "ui.pedia",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ShowGraphs, this), "ui.map.graphs",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ShowMenu, this), "ui.gamemenu",
+                AndCondition(VisibleWindowCondition(this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::KeyboardZoomIn, this), "ui.zoom.in",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::KeyboardZoomIn, this), "ui.zoom.in.alt",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::KeyboardZoomOut, this), "ui.zoom.out",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::KeyboardZoomOut, this), "ui.zoom.out.alt",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToHomeSystem, this), "ui.map.system.zoom.home",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToPrevSystem, this), "ui.map.system.zoom.prev",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToNextSystem, this), "ui.map.system.zoom.next",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToPrevOwnedSystem, this), "ui.map.system.owned.zoom.prev",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToNextOwnedSystem, this), "ui.map.system.owned.zoom.next",
+                AndCondition(NotCoveredMapWndCondition(*this), NoModalWndsOpenCondition));
 
     // the list of windows for which the fleet shortcuts are blacklisted.
     std::array<const GG::Wnd*, 3> bl = {m_research_wnd.get(), m_production_wnd.get(), m_design_wnd.get()};
 
-    hkm->Connect(boost::bind(&MapWnd::ZoomToPrevFleet, this), "ui.map.fleet.zoom.prev",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ZoomToNextFleet, this), "ui.map.fleet.zoom.next",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ZoomToPrevIdleFleet, this), "ui.map.fleet.idle.zoom.prev",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::ZoomToNextIdleFleet, this), "ui.map.fleet.idle.zoom.next",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToPrevFleet, this), "ui.map.fleet.zoom.prev",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToNextFleet, this), "ui.map.fleet.zoom.next",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToPrevIdleFleet, this), "ui.map.fleet.idle.zoom.prev",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::ZoomToNextIdleFleet, this), "ui.map.fleet.idle.zoom.next",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
 
-    hkm->Connect(boost::bind(&MapWnd::PanX, this, GG::X(50)),   "ui.pan.right",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::PanX, this, GG::X(-50)),  "ui.pan.left",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::PanY, this, GG::Y(50)),   "ui.pan.down",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&MapWnd::PanY, this, GG::Y(-50)),  "ui.pan.up",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::PanX, this, GG::X(50)),   "ui.pan.right",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::PanX, this, GG::X(-50)),  "ui.pan.left",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::PanY, this, GG::Y(50)),   "ui.pan.down",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&MapWnd::PanY, this, GG::Y(-50)),  "ui.pan.up",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
 
-    hkm->Connect(boost::bind(&ToggleBoolOption, "ui.map.scale.legend.shown"), "ui.map.scale.legend",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
-    hkm->Connect(boost::bind(&ToggleBoolOption, "ui.map.scale.circle.shown"), "ui.map.scale.circle",
-                 AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&ToggleBoolOption, "ui.map.scale.legend.shown"), "ui.map.scale.legend",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
+    hkm.Connect(boost::bind(&ToggleBoolOption, "ui.map.scale.circle.shown"), "ui.map.scale.circle",
+                AndCondition(OrCondition(InvisibleWindowCondition(bl), VisibleWindowCondition(this)), NoModalWndsOpenCondition));
 
 
     // these are general-use hotkeys, only connected here as a convenient location to do so once.
-    hkm->Connect(boost::bind(&GG::GUI::CutFocusWndText, GG::GUI::GetGUI()), "ui.cut");
-    hkm->Connect(boost::bind(&GG::GUI::CopyFocusWndText, GG::GUI::GetGUI()), "ui.copy");
-    hkm->Connect(boost::bind(&GG::GUI::PasteFocusWndClipboardText, GG::GUI::GetGUI()), "ui.paste");
+    hkm.Connect(boost::bind(&GG::GUI::CutFocusWndText, GG::GUI::GetGUI()), "ui.cut");
+    hkm.Connect(boost::bind(&GG::GUI::CopyFocusWndText, GG::GUI::GetGUI()), "ui.copy");
+    hkm.Connect(boost::bind(&GG::GUI::PasteFocusWndClipboardText, GG::GUI::GetGUI()), "ui.paste");
 
-    hkm->Connect(boost::bind(&GG::GUI::FocusWndSelectAll, GG::GUI::GetGUI()), "ui.select.all");
-    hkm->Connect(boost::bind(&GG::GUI::FocusWndDeselect, GG::GUI::GetGUI()), "ui.select.none");
+    hkm.Connect(boost::bind(&GG::GUI::FocusWndSelectAll, GG::GUI::GetGUI()), "ui.select.all");
+    hkm.Connect(boost::bind(&GG::GUI::FocusWndDeselect, GG::GUI::GetGUI()), "ui.select.none");
 
-    //hkm->Connect(boost::bind(&GG::GUI::SetPrevFocusWndInCycle, GG::GUI::GetGUI()), "ui.focus.prev",
+    //hkm.Connect(boost::bind(&GG::GUI::SetPrevFocusWndInCycle, GG::GUI::GetGUI()), "ui.focus.prev",
     //             NoModalWndsOpenCondition);
-    //hkm->Connect(boost::bind(&GG::GUI::SetNextFocusWndInCycle, GG::GUI::GetGUI()), "ui.focus.next",
+    //hkm.Connect(boost::bind(&GG::GUI::SetNextFocusWndInCycle, GG::GUI::GetGUI()), "ui.focus.next",
     //             NoModalWndsOpenCondition);
 
-    hkm->RebuildShortcuts();
+    hkm.RebuildShortcuts();
 }
 
 void MapWnd::CloseAllPopups()
@@ -7879,7 +7776,7 @@ void MapWnd::DispatchFleetsExploring() {
         return;
     }
     int max_routes_per_system = GetOptionsDB().Get<int>("ui.fleet.explore.system.route.limit");
-    auto destroyed_objects = universe.EmpireKnownDestroyedObjectIDs(empire_id);
+    const auto& destroyed_objects{universe.EmpireKnownDestroyedObjectIDs(empire_id)};
 
     boost::unordered_set<int> idle_fleets;
     /** all systems ID for which an exploring fleet is in route and the fleet assigned */

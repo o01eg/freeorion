@@ -84,7 +84,7 @@ public:
     /** Extracts player save game data. */
     [[nodiscard]] std::vector<PlayerSaveGameData> GetPlayerSaveGameData() const;
 
-    [[nodiscard]] bool IsTurnExpired() const;
+    [[nodiscard]] bool IsTurnExpired() const noexcept { return m_turn_expired; }
 
     [[nodiscard]] bool IsHaveWinner() const;
 
@@ -210,10 +210,8 @@ public:
     /** Loads chat history via python script. */
     void LoadChatHistory();
 
-    void PushChatMessage(const std::string& text,
-                         const std::string& player_name,
-                         std::array<uint8_t, 4> text_color,
-                         const boost::posix_time::ptime& timestamp);
+    void PushChatMessage(std::string text, std::string player_name, std::array<uint8_t, 4> text_color,
+                         boost::posix_time::ptime timestamp);
 
     void SendOutboundChatMessage(const std::string& text, const std::string& player_name, bool allow_email);
 

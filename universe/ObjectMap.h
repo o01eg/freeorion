@@ -67,6 +67,8 @@ public:
     /** Returns pointer to an object of type T that matches predicate \a pred.
       * returns nullptr if none exists. */
     template <typename T = UniverseObject, typename Pred, bool only_existing = false>
+    [[nodiscard]] std::shared_ptr<const std::decay_t<T>> get(Pred pred) const;
+    template <typename T = UniverseObject, typename Pred, bool only_existing = false>
     [[nodiscard]] const std::decay_t<T>* getRaw(Pred pred) const;
 
     /** Returns a pointer to the object of type T with ID number \a id.
@@ -104,6 +106,13 @@ public:
       * predicate filter or range of object ids */
     template <typename T = UniverseObject, typename Pred, bool only_existing = false>
     [[nodiscard]] bool check_if_any(Pred pred) const;
+    template <typename T = UniverseObject, typename Pred, typename IDs, bool only_existing = false>
+#if !defined(FREEORION_ANDROID)
+        requires requires(IDs ids) { ids.begin(); ids.end(); {*ids.begin()} -> std::convertible_to<int>; }
+#else
+        requires requires(IDs ids) { ids.begin(); ids.end(); {static_cast<int>(*ids.begin())}; }
+#endif
+    [[nodiscard]] bool check_if_any(Pred pred, IDs&& ids) const;
 
     /** Returns all the objects of type T (maybe shared) ptr to const */
     template <typename T = UniverseObject, bool only_existing = false>
@@ -558,7 +567,7 @@ namespace ObjectMapPredicateTypeTraits{
   * Pred may also be an iterable range of int that specifes IDs of the UniverseObjects
   * to select. */
 template <typename T, typename Pred>
-constexpr std::array<bool, 11> ObjectMap::CheckTypes()
+constexpr std::array<bool, 11> ObjectMap::CheckTypes() // TODO: check if it's a Condition
 {
     using DecayT = std::decay_t<T>;
     using DecayPred = std::decay_t<Pred>;
@@ -644,6 +653,56 @@ const std::decay_t<T>* ObjectMap::getRaw(int id) const
     auto& map{Map<DecayT, only_existing>()};
     auto it = map.find(id);
     return it != map.end() ? it->second.get() : nullptr;
+}
+
+template <typename T, typename Pred, bool only_existing>
+std::shared_ptr<const std::decay_t<T>> ObjectMap::get(Pred pred) const
+{
+    static constexpr auto invoke_flags = CheckTypes<T, Pred>();
+    static constexpr bool invokable_on_raw_const_object = invoke_flags[0];
+    static constexpr bool invokable_on_shared_const_object = invoke_flags[2];
+    static constexpr bool invokable_on_const_entry = invoke_flags[4];
+    static constexpr bool invokable_on_const_reference = invoke_flags[6];
+    static constexpr bool is_visitor = invoke_flags[9];
+    static constexpr bool is_int_range = invoke_flags[10];
+    static_assert(!is_int_range, "use findRaw to get multiple objects from IDs");
+
+    using DecayT = std::decay_t<T>;
+    auto& map{Map<DecayT, only_existing>()};
+    static constexpr auto raw_ptr_tx = [](const auto& p) -> const DecayT* { return p.get(); };
+    static constexpr auto ref_tx = [](const auto& p) -> const DecayT& { return *p; };
+
+
+    if constexpr (is_visitor) {
+        auto rng = map | range_values;
+        auto it = range_find_if(rng, [&pred](const auto& obj) { return obj->Accept(pred); });
+        return (it != rng.end()) ? *it : nullptr;
+
+    } else if constexpr (invokable_on_raw_const_object) {
+        auto rng = map | range_values;
+        auto it = range_find_if(rng, [&pred](const auto& obj) { return pred(obj.get()); });
+        return (it != rng.end()) ? *it : nullptr;
+
+    } else if constexpr (invokable_on_shared_const_object) {
+        auto rng = map | range_values;
+        auto it = range_find_if(rng, pred);
+        return (it != rng.end()) ? *it : nullptr;
+
+    } else if constexpr (invokable_on_const_entry) {
+        auto it = std::find_if(map.begin(), map.end(), pred);
+        return (it != map.end()) ? it->second : nullptr;
+
+    } else if constexpr (invokable_on_const_reference) {
+        auto rng = map | range_values;
+        auto it = range_find_if(rng,
+                                [&pred](const auto& id_obj) { return pred(*id_obj->second); });
+        return (it != rng.end()) ? it->second : nullptr;
+
+    } else {
+        static constexpr bool invokable = invoke_flags[8];
+        static_assert(is_visitor || invokable, "Don't know how to handle predicate");
+        return nullptr;
+    }
 }
 
 template <typename T, typename Pred, bool only_existing>
@@ -739,23 +798,22 @@ std::vector<const std::decay_t<T>*> ObjectMap::findRaw(Pred pred) const
             auto map_it = map.find(id);
             return (map_it != map.end()) ? map_it->second.get() : nullptr;
         };
-        auto rng = pred | range_transform(find_in_map) | range_filter(not_null);
+        auto rng = pred | range_transform(find_in_map);
         result.reserve(pred.size());
-        range_copy(rng, std::back_inserter(result));
+        range_copy_if(rng, std::back_inserter(result), not_null);
         return result;
 
     } else if constexpr (is_visitor) {
         const auto visitor_is_accepted = [pred](const auto& obj) -> bool { return obj->Accept(pred); };
-        auto rng = map | range_values | range_filter(visitor_is_accepted)
-            | range_transform(get_rawptr) | range_filter(not_null);
+        auto rng = map | range_values | range_filter(visitor_is_accepted) | range_transform(get_rawptr);
         result.reserve(map.size());
-        range_copy(rng, std::back_inserter(result));
+        range_copy_if(rng, std::back_inserter(result), not_null);
         return result;
 
     } else if constexpr (invokable_on_raw_const_object) {
-        auto rng = map | range_values | range_transform(get_rawptr) | range_filter(pred);
+        auto rng = map | range_values | range_transform(get_rawptr);
         result.reserve(map.size());
-        range_copy(rng, std::back_inserter(result));
+        range_copy_if(rng, std::back_inserter(result), pred);
         return result;
 
     } else if constexpr (invokable_on_shared_const_object) {
@@ -1094,34 +1152,76 @@ bool ObjectMap::check_if_any(Pred pred) const
     using EntryT = typename ContainerT::value_type;
 
     if constexpr (is_int_range) {
-        return std::any_of(pred.begin(), pred.end(),
-                           [&map](int id) { return map.contains(id); });
-
-    } else if constexpr (is_visitor) {
-        return std::any_of(map.begin(), map.end(),
-                           [visitor{pred}](const EntryT& o) { return o.second->Accept(visitor); });
-
-    } else if constexpr (invokable_on_raw_const_object) {
-        return std::any_of(map.begin(), map.end(),
-                           [obj_pred{pred}](const EntryT& o) { return obj_pred(o.second.get()); });
-
-    } else if constexpr (invokable_on_shared_const_object) {
-        return std::any_of(map.begin(), map.end(),
-                           [obj_pred{pred}](const EntryT& o) { return obj_pred(o.second); });
-
-    } else if constexpr (invokable_on_const_entry) {
-        return std::any_of(map.begin(), map.end(),
-                           [entry_pred{pred}](const EntryT& o) { return entry_pred(o); });
-
-    } else if constexpr (invokable_on_const_reference) {
-        return std::any_of(map.begin(), map.end(),
-                           [ref_pred{pred}](const EntryT& o) { return ref_pred(*o.second); });
+        return range_any_of(pred, [&map](int id) { return map.contains(id); });
 
     } else {
-        constexpr bool invokable = invoke_flags[8];
-        static_assert(invokable, "Don't know how to handle predicate");
-        return false;
+        const auto test_pred = [&pred](const EntryT& obj) {
+            if constexpr (is_visitor)
+                return obj.second->Accept(pred);
+            else if constexpr (invokable_on_raw_const_object)
+                return pred(obj.second.get());
+            else if constexpr (invokable_on_shared_const_object)
+                return pred(obj.second);
+            else if constexpr (invokable_on_const_entry)
+                return pred(obj);
+            else if constexpr (invokable_on_const_reference)
+                return pred(obj.second);
+
+            else {
+                constexpr bool invokable = invoke_flags[8];
+                static_assert(invokable, "Don't know how to handle predicate");
+                return false;
+            }
+        };
+
+        return range_any_of(map, test_pred);
     }
+}
+
+template <typename T, typename Pred, typename IDs, bool only_existing>
+#if !defined(FREEORION_ANDROID)
+    requires requires(IDs ids) { ids.begin(); ids.end(); {*ids.begin()} -> std::convertible_to<int>; }
+#else
+    requires requires(IDs ids) { ids.begin(); ids.end(); {static_cast<int>(*ids.begin())}; }
+#endif
+bool ObjectMap::check_if_any(Pred pred, IDs&& ids) const
+{
+    constexpr auto invoke_flags = CheckTypes<T, Pred>();
+    constexpr bool invokable_on_raw_const_object = invoke_flags[0];
+    constexpr bool invokable_on_shared_const_object = invoke_flags[2];
+    constexpr bool invokable_on_const_entry = invoke_flags[4];
+    constexpr bool invokable_on_const_reference = invoke_flags[6];
+    constexpr bool is_visitor = invoke_flags[9];
+    constexpr bool is_int_range = invoke_flags[10];
+    static_assert(!is_int_range, "check_if_any passed two int ranges. Don't know what to do with this...");
+
+    using DecayT = std::decay_t<T>;
+    auto& map{Map<DecayT, only_existing>()};
+
+    const auto map_lookup = [&map](const int id) { return map.find(id); };
+    const auto rng = ids | range_transform(map_lookup);
+
+    const auto test_pred = [&pred, end_it{map.end()}](const auto it) {
+        if constexpr (is_visitor)
+            return it != end_it && it->second->Accept(pred);
+        else if constexpr (invokable_on_raw_const_object)
+            return it != end_it && pred(it->second.get());
+        else if constexpr (invokable_on_shared_const_object)
+            return it != end_it && pred(it->second);
+        else if constexpr (invokable_on_const_entry)
+            return it != end_it && pred(*it);
+        else if constexpr (invokable_on_const_reference)
+            return it != end_it && pred(*it->second);
+
+        else {
+            constexpr bool invokable = invoke_flags[8];
+            static_assert(invokable, "Don't know how to handle predicate");
+            return false;
+        }
+        return false;
+    };
+
+    return range_any_of(rng, test_pred);
 }
 
 

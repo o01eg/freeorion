@@ -1136,12 +1136,10 @@ void ServerApp::LoadChatHistory() {
     }
 }
 
-void ServerApp::PushChatMessage(const std::string& text,
-                                const std::string& player_name,
-                                std::array<uint8_t, 4> text_color,
-                                const boost::posix_time::ptime& timestamp)
+void ServerApp::PushChatMessage(std::string text, std::string player_name, std::array<uint8_t, 4> text_color,
+                                const boost::posix_time::ptime timestamp)
 {
-    ChatHistoryEntity chat{player_name, text, timestamp, text_color};
+    ChatHistoryEntity chat{std::move(player_name), std::move(text), timestamp, text_color};
     m_chat_history.push_back(chat);
 
     bool success = false;
@@ -1201,16 +1199,8 @@ void ServerApp::ExpireTurn() {
     m_turn_expired = true;
 }
 
-bool ServerApp::IsTurnExpired() const
-{ return m_turn_expired; }
-
-bool ServerApp::IsHaveWinner() const {
-    for (const auto& empire : m_empires) {
-        if (empire.second->Won())
-            return true;
-    }
-    return false;
-}
+bool ServerApp::IsHaveWinner() const
+{ return std::any_of(m_empires.begin(), m_empires.end(), [](const auto& e) { return e.second->Won(); }); }
 
 namespace {
     /** Verifies that a human player is connected with the indicated \a id. */
@@ -1318,7 +1308,7 @@ namespace {
         }
 
         // get ID of name-matched AI player
-        int player_id = AIPlayerIDWithName(sn, psd.player_name);
+        const int player_id = AIPlayerIDWithName(sn, psd.player_name);
         if (player_id == Networking::INVALID_PLAYER_ID) {
             ErrorLogger() << "ServerApp::LoadMPGameInit couldn't find expected AI player with name " << psd.player_name;
             return;
@@ -1359,11 +1349,8 @@ void ServerApp::LoadMPGameInit(const MultiplayerLobbyData& lobby_data,
 
     // for every player setup data entry that represents an empire in the game,
     // assign saved game data to the player ID of an established human or AI player
-    for (const auto& entry : player_setup_data) {
-        const PlayerSetupData& psd = entry.second;
-
+    for (const auto& [setup_data_player_id, psd] : player_setup_data) {
         if (psd.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
-            int setup_data_player_id = entry.first;
             GetSaveGameDataIndexForHumanPlayer(player_id_to_save_game_data_index, psd,
                                                setup_data_player_id, player_save_game_data,
                                                m_networking);
@@ -1487,7 +1474,7 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
     }
 
     for (const auto& psgd : player_save_game_data) {
-        int empire_id = psgd.empire_id;
+        const int empire_id = psgd.empire_id;
         // add empires to turn processing, and restore saved orders and UI data or save state data
         if (auto empire = m_empires.GetEmpire(empire_id)) {
             if (!empire->Eliminated())
@@ -1519,20 +1506,19 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
          player_connection_it != m_networking.established_end(); ++player_connection_it)
     {
         const PlayerConnectionPtr player_connection = *player_connection_it;
-        int player_id = player_connection->PlayerID();
+        const int player_id = player_connection->PlayerID();
         Networking::ClientType client_type = player_connection->GetClientType();
 
         // attempt to find saved state data for this player.
         PlayerSaveGameData psgd;
-        auto save_data_it = player_id_save_game_data.find(player_id);
-        if (save_data_it != player_id_save_game_data.end()) {
+        const auto save_data_it = player_id_save_game_data.find(player_id);
+        if (save_data_it != player_id_save_game_data.end())
             psgd = save_data_it->second;
-        }
         if (!psgd.orders)
-            psgd.orders.reset(new OrderSet());    // need an empty order set pointed to for serialization in case no data is loaded but the game start message wants orders to send
+            psgd.orders = std::make_shared<OrderSet>(); // need an empty order set pointed to for serialization in case no data is loaded but the game start message wants orders to send
 
         // get empire ID for player. safety check on it.
-        int empire_id = PlayerEmpireID(player_id);
+        const int empire_id = PlayerEmpireID(player_id);
         if (empire_id != psgd.empire_id)
             ErrorLogger() << "LoadGameInit got inconsistent empire ids between player save game data and result of PlayerEmpireID";
 
@@ -1544,9 +1530,9 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         // restore saved orders.  these will be re-executed on client and
         // re-sent to the server (after possibly modification) by clients
         // when they end their turn
-        auto orders = psgd.orders;
+        const auto orders{psgd.orders};
 
-        bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
+        const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
 
         if (client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
             // get save state string
@@ -2903,24 +2889,18 @@ namespace {
     {
         const auto get_empire = [&empires](const auto empire_id) { return empires.GetEmpire(empire_id); };
         const auto get_planet = [&objects](const auto& planet_id_troops)
-        { return std::make_pair(objects.getRaw<Planet>(planet_id_troops.first), planet_id_troops.second); };
-        static constexpr auto has_species = [](const auto& planet_troops)
-        { return planet_troops.first && !planet_troops.first->SpeciesName().empty(); };
-        static constexpr auto not_nullptr = [](const auto& e) -> bool { return e.get(); };
+        { return std::pair(objects.getRaw<Planet>(planet_id_troops.first), planet_id_troops.second); };
+        static constexpr auto has_species = [](const auto* planet) { return planet && planet->SpeciesName().empty(); };
 
-        for (const auto& [planet, empire_troops] : planet_empire_invasion_troops
-             | range_transform(get_planet) | range_filter(has_species))
-        {
-            for (const auto& invader_empire : empire_troops | range_keys
-                 | range_transform(get_empire) | range_filter(not_nullptr))
-            { invader_empire->RecordPlanetInvaded(*planet); }
+        for (const auto& [planet, empire_troops] : planet_empire_invasion_troops | range_transform(get_planet)) {
+            if (!has_species(planet)) continue; // if in loop avoids double-transform with range filter
+            for (const auto& invader_empire : empire_troops | range_keys | range_transform(get_empire))
+                if (invader_empire) invader_empire->RecordPlanetInvaded(*planet); // if in loop avoids double-transform with a range filter
         }
     }
 
     /** Does colonization, with safety checks */
-    bool ColonizePlanet(int ship_id, int planet_id, ScriptingContext& context,
-                        const std::vector<int>& empire_ids)
-    {
+    bool ColonizePlanet(int ship_id, int planet_id, ScriptingContext& context, const std::vector<int>& empire_ids) {
         auto& objects = context.ContextObjects();
         auto& universe = context.ContextUniverse();
 
@@ -3589,17 +3569,15 @@ namespace {
         // collect planets ordered annexed but that aren't being invaded
         std::map<int, std::vector<Planet*>> empire_annexed_planets; // indexed by recipient empire id
         auto annexed_not_invaded_planet = [&invaded_planet_ids](const Planet& p) {
-            return std::none_of(invaded_planet_ids.begin(), invaded_planet_ids.end(),
-                                [pid{p.ID()}](const auto iid) { return iid == pid; }) &&
-                p.IsAboutToBeAnnexed();
+            return p.IsAboutToBeAnnexed() &&
+                std::none_of(invaded_planet_ids.begin(), invaded_planet_ids.end(),
+                             [pid{p.ID()}](const auto iid) { return iid == pid; });
         };
 
-        for (auto* planet : objects.findRaw<Planet>(annexed_not_invaded_planet)) {
-            const auto annexer_empire_id = planet->OrderedAnnexedByEmpire();
-            empire_annexed_planets[annexer_empire_id].push_back(planet);
-        }
-        for (auto* fleet : objects.allRaw<Planet>())
-            fleet->ResetBeingAnnxed(); // in case things fail, to avoid potential inconsistent state
+        for (auto* planet : objects.findRaw<Planet>(annexed_not_invaded_planet))
+            empire_annexed_planets[planet->OrderedAnnexedByEmpire()].push_back(planet);
+        for (auto* planet : objects.allRaw<Planet>())
+            planet->ResetBeingAnnxed(); // in case things fail, to avoid potential inconsistent state
 
 
         // storage for list of all annexed planets
@@ -3615,6 +3593,7 @@ namespace {
 
                     planet->SetOwner(annexer_empire_id);
                     planet->SetLastTurnAnnexed(current_turn);
+                    planet->SetLastAnnexedByEmpire(annexer_empire_id);
 
                     Empire::ConquerProductionQueueItemsAtLocation(planet_id, annexer_empire_id, empires);
 
@@ -3676,7 +3655,7 @@ namespace {
         static constexpr auto is_empty_fleet = [](const Fleet* f) { return f->Empty(); };
         using fleet_system = std::pair<const Fleet*, System*>;
         const auto to_fleet_and_system = [&objects](const Fleet* f) -> fleet_system
-        { return std::make_pair(f, objects.getRaw<System>(f->SystemID())); }; // system may be nullptr
+        { return fleet_system(f, objects.getRaw<System>(f->SystemID())); }; // system may be nullptr
         static constexpr auto in_system = [](fleet_system fs) -> bool { return fs.second; };
         static constexpr auto to_id = [](const auto* o) { return o->ID(); };
 

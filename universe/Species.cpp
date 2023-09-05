@@ -78,12 +78,18 @@ uint32_t FocusType::GetCheckSum() const {
 /////////////////////////////////////////////////
 namespace {
     void AddRules(GameRules& rules) {
-        rules.Add<double>(UserStringNop("RULE_ANNEX_COST_EXP_BASE"),
-                          UserStringNop("RULE_ANNEX_COST_EXP_BASE_DESC"),
+        rules.Add<double>(UserStringNop("RULE_ANNEX_COST_OPINION_EXP_BASE"),
+                          UserStringNop("RULE_ANNEX_COST_OPINION_EXP_BASE_DESC"),
                           "BALANCE_STABILITY", 1.2, true, RangedValidator<double>(0.0, 3.0));
+        rules.Add<double>(UserStringNop("RULE_ANNEX_COST_STABILITY_EXP_BASE"),
+                          UserStringNop("RULE_ANNEX_COST_STABILITY_EXP_BASE_DESC"),
+                          "BALANCE_STABILITY", 1.1, true, RangedValidator<double>(0.0, 3.0));
         rules.Add<double>(UserStringNop("RULE_ANNEX_COST_SCALING"),
                           UserStringNop("RULE_ANNEX_COST_SCALING_DESC"),
                           "BALANCE_STABILITY", 5.0, true, RangedValidator<double>(0.0, 50.0));
+        rules.Add<double>(UserStringNop("RULE_BUILDING_ANNEX_COST_SCALING"),
+                          UserStringNop("RULE_BUILDING_ANNEX_COST_SCALING_DESC"),
+                          "BALANCE_STABILITY", 0.25, true, RangedValidator<double>(0.0, 5.0));
         rules.Add<double>(UserStringNop("RULE_ANNEX_COST_MINIMUM"),
                           UserStringNop("RULE_ANNEX_COST_MINIMUM_DESC"),
                           "BALANCE_STABILITY", 5.0, true, RangedValidator<double>(0.0, 50.0));
@@ -166,7 +172,6 @@ namespace {
 
     auto DefaultAnnexationCondition() {
         return std::make_unique<Condition::And>(
-            std::make_unique<Condition::EmpireAffiliation>(EmpireAffiliationType::AFFIL_NONE),
             std::make_unique<Condition::MeterValue>(MeterType::METER_POPULATION,
                                                     std::make_unique<ValueRef::Constant<double>>(0.001),
                                                     nullptr),
@@ -189,38 +194,141 @@ namespace {
         return retval;
     }
 
+    auto SourceOwner()
+    { return std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "Owner"); }
+
+    auto LocalCandidateOwner()
+    { return std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Owner"); }
+
+    auto SpeciesOpinion(std::unique_ptr<ValueRef::Variable<int>>&& empire_id_ref) {
+        return std::make_unique<ValueRef::ComplexVariable<double>>(
+            "SpeciesEmpireOpinion",
+            std::move(empire_id_ref),
+            nullptr, nullptr,
+            std::make_unique<ValueRef::Variable<std::string>>(
+                ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Species")
+        );
+    }
+
+    auto HasOwner() { // 0.0 if unowned or 1.0 if owned by an empire
+        return std::make_unique<ValueRef::StaticCast<int, double>>(
+            std::make_unique<ValueRef::Operation<int>>(
+                ValueRef::OpType::COMPARE_NOT_EQUAL,
+                std::make_unique<ValueRef::Constant<int>>(ALL_EMPIRES),
+                LocalCandidateOwner()
+            )
+        );
+    }
+
+    template <typename VR>
+    concept evalable = requires(const VR vr, const ScriptingContext c) { vr->Eval(c); };
+
+    auto operator+(evalable auto&& lhs, evalable auto&& rhs) {
+        return std::make_unique<ValueRef::Operation<double>>(
+            ValueRef::OpType::PLUS, std::forward<decltype(lhs)>(lhs), std::forward<decltype(rhs)>(rhs));
+    }
+
+    auto operator-(evalable auto&& lhs, evalable auto&& rhs) {
+        return std::make_unique<ValueRef::Operation<double>>(
+            ValueRef::OpType::MINUS, std::forward<decltype(lhs)>(lhs), std::forward<decltype(rhs)>(rhs));
+    }
+
+    auto operator*(evalable auto&& lhs, evalable auto&& rhs) {
+        return std::make_unique<ValueRef::Operation<double>>(
+            ValueRef::OpType::TIMES, std::forward<decltype(lhs)>(lhs), std::forward<decltype(rhs)>(rhs));
+    }
+
+    auto operator^(evalable auto&& lhs, evalable auto&& rhs) {
+        return std::make_unique<ValueRef::Operation<double>>(
+            ValueRef::OpType::EXPONENTIATE, std::forward<decltype(lhs)>(lhs), std::forward<decltype(rhs)>(rhs));
+    }
+
+    auto operator-(evalable auto&& rhs) {
+        return std::make_unique<ValueRef::Operation<double>>(
+            ValueRef::OpType::NEGATE, std::forward<decltype(rhs)>(rhs));
+    }
+
+    auto SpeciesOpinionOfOwnerOrZero() // 0.0 if unowned, or the opinion of the species on the planet of the owner empire
+    { return HasOwner() * SpeciesOpinion(LocalCandidateOwner()); }
+
+    auto PlanetStability() {
+        return std::make_unique<ValueRef::Variable<double>>(
+            ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Happiness"
+        );
+    }
+
+    auto AnnexCostScaling() {
+        return std::make_unique<ValueRef::ComplexVariable<double>>(
+            "GameRule", nullptr, nullptr, nullptr,
+            std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_SCALING"));
+    }
+
+    auto LocalCandidatePop() {
+        return std::make_unique<ValueRef::Variable<double>>(
+            ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "Population");
+    }
+
+    auto ScaledPop() // (pop * scale_factor)
+    { return AnnexCostScaling() * LocalCandidatePop(); }
+
+    auto AnnexCostOpinionBase() {
+        return std::make_unique<ValueRef::ComplexVariable<double>>(
+            "GameRule", nullptr, nullptr, nullptr,
+            std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_OPINION_EXP_BASE"));
+    }
+
+    auto ExpBaseSpeciesOpinion() // (base^(owner_opinion - annexer_opinion))
+    { return AnnexCostOpinionBase() ^ (SpeciesOpinionOfOwnerOrZero() - SpeciesOpinion(SourceOwner())); }
+
+    auto AnnexCostStabilityBase() {
+        return std::make_unique<ValueRef::ComplexVariable<double>>(
+            "GameRule", nullptr, nullptr, nullptr,
+            std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_STABILITY_EXP_BASE"));
+    }
+
+    auto ExpBaseStability() // (base^stability)
+    { return AnnexCostStabilityBase() ^ PlanetStability(); }
+
+    auto MinimumAnnexCost() {
+        return std::make_unique<ValueRef::ComplexVariable<double>>(
+            "GameRule", nullptr, nullptr, nullptr,
+            std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_MINIMUM"));
+    }
+
+    auto BuildingAnnexCostScaling() {
+        return std::make_unique<ValueRef::ComplexVariable<double>>(
+            "GameRule", nullptr, nullptr, nullptr,
+            std::make_unique<ValueRef::Constant<std::string>>("RULE_BUILDING_ANNEX_COST_SCALING"));
+    }
+
+    auto BuildingCostsSum(std::unique_ptr<ValueRef::Variable<int>>&& for_empire_ref) {
+        return std::make_unique<ValueRef::Statistic<double>>(
+            std::make_unique<ValueRef::ComplexVariable<double>>(
+                "BuildingTypeCost",                                                               // cost to produce buildings
+                std::move(for_empire_ref),                                                        // by passed-in empire
+                std::make_unique<ValueRef::Variable<int>>(
+                    ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "PlanetID"),    // at the planet the building is already on
+                nullptr,
+                std::make_unique<ValueRef::Variable<std::string>>(
+                    ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE, "BuildingType") // for each building's building type
+            ),
+            ValueRef::StatisticType::SUM,
+            std::make_unique<Condition::And>(
+                std::make_unique<Condition::Type>(UniverseObjectType::OBJ_BUILDING),
+                std::make_unique<Condition::NoOp>(),
+                std::make_unique<Condition::OnPlanet>(                  // for buildings on the planet being annexed
+                    std::make_unique<ValueRef::Variable<int>>(
+                        ValueRef::ReferenceType::CONDITION_ROOT_CANDIDATE_REFERENCE, "ID")
+                )
+            )
+        );
+    }
+
     auto DefaultAnnexationCost() {
         return std::make_unique<ValueRef::Operation<double>>(
             ValueRef::OpType::MAXIMUM,
-            std::make_unique<ValueRef::ComplexVariable<double>>(
-                "GameRule", nullptr, nullptr, nullptr,
-                std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_MINIMUM")),
-            std::make_unique<ValueRef::Operation<double>>(
-                ValueRef::OpType::TIMES,
-                std::make_unique<ValueRef::Operation<double>>(
-                    ValueRef::OpType::EXPONENTIATE,
-                    std::make_unique<ValueRef::ComplexVariable<double>>(
-                        "GameRule", nullptr, nullptr, nullptr,
-                        std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_EXP_BASE")),
-                    std::make_unique<ValueRef::Operation<double>>(
-                        ValueRef::OpType::NEGATE,
-                        std::make_unique<ValueRef::ComplexVariable<double>>(
-                            "SpeciesEmpireOpinion",
-                            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "Owner"),
-                            nullptr, nullptr,
-                            std::make_unique<ValueRef::Variable<std::string>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE,
-                                                                              "Species")
-                        )
-                    )
-                ),
-                std::make_unique<ValueRef::Operation<double>>(
-                    ValueRef::OpType::TIMES,
-                    std::make_unique<ValueRef::ComplexVariable<double>>(
-                        "GameRule", nullptr, nullptr, nullptr,
-                        std::make_unique<ValueRef::Constant<std::string>>("RULE_ANNEX_COST_SCALING")),
-                    std::make_unique<ValueRef::Variable<double>>(ValueRef::ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE,
-                                                                 "Population"))
-            )
+            MinimumAnnexCost(),
+            (ScaledPop() * ExpBaseSpeciesOpinion() * ExpBaseStability()) + (BuildingAnnexCostScaling() * BuildingCostsSum(SourceOwner()))
         );
     }
 }

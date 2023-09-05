@@ -548,8 +548,7 @@ std::vector<std::pair<std::string_view, int>> Empire::TotalPolicySlots() const {
     // collect policy slot category meter values and return
     for (auto& [cat, cat_slots_meter_string] : cats_slot_meters) {
         const std::string_view csms{cat_slots_meter_string};
-        auto it = std::find_if(m_meters.begin(), m_meters.end(),
-                               [csms](const auto& e) { return e.first == csms; });
+        auto it = m_meters.find(csms);
         if (it == m_meters.end()) {
             ErrorLogger() << "Empire doesn't have policy category slot meter with name: " << cat_slots_meter_string;
             continue;
@@ -1303,7 +1302,7 @@ Empire::IntSet Empire::ExploredSystems() const {
     const auto rng = m_explored_systems | range_keys;
     static_assert(std::is_same_v<std::decay_t<decltype(m_explored_systems)>, std::map<int, int>>,
                   "make sure m_explored_systems is sorted for use of ordered_unique_range below");
-#if BOOST_VERSION > 107400
+#if BOOST_VERSION > 107800
     return {boost::container::ordered_unique_range, rng.begin(), rng.end()};
 #else
     Empire::IntSet::sequence_type scratch;

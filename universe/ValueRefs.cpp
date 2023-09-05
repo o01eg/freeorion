@@ -12,6 +12,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include "Building.h"
+#include "BuildingType.h"
 #include "Enums.h"
 #include "Field.h"
 #include "Fighter.h"
@@ -54,6 +55,12 @@ std::string DoubleToString(double val, int digits, bool always_show_sign);
 bool UserStringExists(const std::string& str);
 
 namespace {
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr const std::string EMPTY_STRING;
+#else
+    const std::string EMPTY_STRING;
+#endif
+
     std::string StackTrace() {
         static std::atomic<int> string_error_lookup_count = 0;
         if (string_error_lookup_count++ > 10)
@@ -98,7 +105,24 @@ namespace {
                           << " target: " << (context.effect_target ? context.effect_target->Name() : "0")
                           << " local c: " << (context.condition_local_candidate ? context.condition_local_candidate->Name() : "0")
                           << " root c: " << (context.condition_root_candidate ? context.condition_root_candidate->Name() : "0")
-                          << "  " << StackTrace();
+                          << " stacktrace: see trace logging";
+            static std::atomic<uint32_t> trace_count = 0;
+            const auto clock_now = std::chrono::system_clock::now();
+            const auto now_mins = std::chrono::duration_cast<std::chrono::minutes>(clock_now.time_since_epoch()).count();
+            static auto previous_mins = std::chrono::duration_cast<std::chrono::minutes>(clock_now.time_since_epoch()).count();
+            if (now_mins > previous_mins) {
+                trace_count = 0;
+                previous_mins = now_mins;
+            }
+            if (trace_count < 11) {
+                trace_count++;
+                ErrorLogger() << " FollowReference stacktrace : top level object (" << type_string << ") not defined in scripting context.\n"
+                              << StackTrace(); // only output stack trace some times per minute, as this was very slow on windows
+            } else {
+                ErrorLogger() << " FollowReference stacktrace : top level object (" << type_string << ") not defined in scripting context. Skip on error logger level. Already printed enough stacktraces. This can be very slow on windows.\n";
+                TraceLogger() << " FollowReference stacktrace : top level object (" << type_string << ") not defined in scripting context.\n"
+                              << StackTrace(); // only output stack trace some times per minute, as this was very slow on windows
+            }
             return nullptr;
         }
 
@@ -343,7 +367,7 @@ std::string_view MeterToName(MeterType meter) noexcept { return MeterToNameCX(me
 namespace {
     constexpr std::string_view PlanetTypeToStringCX(PlanetType planet) noexcept {
         // NOTE: INVALID_PLANET_TYPE (enum's -1 position) <= planet < NUM_PLANET_TYPES (enum's final position)
-        return NAME_BY_PLANET[static_cast<std::underlying_type_t<PlanetType>>(planet) + 1]; 
+        return NAME_BY_PLANET[static_cast<std::underlying_type_t<PlanetType>>(planet) + 1];
     }
 }
 
@@ -711,7 +735,7 @@ PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const
 {
     IF_CURRENT_VALUE(PlanetSize)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
@@ -747,7 +771,7 @@ PlanetType Variable<PlanetType>::Eval(const ScriptingContext& context) const
 {
     IF_CURRENT_VALUE(PlanetType)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
@@ -791,7 +815,7 @@ PlanetEnvironment Variable<PlanetEnvironment>::Eval(const ScriptingContext& cont
 {
     IF_CURRENT_VALUE(PlanetEnvironment)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     if (property_name == "PlanetEnvironment") {
         auto object = FollowReference(m_property_name.begin(), m_property_name.end(), m_ref_type, context);
@@ -817,7 +841,7 @@ UniverseObjectType Variable<UniverseObjectType>::Eval(const ScriptingContext& co
 {
     IF_CURRENT_VALUE(UniverseObjectType)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     if (property_name == "ObjectType") {
         auto object = FollowReference(m_property_name.begin(), m_property_name.end(), m_ref_type, context);
@@ -838,7 +862,7 @@ StarType Variable<StarType>::Eval(const ScriptingContext& context) const
 {
     IF_CURRENT_VALUE(StarType)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     auto object = FollowReference(m_property_name.begin(), m_property_name.end(),
                                   m_ref_type, context);
@@ -888,7 +912,7 @@ double Variable<double>::Eval(const ScriptingContext& context) const
 {
     IF_CURRENT_VALUE(double)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     if (m_ref_type == ReferenceType::NON_OBJECT_REFERENCE) {
         if ((property_name == "UniverseCentreX") ||
@@ -996,7 +1020,7 @@ int Variable<int>::Eval(const ScriptingContext& context) const
 {
     IF_CURRENT_VALUE(int)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     if (m_ref_type == ReferenceType::NON_OBJECT_REFERENCE) {
         if (property_name == "CombatBout")
@@ -1277,7 +1301,7 @@ std::vector<std::string> Variable<std::vector<std::string>>::Eval(
 {
     IF_CURRENT_VALUE(std::vector<std::string>)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     if (m_ref_type == ReferenceType::NON_OBJECT_REFERENCE) {
         // add more non-object reference string vector functions here
@@ -1333,7 +1357,7 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
 {
     IF_CURRENT_VALUE(std::string)
 
-    const std::string& property_name = m_property_name.empty() ? "" : m_property_name.back();
+    const std::string& property_name = m_property_name.empty() ? EMPTY_STRING : m_property_name.back();
 
     if (m_ref_type == ReferenceType::NON_OBJECT_REFERENCE) {
         if (property_name == "GalaxySeed")
@@ -2335,23 +2359,27 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
 
     }
     else if (variable_name == "ShipDesignCost") {
-        int design_id = INVALID_DESIGN_ID;
-        if (m_int_ref1)
-            design_id = m_int_ref1->Eval(context);
-
+        const int design_id = m_int_ref1 ? m_int_ref1->Eval(context) : INVALID_DESIGN_ID;
         const ShipDesign* design = context.ContextUniverse().GetShipDesign(design_id);
         if (!design)
             return 0.0;
 
-        int empire_id = ALL_EMPIRES;
-        if (m_int_ref2)
-            empire_id = m_int_ref2->Eval(context);
-
-        int location_id = INVALID_OBJECT_ID;
-        if (m_int_ref3)
-            location_id = m_int_ref3->Eval(context);
+        const int empire_id = m_int_ref2 ? m_int_ref2->Eval(context) : ALL_EMPIRES;
+        const int location_id = m_int_ref3 ? m_int_ref3->Eval(context) : INVALID_OBJECT_ID;
 
         return design->ProductionCost(empire_id, location_id, context);
+
+    }
+    else if (variable_name == "BuildingTypeCost") {
+        const std::string building_type_name = m_string_ref1 ? m_string_ref1->Eval(context) : "";
+        const auto* building_type = GetBuildingType(building_type_name);
+        if (!building_type)
+            return 0.0;
+
+        const int empire_id = m_int_ref1 ? m_int_ref1->Eval(context) : ALL_EMPIRES;
+        const int location_id = m_int_ref2 ? m_int_ref2->Eval(context) : INVALID_OBJECT_ID;
+
+        return building_type->ProductionCost(empire_id, location_id, context);
 
     }
     else if (variable_name == "EmpireMeterValue") {

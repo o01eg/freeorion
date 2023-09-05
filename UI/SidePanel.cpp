@@ -31,6 +31,7 @@
 #include "../client/human/GGHumanClientApp.h"
 #include "../Empire/Empire.h"
 #include "../universe/Building.h"
+#include "../universe/BuildingType.h"
 #include "../universe/Condition.h"
 #include "../universe/Fleet.h"
 #include "../universe/ShipDesign.h"
@@ -46,6 +47,7 @@
 #include "../util/Random.h"
 #include "../util/ScopedTimer.h"
 #include "../util/XMLDoc.h"
+#include "../util/ranges.h"
 
 
 class RotatingPlanetControl;
@@ -499,6 +501,8 @@ namespace {
             return ac->Eval();
         ScriptingContext source_planet_context{source_for_empire, context};
         source_planet_context.condition_local_candidate = planet;
+        if (!source_planet_context.condition_root_candidate)
+            source_planet_context.condition_root_candidate = planet;
         return ac->Eval(source_planet_context);
     }
 
@@ -1647,18 +1651,22 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     const SpeciesManager& sm = context.species;
     const SupplyManager& supply = context.supply;
 
-    const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    const auto client_empire = client_empire_id != ALL_EMPIRES ? context.GetEmpire(client_empire_id).get() : nullptr;
-    const auto* source_for_empire = client_empire ? client_empire->Source(context.ContextObjects()).get() : nullptr;
-
     auto* planet = objects.getRaw<Planet>(m_planet_id); // not const to allow updates for meter estimates
     if (!planet) {
         RequirePreRender();
         return;
     }
-    if (!source_for_empire && !planet->Unowned())
-        source_for_empire = planet;
 
+    const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const auto client_empire = client_empire_id != ALL_EMPIRES ? context.GetEmpire(client_empire_id).get() : nullptr;
+
+    // use source object owned by client empire, unless there isn't one
+    const auto* const source_for_empire = [client_empire, planet, &context]() {
+        const auto* retval = client_empire ? client_empire->Source(context.ContextObjects()).get() : nullptr;
+        if (!retval && !planet->Unowned())
+            retval = planet;
+        return retval;
+    }();
 
 
     // set planet name, formatted to indicate presense of shipyards / homeworlds
@@ -1669,8 +1677,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     bool homeworld = false, has_shipyard = false;
 
     // need to check all species for homeworlds
-    for (const auto& entry : sm.GetSpeciesHomeworldsMap()) {
-        const auto& homeworld_ids = entry.second;
+    for (const auto& homeworld_ids : sm.GetSpeciesHomeworldsMap() | range_values) { // TODO: any_of
         if (homeworld_ids.contains(m_planet_id)) {
             homeworld = true;
             break;
@@ -1679,7 +1686,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
 
     // check for shipyard
     const auto& known_destroyed_object_ids = u.EmpireKnownDestroyedObjectIDs(client_empire_id);
-    for (const auto* building : objects.findRaw<const Building>(planet->BuildingIDs())) {
+    for (const auto* building : objects.findRaw<const Building>(planet->BuildingIDs())) { // TODO: any_of
         if (!building || known_destroyed_object_ids.contains(building->ID()))
             continue;
         if (building->HasTag(TAG_SHIPYARD, context)) {
@@ -1775,9 +1782,9 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
     const double total_costs = empire_annexations_cost + empire_adopted_policies_cost + this_planet_annexation_cost;
     const double available_ip = client_empire ? client_empire->ResourceStockpile(ResourceType::RE_INFLUENCE) : 0.0;
     const bool annexation_affordable = total_costs <= available_ip;
-    const bool annexable =        !being_annexed && populated && !has_owner && !being_invaded && species &&
-                                  potentially_annexable && annexation_affordable;
-    const bool show_annex_button = being_annexed || annexable || (populated && !has_owner && !being_invaded && species);
+    const bool annexable =        at_war_with_me && visible && !being_annexed && populated && !being_invaded &&
+                                  species && potentially_annexable && annexation_affordable;
+    const bool show_annex_button = !mine && (being_annexed || annexable || (populated && !being_invaded && species));
 
 
     const bool being_bombarded =  planet->IsAboutToBeBombarded();
@@ -1822,6 +1829,49 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
         }();
 
         m_annex_button->SetText(std::move(txt));
+        m_annex_button->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
+
+        // checked above for non-null planeted
+        auto annex_tooltip = [planet, &planet_species_name, client_empire, client_empire_id,
+                              &context, this_planet_annexation_cost]() -> std::string
+        {
+            const auto& client_empire_name = client_empire ? client_empire->Name() : UserString("UNOWNED");
+            const auto client_op = context.species.SpeciesEmpireOpinion(planet_species_name, client_empire_id, false, true);
+            auto opinion_of_client_empire = DoubleToString(client_op, 3, false);
+
+            const auto owner_empire = context.GetEmpire(planet->Owner());
+            const auto& owner_name = owner_empire ? owner_empire->Name() : UserString("UNOWNED");
+            const auto owner_op = context.species.SpeciesEmpireOpinion(planet_species_name, planet->Owner(), false, true);
+            auto opinion_of_owner = DoubleToString(owner_op, 3, false);
+
+            auto stability = DoubleToString(planet->GetMeter(MeterType::METER_HAPPINESS)->Initial(), 3, false);;
+            auto population = DoubleToString(planet->GetMeter(MeterType::METER_POPULATION)->Initial(), 3, false);;
+
+            const auto building_costs = [&context, planet, client_empire_id]() {
+                const auto to_building_type_name = [](const Building* building) -> const auto&
+                { return building ? building->BuildingTypeName() : EMPTY_STRING; };
+
+                const auto to_cost = [client_empire_id, location_id{planet->ID()}, &context](const std::string& bt_name) {
+                    if (bt_name.empty())
+                        return 0.0;
+                    const auto* building_type = GetBuildingType(bt_name);
+                    return building_type ? building_type->ProductionCost(client_empire_id, location_id, context) : 0.0;
+                };
+
+                auto buildings = context.ContextObjects().findRaw<Building>(planet->BuildingIDs());
+                auto cost_rng = buildings | range_transform(to_building_type_name) | range_transform(to_cost);
+                return std::accumulate(cost_rng.begin(), cost_rng.end(), 0.0);
+            }();
+            auto building_costs_pp = DoubleToString(building_costs, 3, false);
+            auto annex_cost_ip = DoubleToString(this_planet_annexation_cost, 3, false);
+
+            return boost::io::str(FlexibleFormat(UserString("ANNEX_BUTTON_TOOLTIP"))
+                                  % UserString(planet_species_name) % client_empire_name % opinion_of_client_empire
+                                  % owner_name % opinion_of_owner
+                                  % stability % population % building_costs_pp % annex_cost_ip);
+        }();
+        m_annex_button->SetBrowseText(std::move(annex_tooltip));
+
         const bool clickable = annexable || being_annexed;
         m_annex_button->Disable(!clickable);
     }
@@ -1978,7 +2028,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context) {
                                % UserString(focus_name)));
 
             row->push_back(std::move(graphic));
-            rows.emplace_back(std::move(row));
+            rows.push_back(std::move(row));
         }
 
         if (m_focus_drop->Dropped())
@@ -2494,9 +2544,9 @@ void SidePanel::PlanetPanel::ClickAnnex() {
     // been ordered
 
     ScriptingContext context;
-    ObjectMap& objects{context.ContextObjects()};
+    const ObjectMap& objects{context.ContextObjects()};
 
-    auto planet = objects.get<Planet>(m_planet_id);
+    const auto planet = objects.get<const Planet>(m_planet_id);
     if (!planet || !m_order_issuing_enabled)
         return;
 

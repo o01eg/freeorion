@@ -33,7 +33,7 @@ BOOST_AUTO_TEST_CASE(parse_game_rules) {
     auto game_rules = *Pending::WaitForPendingUnlocked(std::move(game_rules_p));
     BOOST_REQUIRE(!game_rules.empty());
     BOOST_REQUIRE(game_rules.contains("RULE_HABITABLE_SIZE_MEDIUM"));
-    BOOST_REQUIRE(GameRule::Type::TOGGLE == game_rules["RULE_ENABLE_ALLIED_REPAIR"].type);
+    BOOST_REQUIRE(GameRule::Type::TOGGLE == game_rules.at("RULE_ENABLE_ALLIED_REPAIR").type);
 }
 
 BOOST_AUTO_TEST_CASE(parse_techs) {
@@ -286,7 +286,7 @@ BOOST_AUTO_TEST_CASE(parse_species) {
         BOOST_TEST_MESSAGE("Dump " << species.Name() << ":");
         BOOST_TEST_MESSAGE(species.Dump(0));
 
-        BOOST_REQUIRE_EQUAL(6533633, species.GetCheckSum());
+        BOOST_REQUIRE_EQUAL(6594376, species.GetCheckSum());
 
         const Species test_species{"SP_ABADDONI",
             "SP_ABADDONI_DESC",

@@ -68,12 +68,15 @@ namespace {
 ////////////////////////////////////////////////
 MultiEdit::MultiEdit(std::string str, const std::shared_ptr<Font>& font, Clr color,
                      Flags<MultiEditStyle> style, Clr text_color, Clr interior) :
-    Edit(std::move(str), font, color, text_color, interior),
+    Edit("", font, color, text_color, interior),
     m_style(style),
     m_cursor_begin(0, CP0),
     m_cursor_end(0, CP0),
     m_max_lines_history(ALL_LINES)
-{ SetColor(color); }
+{
+    SetColor(color);
+    Edit::SetText(std::move(str));
+}
 
 void MultiEdit::CompleteConstruction()
 {
@@ -272,8 +275,8 @@ void MultiEdit::SetText(std::string str)
         if (m_max_lines_history == ALL_LINES) {
             TextControl::SetText(std::move(str));
         } else {
-            auto text_elements = GetFont()->ExpensiveParseFromTextToTextElements(str, format);
-            auto lines = GetFont()->DetermineLines(str, format, cl_sz.x, text_elements);
+            const auto text_elements = GetFont()->ExpensiveParseFromTextToTextElements(str, format);
+            const auto lines = GetFont()->DetermineLines(str, format, cl_sz.x, text_elements);
             if (m_max_lines_history < lines.size()) {
                 std::size_t first_line = 0;
                 std::size_t last_line = m_max_lines_history - 1;
@@ -654,30 +657,19 @@ std::pair<std::size_t, CPSize> MultiEdit::LowCursorPos() const
     }
 }
 
-namespace {
-
-struct InRange
-{
-    InRange(CPSize value) : m_value(value) {}
-    bool operator()(const std::pair<CPSize, CPSize>& p) const
-    { return p.first < m_value && m_value < p.second; }
-    const CPSize m_value;
-};
-
-}
-
 std::pair<CPSize, CPSize> MultiEdit::GetDoubleButtonDownWordIndices(CPSize char_index)
 {
     //std::cout << "GetDoubleButtonDownWordIndices index: " << Value(char_index) << std::endl;
-    unsigned int ticks = GUI::GetGUI()->Ticks();
+    const unsigned int ticks = GUI::GetGUI()->Ticks();
     if (ticks - this->m_last_button_down_time <= GUI::GetGUI()->DoubleClickInterval())
         m_in_double_click_mode = true;
     this->m_last_button_down_time = ticks;
     this->m_double_click_cursor_pos = std::pair<CPSize, CPSize>(CP0, CP0);
     if (m_in_double_click_mode) {
         //std::cout << "GetDoubleButtonDownWordIndices in double click mode!" << std::endl;
-        auto words = GUI::GetGUI()->FindWords(Text());
-        auto it = std::find_if(words.begin(), words.end(), InRange(char_index));
+        const auto words = GUI::GetGUI()->FindWords(Text());
+        const auto it = std::find_if(words.begin(), words.end(),
+                                     [char_index](auto word) { return word.first < char_index && char_index < word.second; });
         if (it != words.end())
             this->m_double_click_cursor_pos = *it;
     }

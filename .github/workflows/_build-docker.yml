@@ -11,11 +11,12 @@ jobs:
       fail-fast: false
       matrix:
         image:
-          - ubuntu-22.10
+          - ubuntu-23.04
           - fedora-33
           - debian-oldstable
           - debian-stable
           - debian-sid
+          - debian-sid-i386
           - manjaro
           - fedora-rawhide
     env:

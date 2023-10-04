@@ -1,4 +1,4 @@
-FROM docker.io/ubuntu:kinetic
+FROM i386/debian:sid-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -9,14 +9,14 @@ path-exclude=/usr/share/cmake-3.18/Help/*\n\
 " > /etc/dpkg/dpkg.cfg.d/docker-no-documentation
 
 RUN echo "# don't install static libraries inside container\n\
-path-exclude=/usr/lib/x86_64-linux-gnu/*.a\n\
-path-exclude=/usr/lib/python3.9/config-x86_64-linux-gnu/*.a\n\
-path-include=/usr/lib/x86_64-linux-gnu/libc_nonshared.a\n\
-path-include=/usr/lib/gcc/x86_64-linux-gnu/11/libgcc.a\n\
-path-include=/usr/lib/x86_64-linux-gnu/libmvec_nonshared.a\n\
-path-include=/usr/lib/x86_64-linux-gnu/libpthread.a\n\
-path-include=/usr/lib/x86_64-linux-gnu/libpthread-2.0.a\n\
-path-include=/usr/lib/x86_64-linux-gnu/libpthread_nonshared.a\n\
+path-exclude=/usr/lib/i386-linux-gnu/*.a\n\
+path-exclude=/usr/lib/python3.9/config-i386-linux-gnu/*.a\n\
+path-include=/usr/lib/i386-linux-gnu/libc_nonshared.a\n\
+path-include=/usr/lib/gcc/i386-linux-gnu/11/libgcc.a\n\
+path-include=/usr/lib/i386-linux-gnu/libmvec_nonshared.a\n\
+path-include=/usr/lib/i386-linux-gnu/libpthread.a\n\
+path-include=/usr/lib/i386-linux-gnu/libpthread-2.0.a\n\
+path-include=/usr/lib/i386-linux-gnu/libpthread_nonshared.a\n\
 " > /etc/dpkg/dpkg.cfg.d/docker-no-static-libraries
 
 RUN echo "# don't install recommends and suggests packages\n\
@@ -27,14 +27,14 @@ APT::Install-Suggests \"false\";\n\
 RUN apt-get update --assume-yes
 RUN apt-get install --assume-yes \
         git \
-        g++-12 \
-	make \
+        g++ \
+        make \
         cmake \
         python3 \
         ccache \
         coreutils \
         libpython3-dev \
-        libfreetype6-dev \
+        libfreetype-dev \
         libglew-dev \
         libopenal-dev \
         libogg-dev \

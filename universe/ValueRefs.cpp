@@ -51,6 +51,14 @@ struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax er
 
 #include <boost/stacktrace.hpp>
 
+#include <utility>
+#if !defined(__cpp_lib_integer_comparison_functions)
+namespace std {
+    inline constexpr auto cmp_less(auto&& lhs, auto&& rhs) { return lhs < rhs; }
+}
+#endif
+
+
 std::string DoubleToString(double val, int digits, bool always_show_sign);
 bool UserStringExists(const std::string& str);
 
@@ -341,7 +349,7 @@ std::string ValueRefBase::InvariancePattern() const {
 
 namespace {
     constexpr MeterType NameToMeterCX(std::string_view name) noexcept {
-        for (int i = 0; i < static_cast<int>(NAME_BY_METER.size()); i++) {
+        for (int i = 0; std::cmp_less(i, NAME_BY_METER.size()); i++) {
             if (NAME_BY_METER[i] == name)
                 return static_cast<MeterType>(i - 1);
         }
@@ -376,7 +384,7 @@ std::string_view PlanetTypeToString(PlanetType planet) noexcept { return PlanetT
 namespace {
     // @return the correct PlanetType enum for a user friendly planet type string (e.g. "Ocean"), else it returns PlanetType::INVALID_PLANET_TYPE
     constexpr PlanetType StringToPlanetTypeCX(std::string_view name) noexcept {
-        for (int i = 0; i < static_cast<int>(NAME_BY_PLANET.size()); i++) {
+        for (int i = 0; std::cmp_less(i, NAME_BY_PLANET.size()); i++) {
             if (NAME_BY_PLANET[i] == name)
                 return static_cast<PlanetType>(i - 1);
         }
@@ -597,14 +605,6 @@ std::string Constant<double>::Description() const
 { return DoubleToString(m_value, 3, false); }
 
 template <>
-std::string Constant<std::string>::Description() const
-{
-    if (m_value == current_content)
-        return m_top_level_content;
-    return m_value;
-}
-
-template <>
 std::string Constant<PlanetSize>::Dump(uint8_t ntabs) const
 {
     switch (m_value) {
@@ -701,9 +701,12 @@ template <>
 std::string Constant<double>::Dump(uint8_t ntabs) const
 { return std::to_string(m_value); }
 
-template <>
-std::string Constant<std::string>::Dump(uint8_t ntabs) const
-{ return "\"" + Description() + "\""; }
+namespace StaticTests {
+    constexpr double test_val = 42.6;
+    constexpr ::ValueRef::Constant<double> cdvr(test_val);
+    static_assert(cdvr.Value() == test_val);
+    static_assert(cdvr.GetReferenceType() == ::ValueRef::ReferenceType::INVALID_REFERENCE_TYPE);
+}
 
 ///////////////////////////////////////////////////////////
 // Variable                                              //

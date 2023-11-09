@@ -47,14 +47,14 @@ HS_VICINITY_RANGE = 3
 # With large galaxies an excessive amount of time can be used in failed attempts to select home systems, so defining
 # an upper limit for the home system selection process to use when calculating the starting value for the minimum
 # jump distance limit is reasonable.
-HS_MAX_JUMP_DISTANCE_LIMIT = 10
+HS_MAX_JUMP_DISTANCE_LIMIT = 20
 
 # This options defines the minimum jump distance limit between home systems that should be considered high priority.
 # As long as the jump distance limit which home systems must at least be apart does not get reduced below this limit
 # during the home system selection process, the minimum systems in home system vicinity requirement takes
 # precedence over the jump distance limit. If the jump distance limit drops below this minimum jump distance limit,
 # the process is restarted giving the jump distance limit precedence.
-HS_MIN_DISTANCE_PRIORITY_LIMIT = 5
+HS_MIN_DISTANCE_PRIORITY_LIMIT = 10
 
 # These two options define which types of planets are counted when determining the number of planets in the near
 # vicinity of a home system. HS_ACCEPTABLE_PLANET_SIZES is actually only needed for the process of adding planets

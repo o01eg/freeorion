@@ -451,7 +451,7 @@ private:
     double                                      m_zoom_steps_in = 1.0;      //!< number of zoom steps in.  each 1.0 step increases display scaling by the same zoom step factor
     std::shared_ptr<SidePanel>                  m_side_panel;               //!< planet view panel on the side of the main map
     std::unordered_map<int, std::shared_ptr<SystemIcon>> m_system_icons;    //!< system icons in the main map, indexed by system id
-    std::map<int, std::shared_ptr<FieldIcon>>   m_field_icons;              //!< field icons in the main map, indexed by field id
+    std::vector<std::shared_ptr<FieldIcon>>     m_field_icons;              //!< field icons in the main map, sorted by field size
     std::shared_ptr<SitRepPanel>                m_sitrep_panel;             //!< sitrep panel
     std::shared_ptr<ResearchWnd>                m_research_wnd;             //!< research screen
     std::shared_ptr<ProductionWnd>              m_production_wnd;           //!< production screen
@@ -529,11 +529,8 @@ private:
     GG::GL2DVertexBuffer    m_system_circle_vertices;
     GG::GLRGBAColorBuffer   m_system_circle_colours;
 
-    /** First buffer is visible fields, second buffer is not visible (scanlined)
-        fields for each texture. */
-    std::map<std::shared_ptr<GG::Texture>,
-             std::pair<GG::GL2DVertexBuffer, GG::GL2DVertexBuffer>>
-                                    m_field_vertices;
+    std::vector<std::pair<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer>> m_field_vertices_visible;
+    std::vector<std::pair<std::shared_ptr<GG::Texture>, GG::GL2DVertexBuffer>> m_field_vertices_not_visible;
 
     GG::GL2DVertexBuffer            m_field_scanline_circles;
     GG::GLTexCoordBuffer            m_field_texture_coords;

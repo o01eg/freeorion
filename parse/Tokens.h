@@ -41,7 +41,6 @@
     (BuildingTypesProduced)                     \
     (BuildingTypesScrapped)                     \
     (buildtime)                                 \
-    (CanAddStarlanesTo)                         \
     (CanColonize)                               \
     (CanProduceShips)                           \
     (CanSee)                                    \
@@ -55,6 +54,7 @@
     (ceil)                                      \
     (class)                                     \
     (ClockwiseNextPlanetType)                   \
+    (closeto)                                   \
     (Colony)                                    \
     (colour)                                    \
     (CombatBout)                                \
@@ -180,6 +180,7 @@
     (HasSpecial)                                \
     (HasSpecialCapacity)                        \
     (HasSpecialSinceTurn)                       \
+    (HasStarlane)                               \
     (HasTag)                                    \
     (high)                                      \
     (HighestCostEnqueuedTech)                   \
@@ -243,6 +244,7 @@
     (MaxCapacity)                               \
     (MaxDamage)                                 \
     (MaxDefense)                                \
+    (maxdotprod)                                \
     (MaxFuel)                                   \
     (MaximumNumberOf)                           \
     (MaxSecondaryStat)                          \
@@ -412,6 +414,7 @@
     (SetEmpireMeter)                            \
     (SetEmpireTechProgress)                     \
     (SetEmpireStockpile)                        \
+    (SetFocus)                                  \
     (SetFuel)                                   \
     (SetHappiness)                              \
     (SetIndustry)                               \
@@ -527,6 +530,9 @@
     (Spread)                                    \
     (stackinggroup)                             \
     (Star)                                      \
+    (StarlaneToWouldBeAngularlyCloseToExistingStarlane) \
+    (StarlaneToWouldBeCloseToObject)            \
+    (StarlaneToWouldCrossExistingStarlane)      \
     (StarType)                                  \
     (Stationary)                                \
     (Statistic)                                 \

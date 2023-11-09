@@ -653,19 +653,6 @@ namespace {
                                                            tex_name));
              }
 
-             for (auto& [tex_name, tex] : GG::GetVectorTextureManager().Textures()) {
-                 auto texture_info_str = boost::io::str(
-                     FlexibleFormat(UserString("ENC_VECTOR_TEXTURE_INFO")) %
-                     Value(tex->Size().x) %
-                     Value(tex->Size().y) %
-                     tex->NumShapes() %
-                     tex_name);
-                 retval.emplace_back(std::piecewise_construct,
-                                     std::forward_as_tuple(tex_name),
-                                     std::forward_as_tuple(std::move(texture_info_str),
-                                                           tex_name));
-             }
-
         }
         else if (dir_name == "ENC_STRINGS") {
             // show all stringable keys and values
@@ -676,7 +663,7 @@ namespace {
                                                           str_key));
 
         }
-        else if  (dir_name == "ENC_NAMED_VALUE_REF") {
+        else if (dir_name == "ENC_NAMED_VALUE_REF") {
             retval.emplace_back(std::piecewise_construct,
                                 std::forward_as_tuple("ENC_NAMED_VALUE_REF_DESC"),
                                 std::forward_as_tuple(UserString("ENC_NAMED_VALUE_REF_DESC") + "\n\n", dir_name));
@@ -781,8 +768,10 @@ namespace {
             }
         }
 
-
-        std::sort(retval.begin(), retval.end());
+        if (dir_name == "ENC_NAMED_VALUE_REF" && !retval.empty())
+            std::sort(std::next(retval.begin()), retval.end()); // leave explanitory text first
+        else
+            std::sort(retval.begin(), retval.end());
         return retval;
     }
 
@@ -1397,11 +1386,17 @@ namespace {
             return;
         }
         else if (item_name == "ENC_GAME_RULES") {
-            for (auto& [rule_name, rule] : GetGameRules()) {
-                if (rule.ValueIsDefault())
-                    detailed_description += UserString(rule_name) + " : " + rule.ValueToString() + "\n";
+            std::string_view last_category;
+            detailed_description += UserString("GENERAL") + ":\n";
+            for (const auto* rule : GetGameRules().GetSortedByCategoryAndRank()) {
+                if (last_category != rule->category) {
+                    last_category = rule->category;
+                    detailed_description += "\n\n" + UserString(last_category.empty() ? "GENERAL" : last_category) + ":\n";
+                }
+                if (rule->ValueIsDefault())
+                    detailed_description += "    " + UserString(rule->name) + " : " + rule->ValueToString() + "\n";
                 else
-                    detailed_description += "<u>" + UserString(rule_name) + " : " + rule.ValueToString() + "</u>\n";
+                    detailed_description += "    <u>" + UserString(rule->name) + " : " + rule->ValueToString() + "</u>\n";
             }
             return;
         }

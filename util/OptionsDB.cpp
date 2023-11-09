@@ -11,6 +11,12 @@
 #include <iomanip>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#if !defined(__cpp_lib_integer_comparison_functions)
+namespace std {
+    inline auto cmp_greater_equal(auto&& lhs, auto&& rhs) { return lhs < rhs; }
+}
+#endif
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/erase.hpp>
@@ -75,15 +81,15 @@ OptionsDB::Option::Option(char short_name_, std::string name_, boost::any value_
                           std::unique_ptr<ValidatorBase>&& validator_, bool storable_,
                           bool flag_, bool recognized_, std::string section) :
     name(std::move(name_)),
-    short_name(short_name_),
-    storable(storable_),
-    flag(flag_),
-    recognized(recognized_),
     value(std::move(value_)),
     default_value(std::move(default_value_)),
     description(std::move(description_)),
     validator(std::move(validator_)),
-    option_changed_sig(std::make_unique<OptionChangedSignalType>())
+    option_changed_sig(std::make_unique<OptionChangedSignalType>()),
+    short_name(short_name_),
+    storable(storable_),
+    flag(flag_),
+    recognized(recognized_)
 {
     if (!validator)
         DebugLogger() << "Option " << name << " created with null validator...";
@@ -713,7 +719,7 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
                 if (!option.flag) { // non-flag
                     try {
                         // check if parameter exists...
-                        if (i + 1 >= static_cast<unsigned int>(args.size())) {
+                        if (std::cmp_greater_equal(i + 1, args.size())) {
                             m_dirty |= option.SetFromString("");
                             continue;
                         }
@@ -765,7 +771,7 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
                     if (j < single_char_options.size() - 1) {
                         throw std::runtime_error(std::string("Option \"-") + single_char_options[j] + "\" was given with no parameter.");
                     } else {
-                        if (i + 1 >= static_cast<unsigned int>(args.size()))
+                        if (std::cmp_greater_equal(i + 1, args.size()))
                             m_dirty |= option.SetFromString("");
                         else
                             m_dirty |= option.SetFromString(args[++i]);

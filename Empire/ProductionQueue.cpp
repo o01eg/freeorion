@@ -10,13 +10,20 @@
 #include "../universe/ValueRef.h"
 #include "../util/AppInterface.h"
 #include "../util/GameRules.h"
+#include "../util/GameRuleRanks.h"
 #include "../util/ranges.h"
 #include "../util/ScopedTimer.h"
 #include "../util/i18n.h"
 
 #include <boost/uuid/uuid_io.hpp>
 #include <numeric>
-
+#include <utility>
+#if !defined(__cpp_lib_integer_comparison_functions)
+namespace std {
+    inline auto cmp_less(auto&& lhs, auto&& rhs) { return lhs < rhs; }
+    inline auto cmp_greater_equal(auto&& lhs, auto&& rhs) { return lhs < rhs; }
+}
+#endif
 
 namespace {
     constexpr float EPSILON = 0.001f;
@@ -25,14 +32,21 @@ namespace {
         // limits amount of PP per turn that can be imported into the stockpile
         rules.Add<bool>(UserStringNop("RULE_STOCKPILE_IMPORT_LIMITED"),
                         UserStringNop("RULE_STOCKPILE_IMPORT_LIMITED_DESC"),
-                        "", false, true);
-
+                        GameRuleCategories::GameRuleCategory::GENERAL,
+                        false, true,
+                        GameRuleRanks::RULE_STOCKPILE_IMPORT_LIMITED_RANK);
         rules.Add<double>(UserStringNop("RULE_PRODUCTION_QUEUE_FRONTLOAD_FACTOR"),
                           UserStringNop("RULE_PRODUCTION_QUEUE_FRONTLOAD_FACTOR_DESC"),
-                          "", 0.0, true, RangedValidator<double>(0.0, 30.0));
+                          GameRuleCategories::GameRuleCategory::GENERAL,
+                          0.0, true,
+                          GameRuleRanks::RULE_PRODUCTION_QUEUE_FRONTLOAD_FACTOR_RANK,
+                          RangedValidator<double>(0.0, 30.0));
         rules.Add<double>(UserStringNop("RULE_PRODUCTION_QUEUE_TOPPING_UP_FACTOR"),
                           UserStringNop("RULE_PRODUCTION_QUEUE_TOPPING_UP_FACTOR_DESC"),
-                          "", 0.0, true, RangedValidator<double>(0.0, 30.0));
+                          GameRuleCategories::GameRuleCategory::GENERAL,
+                          0.0, true,
+                          GameRuleRanks::RULE_PRODUCTION_QUEUE_TOPPING_UP_FACTOR_RANK,
+                          RangedValidator<double>(0.0, 30.0));
     }
     bool temp_bool = RegisterGameRules(&AddRules);
 
@@ -600,10 +614,10 @@ std::vector<std::vector<int>> ProductionQueue::ObjectsWithWastedPP(const Resourc
 }
 
 ProductionQueue::const_iterator ProductionQueue::find(int i) const
-{ return (0 <= i && i < static_cast<int>(size())) ? (begin() + i) : end(); }
+{ return (0 <= i && std::cmp_less(i, size())) ? (begin() + i) : end(); }
 
 const ProductionQueue::Element& ProductionQueue::operator[](int i) const {
-    if (i < 0 || i >= static_cast<int>(m_queue.size()))
+    if (i < 0 || std::cmp_greater_equal(i, m_queue.size()))
         throw std::out_of_range("Tried to access ProductionQueue element out of bounds");
     return m_queue[i];
 }
@@ -883,7 +897,7 @@ void ProductionQueue::insert(iterator it, Element element) {
 }
 
 void ProductionQueue::erase(int i) {
-    if (i < 0 || i >= static_cast<int>(m_queue.size()))
+    if (i < 0 || std::cmp_greater_equal(i, m_queue.size()))
         throw std::out_of_range("Tried to erase ProductionQueue item out of bounds.");
     m_queue.erase(begin() + i);
 }
@@ -895,10 +909,10 @@ ProductionQueue::iterator ProductionQueue::erase(iterator it) {
 }
 
 ProductionQueue::iterator ProductionQueue::find(int i)
-{ return (0 <= i && i < static_cast<int>(size())) ? (begin() + i) : end(); }
+{ return (0 <= i && std::cmp_less(i, size())) ? (begin() + i) : end(); }
 
 ProductionQueue::Element& ProductionQueue::operator[](int i) {
-    if (i < 0 || i >= static_cast<int>(m_queue.size()))
+    if (i < 0 || std::cmp_greater_equal(i, m_queue.size()))
         throw std::out_of_range("Tried to access ProductionQueue element out of bounds");
     return m_queue[i];
 }

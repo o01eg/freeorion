@@ -7512,8 +7512,14 @@ Last Turn Colonized
 LAST_TURN_CONQUERED
 Last Turn Conquered
 
+LAST_TURN_ANNEXED
+Last Turn Annexed
+
 LAST_TURN_ATTACKED_BY_SHIP
 Last Turn Attacked By Ship
+
+ANNEXATION_COST_BY_ME
+Annexation Cost
 
 ARRIVED_ON_TURN
 Arrived on Turn
@@ -11940,12 +11946,42 @@ DESC_WITHIN_STARLANE_JUMPS_NOT
 ''' that is not within %1% starlane jumps of any object%2%'''
 
 # %1% textual description of the far endpoint system the starlane connects to.
-DESC_CAN_ADD_STARLANE_CONNECTION
-''' that can have starlanes added connecting to all systems that contain objects%1%'''
+DESC_HAS_STARLANE_TO
+''' that has a starlane to the location of any object%1%'''
 
 # %1% textual description of the far endpoint system the starlane connects to.
-DESC_CAN_ADD_STARLANE_CONNECTION_NOT
-''' that can not have starlanes added connecting to all systems that contain objects%1%'''
+DESC_HAS_STARLANE_TO_NOT
+''' that does not have a starlane to the location of any object%1%'''
+
+# %1% textual description of the other endpoint system the starlane connects to.
+DESC_STARLANE_TO_WOULD_CROSS_EXISTING_LANE
+''' that would cross an existing starlane if adding a starlane between it and the location of any object %1%'''
+
+# %1% textual description of the other endpoint system the starlane connects to.
+DESC_STARLANE_TO_WOULD_CROSS_EXISTING_LANE_NOT
+''' that would not cross an existing starlane if adding a starlane between it and the location of any object %1%'''
+
+# %1% textual description of the other endpoint system the starlane connects to.
+# %2% textual description max dot product of normalized lane vectors to consider "close".
+DESC_STARLANE_TO_WOULD_BE_ANGULARLY_CLOSE
+''' to which a new starlane would be angularly close (dot product > %2%) to an existing starlane on either end, with the other end being at any object %1%'''
+
+# %1% textual description of the other endpoint system the starlane connects to.
+# %2% textual description max dot product of normalized lane vectors to consider "close".
+DESC_STARLANE_TO_WOULD_BE_ANGULARLY_CLOSE_NOT
+''' to which a new starlane would not be angularly close (dot product > %2%) to an existing starlane on either end, with the other end being at any object %1%'''
+
+# %1% textual description of the other endpoint objects(s) the starlane(s) connect(s) to.
+# %2% textual description max distance from a lane to consider "close".
+# %3% textual description of the object(s) that the lane would be close to
+DESC_STARLANE_TO_WOULD_BE_CLOSE
+''' to which a new starlane from an object that %1% would be close (distance < %2%) to an object %3%'''
+
+# %1% textual description of the other endpoint object(s) the starlane(s) connect(s) to.
+# %2% textual description max distance from a lane to consider "close".
+# %3% textual description of the object(s) that the lane would be close to
+DESC_STARLANE_TO_WOULD_BE_CLOSE_NOT
+''' to which a new starlane from an object that %1% would not be close (distance < %2%) to an object %3%'''
 
 # %1% textual description of the empire.
 DESC_EXPLORED_BY_EMPIRE
@@ -12714,9 +12750,10 @@ PLC_TERROR_SUPPRESSION
 Terror Suppression
 
 PLC_TERROR_SUPPRESSION_DESC
-'''• Increases populated planet [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_TERROR_SUPPRESSION_TARGET_STABILITY_SCALE]] per ship in the system that is owned by the empire, is armed, and is crewed by the imperial capital planet's species.
-• Decreases those planets' [[metertype METER_REBEL_TROOPS]] by [[value PLC_TERROR_SUPPRESSION_REBEL_REDUCTION_SCALE]] per ship.
-• Makes those ships cost [[value PLC_TERROR_SUPPRESSION_SHIP_INFLUENCE_FLAT]] [[metertype METER_INFLUENCE]].'''
+'''• Increases an empire's populated planet [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_TERROR_SUPPRESSION_TARGET_STABILITY_SCALE]] per ship in the system that is owned by the empire, is armed, is in a fleet set to initiate combat, and is crewed by the imperial capital planet's species.
+• Decreases own and enemy planets' [[metertype METER_REBEL_TROOPS]] by [[value PLC_TERROR_SUPPRESSION_REBEL_REDUCTION_SCALE]] per (armed, combat-initiating, capital species) ship.
+• Decreases enemy empires' populated (by a species other than the ships' empire's capital species) planet [[metertype METER_TARGET_HAPPINESS]] by [[value PLC_TERROR_SUPPRESSION_TARGET_STABILITY_SCALE]] per (armed, combat-initiating, capital species) ship.
+• Makes (armed, capital species crewed) ships cost [[value PLC_TERROR_SUPPRESSION_SHIP_INFLUENCE_FLAT]] [[metertype METER_INFLUENCE]] (regardless of whether set to initiate combat).'''
 
 PLC_TERROR_SUPPRESSION_SHORT_DESC
 Increases stability with armed ships

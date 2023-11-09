@@ -1860,14 +1860,11 @@ void MapWnd::RenderFields() {
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
     // render not visible fields
-    for (auto& field_buffer : m_field_vertices) {
-        if (field_buffer.second.second.empty())
-            continue;
-
-        glBindTexture(GL_TEXTURE_2D, field_buffer.first->OpenGLId());
-        field_buffer.second.second.activate();
+    for (auto& [field_texture, buffer] : m_field_vertices_not_visible) {
+        glBindTexture(GL_TEXTURE_2D, field_texture->OpenGLId());
+        buffer.activate();
         m_field_texture_coords.activate();
-        glDrawArrays(GL_QUADS, 0, field_buffer.second.second.size());
+        glDrawArrays(GL_QUADS, 0, buffer.size());
     }
 
     // if any, render scanlines over not-visible fields
@@ -1892,14 +1889,11 @@ void MapWnd::RenderFields() {
 
 
     // render visible fields
-    for (auto& field_buffer : m_field_vertices) {
-        if (field_buffer.second.first.empty())
-            continue;
-
-        glBindTexture(GL_TEXTURE_2D, field_buffer.first->OpenGLId());
-        field_buffer.second.first.activate();
+    for (auto& [field_texture, buffer] : m_field_vertices_visible) {
+        glBindTexture(GL_TEXTURE_2D, field_texture->OpenGLId());
+        buffer.activate();
         m_field_texture_coords.activate();
-        glDrawArrays(GL_QUADS, 0, field_buffer.second.first.size());
+        glDrawArrays(GL_QUADS, 0, buffer.size());
     }
 
 
@@ -2088,9 +2082,9 @@ void MapWnd::RenderSystems() {
 
 
         // prep circles around systems that have at least one starlane, if they are enabled
-        GG::Pt circle_distance_pt = GG::Pt(GG::X1, GG::Y1) * circle_distance;
-        GG::Pt inner_circle_ul = circle_ul + (circle_distance_pt * ZoomFactor());
-        GG::Pt inner_circle_lr = circle_lr - (circle_distance_pt * ZoomFactor());
+        const GG::Pt circle_distance_pt = GG::Pt(GG::X1, GG::Y1) * circle_distance;
+        const GG::Pt inner_circle_ul = circle_ul + (circle_distance_pt * ZoomFactor());
+        const GG::Pt inner_circle_lr = circle_lr - (circle_distance_pt * ZoomFactor());
 
         bool has_empire_planet = false;
         bool has_neutrals = false;
@@ -2118,13 +2112,15 @@ void MapWnd::RenderSystems() {
 
         // outer circle in color of supplying empire
         const int supply_empire_id = supply.EmpireThatCanSupplyAt(system_id);
-        auto pre_sz = m_system_circle_vertices.size();
+        const auto pre_sz1 = m_system_circle_vertices.size();
         BufferStoreCircleArcVertices(m_system_circle_vertices, circle_ul, circle_lr,
                                      0.0, TWO_PI, false, 0, false);
-        const std::size_t count = m_system_circle_vertices.size() - pre_sz;
-        const auto clr = get_empire_colour(supply_empire_id);
-        for (std::size_t n = 0; n < count; ++n)
-            m_system_circle_colours.store(clr);
+        {
+            const std::size_t count1 = m_system_circle_vertices.size() - pre_sz1;
+            const auto clr_e = get_empire_colour(supply_empire_id);
+            for (std::size_t n = 0; n < count1; ++n)
+                m_system_circle_colours.store(clr_e);
+        }
 
 
         // systems with neutrals and no empire have a segmented inner circle
@@ -2132,17 +2128,17 @@ void MapWnd::RenderSystems() {
             static constexpr std::size_t segments = 24;
             static constexpr double segment_arc = TWO_PI / segments;
 
-            pre_sz = m_system_circle_vertices.size();
+            const auto pre_sz2 = m_system_circle_vertices.size();
             for (std::size_t n = 0; n < segments; n = n + 2) {
                 const auto theta1 = n * segment_arc;
                 const auto theta2 = (n+1) * segment_arc;
                 BufferStoreCircleArcVertices(m_system_circle_vertices, inner_circle_ul, inner_circle_lr,
                                              theta1, theta2, false, 48, false);
             }
-            const std::size_t count = m_system_circle_vertices.size() - pre_sz;
-            const auto clr = ClientUI::TextColor();
-            for (std::size_t n = 0; n < count; ++n)
-                m_system_circle_colours.store(clr);
+            const std::size_t count2 = m_system_circle_vertices.size() - pre_sz2;
+            const auto clr_txt = ClientUI::TextColor();
+            for (std::size_t n = 0; n < count2; ++n)
+                m_system_circle_colours.store(clr_txt);
         }
 
 
@@ -2159,18 +2155,18 @@ void MapWnd::RenderSystems() {
 
 
         std::size_t n = 0;
-        for (const auto& [empire_id, colony_count] : colony_count_by_empire_id) {
-            pre_sz = m_system_circle_vertices.size();
+        for (const auto& [colony_empire_id, colony_count] : colony_count_by_empire_id) {
+            const auto pre_sz3 = m_system_circle_vertices.size();
             const auto theta1 = n*segment_arc;
             const auto theta2 = (n + colony_count)*segment_arc;
             BufferStoreCircleArcVertices(m_system_circle_vertices, inner_circle_ul, inner_circle_lr,
                                          theta1, theta2, false, 30, false);
-            const std::size_t count = m_system_circle_vertices.size() - pre_sz;
+            const std::size_t count3 = m_system_circle_vertices.size() - pre_sz3;
             n += colony_count;
-            const auto clr = (empire_id == ALL_EMPIRES) ?
-                ClientUI::TextColor() : get_empire_colour(empire_id);
-            for (std::size_t n2 = 0; n2 < count; ++n2)
-                m_system_circle_colours.store(clr);
+            const auto clr_e2 = (colony_empire_id == ALL_EMPIRES) ?
+                ClientUI::TextColor() : get_empire_colour(colony_empire_id);
+            for (std::size_t n2 = 0; n2 < count3; ++n2)
+                m_system_circle_colours.store(clr_e2);
         }
     }
 
@@ -2189,7 +2185,7 @@ void MapWnd::RenderSystems() {
     m_scanline_shader.SetColor(GetOptionsDB().Get<GG::Clr>("ui.map.system.scanlines.color"));
     m_scanline_shader.StartUsing();
     m_scanline_circle_vertices.activate();
-    glDrawArrays(GL_TRIANGLES, 0, m_scanline_circle_vertices.size());
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_scanline_circle_vertices.size()));
     m_scanline_shader.StopUsing();
 
 
@@ -2198,7 +2194,7 @@ void MapWnd::RenderSystems() {
     glLineWidth(line_thick);
     m_system_circle_vertices.activate();
     m_system_circle_colours.activate();
-    glDrawArrays(GL_LINES, 0, m_system_circle_vertices.size());
+    glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_system_circle_vertices.size()));
 
 
     glPopClientAttrib();
@@ -3165,13 +3161,17 @@ void MapWnd::InitTurnRendering() {
 
     // remove old field icons
     for (const auto& field_icon : m_field_icons)
-        DetachChild(field_icon.second);
+        DetachChild(field_icon);
     m_field_icons.clear();
 
     // create field icons
+    std::vector<std::pair<int, float>> field_ids_by_size;
     for (auto* field : objects.allRaw<Field>()) {
-        const int fld_id = field->ID();
+        field_ids_by_size.emplace_back(field->ID(), field->GetMeter(MeterType::METER_SIZE)->Initial());
+    }
+    std::sort(field_ids_by_size.begin(), field_ids_by_size.end(), [](const auto& lhs, const auto& rhs) { return lhs.second < rhs.second; });
 
+    for (const auto& [fld_id, field_size] : field_ids_by_size) {
         // skip known destroyed and stale fields
         if (this_client_known_destroyed_objects.contains(fld_id))
             continue;
@@ -3183,7 +3183,7 @@ void MapWnd::InitTurnRendering() {
 
         // create new system icon
         auto icon = GG::Wnd::Create<FieldIcon>(fld_id);
-        m_field_icons[fld_id] = icon;
+        m_field_icons.push_back(icon);
         icon->InstallEventFilter(shared_from_this());
 
         AttachChild(icon);
@@ -3201,10 +3201,9 @@ void MapWnd::InitTurnRendering() {
     // create fleet buttons and move lines.  needs to be after InitStarlaneRenderingBuffers so that m_starlane_endpoints is populated
     RefreshFleetButtons(true);
 
-
     // move field icons to bottom of child stack so that other icons can be moused over with a field
     for (const auto& field_icon : m_field_icons)
-        MoveChildDown(field_icon.second);
+        MoveChildDown(field_icon);
 }
 
 void MapWnd::InitSystemRenderingBuffers() {
@@ -4049,22 +4048,29 @@ void MapWnd::InitFieldRenderingBuffers() {
     const auto empire_id = app->EmpireID();
     const auto current_turn = app->CurrentTurn();
 
-
-    for (auto& field_icon : m_field_icons) {
-        bool current_field_visible = universe.GetObjectVisibilityByEmpire(field_icon.first, empire_id) > Visibility::VIS_BASIC_VISIBILITY;
-        auto field = universe.Objects().get<Field>(field_icon.first);
+    // reverse size processing so large fields are painted first and smaller ones on top of larger ones
+    for (auto& field_icon : m_field_icons | range_reverse) {
+        bool current_field_visible = universe.GetObjectVisibilityByEmpire(field_icon->FieldID(), empire_id) > Visibility::VIS_BASIC_VISIBILITY;
+        auto field = universe.Objects().get<Field>(field_icon->FieldID());
         if (!field)
             continue;
         const float FIELD_SIZE = field->GetMeter(MeterType::METER_SIZE)->Initial();  // field size is its radius
         if (FIELD_SIZE <= 0)
             continue;
-        const auto& field_texture = field_icon.second->FieldTexture();
+        const auto& field_texture = field_icon->FieldTexture();
         if (!field_texture)
             continue;
 
-        auto& field_both_vertex_buffers = m_field_vertices[field_texture];
+        // group by texture as much as possible for fewer GL calls, but generally paint fields one by one according to size
+        // so smaller ones get painted over larger ones, including across different textures
+        // -> if field_vertices is empty (initial conditions), or the last considered texture is not the same as the current field_texture, we create new buffer;
+        //    otherwise, the field type/texture did not change, so we keep adding vertices to the old buffer, and end up with fewer gl calls during rendering
+        auto& field_vertices = current_field_visible ? m_field_vertices_visible : m_field_vertices_not_visible;
+        const bool should_create_new_buffer = (field_vertices.empty() || field_vertices.back().first != field_texture);
         GG::GL2DVertexBuffer& current_field_vertex_buffer =
-            current_field_visible ? field_both_vertex_buffers.first : field_both_vertex_buffers.second;
+            should_create_new_buffer ?
+                field_vertices.emplace_back(field_texture, std::move(GG::GL2DVertexBuffer())).second :
+                field_vertices.back().second;
 
         // determine field rotation angle...
         float rotation_angle = field->ID() * 27.0f; // arbitrary rotation in radians ("27.0" is just a number that produces pleasing results)
@@ -4116,24 +4122,26 @@ void MapWnd::InitFieldRenderingBuffers() {
     }
     m_field_scanline_circles.createServerBuffer();
 
-    for (auto& [field_texture, buffers] : m_field_vertices) {
-        if (!field_texture)
-            continue;
+    std::size_t max_buffer_size = 0;
 
-        // TODO: why the binding here?
-        glBindTexture(GL_TEXTURE_2D, field_texture->OpenGLId());
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-
-        buffers.first.createServerBuffer();
-        buffers.second.createServerBuffer();
+    static constexpr auto field_texture_exists = [](const auto& field_vertices_pair) { return field_vertices_pair.first.get(); };
+    for (auto& field_vertices : { std::ref(m_field_vertices_not_visible), std::ref(m_field_vertices_visible) }) {
+        for (auto& [field_texture, buffer] : field_vertices.get() | range_filter(field_texture_exists)) {
+            // TODO: why the binding here?
+            glBindTexture(GL_TEXTURE_2D, field_texture->OpenGLId());
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+            buffer.createServerBuffer();
+            max_buffer_size = std::max(max_buffer_size, buffer.size());
+        }
     }
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    // this buffer should only need to be as big as the largest number of
-    // visible or not visisble fields for any single texture, but
-    // this is simpler to prepare and should be more than big enough
-    for (std::size_t i = 0; i < m_field_icons.size(); ++i) {
+    // make texture coords buffer's size proportional to largest number of fields rendered
+    // in one GL call; proxy for that is max_buffer_size computed earlier, and since those
+    // vertex buffers store 4 vertices per field, we divide by 4 to get field count
+    const std::size_t max_fields_per_texture = max_buffer_size / 4;
+    for (std::size_t i = 0; i < max_fields_per_texture; ++i) {
         m_field_texture_coords.store(1.0f, 0.0f);
         m_field_texture_coords.store(0.0f, 0.0f);
         m_field_texture_coords.store(0.0f, 1.0f);
@@ -4143,7 +4151,8 @@ void MapWnd::InitFieldRenderingBuffers() {
 }
 
 void MapWnd::ClearFieldRenderingBuffers() {
-    m_field_vertices.clear();
+    m_field_vertices_not_visible.clear();
+    m_field_vertices_visible.clear();
     m_field_texture_coords.clear();
     m_field_scanline_circles.clear();
 }
@@ -4858,19 +4867,19 @@ void MapWnd::DoSystemIconsLayout() {
 
 void MapWnd::DoFieldIconsLayout() {
     // position and resize field icons
-    for (auto& field_icon : m_field_icons) {
-        auto field = Objects().get<Field>(field_icon.first);
+    const double zoom_factor = ZoomFactor();
+    std::for_each(m_field_icons.cbegin(), m_field_icons.cend(), [zoom_factor](const auto& field_icon) {
+        auto field = Objects().get<Field>(field_icon->FieldID());
         if (!field) {
-            ErrorLogger() << "MapWnd::DoFieldIconsLayout couldn't get field with id " << field_icon.first;
-            continue;
+            ErrorLogger() << "MapWnd::DoFieldIconsLayout couldn't get field with id " << field_icon->FieldID();
+        } else {
+            double RADIUS = zoom_factor * field->GetMeter(MeterType::METER_SIZE)->Initial();    // Field's MeterType::METER_SIZE gives the radius of the field
+
+            GG::Pt icon_ul(GG::X(static_cast<int>(field->X() * zoom_factor - RADIUS)),
+                           GG::Y(static_cast<int>(field->Y() * zoom_factor - RADIUS)));
+            field_icon->SizeMove(icon_ul, icon_ul + GG::Pt(GG::X(2 * RADIUS), GG::Y(2 * RADIUS)));
         }
-
-        double RADIUS = ZoomFactor() * field->GetMeter(MeterType::METER_SIZE)->Initial();    // Field's MeterType::METER_SIZE gives the radius of the field
-
-        GG::Pt icon_ul(GG::X(static_cast<int>(field->X()*ZoomFactor() - RADIUS)),
-                       GG::Y(static_cast<int>(field->Y()*ZoomFactor() - RADIUS)));
-        field_icon.second->SizeMove(icon_ul, icon_ul + GG::Pt(GG::X(2*RADIUS), GG::Y(2*RADIUS)));
-    }
+    });
 }
 
 void MapWnd::DoFleetButtonsLayout() {
@@ -5360,7 +5369,7 @@ void MapWnd::SetZoom(double steps_in, bool update_slide, const GG::Pt position) 
 
     // move field icons to bottom of child stack so that other icons can be moused over with a field
     for (const auto& field_icon : m_field_icons)
-        MoveChildDown(field_icon.second);
+        MoveChildDown(field_icon);
 
 
     // translate map and UI widgets to account for the change in upper left due to zooming

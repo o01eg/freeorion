@@ -36,6 +36,12 @@
   #include <charconv>
 #endif
 #include <sstream>
+#include <utility>
+#if !defined(__cpp_lib_integer_comparison_functions)
+namespace std {
+    inline constexpr auto cmp_equal(auto&& lhs, auto&& rhs) { return lhs == rhs; }
+}
+#endif
 
 std::vector<std::string_view> SpecialNames();
 
@@ -109,38 +115,38 @@ namespace {
         );
     }
 
-    std::unique_ptr<ValueRef::Variable<std::string>> StringValueRef(const char* token) {
+    auto StringValueRef(const char* token) {
         return std::make_unique<ValueRef::Variable<std::string>>(
             ValueRef::ReferenceType::SOURCE_REFERENCE, token);
     }
 
-    std::unique_ptr<ValueRef::Variable<std::string>> UserStringValueRef(const char* token) {
+    auto UserStringValueRef(const char* token) {
         return std::make_unique<ValueRef::UserStringLookup<std::string>>(
             std::make_unique<ValueRef::Variable<std::string>>(
                 ValueRef::ReferenceType::SOURCE_REFERENCE, token));
     }
 
-    std::unique_ptr<ValueRef::Variable<std::string>> UserStringVecValueRef(const char* token) {
+    auto UserStringVecValueRef(const char* token) {
         return std::make_unique<ValueRef::UserStringLookup<std::vector<std::string>>>(
             std::make_unique<ValueRef::Variable<std::vector<std::string>>>(
                 ValueRef::ReferenceType::SOURCE_REFERENCE, token));
     }
 
     template <typename T>
-    std::unique_ptr<ValueRef::Variable<std::string>> StringCastedValueRef(const char* token) {
+    auto StringCastedValueRef(const char* token) {
         return std::make_unique<ValueRef::StringCast<T>>(
             std::make_unique<ValueRef::Variable<T>>(
                 ValueRef::ReferenceType::SOURCE_REFERENCE, token));
     }
 
-    std::unique_ptr<ValueRef::Variable<std::string>> StringCastedImmediateValueRef(std::string token) {
+    auto StringCastedImmediateValueRef(std::string token) {
         return std::make_unique<ValueRef::StringCast<double>>(
             std::make_unique<ValueRef::Variable<double>>(
                 ValueRef::ReferenceType::SOURCE_REFERENCE, std::move(token), true));
     }
 
     template <typename T>
-    std::unique_ptr<ValueRef::Variable<std::string>> StringCastedComplexValueRef(
+    auto StringCastedComplexValueRef(
         const char* token,
         std::unique_ptr<ValueRef::ValueRef<int>>&& int_ref1 = nullptr,
         std::unique_ptr<ValueRef::ValueRef<int>>&& int_ref2 = nullptr,
@@ -252,6 +258,17 @@ namespace {
             ValueRef::NameLookup::LookupType::SHIP_DESIGN_NAME);
     }
 
+    auto AnnexationCostByClientEmpire() {
+        return ObjectTypeFilteredRef<std::string>(
+            {UniverseObjectType::OBJ_PLANET},
+            StringCastedComplexValueRef<double>(
+                "EmpireAnnexationCost",
+                std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, "ThisClientEmpireID"),
+                std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "ID")
+            )
+        );
+    }
+
     using column_ref_type = std::unique_ptr<ValueRef::ValueRef<std::string>>;
     using column_ref_raw_ptr = const column_ref_type::element_type*;
 
@@ -307,7 +324,9 @@ namespace {
             col_types[{UserStringNop("AVAILABLE_FOCI"),             UserStringNop("PLANETS_SUBMENU")}]= UserStringVecValueRef("AvailableFoci");
             col_types[{UserStringNop("LAST_TURN_COLONIZED"),        UserStringNop("PLANETS_SUBMENU")}]= StringCastedValueRef<int>("LastTurnColonized");
             col_types[{UserStringNop("LAST_TURN_CONQUERED"),        UserStringNop("PLANETS_SUBMENU")}]= StringCastedValueRef<int>("LastTurnConquered");
+            col_types[{UserStringNop("LAST_TURN_ANNEXED"),          UserStringNop("PLANETS_SUBMENU")}]= StringCastedValueRef<int>("LastTurnAnnexed");
             col_types[{UserStringNop("LAST_TURN_ATTACKED_BY_SHIP"), UserStringNop("PLANETS_SUBMENU")}]= StringCastedValueRef<int>("LastTurnAttackedByShip");
+            col_types[{UserStringNop("ANNEXATION_COST_BY_ME"),      UserStringNop("PLANETS_SUBMENU")}]= AnnexationCostByClientEmpire();
 
             // ship/fleet
             col_types[{UserStringNop("SPECIES"),                    UserStringNop("FLEETS_SUBMENU")}] = ObjectTypeFilteredRef<std::string>({UniverseObjectType::OBJ_PLANET, UniverseObjectType::OBJ_SHIP}, UserStringValueRef("Species"));
@@ -2373,7 +2392,7 @@ public:
 
         } else if (!GetColumnName(clicked_column).empty()) { // empty columns are not sort-worthy
             this->SetSortCol(clicked_column);
-            if (old_sort_col == clicked_column) {
+            if (std::cmp_equal(old_sort_col, clicked_column)) {
                 // if previously descending sorting, switch to normal sort
                 // if previously no sorting, switch to descending sort
                 // if previously normal sort, switch to descending sort

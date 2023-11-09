@@ -13,6 +13,7 @@
 #include "Pending.h"
 
 
+#include <compare>
 #include <list>
 #include <set>
 #include <vector>
@@ -111,8 +112,8 @@ struct FO_COMMON_API GalaxySetupData {
     const auto&                  GetGameRules() const noexcept { return game_rules; }
     const auto&                  GetGameUID() const noexcept { return game_uid; }
 
-    void SetSeed(const std::string& seed);
-    void SetGameUID(const std::string& game_uid);
+    void SetSeed(std::string new_seed);
+    void SetGameUID(std::string game_uid);
 
     GalaxySetupData& operator=(const GalaxySetupData&) = default;
 
@@ -217,8 +218,8 @@ struct PlayerSetupData {
     bool                    authenticated = false;
 };
 
+// ignores player_id
 bool FO_COMMON_API operator==(const PlayerSetupData& lhs, const PlayerSetupData& rhs);
-bool operator!=(const PlayerSetupData& lhs, const PlayerSetupData& rhs);
 
 /** The data needed to establish a new single player game.  If \a m_new_game
   * is true, a new game is to be started, using the remaining members besides
@@ -273,7 +274,11 @@ struct PlayerInfo {
     bool                    host = false; //! true iff this is the host player
 
     static_assert(__cpp_impl_three_way_comparison);
-    auto operator<=>(const PlayerInfo&) const = default;
+#if !defined(__cpp_lib_three_way_comparison)
+    [[nodiscard]] std::strong_ordering operator<=>(const PlayerInfo&) const = default;
+#else
+    [[nodiscard]] auto operator<=>(const PlayerInfo&) const = default;
+#endif
 };
 
 

@@ -51,6 +51,14 @@ struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax er
 
 #include <boost/stacktrace.hpp>
 
+#include <utility>
+#if !defined(__cpp_lib_integer_comparison_functions)
+namespace std {
+    inline constexpr auto cmp_less(auto&& lhs, auto&& rhs) { return lhs < rhs; }
+}
+#endif
+
+
 std::string DoubleToString(double val, int digits, bool always_show_sign);
 bool UserStringExists(const std::string& str);
 
@@ -341,7 +349,7 @@ std::string ValueRefBase::InvariancePattern() const {
 
 namespace {
     constexpr MeterType NameToMeterCX(std::string_view name) noexcept {
-        for (int i = 0; i < static_cast<int>(NAME_BY_METER.size()); i++) {
+        for (int i = 0; std::cmp_less(i, NAME_BY_METER.size()); i++) {
             if (NAME_BY_METER[i] == name)
                 return static_cast<MeterType>(i - 1);
         }
@@ -376,7 +384,7 @@ std::string_view PlanetTypeToString(PlanetType planet) noexcept { return PlanetT
 namespace {
     // @return the correct PlanetType enum for a user friendly planet type string (e.g. "Ocean"), else it returns PlanetType::INVALID_PLANET_TYPE
     constexpr PlanetType StringToPlanetTypeCX(std::string_view name) noexcept {
-        for (int i = 0; i < static_cast<int>(NAME_BY_PLANET.size()); i++) {
+        for (int i = 0; std::cmp_less(i, NAME_BY_PLANET.size()); i++) {
             if (NAME_BY_PLANET[i] == name)
                 return static_cast<PlanetType>(i - 1);
         }
@@ -597,14 +605,6 @@ std::string Constant<double>::Description() const
 { return DoubleToString(m_value, 3, false); }
 
 template <>
-std::string Constant<std::string>::Description() const
-{
-    if (m_value == current_content)
-        return m_top_level_content;
-    return m_value;
-}
-
-template <>
 std::string Constant<PlanetSize>::Dump(uint8_t ntabs) const
 {
     switch (m_value) {
@@ -701,9 +701,12 @@ template <>
 std::string Constant<double>::Dump(uint8_t ntabs) const
 { return std::to_string(m_value); }
 
-template <>
-std::string Constant<std::string>::Dump(uint8_t ntabs) const
-{ return "\"" + Description() + "\""; }
+namespace StaticTests {
+    constexpr double test_val = 42.6;
+    constexpr ::ValueRef::Constant<double> cdvr(test_val);
+    static_assert(cdvr.Value() == test_val);
+    static_assert(cdvr.GetReferenceType() == ::ValueRef::ReferenceType::INVALID_REFERENCE_TYPE);
+}
 
 ///////////////////////////////////////////////////////////
 // Variable                                              //
@@ -2367,7 +2370,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         const int empire_id = m_int_ref2 ? m_int_ref2->Eval(context) : ALL_EMPIRES;
         const int location_id = m_int_ref3 ? m_int_ref3->Eval(context) : INVALID_OBJECT_ID;
 
-        return design->ProductionCost(empire_id, location_id, context);
+        return design->ProductionCost(empire_id, location_id, context); // overrides source and local candidate to specify empire and location
 
     }
     else if (variable_name == "BuildingTypeCost") {
@@ -2379,7 +2382,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         const int empire_id = m_int_ref1 ? m_int_ref1->Eval(context) : ALL_EMPIRES;
         const int location_id = m_int_ref2 ? m_int_ref2->Eval(context) : INVALID_OBJECT_ID;
 
-        return building_type->ProductionCost(empire_id, location_id, context);
+        return building_type->ProductionCost(empire_id, location_id, context); // overrides source and local candidate to specify empire and location
 
     }
     else if (variable_name == "EmpireMeterValue") {
@@ -2397,6 +2400,25 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         if (!meter)
             return 0.0;
         return meter->Current();
+
+    }
+    else if (variable_name == "EmpireAnnexationCost") { // intended for use in UI, not in scripted content, due to ambiguity about what the "source" object would be, since this sets the source to specify the empire
+        const int empire_id = m_int_ref1 ? m_int_ref1->Eval(context) : ALL_EMPIRES;
+        const auto empire = context.GetEmpire(empire_id);
+        if (!empire)
+            return std::numeric_limits<double>::quiet_NaN();
+        const auto source_for_empire = empire->Source(context.ContextObjects()); // not (necessarily) the source in context, but used to specify empire
+
+        const int location_id = m_int_ref2 ? m_int_ref2->Eval(context) : INVALID_OBJECT_ID;
+        const auto* location = context.ContextObjects().getRaw(location_id); // could be nullptr
+
+        if (!location || location->ObjectType() != UniverseObjectType::OBJ_PLANET)
+            return std::numeric_limits<double>::quiet_NaN();
+        const auto* planet = static_cast<const Planet*>(location);
+        if (planet->SpeciesName().empty())
+            return std::numeric_limits<double>::quiet_NaN();
+        return planet->AnnexationCost(empire_id, context);
+
     }
     else if (variable_name == "DirectDistanceBetween") {
         int object1_id = INVALID_OBJECT_ID;
@@ -3004,6 +3026,9 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
 
     double result = raw_ref->Eval(context);
     auto Stringify = [](double num) -> std::string {
+        if (std::isnan(num))
+            return "";
+
         const auto abs_num = std::abs(num);
         if (abs_num < 0.1 || abs_num >= 1000)
             return DoubleToString(num, 3, false);
@@ -3087,21 +3112,6 @@ std::string StringCast<int>::Eval(const ScriptingContext& context) const
     }
 
     return std::to_string(result);
-}
-
-template <>
-std::string StringCast<std::vector<std::string>>::Eval(const ScriptingContext& context) const
-{
-    if (!m_value_ref)
-        return "";
-    std::vector<std::string> temp = m_value_ref->Eval(context);
-
-    // concatenate strings into one big string
-    std::string retval;
-    retval.reserve(16 * temp.size()); // rough guesstimate to avoid reallocations
-    for (const auto& str : temp)
-        retval += str + " ";
-    return retval;
 }
 
 ///////////////////////////////////////////////////////////

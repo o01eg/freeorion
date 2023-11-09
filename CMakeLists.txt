@@ -60,7 +60,6 @@ include(CPackComponent)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 option(BUILD_SHARED_LIBS "Build project as shared libraries." ON)
@@ -989,7 +988,7 @@ if(BUILD_CLIENT_GG)
                 POST_EXCLUDE_REGEXES ${post_exclude_regexes}
             )
         ]]
-        COMPONENT binaries)
+        ALL_COMPONENTS)
     endif()
 endif()
 
@@ -1021,7 +1020,7 @@ if(NOT APPLE AND NOT ANDROID)
                     POST_EXCLUDE_REGEXES ${post_exclude_regexes}
                 )
             ]]
-            COMPONENT binaries)
+            ALL_COMPONENTS)
         endif()
     endif()
 
@@ -1042,7 +1041,7 @@ if(NOT APPLE AND NOT ANDROID)
                     POST_EXCLUDE_REGEXES ${post_exclude_regexes}
                 )
             ]]
-            COMPONENT binaries)
+            ALL_COMPONENTS)
         endif()
     endif()
 
@@ -1073,7 +1072,7 @@ if(NOT APPLE AND NOT ANDROID)
                     POST_EXCLUDE_REGEXES ${post_exclude_regexes}
                 )
             ]]
-            COMPONENT binaries)
+            ALL_COMPONENTS)
         endif()
     endif()
 
@@ -1134,10 +1133,21 @@ if(WIN32)
     ]]
     COMPONENT binaries)
     if(BUILD_TESTING)
-        install(FILES $<TARGET_FILE:Boost::unit_test_framework>
-            DESTINATION ${CMAKE_INSTALL_BINDIR}
-            COMPONENT binaries-test) 
         if(BUILD_PARSERS)
+            install(CODE [[
+                file(GET_RUNTIME_DEPENDENCIES
+                    EXECUTABLES $<TARGET_FILE:fo_unittest_parse>
+                    RESOLVED_DEPENDENCIES_VAR deps_install_fotp
+                    PRE_EXCLUDE_REGEXES ${pre_exclude_regexes}
+                    POST_EXCLUDE_REGEXES ${post_exclude_regexes}
+                )
+                list(REMOVE_ITEM deps_install_fotp ${deps_install_fo} ${deps_install_fod} ${deps_install_foca} ${deps_install_fog})
+                message(STATUS "Install dependencies ${deps_install_fotp}")
+                foreach(dep ${deps_install_fotp})
+                    file(INSTALL ${dep} DESTINATION ${CMAKE_INSTALL_PREFIX})
+                endforeach()
+            ]]
+            COMPONENT binaries-test)
             install(TARGETS fo_unittest_parse
                 COMPONENT binaries-test
                 LIBRARY DESTINATION ${FreeOrion_INSTALL_LIBDIR}

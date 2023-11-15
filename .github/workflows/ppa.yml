@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        dist: [jammy, lunar, mantic]
+        dist: [jammy, lunar, mantic, noble]
 
     steps:
       - name: Checkout sources
@@ -28,6 +28,8 @@ jobs:
           cache: ${{ runner.temp }}/cache-build-linux-install
           snapshot: '/'
           exclude: '/boot /data /dev /mnt /proc /run /sys'
+      - name: Ensure installed packages
+        run: bash .github/workflows/ppa-install-build.sh
       - name: Export secret keys
         run: bash .ci/before_script.sh
         env:

@@ -129,11 +129,9 @@ GG::Pt CUIButton::MinUsableSize() const {
 
 void CUIButton::RenderPressed() {
     if (PressedGraphic().Empty()) {
-        GG::Clr background_clr = Color();
+        GG::Clr background_clr = AdjustBrightness(Color(), 25);
         GG::Clr border_clr     = ClientUI::CtrlBorderColor();
         int     border_thick   = 1;
-
-        AdjustBrightness(background_clr, 25);
 
         GG::Pt ul = UpperLeft();
         GG::Pt lr = LowerRight();
@@ -156,7 +154,7 @@ void CUIButton::RenderRollover() {
             background_clr = DisabledColor(background_clr);
             border_clr     = DisabledColor(border_clr);
         } else {
-            AdjustBrightness(border_clr, 100);
+            border_clr = AdjustBrightness(border_clr, 100);
         }
 
         GG::Pt ul = UpperLeft();
@@ -215,17 +213,14 @@ CUIArrowButton::CUIArrowButton(ShapeOrientation orientation, bool fill_backgroun
     Button("", nullptr, ClientUI::DropDownListArrowColor(), GG::CLR_ZERO, flags),
     m_orientation(orientation),
     m_fill_background_with_wnd_color(fill_background)
-{
-    LeftClickedSignal.connect(-1,
-        &PlayButtonClickSound);
-}
+{ LeftClickedSignal.connect(-1, &PlayButtonClickSound); }
 
 bool CUIArrowButton::InWindow(GG::Pt pt) const {
     if (m_fill_background_with_wnd_color) {
         return Button::InWindow(pt);
     } else {
-        const GG::Pt ul = UpperLeft() + GG::Pt(GG::X(3), GG::Y(1));
-        const GG::Pt lr = LowerRight() - GG::Pt(GG::X(2), GG::Y(1));
+        const GG::Pt ul = UpperLeft() + GG::Pt(GG::X{3}, GG::Y1);
+        const GG::Pt lr = LowerRight() - GG::Pt(GG::X{2}, GG::Y1);
         return InIsoscelesTriangle(pt, ul, lr, m_orientation);
     }
 }
@@ -253,7 +248,7 @@ void CUIArrowButton::RenderRollover() {
         FlatRectangle(ul, lr, ClientUI::WndColor(), GG::CLR_ZERO, 0);
     GG::Clr color_to_use = Disabled() ? DisabledColor(Color()) : Color();
     if (!Disabled())
-        AdjustBrightness(color_to_use, ARROW_BRIGHTENING_SCALE_FACTOR);
+        color_to_use = AdjustBrightness(color_to_use, ARROW_BRIGHTENING_SCALE_FACTOR);
     GG::Pt tri_ul = ul + GG::Pt(GG::X(3), GG::Y1), tri_lr = lr - GG::Pt(GG::X(2), GG::Y1);
     IsoscelesTriangle(tri_ul, tri_lr, m_orientation, color_to_use);
 }
@@ -282,16 +277,15 @@ void CUICheckBoxRepresenter::Render(const GG::StateButton& button) const {
     if (!button.Disabled() && !button.Checked() &&
         GG::StateButton::ButtonState::BN_ROLLOVER == button.State())
     {
-        AdjustBrightness(color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
-        AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
+        color_to_use = AdjustBrightness(color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
+        border_color_to_use = AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
     }
 
     static constexpr int MARGIN = 3;
     FlatRectangle(bn_ul, bn_lr, GG::CLR_ZERO, border_color_to_use, 1);
     if (button.Checked()) {
         GG::Clr inside_color = color_to_use;
-        GG::Clr outside_color = color_to_use;
-        AdjustBrightness(outside_color, 50);
+        GG::Clr outside_color = AdjustBrightness(color_to_use, 50);
         bn_ul += GG::Pt(GG::X(MARGIN), GG::Y(MARGIN));
         bn_lr -= GG::Pt(GG::X(MARGIN), GG::Y(MARGIN));
         const int OFFSET = Value(bn_lr.y - bn_ul.y) / 2;
@@ -334,19 +328,17 @@ void CUICheckBoxRepresenter::Render(const GG::StateButton& button) const {
         glPopClientAttrib();
         glEnable(GL_TEXTURE_2D);
     } else {
-        GG::Clr inside_color = border_color_to_use;
-        AdjustBrightness(inside_color, -75);
-        GG::Clr outside_color = inside_color;
-        AdjustBrightness(outside_color, 40);
-        glTranslated(Value((bn_ul.x + bn_lr.x) / 2.0), Value(-(bn_ul.y + bn_lr.y) / 2.0), 0.0);
+        GG::Clr inside_color = AdjustBrightness(border_color_to_use, -75);
+        GG::Clr outside_color = AdjustBrightness(inside_color, 40);
+        glTranslated((bn_ul.x + bn_lr.x) / 2.0, -(bn_ul.y + bn_lr.y) / 2.0, 0.0);
         glScaled(-1.0, 1.0, 1.0);
-        glTranslated(Value(-(bn_ul.x + bn_lr.x) / 2.0), Value((bn_ul.y + bn_lr.y) / 2.0), 0.0);
+        glTranslated(-(bn_ul.x + bn_lr.x) / 2.0, (bn_ul.y + bn_lr.y) / 2.0, 0.0);
         AngledCornerRectangle(GG::Pt(bn_ul.x + MARGIN, bn_ul.y + MARGIN),
                               GG::Pt(bn_lr.x - MARGIN, bn_lr.y - MARGIN),
                               inside_color, outside_color, Value(bn_lr.y - bn_ul.y - 2 * MARGIN) / 2, 1);
-        glTranslated(Value((bn_ul.x + bn_lr.x) / 2.0), Value(-(bn_ul.y + bn_lr.y) / 2.0), 0.0);
+        glTranslated((bn_ul.x + bn_lr.x) / 2.0, -(bn_ul.y + bn_lr.y) / 2.0, 0.0);
         glScaled(-1.0, 1.0, 1.0);
-        glTranslated(Value(-(bn_ul.x + bn_lr.x) / 2.0), Value((bn_ul.y + bn_lr.y) / 2.0), 0.0);
+        glTranslated(-(bn_ul.x + bn_lr.x) / 2.0, (bn_ul.y + bn_lr.y) / 2.0, 0.0);
     }
 
     // draw text
@@ -382,16 +374,15 @@ void CUIRadioRepresenter::Render(const GG::StateButton& button) const {
     if (!button.Disabled() && !button.Checked() &&
         GG::StateButton::ButtonState::BN_ROLLOVER == button.State())
     {
-        AdjustBrightness(color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
-        AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
+        color_to_use = AdjustBrightness(color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
+        border_color_to_use = AdjustBrightness(border_color_to_use, STATE_BUTTON_BRIGHTENING_SCALE_FACTOR);
     }
 
     static constexpr int MARGIN = 2;
     FlatCircle(bn_ul, bn_lr, GG::CLR_ZERO, border_color_to_use, 1);
     if (button.Checked()) {
         GG::Clr inside_color = color_to_use;
-        GG::Clr outside_color = color_to_use;
-        AdjustBrightness(outside_color, 50);
+        GG::Clr outside_color = AdjustBrightness(color_to_use, 50);
         FlatCircle(GG::Pt(bn_ul.x + MARGIN, bn_ul.y + MARGIN),
                    GG::Pt(bn_lr.x - MARGIN, bn_lr.y - MARGIN),
                    GG::CLR_ZERO, outside_color, 1);
@@ -399,10 +390,8 @@ void CUIRadioRepresenter::Render(const GG::StateButton& button) const {
                    GG::Pt(bn_lr.x - MARGIN - 1, bn_lr.y - MARGIN - 1), 
                    inside_color, outside_color, 1);
     } else {
-        GG::Clr inside_color = border_color_to_use;
-        AdjustBrightness(inside_color, -75);
-        GG::Clr outside_color = inside_color;
-        AdjustBrightness(outside_color, 40);
+        GG::Clr inside_color = AdjustBrightness(border_color_to_use, -75);
+        GG::Clr outside_color = AdjustBrightness(inside_color, 40);;
         FlatCircle(GG::Pt(bn_ul.x + MARGIN, bn_ul.y + MARGIN),
                    GG::Pt(bn_lr.x - MARGIN, bn_lr.y - MARGIN),
                    inside_color, outside_color, 1);
@@ -435,7 +424,7 @@ void CUITabRepresenter::Render(const GG::StateButton& button) const {
 
     if (button.Checked() || (!button.Disabled() &&
                              GG::StateButton::ButtonState::BN_ROLLOVER == button.State()))
-    { AdjustBrightness(border_color_to_use, 100); }
+    { border_color_to_use = AdjustBrightness(border_color_to_use, 100); }
 
     static constexpr int UNCHECKED_OFFSET = 4;
 
@@ -495,13 +484,11 @@ void CUILabelButtonRepresenter::Render(const GG::StateButton& button) const {
         border_clr     = DisabledColor(border_clr);
     } else {
         if (GG::StateButton::ButtonState::BN_PRESSED == button.State()) {
-            AdjustBrightness(background_clr, 25);
-
+            background_clr = AdjustBrightness(background_clr, 25);
             tx_ul = GG::Pt(GG::X1, GG::Y1);
         }
-        if (GG::StateButton::ButtonState::BN_ROLLOVER == button.State()) {
-            AdjustBrightness(border_clr, 100);
-        }
+        if (GG::StateButton::ButtonState::BN_ROLLOVER == button.State())
+            border_clr = AdjustBrightness(border_clr, 100);
     }
 
     AngledCornerRectangle(ul, lr, background_clr, border_clr, CUIBUTTON_ANGLE_OFFSET, border_thick);
@@ -512,7 +499,7 @@ void CUILabelButtonRepresenter::Render(const GG::StateButton& button) const {
 }
 
 CUIIconButtonRepresenter::CUIIconButtonRepresenter(std::shared_ptr<GG::SubTexture> icon,
-                                                   const GG::Clr& highlight_clr) :
+                                                   GG::Clr highlight_clr) :
     m_unchecked_icon(icon),
     m_checked_icon(std::move(icon)),
     m_unchecked_color(highlight_clr),
@@ -520,9 +507,9 @@ CUIIconButtonRepresenter::CUIIconButtonRepresenter(std::shared_ptr<GG::SubTextur
 {}
 
 CUIIconButtonRepresenter::CUIIconButtonRepresenter(std::shared_ptr<GG::SubTexture> unchecked_icon,
-                                                   const GG::Clr& unchecked_clr,
+                                                   GG::Clr unchecked_clr,
                                                    std::shared_ptr<GG::SubTexture> checked_icon,
-                                                   const GG::Clr& checked_clr) :
+                                                   GG::Clr checked_clr) :
     m_unchecked_icon(std::move(unchecked_icon)),
     m_checked_icon(std::move(checked_icon)),
     m_unchecked_color(unchecked_clr),
@@ -553,12 +540,12 @@ void CUIIconButtonRepresenter::Render(const GG::StateButton& button) const {
     if (button.Disabled() || (!render_checked &&
                               (m_checked_color == m_unchecked_color) &&
                               (m_checked_icon == m_unchecked_icon)))
-        icon_clr = DisabledColor(icon_clr) * 0.8f;
+    { icon_clr = GG::BlendClr(DisabledColor(icon_clr), GG::CLR_ZERO, 0.8f); }
 
     // highlight on mouseover
     if (GG::StateButton::ButtonState::BN_ROLLOVER == button.State()) {
-        AdjustBrightness(border_clr, 100);
-        AdjustBrightness(icon_clr, 1.7);
+        border_clr = AdjustBrightness(border_clr, 100);
+        icon_clr = AdjustBrightness(icon_clr, 1.7);
     }
 
     // shrink icon for border
@@ -654,8 +641,8 @@ void CUIScroll::ScrollTab::Render() {
     GG::Clr background_color = Disabled() ? DisabledColor(Color()) : Color();
     GG::Clr border_color = Disabled() ? DisabledColor(m_border_color) : m_border_color;
     if (!Disabled() && m_mouse_here) {
-        AdjustBrightness(background_color, 100);
-        AdjustBrightness(border_color,     100);
+        background_color = AdjustBrightness(background_color, 100);
+        border_color = AdjustBrightness(border_color, 100);
     }
 
     static constexpr int CUISCROLL_ANGLE_OFFSET = 3;
@@ -765,10 +752,10 @@ CUIDropDownList::CUIDropDownList(std::size_t num_shown_elements) :
 void CUIDropDownList::InitBuffer() {
     m_buffer.clear();
     GG::Pt sz = Size();
-    BufferStoreAngledCornerRectangleVertices(this->m_buffer, GG::Pt(GG::X0, GG::Y0), sz,
+    BufferStoreAngledCornerRectangleVertices(this->m_buffer, GG::Pt0, sz,
                                              CUIDROPDOWNLIST_ANGLE_OFFSET, false, true, false);
 
-    int margin = 3;
+    static constexpr int margin = 3;
     int triangle_width = Value(sz.y - 4 * margin);
     int outline_width = triangle_width + 3 * margin;
 
@@ -813,9 +800,8 @@ void CUIDropDownList::Render() {
     if (m_render_drop_arrow) {
         GG::Clr triangle_fill_color = ClientUI::DropDownListArrowColor();
         if (m_mouse_here && !Disabled())
-            AdjustBrightness(triangle_fill_color, ARROW_BRIGHTENING_SCALE_FACTOR);
-        GG::Clr triangle_border_color = triangle_fill_color;
-        AdjustBrightness(triangle_border_color, 75);
+            triangle_fill_color = AdjustBrightness(triangle_fill_color, ARROW_BRIGHTENING_SCALE_FACTOR);
+        GG::Clr triangle_border_color = AdjustBrightness(triangle_fill_color, 75);
 
         // triangle interior
         glColor(triangle_fill_color);
@@ -1049,7 +1035,7 @@ void CensoredCUIEdit::AcceptPastedText(const std::string& text) {
 
     if (modified_text) {
         // moves cursor to end of pasted text
-        GG::CPSize text_span(utf8::distance(text.begin(), text.end()));
+        GG::CPSize text_span{static_cast<std::size_t>(utf8::distance(text.begin(), text.end()))};
         GG::CPSize new_cursor_pos = std::max(GG::CP0, std::min(Length(), m_cursor_pos.second + text_span));
         m_cursor_pos.second = new_cursor_pos;
 
@@ -1210,14 +1196,14 @@ void CUILinkTextMultiEdit::MouseLeave() {
 void CUILinkTextMultiEdit::SizeMove(GG::Pt ul, GG::Pt lr) {
     GG::Pt lower_right = lr;
     if (Style() & GG::MULTI_INTEGRAL_HEIGHT)
-        lower_right.y -= ((lr.y - ul.y) - (2 * PIXEL_MARGIN)) % GetFont()->Lineskip();
-    bool resized = lower_right - ul != Size();
+        lower_right.y -= Value((lr.y - ul.y) - (2 * PIXEL_MARGIN)) % Value(GetFont()->Lineskip());
+    const bool resized = lower_right - ul != Size();
 
     // need to restore scroll position after SetText call below, so that
     // resizing this control doesn't reset the scroll position to the top.
     // just calling PreserveTextPositionOnNextSetText() before the SetText
     // call doesn't work as that leaves the scrollbars unadjusted for the resize
-    GG::Pt initial_scroll_pos = ScrollPosition();
+    const GG::Pt initial_scroll_pos = ScrollPosition();
 
     GG::Edit::SizeMove(ul, lower_right);
 
@@ -1306,7 +1292,7 @@ void StatisticIcon::CompleteConstruction() {
     // Format for text?
     GG::Flags<GG::TextFormat> format;
 
-    if (Width() >= Value(Height())) {
+    if (Value(Width()) >= Value(Height())) {
         format = GG::FORMAT_LEFT;
     } else {
         format = GG::FORMAT_BOTTOM;
@@ -1429,14 +1415,14 @@ void StatisticIcon::DragDropLeave()
 void StatisticIcon::DoLayout() {
     // arrange child controls horizontally if icon is wider than it is high, or vertically otherwise
     int icon_dim = std::min(Value(Height()), Value(Width()));
-    m_icon->SizeMove(GG::Pt(GG::X0, GG::Y0),
+    m_icon->SizeMove(GG::Pt0,
                      GG::Pt(GG::X(icon_dim), GG::Y(icon_dim)));
 
     if (m_values.empty())
         return;
 
     GG::Pt text_ul;
-    if (Width() >= Value(Height())) {
+    if (Value(Width()) >= Value(Height())) {
         text_ul.x = GG::X(icon_dim + STAT_ICON_PAD);
     } else {
         text_ul.y = GG::Y(icon_dim + STAT_ICON_PAD);
@@ -1453,7 +1439,7 @@ GG::Pt StatisticIcon::MinUsableSize() const {
     if (m_values.empty() || !m_text)
         return m_icon->Size();
 
-    if (Width() >= Value(Height()))
+    if (Value(Width()) >= Value(Height()))
         return GG::Pt(m_text->RelativeUpperLeft().x + m_text->Width(),
                       std::max(m_icon->RelativeLowerRight().y, m_text->Height()));
     else
@@ -1518,7 +1504,7 @@ namespace {
 
             push_back(m_icon);
             push_back(m_species_label);
-            GG::X first_col_width(Value(Height()));
+            GG::X first_col_width{Value(Height())};
             SetColWidth(0, first_col_width);
             SetColWidth(1, Width() - first_col_width);
             GetLayout()->SetColumnStretch(0, 0.0);
@@ -1605,7 +1591,7 @@ namespace {
     // row type used in the EmpireColorSelector
     struct ColorRow : public GG::ListBox::Row {
         struct ColorSquare : GG::Control {
-            ColorSquare(const GG::Clr& color, GG::Y h) :
+            ColorSquare(GG::Clr color, GG::Y h) :
                 GG::Control(GG::X0, GG::Y0, COLOR_SELECTOR_WIDTH - 40, h, GG::NO_WND_FLAGS)
             {
                 SetColor(color);
@@ -1616,7 +1602,7 @@ namespace {
             { GG::FlatRectangle(UpperLeft(), LowerRight(), Color(), GG::CLR_ZERO, 0); }
         };
 
-        ColorRow(const GG::Clr& color, GG::Y h) :
+        ColorRow(GG::Clr color, GG::Y h) :
             GG::ListBox::Row(GG::X(Value(h)), h),
             m_color_square(GG::Wnd::Create<ColorSquare>(color, h))
         {}
@@ -1652,7 +1638,7 @@ EmpireColorSelector::EmpireColorSelector(GG::Y h) :
 GG::Clr EmpireColorSelector::CurrentColor() const
 { return !(**CurrentItem()).empty() ? (**CurrentItem()).at(0)->Color() : GG::CLR_RED; }
 
-void EmpireColorSelector::SelectColor(const GG::Clr& clr) {
+void EmpireColorSelector::SelectColor(GG::Clr clr) {
     for (iterator list_it = begin(); list_it != end(); ++list_it) {
         const auto& row = *list_it;
         if (row && !row->empty() && row->at(0)->Color() == clr) {
@@ -2085,22 +2071,22 @@ MultiTurnProgressBar::MultiTurnProgressBar(int num_segments, float percent_compl
 }
 
 void MultiTurnProgressBar::Render() {
-    GG::Pt ul(UpperLeft());
-    GG::Pt lr(LowerRight());
-    GG::Y bottom(lr.y);
-    GG::Rect border_rect({GG::X1, GG::Y1}, {GG::X1, GG::Y1});
+    const GG::Pt ul(UpperLeft());
+    const GG::Pt lr(LowerRight());
+    const GG::Y bottom(lr.y);
+    const GG::Rect border_rect({GG::X1, GG::Y1}, {GG::X1, GG::Y1});
 
     // background
     GG::GL2DVertexBuffer bg_verts;
     BufferStoreRectangle(bg_verts, {ul, lr}, border_rect);
 
     // define completed and predicted bar sizes
-    GG::X comp_width(Width() * m_perc_completed);
-    GG::X pred_width(Width() * m_perc_predicted);
+    const GG::X comp_width(GG::ToX(Width() * m_perc_completed));
+    const GG::X pred_width(GG::ToX(Width() * m_perc_predicted));
     // maximum lower right points to lower right of control
-    GG::Rect comp_rect(ul, {std::min(lr.x, ul.x + comp_width), bottom});
-    GG::Rect pred_rect({std::max(ul.x, comp_rect.lr.x - 1), ul.y},
-                       {std::min(lr.x, comp_rect.lr.x + pred_width), bottom});
+    const GG::Rect comp_rect(ul, {std::min(lr.x, ul.x + comp_width), bottom});
+    const GG::Rect pred_rect({std::max(ul.x, comp_rect.lr.x - 1), ul.y},
+                             {std::min(lr.x, comp_rect.lr.x + pred_width), bottom});
 
     // predicted progress
     GG::GL2DVertexBuffer pred_verts;
@@ -2258,8 +2244,8 @@ GG::Rect MultiTextureStaticGraphic::RenderedArea(const GG::SubTexture& subtextur
             double scale_x = Value(window_sz.x) / static_cast<double>(Value(graphic_sz.x));
             double scale_y = Value(window_sz.y) / static_cast<double>(Value(graphic_sz.y));
             double scale = std::min(scale_x, scale_y);
-            pt2.x = graphic_sz.x * scale;
-            pt2.y = graphic_sz.y * scale;
+            pt2.x = GG::ToX(graphic_sz.x * scale);
+            pt2.y = GG::ToY(graphic_sz.y * scale);
         } else {
             pt2 = window_sz;
         }
@@ -2268,14 +2254,14 @@ GG::Rect MultiTextureStaticGraphic::RenderedArea(const GG::SubTexture& subtextur
             double scale_x = (graphic_sz.x > window_sz.x) ? Value(window_sz.x) / static_cast<double>(Value(graphic_sz.x)) : 1.0;
             double scale_y = (graphic_sz.y > window_sz.y) ? Value(window_sz.y) / static_cast<double>(Value(graphic_sz.y)) : 1.0;
             double scale = std::min(scale_x, scale_y);
-            pt2.x = graphic_sz.x * scale;
-            pt2.y = graphic_sz.y * scale;
+            pt2.x = GG::ToX(graphic_sz.x * scale);
+            pt2.y = GG::ToY(graphic_sz.y * scale);
         } else {
             pt2 = window_sz;
         }
     }
 
-    GG::X x_shift(0);
+    GG::X x_shift(GG::X0);
     if (style & GG::GRAPHIC_LEFT) {
         x_shift = ul.x;
     } else if (style & GG::GRAPHIC_CENTER) {
@@ -2286,7 +2272,7 @@ GG::Rect MultiTextureStaticGraphic::RenderedArea(const GG::SubTexture& subtextur
     pt1.x += x_shift;
     pt2.x += x_shift;
 
-    GG::Y y_shift(0);
+    GG::Y y_shift(GG::Y0);
     if (style & GG::GRAPHIC_TOP) {
         y_shift = ul.y;
     } else if (style & GG::GRAPHIC_VCENTER) {
@@ -2303,7 +2289,7 @@ GG::Rect MultiTextureStaticGraphic::RenderedArea(const GG::SubTexture& subtextur
 void MultiTextureStaticGraphic::Render() {
     const GG::Clr color_to_use = Disabled() ? DisabledColor(Color()) : Color();
     glColor(color_to_use);
-    for (auto i = 0u; i < m_graphics.size(); ++i) {
+    for (std::size_t i = 0; i < m_graphics.size(); ++i) {
         const GG::Rect rendered_area = RenderedArea(m_graphics[i], m_styles[i]);
         m_graphics[i].OrthoBlit(rendered_area.ul, rendered_area.lr);
     }

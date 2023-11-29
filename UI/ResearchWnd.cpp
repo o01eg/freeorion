@@ -144,14 +144,14 @@ namespace {
         SetChildClippingMode(ChildClippingMode::ClipToClient);
 
         const int FONT_PTS = ClientUI::Pts();
-        const GG::Y METER_HEIGHT(FONT_PTS);
+        const GG::Y METER_HEIGHT{FONT_PTS};
 
         // 9 pixels accounts for border thickness so the sharp-cornered icon doesn't with the rounded panel corner
         const int GRAPHIC_SIZE = std::max(Value(DefaultHeight() - 9), 1);
 
-        const GG::X NAME_WIDTH  = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X(1));
-        const GG::X METER_WIDTH = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X(1));
-        const GG::X TURNS_AND_COST_WIDTH = std::max(NAME_WIDTH/2 - MARGIN, GG::X(1));
+        const GG::X NAME_WIDTH  = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X1);
+        const GG::X METER_WIDTH = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X1);
+        const GG::X TURNS_AND_COST_WIDTH = std::max(NAME_WIDTH/2 - MARGIN, GG::X1);
 
         ScriptingContext context;
         const Tech* tech = GetTech(m_tech_name);
@@ -162,8 +162,8 @@ namespace {
                         ? GG::LightenClr(ClientUI::ResearchableTechTextAndBorderColor())
                         : ClientUI::ResearchableTechTextAndBorderColor();
 
-        GG::Y top(MARGIN);
-        GG::X left(MARGIN);
+        GG::Y top{MARGIN};
+        GG::X left{MARGIN};
 
         m_icon = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::TechIcon(m_tech_name), GG::GRAPHIC_FITGRAPHIC);
         m_icon->MoveTo(GG::Pt(left, top));
@@ -265,14 +265,14 @@ namespace {
         GG::Control::SizeMove(ul, lr);
         if (Size() != old_size) {
             const int FONT_PTS = ClientUI::Pts();
-            const GG::Y METER_HEIGHT(FONT_PTS);
+            const GG::Y METER_HEIGHT{FONT_PTS};
 
             // 9 pixels accounts for border thickness so the sharp-cornered icon doesn't with the rounded panel corner
             const int GRAPHIC_SIZE = std::max(Value(DefaultHeight() - 9), 1);
 
-            const GG::X NAME_WIDTH  = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X(1));
-            const GG::X METER_WIDTH = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X(1));
-            const GG::X TURNS_AND_COST_WIDTH = std::max(NAME_WIDTH/2 - MARGIN, GG::X(1));
+            const GG::X NAME_WIDTH  = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X1);
+            const GG::X METER_WIDTH = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X1);
+            const GG::X TURNS_AND_COST_WIDTH = std::max(NAME_WIDTH/2 - MARGIN, GG::X1);
 
             m_name_text->Resize(GG::Pt(NAME_WIDTH, GG::Y(FONT_PTS + 2*MARGIN)));
             m_progress_bar->Resize(GG::Pt(METER_WIDTH, METER_HEIGHT));
@@ -285,7 +285,7 @@ namespace {
 
     GG::Y QueueTechPanel::DefaultHeight() {
         const int FONT_PTS = ClientUI::Pts();
-        const GG::Y METER_HEIGHT(FONT_PTS);
+        const GG::Y METER_HEIGHT{FONT_PTS};
 
         const GG::Y HEIGHT = MARGIN + FONT_PTS + MARGIN + METER_HEIGHT + MARGIN + FONT_PTS + MARGIN + 6;
 
@@ -403,7 +403,7 @@ public:
 private:
     void DoLayout() {
         m_queue_lb->SizeMove(
-            GG::Pt(GG::X0, GG::Y0),
+            GG::Pt0,
             GG::Pt(ClientWidth(), ClientHeight() - GG::Y(CUIWnd::INNER_BORDER_ANGLE_OFFSET)));
     }
 
@@ -417,13 +417,13 @@ private:
 ResearchWnd::ResearchWnd(GG::X w, GG::Y h, bool initially_hidden) :
     GG::Wnd(GG::X0, GG::Y0, w, h, GG::INTERACTIVE | GG::ONTOP)
 {
-    GG::X queue_width(GetOptionsDB().Get<int>("ui.queue.width"));
-    GG::Pt tech_tree_wnd_size = ClientSize() - GG::Pt(GG::X(GetOptionsDB().Get<int>("ui.queue.width")), GG::Y0);
+    const GG::X queue_width(GetOptionsDB().Get<GG::X>("ui.queue.width"));
+    const GG::Pt tech_tree_wnd_size = ClientSize() - GG::Pt(GetOptionsDB().Get<GG::X>("ui.queue.width"), GG::Y0);
 
     m_research_info_panel = GG::Wnd::Create<ResourceInfoPanel>(
         UserString("RESEARCH_WND_TITLE"), UserString("RESEARCH_INFO_RP"),
-        GG::X0, GG::Y0, GG::X(queue_width), GG::Y(100), "research.info");
-    m_queue_wnd = GG::Wnd::Create<ResearchQueueWnd>(GG::X0, GG::Y(100), queue_width, GG::Y(ClientSize().y - 100));
+        GG::X0, GG::Y0, queue_width, GG::Y{100}, "research.info");
+    m_queue_wnd = GG::Wnd::Create<ResearchQueueWnd>(GG::X0, GG::Y{100}, queue_width, ClientSize().y - 100);
     m_tech_tree_wnd = GG::Wnd::Create<TechTreeWnd>(tech_tree_wnd_size.x, tech_tree_wnd_size.y, initially_hidden);
 
     using boost::placeholders::_1;
@@ -468,7 +468,7 @@ void ResearchWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
 }
 
 void ResearchWnd::DoLayout(bool init) {
-    m_research_info_panel->MoveTo(GG::Pt(GG::X0, GG::Y0));
+    m_research_info_panel->MoveTo(GG::Pt0);
     GG::X queue_width = GG::X(init ? GetOptionsDB().GetDefault<int>("ui.queue.width") :
                                      GetOptionsDB().Get<int>("ui.queue.width"));
     if (init) {
@@ -518,11 +518,11 @@ void ResearchWnd::Update(const ScriptingContext& context)
 void ResearchWnd::CenterOnTech(const std::string& tech_name)
 { m_tech_tree_wnd->CenterOnTech(tech_name); }
 
-void ResearchWnd::ShowTech(const std::string& tech_name, bool force) {
+void ResearchWnd::ShowTech(std::string tech_name, bool force) {
     m_tech_tree_wnd->SetEncyclopediaTech(tech_name);
     if (force || m_tech_tree_wnd->TechIsVisible(tech_name)) {
         m_tech_tree_wnd->CenterOnTech(tech_name);
-        m_tech_tree_wnd->SelectTech(tech_name);
+        m_tech_tree_wnd->SelectTech(std::move(tech_name));
     }
 }
 
@@ -538,8 +538,8 @@ void ResearchWnd::TogglePedia()
 bool ResearchWnd::PediaVisible()
 { return m_tech_tree_wnd->PediaVisible(); }
 
-void ResearchWnd::QueueItemMoved(const GG::ListBox::iterator& row_it,
-                                 const GG::ListBox::iterator& original_position_it)
+void ResearchWnd::QueueItemMoved(GG::ListBox::iterator row_it,
+                                 GG::ListBox::iterator original_position_it)
 {
     if (!m_enabled)
         return;
@@ -701,8 +701,9 @@ void ResearchWnd::DeleteQueueItem(GG::ListBox::iterator it) {
 }
 
 void ResearchWnd::QueueItemClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) {
-    if (m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0 || !m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems())
-        return;
+    if (m_queue_wnd->GetQueueListBox()->IteraterIndex(it) < 0 ||
+        !m_queue_wnd->GetQueueListBox()->DisplayingValidQueueItems())
+    { return; }
 
     if (modkeys & GG::MOD_KEY_CTRL) {
         if (m_enabled)

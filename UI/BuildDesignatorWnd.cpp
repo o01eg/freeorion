@@ -38,8 +38,8 @@ namespace {
     { db.Add("ui." + PROD_PEDIA_WND_NAME + ".hidden.enabled", UserStringNop("OPTIONS_DB_PRODUCTION_PEDIA_HIDDEN"), false); }
     bool temp_bool = RegisterOptions(&AddOptions);
 
-    static constexpr int MAX_PRODUCTION_TURNS = 200;
-    static constexpr float EPSILON = 0.001f;
+    constexpr int MAX_PRODUCTION_TURNS = 200;
+    constexpr float EPSILON = 0.001f;
     int IconTextBrowseWndRowHeight() { return ClientUI::Pts()*3/2; }
     constexpr int   EDGE_PAD(3);
     constexpr GG::X ICON_BROWSE_TEXT_WIDTH{400};
@@ -131,11 +131,11 @@ namespace {
             if (!m_initialized)
                 return;
 
-            const GG::X ICON_WIDTH(Value(ClientHeight()));
-            const GG::X ITEM_NAME_WIDTH(ClientUI::Pts() * 16);
-            //const GG::X COST_WIDTH(ClientUI::Pts() * 4);
-            const GG::X TIME_WIDTH(ClientUI::Pts() * 3);
-            const GG::X DESC_WIDTH(ClientUI::Pts() * 18);
+            const GG::X ICON_WIDTH{Value(ClientHeight())};
+            const GG::X ITEM_NAME_WIDTH{ClientUI::Pts() * 16};
+            //const GG::X COST_WIDTH{ClientUI::Pts() * 4};
+            const GG::X TIME_WIDTH{ClientUI::Pts() * 3};
+            const GG::X DESC_WIDTH{ClientUI::Pts() * 18};
 
             GG::X left(GG::X0);
             GG::Y bottom(ClientHeight());
@@ -329,7 +329,7 @@ namespace {
         void Render() {
             const auto ul = UpperLeft();
             const auto lr = LowerRight();
-            const GG::Y ROW_HEIGHT(IconTextBrowseWndRowHeight());
+            const GG::Y ROW_HEIGHT{IconTextBrowseWndRowHeight()};
             GG::FlatRectangle(ul, lr, ClientUI::WndColor(), ClientUI::WndOuterBorderColor(), 1);    // main background
             GG::FlatRectangle(GG::Pt(ul.x + ICON_BROWSE_ICON_WIDTH, ul.y), GG::Pt(lr.x, ul.y + ROW_HEIGHT),
                               ClientUI::WndOuterBorderColor(), ClientUI::WndOuterBorderColor(), 0); // top title filled background
@@ -363,7 +363,7 @@ namespace {
             m_icon->Resize(GG::Pt(ICON_BROWSE_ICON_WIDTH, ICON_BROWSE_ICON_HEIGHT));
             AttachChild(m_icon);
 
-            const GG::Y ROW_HEIGHT(IconTextBrowseWndRowHeight());
+            const GG::Y ROW_HEIGHT{IconTextBrowseWndRowHeight()};
 
             m_title_text_label = GG::Wnd::Create<CUILabel>(title, GG::FORMAT_LEFT);
             m_title_text_label->MoveTo(GG::Pt(m_icon->Width() + GG::X(EDGE_PAD), GG::Y0));
@@ -410,7 +410,6 @@ namespace {
             auto [obj, candidate_name] = GetObjName(context);
             auto [local_pp_output, stockpile, stockpile_limit_per_turn] = GetOutputStockpile(context);
 
-            const auto& title = UserString(m_item.name);
             std::string main_text;
             main_text.reserve(1000); // guesstimate
 
@@ -490,7 +489,6 @@ namespace {
             auto [local_pp_output, stockpile, stockpile_limit_per_turn] = GetOutputStockpile(context);
 
             const ShipDesign* design = GetUniverse().GetShipDesign(m_item.design_id);
-            const auto& title = design ? design->Name(true) : EMPTY_STRING;
             std::string main_text;
             main_text.reserve(1000); // guesstimate
 
@@ -839,9 +837,9 @@ void BuildDesignatorWnd::BuildSelector::CompleteConstruction() {
 
 void BuildDesignatorWnd::BuildSelector::DoLayout() {
     int num_buttons = 4;
-    GG::X x(0);
+    GG::X x(GG::X0);
     GG::X button_width = ClientWidth() / num_buttons;
-    GG::Y button_height(ClientUI::Pts()*4/3);
+    GG::Y button_height{ClientUI::Pts()*4/3};
 
     m_build_type_buttons[BuildType::BT_BUILDING]->SizeMove(GG::Pt(x, GG::Y0), GG::Pt(x + button_width, button_height));
     x += button_width;
@@ -1406,9 +1404,9 @@ void BuildDesignatorWnd::Update() {
 }
 
 void BuildDesignatorWnd::InitializeWindows() {
-    GG::X queue_width(GetOptionsDB().Get<int>("ui.queue.width"));
+    GG::X queue_width(GetOptionsDB().Get<GG::X>("ui.queue.width"));
 
-    const GG::X SIDEPANEL_WIDTH(GetOptionsDB().Get<int>("ui.map.sidepanel.width"));
+    const GG::X SIDEPANEL_WIDTH(GetOptionsDB().Get<GG::X>("ui.map.sidepanel.width"));
     static constexpr GG::Y PANEL_HEIGHT{240};
 
     const GG::Pt pedia_ul(queue_width, GG::Y0);
@@ -1527,8 +1525,8 @@ void BuildDesignatorWnd::ToggleAvailabilitly(bool available, bool refresh_list) 
     }
 }
 
-void BuildDesignatorWnd::ShowBuildingTypeInEncyclopedia(const std::string& building_type)
-{ m_enc_detail_panel->SetBuildingType(building_type); }
+void BuildDesignatorWnd::ShowBuildingTypeInEncyclopedia(std::string building_type)
+{ m_enc_detail_panel->SetBuildingType(std::move(building_type)); }
 
 void BuildDesignatorWnd::ShowShipDesignInEncyclopedia(int design_id)
 { m_enc_detail_panel->SetDesign(design_id); }
@@ -1536,26 +1534,26 @@ void BuildDesignatorWnd::ShowShipDesignInEncyclopedia(int design_id)
 void BuildDesignatorWnd::ShowPlanetInEncyclopedia(int planet_id)
 { m_enc_detail_panel->SetPlanet(planet_id); }
 
-void BuildDesignatorWnd::ShowTechInEncyclopedia(const std::string& tech_name)
-{ m_enc_detail_panel->SetTech(tech_name); }
+void BuildDesignatorWnd::ShowTechInEncyclopedia(std::string tech_name)
+{ m_enc_detail_panel->SetTech(std::move(tech_name)); }
 
-void BuildDesignatorWnd::ShowPolicyInEncyclopedia(const std::string& policy_name)
-{ m_enc_detail_panel->SetPolicy(policy_name); }
+void BuildDesignatorWnd::ShowPolicyInEncyclopedia(std::string policy_name)
+{ m_enc_detail_panel->SetPolicy(std::move(policy_name)); }
 
-void BuildDesignatorWnd::ShowShipPartInEncyclopedia(const std::string& part_name)
-{ m_enc_detail_panel->SetShipPart(part_name); }
+void BuildDesignatorWnd::ShowShipPartInEncyclopedia(std::string part_name)
+{ m_enc_detail_panel->SetShipPart(std::move(part_name)); }
 
-void BuildDesignatorWnd::ShowSpeciesInEncyclopedia(const std::string& species_name)
-{ m_enc_detail_panel->SetSpecies(species_name); }
+void BuildDesignatorWnd::ShowSpeciesInEncyclopedia(std::string species_name)
+{ m_enc_detail_panel->SetSpecies(std::move(species_name)); }
 
 void BuildDesignatorWnd::ShowEmpireInEncyclopedia(int empire_id)
 { m_enc_detail_panel->SetEmpire(empire_id); }
 
-void BuildDesignatorWnd::ShowSpecialInEncyclopedia(const std::string& special_name)
-{ m_enc_detail_panel->SetSpecial(special_name); }
+void BuildDesignatorWnd::ShowSpecialInEncyclopedia(std::string special_name)
+{ m_enc_detail_panel->SetSpecial(std::move(special_name)); }
 
-void BuildDesignatorWnd::ShowFieldTypeInEncyclopedia(const std::string& field_type_name)
-{ m_enc_detail_panel->SetFieldType(field_type_name); }
+void BuildDesignatorWnd::ShowFieldTypeInEncyclopedia(std::string field_type_name)
+{ m_enc_detail_panel->SetFieldType(std::move(field_type_name)); }
 
 void BuildDesignatorWnd::ShowPedia() {
     m_enc_detail_panel->Refresh();

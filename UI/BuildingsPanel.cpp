@@ -95,7 +95,7 @@ void BuildingsPanel::Update() {
     }
     int system_id = planet->SystemID();
 
-    const int indicator_size = static_cast<int>(Value(Width() * 1.0 / m_columns));
+    const int indicator_size = static_cast<int>(Width() / static_cast<float>(m_columns));
 
     const int this_client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const ScriptingContext context;
@@ -177,7 +177,7 @@ void BuildingsPanel::DoLayout() {
     int column = 0;
     static constexpr int padding = 5; // space around and between adjacent indicators
     const GG::X effective_width = Width() - padding * (m_columns + 1);  // padding on either side and between
-    const int indicator_size = static_cast<int>(Value(effective_width * 1.0 / m_columns));
+    const int indicator_size = static_cast<int>(Value(effective_width) / m_columns);
     GG::Y height;
 
     // update size of panel and position and visibility of widgets
@@ -220,7 +220,7 @@ void BuildingsPanel::DoLayout() {
     }
 
     if (m_building_indicators.empty()) {
-        height = GG::Y(0);  // hide if empty
+        height = GG::Y0;  // hide if empty
         DetachChild(m_expand_button.get());
     } else {
         AttachChild(m_expand_button);
@@ -435,13 +435,13 @@ void BuildingIndicator::DoLayout() {
     GG::Pt child_lr = Size() - GG::Pt(GG::X1, GG::Y1);   // extra pixel prevents graphic from overflowing border box
 
     if (m_graphic)
-        m_graphic->SizeMove(GG::Pt(GG::X0, GG::Y0), child_lr);
+        m_graphic->SizeMove(GG::Pt0, child_lr);
 
     if (m_scanlines)
-        m_scanlines->SizeMove(GG::Pt(GG::X0, GG::Y0), child_lr);
+        m_scanlines->SizeMove(GG::Pt0, child_lr);
 
     if (m_scrap_indicator)
-        m_scrap_indicator->SizeMove(GG::Pt(GG::X0, GG::Y0), child_lr);
+        m_scrap_indicator->SizeMove(GG::Pt0, child_lr);
 
     GG::Y bar_top = Height() * 4 / 5;
     if (m_progress_bar)

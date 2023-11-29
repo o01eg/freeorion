@@ -683,12 +683,12 @@ namespace {
 
     void ShipDataPanel::Render() {
         // main background position and colour
-        const GG::Clr& background_colour = ClientUI::WndColor();
+        const GG::Clr background_colour = ClientUI::WndColor();
         const GG::Pt ul = UpperLeft(), lr = LowerRight(), cul = ClientUpperLeft();
 
         // title background colour and position
-        const GG::Clr& unselected_colour = ClientUI::WndOuterBorderColor();
-        const GG::Clr& selected_colour = ClientUI::WndInnerBorderColor();
+        const GG::Clr unselected_colour = ClientUI::WndOuterBorderColor();
+        const GG::Clr selected_colour = ClientUI::WndInnerBorderColor();
         GG::Clr border_colour = m_selected ? selected_colour : unselected_colour;
         if (Disabled())
             border_colour = DisabledColor(border_colour);
@@ -894,7 +894,7 @@ namespace {
         if (m_design_name_text)
             m_design_name_text->SizeMove(name_ul, name_lr);
 
-        if (ClientWidth() < 250)
+        if (Value(ClientWidth()) < 250)
             DetachChild(m_ship_name_text);
         else
             AttachChild(m_ship_name_text);
@@ -1146,12 +1146,12 @@ void FleetDataPanel::PreRender() {
 
 void FleetDataPanel::Render() {
     // main background position and colour
-    const GG::Clr& background_colour = ClientUI::WndColor();
+    const GG::Clr background_colour = ClientUI::WndColor();
     const GG::Pt ul = UpperLeft(), lr = LowerRight(), cul = ClientUpperLeft();
 
     // title background colour and position
-    const GG::Clr& unselected_colour = ClientUI::WndOuterBorderColor();
-    const GG::Clr& selected_colour = ClientUI::WndInnerBorderColor();
+    const GG::Clr unselected_colour = ClientUI::WndOuterBorderColor();
+    const GG::Clr selected_colour = ClientUI::WndInnerBorderColor();
     GG::Clr border_colour = m_selected ? selected_colour : unselected_colour;
     if (Disabled())
         border_colour = DisabledColor(border_colour);
@@ -1700,7 +1700,7 @@ void FleetDataPanel::DoLayout() {
     if (m_fleet_destination_text)
         m_fleet_destination_text->SizeMove(name_ul, name_lr);
 
-    if (ClientWidth() < 250)
+    if (Value(ClientWidth()) < 250)
         DetachChild(m_fleet_name_text);
     else
         AttachChild(m_fleet_name_text);
@@ -1795,7 +1795,7 @@ void FleetDataPanel::Init() {
 }
 
 void FleetDataPanel::ColorTextForSelect() {
-    const GG::Clr& unselected_text_color = ClientUI::TextColor();
+    const GG::Clr unselected_text_color = ClientUI::TextColor();
     static constexpr GG::Clr selected_text_color = GG::CLR_BLACK;
 
     GG::Clr text_color_to_use = m_selected ? selected_text_color : unselected_text_color;
@@ -3069,7 +3069,7 @@ void FleetWnd::Refresh() {
     // Otherwise, is the current location a system?  Use that location.
     // Otherwise remove all fleets as all fleets have gone in separate directions.
 
-    std::pair<int, GG::Pt> location{INVALID_OBJECT_ID, GG::Pt(GG::X0, GG::Y0)};
+    std::pair<int, GG::Pt> location{INVALID_OBJECT_ID, GG::Pt0};
     if (!fleet_locations_ids.empty()
         && fleet_locations_ids.begin()->first.first != INVALID_OBJECT_ID
         && (fleet_locations_ids.count(fleet_locations_ids.begin()->first) == fleet_locations_ids.size()))
@@ -3232,7 +3232,7 @@ void FleetWnd::DoLayout() {
     // how tall to make fleets list?  subtract height for other panels from available height.
     GG::Y fleets_list_height(AVAILABLE_HEIGHT);
     if (show_fleet_detail_panel)
-        fleets_list_height *= 0.5;
+        fleets_list_height /= 2;
     if (show_new_fleet_drop_target)
         fleets_list_height -= (ROW_HEIGHT + GG::Y(PAD));
 
@@ -3538,8 +3538,7 @@ void FleetWnd::FleetRightClicked(GG::ListBox::iterator it, GG::Pt pt,
         && !ClientPlayerIsModerator()
        )
     {
-        FleetAggression nfa = fleet->Aggression();
-        auto split_damage_action = [&damaged_ship_ids, nfa]() {
+        auto split_damage_action = [nfa{fleet->Aggression()}, &damaged_ship_ids]() {
             ScriptingContext context;
             CreateNewFleetFromShips(damaged_ship_ids, nfa, context);
         };

@@ -724,7 +724,7 @@ void GUIImpl::HandleMouseWheel(Flags<ModKey> mod_keys, Pt pos, Pt rel, int curr_
     m_browse_target = nullptr;
     m_prev_wnd_under_cursor_time = curr_ticks;
     // don't send out 0-movement wheel messages
-    if (curr_wnd_under_cursor && rel.y)
+    if (curr_wnd_under_cursor && rel.y != Y0)
         curr_wnd_under_cursor->HandleEvent(WndEvent(
             WndEvent::EventType::MouseWheel, pos, Value(rel.y), mod_keys));
     m_prev_wnd_under_cursor = m_curr_wnd_under_cursor; // update this for the next time around
@@ -1064,9 +1064,9 @@ std::vector<std::pair<StrSize, StrSize>> GUI::FindWordsStringIndices(std::string
         {
             auto word_pos_it = first;
             std::advance(word_pos_it, match_result.position());
-            StrSize start_idx(std::distance(begin, word_pos_it.base()));
+            StrSize start_idx{static_cast<std::size_t>(std::distance(begin, word_pos_it.base()))};
             std::advance(word_pos_it, match_result.length());
-            StrSize end_idx(std::distance(begin, word_pos_it.base()));
+            StrSize end_idx{static_cast<std::size_t>(std::distance(begin, word_pos_it.base()))};
 
             return {start_idx, end_idx};
         });

@@ -28,15 +28,15 @@
 namespace fs = boost::filesystem;
 
 namespace {
-    constexpr GG::X SAVE_FILE_DIALOG_WIDTH(600);
-    constexpr GG::Y SAVE_FILE_DIALOG_HEIGHT(400);
-    constexpr GG::X SAVE_FILE_DIALOG_MIN_WIDTH(160);
-    constexpr GG::Y SAVE_FILE_DIALOG_MIN_HEIGHT(100);
+    constexpr GG::X SAVE_FILE_DIALOG_WIDTH{600};
+    constexpr GG::Y SAVE_FILE_DIALOG_HEIGHT{400};
+    constexpr GG::X SAVE_FILE_DIALOG_MIN_WIDTH{160};
+    constexpr GG::Y SAVE_FILE_DIALOG_MIN_HEIGHT{100};
 
     constexpr std::string_view SAVE_FILE_WND_NAME = "dialog.save";
 
-    constexpr GG::X PROMT_WIDTH(200);
-    constexpr GG::Y PROMPT_HEIGHT(75);
+    constexpr GG::X PROMT_WIDTH{200};
+    constexpr GG::Y PROMPT_HEIGHT{75};
 
     constexpr double DEFAULT_STRETCH = 1.0;
 
@@ -125,7 +125,7 @@ namespace {
 /** Describes how a column should be set up in the dialog */
 class SaveFileColumn {
 public:
-    static std::vector<SaveFileColumn> GetColumns(GG::X max_width) {
+    static auto GetColumns(GG::X max_width) {
         std::vector<SaveFileColumn> columns;
         columns.reserve(VALID_PREVIEW_COLUMNS.size());
         for (const auto& sv : VALID_PREVIEW_COLUMNS)
@@ -133,14 +133,13 @@ public:
         return columns;
     }
 
-    static std::shared_ptr<GG::Control> TitleForColumn(const SaveFileColumn& column) {
+    static auto TitleForColumn(const SaveFileColumn& column) {
         auto retval = GG::Wnd::Create<CUILabel>(column.Title(), GG::FORMAT_LEFT);
         retval->Resize(GG::Pt(GG::X1, ClientUI::GetFont()->Height()));
         return retval;
     }
 
-    static std::shared_ptr<GG::Control> CellForColumn(const SaveFileColumn& column,
-                                                      const FullPreview& full, GG::X max_width)
+    static auto CellForColumn(const SaveFileColumn& column, const FullPreview& full, GG::X max_width)
     {
         GG::Clr color = ClientUI::TextColor();
         std::string value = ColumnInPreview(full, column.m_name);
@@ -165,16 +164,16 @@ public:
         return retval;
     }
 
-    bool Fixed() const
+    bool Fixed() const noexcept
     { return m_fixed; }
 
-    GG::X FixedWidth() const
+    GG::X FixedWidth() const noexcept
     { return m_fixed_width; }
 
-    double Stretch() const
+    double Stretch() const noexcept
     { return m_stretch; }
 
-    const std::string& Name() const
+    const auto& Name() const noexcept
     { return m_name; }
 
 private:
@@ -198,16 +197,14 @@ private:
     template <class S1, class S2>
     SaveFileColumn(S1&& name, S2&& wide_as, GG::X max_width) :
         m_name(std::forward<S1>(name)),
-        m_fixed(true),
         m_wide_as(std::forward<S2>(wide_as)),
-        m_stretch(0.0)
+        m_fixed(true)
     { m_fixed_width = ComputeFixedWidth(Title(), m_wide_as, max_width);}
 
     /// Creates a stretchy column
     template <class S>
     SaveFileColumn(S&& name, double stretch, GG::X max_width) :
         m_name(std::forward<S>(name)),
-        m_fixed(false),
         m_stretch(stretch)
     { m_fixed_width = ComputeFixedWidth(Title(), m_wide_as, max_width);}
 
@@ -253,9 +250,7 @@ private:
         }
     }
 
-    static GG::X ComputeFixedWidth(const std::string& title, const std::string& wide_as,
-                                   GG::X max_width)
-    {
+    static GG::X ComputeFixedWidth(const std::string& title, const std::string& wide_as, GG::X max_width) {
         auto font = ClientUI::GetFont();
         // We need to maintain the fixed sizes since the base list box messes them
         std::vector<GG::Font::LineData> lines;
@@ -275,15 +270,15 @@ private:
 
     /// The identifier of what data to show. Must be valid.
     std::string m_name;
-    /// If true, column width is fixed to be the width of m_wide_as under the current font.
-    /// If false, column stretches with factor m_stretch
-    bool m_fixed;
-    /// The wideset fixed width from wide_as or the title
-    GG::X m_fixed_width = GG::X0;
     /// The string to be used in determining the width of the column
     std::string m_wide_as;
     /// The stretch of the column.
-    double m_stretch;
+    double m_stretch = 0.0;
+    /// The wideset fixed width from wide_as or the title
+    GG::X m_fixed_width = GG::X0;
+    /// If true, column width is fixed to be the width of m_wide_as under the current font.
+    /// If false, column stretches with factor m_stretch
+    bool m_fixed = false;
 };
 
 /** A Specialized row for the save dialog list box. */
@@ -408,10 +403,9 @@ public:
             return ClientUI::GetFont()->SpaceWidth() * 10;
 
         // Give the directory label at least all the room that the other columns demand anyway
-        GG::X sum(0);
-        for (const auto& column : m_columns) {
+        GG::X sum(GG::X0);
+        for (const auto& column : m_columns)
             sum += column.FixedWidth();
-        }
         return sum;
     }
 };

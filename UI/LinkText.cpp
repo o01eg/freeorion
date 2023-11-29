@@ -492,7 +492,7 @@ void TextLinker::LocateLinks() {
     if (m_links.empty())
         return;
 
-    GG::Y y_posn(0); // y-coordinate of the top of the current line
+    GG::Y y_posn(GG::Y0); // y-coordinate of the top of the current line
     const auto& font = GetFont();
 
     // We assume that links are stored in m_links in the order they appear in the text.
@@ -508,15 +508,21 @@ void TextLinker::LocateLinks() {
         for (unsigned int i = 0; i < curr_line.char_data.size(); ++i) {
             // The link text_posn is at the beginning of the tag, whereas
             // char_data jumps over tags. That is why we cannot test for precise equality
-            if (!inside_link && curr_line.char_data[i].string_index >= current_link->real_text_posn.first &&
-                curr_line.char_data[i].string_index < current_link->real_text_posn.second)
+            const auto cdsi = Value(curr_line.char_data[i].string_index);
+
+            if (!inside_link &&
+                cdsi >= current_link->real_text_posn.first &&
+                cdsi < current_link->real_text_posn.second)
             {
                 inside_link = true;
                 // Clear out the old rectangles
                 current_link->rects.clear();
                 current_link->rects.emplace_back(i ? curr_line.char_data[i - 1].extent : GG::X0,
                                                  y_posn, GG::X0, y_posn + font->Height());
-            } else if (inside_link && curr_line.char_data[i].string_index >= current_link->real_text_posn.second) {
+
+            } else if (inside_link &&
+                       cdsi >= current_link->real_text_posn.second)
+            {
                 inside_link = false;
                 current_link->rects.back().lr.x = i ? curr_line.char_data[i - 1].extent : GG::X0;
                 ++current_link;
@@ -674,7 +680,7 @@ std::string LinkTaggedPresetText(std::string_view tag, std::string_view stringta
 }
 
 namespace {
-    static bool link_tags_registered = false;
+    bool link_tags_registered = false;
 }
 
 void RegisterLinkTags() {

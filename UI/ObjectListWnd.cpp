@@ -26,11 +26,10 @@
 
 #include <GG/Layout.h>
 
-#include <boost/lexical_cast.hpp>
-#include <boost/range/any_range.hpp>
 #include <boost/uuid/random_generator.hpp>
 
 #include <iterator>
+#include <span>
 
 #if __has_include(<charconv>)
   #include <charconv>
@@ -39,16 +38,19 @@
 #include <utility>
 #if !defined(__cpp_lib_integer_comparison_functions)
 namespace std {
-    inline constexpr auto cmp_equal(auto&& lhs, auto&& rhs) { return lhs == rhs; }
+    constexpr auto cmp_equal(auto&& lhs, auto&& rhs) { return lhs == rhs; }
 }
+#endif
+
+#if defined(__cpp_lib_to_chars)
+  #include <boost/lexical_cast.hpp>
 #endif
 
 std::vector<std::string_view> SpecialNames();
 
 namespace {
     enum class VIS_DISPLAY : uint8_t { SHOW_VISIBLE, SHOW_PREVIOUSLY_VISIBLE, SHOW_DESTROYED };
-    using VisMap = std::map<UniverseObjectType, std::set<VIS_DISPLAY>>; // TODO: flat_map<flat_set> ?
-    using id_range = boost::any_range<int, boost::forward_traversal_tag>;
+    using VisMap = boost::container::flat_map<UniverseObjectType, boost::container::flat_set<VIS_DISPLAY>>;
 
     constexpr unsigned int NUM_COLUMNS(12u);
 
@@ -603,27 +605,32 @@ private:
             push_back(m_label);
         }
 
-        const auto& Text() const noexcept { return m_string; }
+        const std::string& Text() const noexcept { return m_string; }
 
     private:
         std::string m_string;
         std::shared_ptr<CUILabel> m_label;
     };
 
-    std::string_view GetString() const noexcept {
+    const auto& GetString() const noexcept {
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+        static constexpr std::string EMPTY_STRING_X;
+#else
+        static const std::string EMPTY_STRING_X;
+#endif
         if (!m_string_drop)
-            return EMPTY_STRING;
+            return EMPTY_STRING_X;
         auto row_it = m_string_drop->CurrentItem();
         if (row_it == m_string_drop->end())
-            return EMPTY_STRING;
+            return EMPTY_STRING_X;
         auto string_row = dynamic_cast<const StringRow*>(row_it->get());
         if (!string_row)
-            return EMPTY_STRING;
+            return EMPTY_STRING_X;
         return string_row->Text();
     }
 
     auto GetStringValueRef() const
-    { return std::make_unique<ValueRef::Constant<std::string>>(std::string{GetString()}); }
+    { return std::make_unique<ValueRef::Constant<std::string>>(GetString()); }
 
     auto GetStringValueRefVec() const {
         std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> retval;
@@ -673,17 +680,20 @@ private:
 
     template <typename T>
     T GetEnum() const {
-        auto text = GetString();
+        const auto& text = GetString();
         if constexpr (std::is_same_v<T, MeterType>) {
             return MeterTypeFromString(text, MeterType::INVALID_METER_TYPE);
+        } else if constexpr (std::is_same_v<T, StarType>) {
+            return StarTypeFromString(text, StarType::INVALID_STAR_TYPE);
+        } else if constexpr (std::is_same_v<T, PlanetType>) {
+            return PlanetTypeFromString(text, PlanetType::INVALID_PLANET_TYPE);
+        } else if constexpr (std::is_same_v<T, PlanetSize>) {
+            return PlanetSizeFromString(text, PlanetSize::INVALID_PLANET_SIZE);
         } else {
-            T enum_val = T(-1);
-            try {
-                enum_val = boost::lexical_cast<T>(text);
-            } catch (...) {
-                ErrorLogger() << "ConditionWidget::GetEnum unable to convert text to enum type: " << text;
-            }
-            return enum_val;
+            T retval{-1};
+            std::stringstream ss{text};
+            ss >> retval;
+            return T{-1};
         }
     }
 
@@ -714,15 +724,15 @@ public:
         } else if (condition_key == EMPIREAFFILIATION_CONDITION) {
             EmpireAffiliationType affil = EmpireAffiliationType::AFFIL_SELF;
 
-            auto empire_name = GetString();
+            const auto& empire_name = GetString();
             if (empire_name.empty())
                 return std::make_unique<Condition::EmpireAffiliation>(affil);
 
             // get id of empire matching name
             int empire_id = ALL_EMPIRES;
-            for (auto& entry : Empires()) {
-                if (entry.second->Name() == empire_name) {
-                    empire_id = entry.first;
+            for (auto& [loop_empire_id, loop_empire] : Empires()) {
+                if (loop_empire->Name() == empire_name) {
+                    empire_id = loop_empire_id;
                     break;
                 }
             }
@@ -730,11 +740,11 @@ public:
                 std::make_unique<ValueRef::Constant<int>>(empire_id), affil);
 
         } else if (condition_key == HOMEWORLD_CONDITION) {
-            auto species_name = GetString();
+            const auto& species_name = GetString();
             if (species_name.empty())
                 return std::make_unique<Condition::Homeworld>();
             std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> names;
-            names.emplace_back(std::make_unique<ValueRef::Constant<std::string>>(std::string{species_name}));
+            names.emplace_back(std::make_unique<ValueRef::Constant<std::string>>(species_name));
             return std::make_unique<Condition::Homeworld>(std::move(names));
 
         } else if (condition_key == CANCOLONIZE_CONDITION) {
@@ -744,7 +754,7 @@ public:
             return std::make_unique<Condition::CanProduceShips>();
 
         } else if (condition_key == HASSPECIAL_CONDITION) {
-            return std::make_unique<Condition::HasSpecial>(std::string{GetString()});
+            return std::make_unique<Condition::HasSpecial>(GetString());
 
         } else if (condition_key == HASGROWTHSPECIAL_CONDITION) {
             std::vector<std::unique_ptr<Condition::Condition>> operands;
@@ -798,7 +808,7 @@ public:
             return this_cond;
 
         } else if (condition_key == HASTAG_CONDITION) {
-            return std::make_unique<Condition::HasTag>(std::string{GetString()});
+            return std::make_unique<Condition::HasTag>(GetString());
 
         } else if (condition_key == MONSTER_CONDITION) {
             return std::make_unique<Condition::Monster>();
@@ -1492,9 +1502,9 @@ public:
     }
 
     void Render() override {
-        const GG::Clr& background_colour = ClientUI::WndColor();
-        const GG::Clr& unselected_colour = ClientUI::WndOuterBorderColor();
-        const GG::Clr& selected_colour = ClientUI::WndInnerBorderColor();
+        GG::Clr background_colour = ClientUI::WndColor();
+        GG::Clr unselected_colour = ClientUI::WndOuterBorderColor();
+        GG::Clr selected_colour = ClientUI::WndInnerBorderColor();
         GG::Clr border_colour = m_selected ? selected_colour : unselected_colour;
         if (Disabled())
             border_colour = DisabledColor(border_colour);
@@ -1522,7 +1532,7 @@ private:
         if (!m_initialized)
             return;
 
-        const GG::X ICON_WIDTH(Value(ClientHeight()));
+        const GG::X ICON_WIDTH{Value(ClientHeight())};
 
         GG::X indent(ICON_WIDTH * m_indent);
         GG::X left = indent;
@@ -1546,14 +1556,13 @@ private:
         // second column position fixed equal to first column width value.
         // ie. reset left, not dependent on current left.
         auto& ctrl = m_controls[0];
-        GG::X width(GetColumnWidth(static_cast<int>(-1)) + GetColumnWidth(static_cast<int>(0)));
-        GG::X right = width;
+        GG::X right{GetColumnWidth(-1) + GetColumnWidth(0)};
         ctrl->SizeMove(GG::Pt(left, top), GG::Pt(right, bottom));
         left = right + 2*PAD;
 
         for (std::size_t i = 1; i < m_controls.size(); ++i) {
             right = left + GetColumnWidth(static_cast<int>(i));
-            if ((ctrl = m_controls[i]))
+            if ((ctrl = m_controls[i])) // TODO: use ranged loop, avoid this assignment?
                 ctrl->SizeMove(GG::Pt(left, top), GG::Pt(right, bottom));
             left = right + PAD;
         }
@@ -1652,7 +1661,7 @@ private:
 class ObjectRow : public GG::ListBox::Row {
 public:
     ObjectRow(GG::X w, GG::Y h, std::shared_ptr<const UniverseObject> obj, bool expanded,
-              int container_object_panel, const id_range& contained_object_panels,
+              int container_object_panel, const std::span<const int> contained_object_panels,
               int indent) :
         GG::ListBox::Row(w, h),
         m_container_object_panel(container_object_panel),
@@ -1700,8 +1709,15 @@ public:
     auto& ContainedPanels() const noexcept
     { return m_contained_object_panels; }
 
-    void SetContainedPanels(const std::set<int>& contained_object_panels) {
-        m_contained_object_panels = contained_object_panels;
+    void SetContainedPanels(boost::container::flat_set<int>&& contained_object_panels) {
+        m_contained_object_panels = std::move(contained_object_panels);
+        m_panel->SetHasContents(!m_contained_object_panels.empty());
+        m_panel->RequirePreRender();
+    }
+
+    void SetContainedPanels(const std::span<const int> contained_object_panels) {
+        m_contained_object_panels.clear();
+        m_contained_object_panels.insert(contained_object_panels.begin(), contained_object_panels.end());
         m_panel->SetHasContents(!m_contained_object_panels.empty());
         m_panel->RequirePreRender();
     }
@@ -1727,7 +1743,7 @@ public:
 private:
     std::shared_ptr<ObjectPanel>            m_panel;
     int                                     m_container_object_panel;
-    std::set<int>                           m_contained_object_panels;
+    boost::container::flat_set<int>         m_contained_object_panels;
     std::shared_ptr<const UniverseObject>   m_obj_init;
     int                                     m_indent_init = 0;
     bool                                    m_expanded_init = false;
@@ -1783,7 +1799,7 @@ private:
         // loop through m_controls, positioning according to column widths.
         for (std::size_t i = 0; i < m_controls.size(); ++i) {
             auto& ctrl = m_controls[i];
-            GG::X width(GetColumnWidth(static_cast<int>(i)-1));
+            GG::X width{GetColumnWidth(static_cast<int>(i)-1)};
 
             GG::X right = left + width;
 
@@ -1923,7 +1939,7 @@ namespace {
 #endif
         }
 
-        static auto StringToFloat(const std::string& key) {
+        static auto StringToFloat(const std::string_view key) {
 #if defined(__cpp_lib_to_chars)
             float retval = 0.0f;
             auto result = std::from_chars(key.data(), key.data() + key.size(), retval);
@@ -2014,12 +2030,13 @@ public:
 
         m_filter_condition = std::make_unique<Condition::All>();
 
+        m_visibilities.reserve(static_cast<std::size_t>(UniverseObjectType::NUM_OBJ_TYPES));
         //m_visibilities[UniverseObjectType::OBJ_BUILDING].insert(SHOW_VISIBLE);
         //m_visibilities[UniverseObjectType::OBJ_BUILDING].insert(SHOW_PREVIOUSLY_VISIBLE);
         //m_visibilities[UniverseObjectType::OBJ_SHIP].insert(SHOW_VISIBLE);
         //m_visibilities[UniverseObjectType::OBJ_FLEET].insert(SHOW_VISIBLE);
-        m_visibilities[UniverseObjectType::OBJ_PLANET].insert(VIS_DISPLAY::SHOW_VISIBLE);
-        m_visibilities[UniverseObjectType::OBJ_PLANET].insert(VIS_DISPLAY::SHOW_PREVIOUSLY_VISIBLE);
+        m_visibilities.try_emplace(UniverseObjectType::OBJ_PLANET,
+                                   boost::container::flat_set{VIS_DISPLAY::SHOW_VISIBLE, VIS_DISPLAY::SHOW_PREVIOUSLY_VISIBLE});
         //m_visibilities[UniverseObjectType::OBJ_SYSTEM].insert(SHOW_VISIBLE);
         //m_visibilities[UniverseObjectType::OBJ_SYSTEM].insert(SHOW_PREVIOUSLY_VISIBLE);
         //m_visibilities[UniverseObjectType::OBJ_FIELD].insert(SHOW_VISIBLE);
@@ -2210,7 +2227,7 @@ public:
                 system_contents.push_back(fleet->ID());
 
 
-            AddObjectRow(std::move(system), INVALID_OBJECT_ID, system_contents, indent);
+            AddObjectRow(std::move(system), INVALID_OBJECT_ID, indent, system_contents);
             if (ObjectCollapsed(SYSTEM_ID)) {
                 timer.EnterSection("");
                 // remove contained planets and buildings, which will not be shown
@@ -2232,7 +2249,7 @@ public:
                 for (const auto& building : planet_buildings[PLANET_ID])
                     planet_contents.push_back(building->ID());
 
-                AddObjectRow(std::move(planet), SYSTEM_ID, planet_contents, indent);
+                AddObjectRow(std::move(planet), SYSTEM_ID, indent, planet_contents);
                 if (ObjectCollapsed(PLANET_ID)) {
                     // remove contained buildings, which will not be shown
                     planet_buildings[PLANET_ID].clear();
@@ -2242,7 +2259,7 @@ public:
                 ++indent;
                 // add building rows on this planet
                 for (auto& building : planet_buildings[PLANET_ID])
-                    AddObjectRow(std::move(building), PLANET_ID, id_range{}, indent);
+                    AddObjectRow(std::move(building), PLANET_ID, indent);
                 planet_buildings[PLANET_ID].clear();
                 --indent;
             }
@@ -2259,7 +2276,7 @@ public:
                                std::back_inserter(fleet_contents),
                                [](const auto& ship) { return ship->ID(); });
 
-                AddObjectRow(std::move(fleet), SYSTEM_ID, fleet_contents, indent);
+                AddObjectRow(std::move(fleet), SYSTEM_ID, indent, fleet_contents);
                 if (ObjectCollapsed(FLEET_ID)) {
                     // remove contained ships, which will not be shown
                     fleet_ships[FLEET_ID].clear();
@@ -2269,7 +2286,7 @@ public:
                 ++indent;
                 // add ship rows in this fleet
                 for (auto& ship : fleet_ships[FLEET_ID])
-                    AddObjectRow(std::move(ship), FLEET_ID, id_range(), indent);
+                    AddObjectRow(std::move(ship), FLEET_ID, indent);
                 fleet_ships[FLEET_ID].clear();
                 --indent;
             }
@@ -2278,7 +2295,7 @@ public:
             // add field rows in this system
             timer.EnterSection("system field rows");
             for (auto& field : system_fields[SYSTEM_ID])
-                AddObjectRow(std::move(field), SYSTEM_ID, id_range(), indent);
+                AddObjectRow(std::move(field), SYSTEM_ID, indent);
             system_fields[SYSTEM_ID].clear();
 
             indent--;
@@ -2295,7 +2312,7 @@ public:
                 for (const auto& building : planet_buildings[PLANET_ID])
                     planet_contents.emplace_back(building->ID());
 
-                AddObjectRow(planet, system_id, planet_contents, indent);
+                AddObjectRow(planet, system_id, indent, planet_contents);
                 if (ObjectCollapsed(PLANET_ID)) {
                     // remove contained buildings, which will not be shown
                     planet_buildings[planet->ID()].clear();
@@ -2305,7 +2322,7 @@ public:
                 ++indent;
                 // add building rows on this planet
                 for (const auto& building : planet_buildings[PLANET_ID])
-                    AddObjectRow(building, PLANET_ID, id_range(), indent);
+                    AddObjectRow(building, PLANET_ID, indent);
                 planet_buildings[PLANET_ID].clear();
                 --indent;
             }
@@ -2314,12 +2331,12 @@ public:
         // add buildings not on shown planets
         for (const auto& [planet_id, buildings] : planet_buildings)
             for (const auto& building : buildings)
-                AddObjectRow(building, planet_id, id_range(), indent);
+                AddObjectRow(building, planet_id, indent);
 
         // add fleets not in shown systems
         timer.EnterSection("non-system fleet rows");
-        for (const auto& sys_fleets : system_fleets) {
-           for (const auto& fleet : sys_fleets.second) {
+        for (const auto& [sys_id, sys_fleets] : system_fleets) {
+           for (const auto& fleet : sys_fleets) {
                const int FLEET_ID = fleet->ID();
 
                 // add fleet rows in this system
@@ -2328,7 +2345,7 @@ public:
                 for (const auto& ship : fleet_ships[FLEET_ID])
                     fleet_contents.emplace_back(ship->ID());
 
-                AddObjectRow(fleet, sys_fleets.first, fleet_contents, indent);
+                AddObjectRow(fleet, sys_id, indent, fleet_contents);
                 if (ObjectCollapsed(FLEET_ID)) {
                     // remove contained ships, which will not be shown
                     fleet_ships[FLEET_ID].clear();
@@ -2338,7 +2355,7 @@ public:
                 ++indent;
                 // add ship rows in this fleet
                 for (const auto& ship : fleet_ships[FLEET_ID])
-                    AddObjectRow(ship, FLEET_ID, id_range(), indent);
+                    AddObjectRow(ship, FLEET_ID, indent);
                 fleet_ships[FLEET_ID].clear();
                 --indent;
             }
@@ -2347,13 +2364,13 @@ public:
         // add ships not in shown fleets
         for (const auto& [fleet_id, ships] : fleet_ships)
             for (const auto& ship : ships)
-                AddObjectRow(ship, fleet_id, id_range(), indent);
+                AddObjectRow(ship, fleet_id, indent);
 
         // add fields not in shown systems
         timer.EnterSection("non-system field rows");
         for (const auto& [system_id, fields] : system_fields)
             for (const auto& field : fields)
-                AddObjectRow(field, system_id, id_range(), indent);
+                AddObjectRow(field, system_id, indent);
 
 
         // sort added rows
@@ -2411,11 +2428,11 @@ public:
     mutable boost::signals2::signal<void ()> ExpandCollapseSignal;
 
 private:
-    void AddObjectRow(int object_id, int container, const id_range& contents, int indent)
-    { AddObjectRow(Objects().get(object_id), container, contents, indent); }
+    void AddObjectRow(int object_id, int container, int indent, const std::span<const int> contents)
+    { AddObjectRow(Objects().get(object_id), container, indent, contents); }
 
     void AddObjectRow(std::shared_ptr<const UniverseObject> obj, int container,
-                      const id_range& contents, int indent)
+                      int indent, const std::span<const int> contents = {})
     {
         if (!obj)
             return;
@@ -2459,12 +2476,9 @@ private:
         for (auto& row : *this) {
             if (ObjectRow* object_row = dynamic_cast<ObjectRow*>(row.get())) {
                 if (object_row->ObjectID() == container_object_id) {
-                    std::set<int> new_contents;
-                    for (int content_id : object_row->ContainedPanels()) {
-                        if (content_id != object_id)
-                            new_contents.insert(content_id);
-                    }
-                    object_row->SetContainedPanels(new_contents);
+                    auto new_contents{object_row->ContainedPanels()};
+                    new_contents.erase(object_id);
+                    object_row->SetContainedPanels(std::move(new_contents));
                     object_row->Update();
                     break;
                 }
@@ -2480,7 +2494,7 @@ private:
         ObjectRow* object_row = dynamic_cast<ObjectRow*>(it->get());
 
         // recursively remove contained rows first
-        const std::set<int>& contents = object_row->ContainedPanels();
+        const auto& contents = object_row->ContainedPanels();
         for (unsigned int i = 0; i < contents.size(); ++i) {
             GG::ListBox::iterator next_it = it; ++next_it;
             if (next_it == this->end())
@@ -2575,18 +2589,18 @@ void ObjectListWnd::CompleteConstruction() {
 }
 
 void ObjectListWnd::DoLayout() {
-    GG::X BUTTON_WIDTH(ClientUI::Pts()*7);
-    GG::Y BUTTON_HEIGHT = m_filter_button->MinUsableSize().y;
+    GG::X BUTTON_WIDTH{ClientUI::Pts()*7};
+    GG::Y BUTTON_HEIGHT{m_filter_button->MinUsableSize().y};
     int PAD(3);
 
     GG::Pt button_ul(GG::X0, ClientHeight() - BUTTON_HEIGHT);
 
     m_filter_button->SizeMove(button_ul, button_ul + GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT));
-    button_ul += GG::Pt(BUTTON_WIDTH + GG::X(PAD), GG::Y0);
+    button_ul += GG::Pt(BUTTON_WIDTH + PAD, GG::Y0);
     m_collapse_button->SizeMove(button_ul, button_ul + GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT));
-    button_ul += GG::Pt(BUTTON_WIDTH + GG::X(PAD), GG::Y0);
+    button_ul += GG::Pt(BUTTON_WIDTH + PAD, GG::Y0);
 
-    m_list_box->SizeMove(GG::Pt(GG::X0, GG::Y0), GG::Pt(ClientWidth(), button_ul.y));
+    m_list_box->SizeMove(GG::Pt0, GG::Pt(ClientWidth(), button_ul.y));
 
     SetMinSize(GG::Pt(3*BUTTON_WIDTH, 6*BUTTON_HEIGHT));
 

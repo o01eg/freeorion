@@ -581,7 +581,7 @@ namespace {
 
     void QueueProductionItemPanel::DoLayout() {
         const int FONT_PTS = ClientUI::Pts();
-        const GG::Y METER_HEIGHT(FONT_PTS);
+        const GG::Y METER_HEIGHT{FONT_PTS};
         const GG::Y HEIGHT = Y_MARGIN + FONT_PTS + Y_MARGIN + METER_HEIGHT + Y_MARGIN + FONT_PTS + Y_MARGIN + 6;
         const int GRAPHIC_SIZE = Value(HEIGHT - 9);    // 9 pixels accounts for border thickness so the sharp-cornered icon doesn't with the rounded panel corner
         const GG::X METER_WIDTH = Width() - GRAPHIC_SIZE - 3*X_MARGIN/2 - 3;
@@ -854,7 +854,7 @@ public:
 
 private:
     void DoLayout() {
-        m_queue_lb->SizeMove(GG::Pt(GG::X0, GG::Y0),
+        m_queue_lb->SizeMove(GG::Pt0,
                              GG::Pt(ClientWidth(), ClientHeight() - GG::Y(CUIWnd::INNER_BORDER_ANGLE_OFFSET)));
     }
 
@@ -875,8 +875,8 @@ void ProductionWnd::CompleteConstruction() {
    //DebugLogger() << "ProductionWindow:  fullscreen width: "<< GetOptionsDB().Get<int>("video.fullscreen.width")
    //              << " ; windowed width: " << GetOptionsDB().Get<int>("video.windowed.width");
 
-    GG::X queue_width(GetOptionsDB().Get<int>("ui.queue.width"));
-    GG::Y info_height(ClientUI::Pts()*10);
+    GG::X queue_width(GetOptionsDB().Get<GG::X>("ui.queue.width"));
+    GG::Y info_height{ClientUI::Pts()*10};
 
     m_production_info_panel = GG::Wnd::Create<ResourceInfoPanel>(
         UserString("PRODUCTION_WND_TITLE"), UserString("PRODUCTION_INFO_PP"),
@@ -937,17 +937,17 @@ bool ProductionWnd::InClient(GG::Pt pt) const
 { return m_production_info_panel->InClient(pt) || m_queue_wnd->InClient(pt) || m_build_designator_wnd->InClient(pt); }
 
 void ProductionWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size())
         DoLayout();
 }
 
 void ProductionWnd::DoLayout() {
-    GG::X queue_width(GetOptionsDB().Get<int>("ui.queue.width"));
-    GG::Y info_height(ClientUI::Pts()*8 + 34);
+    const GG::X queue_width(GetOptionsDB().Get<GG::X>("ui.queue.width"));
+    const GG::Y info_height{ClientUI::Pts()*8 + 34};
 
-    m_production_info_panel->MoveTo(GG::Pt(GG::X0, GG::Y0));
+    m_production_info_panel->MoveTo(GG::Pt0);
     m_production_info_panel->Resize(GG::Pt(queue_width, info_height));
 
     m_queue_wnd->MoveTo(GG::Pt(GG::X0, info_height));
@@ -997,8 +997,8 @@ void ProductionWnd::Update(const ScriptingContext& context) {
     m_build_designator_wnd->Update();
 }
 
-void ProductionWnd::ShowBuildingTypeInEncyclopedia(const std::string& building_type)
-{ m_build_designator_wnd->ShowBuildingTypeInEncyclopedia(building_type); }
+void ProductionWnd::ShowBuildingTypeInEncyclopedia(std::string building_type)
+{ m_build_designator_wnd->ShowBuildingTypeInEncyclopedia(std::move(building_type)); }
 
 void ProductionWnd::ShowShipDesignInEncyclopedia(int design_id)
 { m_build_designator_wnd->ShowShipDesignInEncyclopedia(design_id); }
@@ -1006,26 +1006,26 @@ void ProductionWnd::ShowShipDesignInEncyclopedia(int design_id)
 void ProductionWnd::ShowPlanetInEncyclopedia(int planet_id)
 { m_build_designator_wnd->ShowPlanetInEncyclopedia(planet_id); }
 
-void ProductionWnd::ShowTechInEncyclopedia(const std::string& tech_name)
-{ m_build_designator_wnd->ShowTechInEncyclopedia(tech_name); }
+void ProductionWnd::ShowTechInEncyclopedia(std::string tech_name)
+{ m_build_designator_wnd->ShowTechInEncyclopedia(std::move(tech_name)); }
 
-void ProductionWnd::ShowPolicyInEncyclopedia(const std::string& policy_name)
-{ m_build_designator_wnd->ShowPolicyInEncyclopedia(policy_name); }
+void ProductionWnd::ShowPolicyInEncyclopedia(std::string policy_name)
+{ m_build_designator_wnd->ShowPolicyInEncyclopedia(std::move(policy_name)); }
 
-void ProductionWnd::ShowShipPartInEncyclopedia(const std::string& part_name)
-{ m_build_designator_wnd->ShowShipPartInEncyclopedia(part_name); }
+void ProductionWnd::ShowShipPartInEncyclopedia(std::string part_name)
+{ m_build_designator_wnd->ShowShipPartInEncyclopedia(std::move(part_name)); }
 
-void ProductionWnd::ShowSpeciesInEncyclopedia(const std::string& species_name)
-{ m_build_designator_wnd->ShowSpeciesInEncyclopedia(species_name); }
+void ProductionWnd::ShowSpeciesInEncyclopedia(std::string species_name)
+{ m_build_designator_wnd->ShowSpeciesInEncyclopedia(std::move(species_name)); }
 
 void ProductionWnd::ShowEmpireInEncyclopedia(int empire_id)
 { m_build_designator_wnd->ShowEmpireInEncyclopedia(empire_id); }
 
-void ProductionWnd::ShowSpecialInEncyclopedia(const std::string& special_name)
-{ m_build_designator_wnd->ShowSpecialInEncyclopedia(special_name); }
+void ProductionWnd::ShowSpecialInEncyclopedia(std::string special_name)
+{ m_build_designator_wnd->ShowSpecialInEncyclopedia(std::move(special_name)); }
 
-void ProductionWnd::ShowFieldTypeInEncyclopedia(const std::string& field_type_name)
-{ m_build_designator_wnd->ShowFieldTypeInEncyclopedia(field_type_name); }
+void ProductionWnd::ShowFieldTypeInEncyclopedia(std::string field_type_name)
+{ m_build_designator_wnd->ShowFieldTypeInEncyclopedia(std::move(field_type_name)); }
 
 void ProductionWnd::ShowPedia()
 { m_build_designator_wnd->ShowPedia(); }

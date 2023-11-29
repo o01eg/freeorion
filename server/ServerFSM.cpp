@@ -561,7 +561,7 @@ bool ServerFSM::EstablishPlayer(PlayerConnectionPtr player_connection,
 
         player_connection->SendMessage(JoinAckMessage(player_id, cookie));
         if (!GetOptionsDB().Get<bool>("skip-checksum"))
-            player_connection->SendMessage(ContentCheckSumMessage());
+            player_connection->SendMessage(ContentCheckSumMessage(m_server.GetSpeciesManager()));
 
         // inform player of host
         player_connection->SendMessage(HostIDMessage(m_server.m_networking.HostPlayerID()));
@@ -650,7 +650,7 @@ sc::result Idle::react(const HostMPGame& msg) {
     server.m_networking.SetHostPlayerID(host_player_id);
 
     if (!GetOptionsDB().Get<bool>("skip-checksum"))
-        player_connection->SendMessage(ContentCheckSumMessage());
+        player_connection->SendMessage(ContentCheckSumMessage(server.GetSpeciesManager()));
 
     DebugLogger(FSM) << "Idle::react(HostMPGame) about to send acknowledgement to host";
     player_connection->SetAuthRoles(Networking::AuthRoles{
@@ -704,7 +704,7 @@ sc::result Idle::react(const HostSPGame& msg) {
                                        std::move(client_version_string));
     server.m_networking.SetHostPlayerID(host_player_id);
     if (!GetOptionsDB().Get<bool>("skip-checksum"))
-        player_connection->SendMessage(ContentCheckSumMessage());
+        player_connection->SendMessage(ContentCheckSumMessage(server.GetSpeciesManager()));
     player_connection->SetAuthRoles(Networking::AuthRoles{
                                         Networking::RoleType::ROLE_HOST,
                                         Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER,
@@ -2189,7 +2189,7 @@ sc::result WaitingForSPGameJoiners::react(const JoinGame& msg) {
                                                std::move(client_version_string));
             player_connection->SendMessage(JoinAckMessage(expected_it->second, boost::uuids::nil_uuid()));
             if (!GetOptionsDB().Get<bool>("skip-checksum"))
-                player_connection->SendMessage(ContentCheckSumMessage());
+                player_connection->SendMessage(ContentCheckSumMessage(server.GetSpeciesManager()));
 
             // Inform AI of logging configuration.
             player_connection->SendMessage(
@@ -2216,7 +2216,7 @@ sc::result WaitingForSPGameJoiners::react(const JoinGame& msg) {
                                                std::move(client_version_string));
             player_connection->SendMessage(JoinAckMessage(host_id, boost::uuids::nil_uuid()));
             if (!GetOptionsDB().Get<bool>("skip-checksum"))
-                player_connection->SendMessage(ContentCheckSumMessage());
+                player_connection->SendMessage(ContentCheckSumMessage(server.GetSpeciesManager()));
 
             DebugLogger(FSM) << "Initializing new SP game...";
             server.NewSPGameInit(*m_single_player_setup_data);

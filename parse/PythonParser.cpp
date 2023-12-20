@@ -157,6 +157,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(py::self_ns::self & py::self_ns::self)
             .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
             .def(py::self_ns::self & py::other<value_ref_wrapper<int>>())
+            .def(py::other<value_ref_wrapper<int>>() & py::self_ns::self)
             .def(py::self_ns::self | py::self_ns::self)
             .def(py::self_ns::self | py::other<value_ref_wrapper<int>>())
             .def(~py::self_ns::self);
@@ -177,6 +178,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         py::class_<enum_wrapper<Condition::ContentType>>("__LocationContentType", py::no_init);
         py::class_<enum_wrapper<BuildType>>("__BuildType", py::no_init);
         py::class_<enum_wrapper<Visibility>>("__Visibility", py::no_init);
+        py::class_<enum_wrapper<CaptureResult>>("__CaptureResult", py::no_init);
         py::class_<unlockable_item_wrapper>("UnlockableItem", py::no_init);
         py::class_<FocusType>("__FocusType", py::no_init);
         auto py_variable_wrapper = py::class_<variable_wrapper>("__Variable", py::no_init);

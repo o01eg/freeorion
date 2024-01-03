@@ -663,7 +663,7 @@ namespace {
     }
 
     void QueueProductionItemPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
-        const GG::Pt old_size = Size();
+        const auto old_size = Size();
         GG::Control::SizeMove(ul, lr);
         if (Size() != old_size)
             RequirePreRender();
@@ -834,7 +834,7 @@ public:
     }
 
     void SizeMove(GG::Pt ul, GG::Pt lr) override {
-        GG::Pt sz = Size();
+        const auto sz = Size();
         CUIWnd::SizeMove(ul, lr);
         if (Size() != sz)
             DoLayout();
@@ -927,13 +927,13 @@ void ProductionWnd::CompleteConstruction() {
     AttachChild(m_build_designator_wnd);
 }
 
-int ProductionWnd::SelectedPlanetID() const
+int ProductionWnd::SelectedPlanetID() const noexcept
 { return m_build_designator_wnd->SelectedPlanetID(); }
 
-bool ProductionWnd::InWindow(GG::Pt pt) const
+bool ProductionWnd::InWindow(GG::Pt pt) const noexcept
 { return m_production_info_panel->InWindow(pt) || m_queue_wnd->InWindow(pt) || m_build_designator_wnd->InWindow(pt); }
 
-bool ProductionWnd::InClient(GG::Pt pt) const
+bool ProductionWnd::InClient(GG::Pt pt) const noexcept
 { return m_production_info_panel->InClient(pt) || m_queue_wnd->InClient(pt) || m_build_designator_wnd->InClient(pt); }
 
 void ProductionWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
@@ -1059,8 +1059,8 @@ void ProductionWnd::SelectSystem(int system_id) {
     }
 }
 
-void ProductionWnd::QueueItemMoved(const GG::ListBox::iterator& row_it,
-                                   const GG::ListBox::iterator& original_position_it)
+void ProductionWnd::QueueItemMoved(const GG::ListBox::iterator row_it,
+                                   const GG::ListBox::iterator original_position_it)
 {
     if (!m_order_issuing_enabled)
         return;

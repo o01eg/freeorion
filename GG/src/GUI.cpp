@@ -127,9 +127,9 @@ struct GG::GUIImpl
     void HandleMouseButtonRelease(unsigned int mouse_button, Pt pos, int curr_ticks);
     void HandleIdle(              Flags<ModKey> mod_keys, Pt pos, int curr_ticks);
 
-    void HandleKeyPress(          Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys, int curr_ticks);
+    void HandleKeyPress(          Key key, uint32_t key_code_point, Flags<ModKey> mod_keys, int curr_ticks);
 
-    void HandleKeyRelease(        Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys, int curr_ticks);
+    void HandleKeyRelease(        Key key, uint32_t key_code_point, Flags<ModKey> mod_keys, int curr_ticks);
 
     void HandleTextInput(         std::string text);
     void HandleMouseMove(         Flags<ModKey> mod_keys, Pt pos, Pt rel, int curr_ticks);
@@ -161,7 +161,7 @@ struct GG::GUIImpl
     int          m_key_press_repeat_interval = 66;
     int          m_last_key_press_repeat_time = 0;          // last time of a simulated key press message
 
-    std::pair<Key, std::uint32_t> m_last_pressed_key_code_point{Key::GGK_NONE, 0u};
+    std::pair<Key, uint32_t> m_last_pressed_key_code_point{Key::GGK_NONE, 0u};
 
     int          m_prev_key_press_time = -1;                // the time of the most recent key press
 
@@ -627,7 +627,7 @@ void GUIImpl::HandleIdle(Flags<ModKey> mod_keys, const Pt pos, int curr_ticks)
         GUI::s_gui->ProcessBrowseInfo();
 }
 
-void GUIImpl::HandleKeyPress(Key key, std::uint32_t key_code_point,
+void GUIImpl::HandleKeyPress(Key key, uint32_t key_code_point,
                              Flags<ModKey> mod_keys, int curr_ticks)
 {
     m_browse_info_wnd.reset();
@@ -657,7 +657,7 @@ void GUIImpl::HandleKeyPress(Key key, std::uint32_t key_code_point,
             WndEvent::EventType::KeyPress, key, key_code_point, mod_keys));
 }
 
-void GUIImpl::HandleKeyRelease(Key key, std::uint32_t key_code_point,
+void GUIImpl::HandleKeyRelease(Key key, uint32_t key_code_point,
                                Flags<ModKey> mod_keys, int curr_ticks)
 {
     m_last_key_press_repeat_time = 0;
@@ -1140,7 +1140,7 @@ void GUI::SaveWndAsPNG(const Wnd* wnd, const std::string& filename) const
     m_impl->m_save_as_png_filename = filename;
 }
 
-void GUI::HandleGGEvent(EventType event, Key key, std::uint32_t key_code_point,
+void GUI::HandleGGEvent(EventType event, Key key, uint32_t key_code_point,
                         Flags<ModKey> mod_keys, Pt pos, Pt rel, std::string text)
 {
     m_impl->m_mod_keys = mod_keys;
@@ -1428,10 +1428,10 @@ void GUI::EnableModalAcceleratorSignals(bool allow)
 void GUI::SetMouseLRSwapped(bool swapped)
 { m_impl->m_mouse_lr_swap = swapped; }
 
-std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned int pts)
+std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts)
 { return GetFontManager().GetFont(font_filename, pts); }
 
-std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned int pts,
+std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts,
                                    const std::vector<uint8_t>& file_contents)
 { return GetFontManager().GetFont(font_filename, pts, file_contents); }
 
@@ -1448,7 +1448,7 @@ std::shared_ptr<Font> GUI::GetFont(const std::shared_ptr<Font>& font, unsigned i
     return retval;
 }
 
-void GUI::FreeFont(const std::string& font_filename, unsigned int pts)
+void GUI::FreeFont(std::string_view font_filename, unsigned int pts)
 { GetFontManager().FreeFont(font_filename, pts); }
 
 std::shared_ptr<Texture> GUI::StoreTexture(Texture* texture, const std::string& texture_name)

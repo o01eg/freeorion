@@ -170,7 +170,7 @@ protected:
     void LButtonDown(Pt pt, Flags<ModKey> mod_keys) override;
     void LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys) override;
     void MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys) override;
-    void KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys) override;
+    void KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys) override;
     void TextInput(const std::string& text) override;
 
     /** Recreates the vertical and horizontal scrolls as needed. */
@@ -203,8 +203,8 @@ private:
 
     Pt              m_contents_sz;          ///< The size of the entire text block in the control (not just the visible part)
 
-    X               m_first_col_shown{0};   ///< The position (counted from the left side of the text) of the first pixel shown
-    Y               m_first_row_shown{0};   ///< The position (counted from the top of the text) of the first pixel shown
+    X               m_first_col_shown_x_from_left_of_text{X0};  ///< The position (counted from the left side of the text) of the first pixel shown
+    Y               m_first_row_shown_y_from_top_of_text{Y0};   ///< The position (counted from the top of the text) of the first pixel shown
 
     std::size_t     m_max_lines_history;
 

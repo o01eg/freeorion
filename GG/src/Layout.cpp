@@ -299,14 +299,14 @@ void Layout::DoLayout(Pt ul, Pt lr)
     }
 
     bool size_or_min_size_changed = false;
-    Pt new_min_size(TotalMinWidth(), TotalMinHeight());
+    const Pt new_min_size(TotalMinWidth(), TotalMinHeight());
     if (new_min_size != MinSize()) {
         ScopedAssign<bool> assignment(m_stop_resize_recursion, true);
         SetMinSize(new_min_size);
         ClampRectWithMinAndMaxSize(ul, lr);
         size_or_min_size_changed = true;
     }
-    Pt original_size = Size();
+    const auto original_size = Size();
     Wnd::SizeMove(ul, lr);
     if (Size() != original_size)
         size_or_min_size_changed = true;
@@ -314,7 +314,7 @@ void Layout::DoLayout(Pt ul, Pt lr)
     // if this is the layout object for some Wnd, propogate the minimum size up to the owning Wnd
     if (auto&& parent = Parent()) {
         if (parent->GetLayout().get() == this) {
-            Pt new_parent_min_size = MinSize() + parent->Size() - parent->ClientSize();
+            const auto new_parent_min_size = MinSize() + parent->Size() - parent->ClientSize();
             ScopedAssign<bool> assignment(m_stop_resize_recursion, true);
             parent->SetMinSize(Pt(new_parent_min_size.x, new_parent_min_size.y));
         }
@@ -660,10 +660,10 @@ void Layout::RenderOutline(bool render_outline)
 void Layout::MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void Layout::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
+void Layout::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void Layout::KeyRelease(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
+void Layout::KeyRelease(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 { ForwardEventToParent(); }
 
 float Layout::TotalStretch(const std::vector<RowColParams>& params_vec)

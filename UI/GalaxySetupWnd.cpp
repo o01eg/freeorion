@@ -53,7 +53,7 @@ namespace {
         }
 
         void SizeMove(GG::Pt ul, GG::Pt lr) override {
-            const GG::Pt old_size = Size();
+            const auto old_size = Size();
             GG::Control::SizeMove(ul, lr);
             if (old_size != Size())
                 DoLayout();
@@ -95,7 +95,7 @@ namespace {
 
         void SizeMove(GG::Pt ul, GG::Pt lr) override {
             //std::cout << "RuleListRow::SizeMove(" << ul << ", " << lr << ")" << std::endl;
-            const GG::Pt old_size = Size();
+            const auto old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
             if (!empty() && old_size != Size() && m_contents)
                 m_contents->Resize(Size());
@@ -120,7 +120,7 @@ namespace {
         }
 
         void SizeMove(GG::Pt ul, GG::Pt lr) override {
-            const GG::Pt old_size = Size();
+            const auto old_size = Size();
             CUIListBox::SizeMove(ul, lr);
             if (old_size != Size()) {
                 const GG::X row_width = ListRowWidth();
@@ -1093,7 +1093,7 @@ void GalaxySetupWnd::Render() {
                       GG::CLR_BLACK, ClientUI::WndInnerBorderColor(), 1);
 }
 
-void GalaxySetupWnd::KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
+void GalaxySetupWnd::KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
     // Enter is no longer accepted as OK as it could clash with ALT-Enter
     if (key == GG::Key::GGK_ESCAPE) // Same behaviour as if "Cancel" was pressed
         CancelClicked();

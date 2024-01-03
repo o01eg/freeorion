@@ -83,32 +83,21 @@ namespace {
 CUI_PinButton::CUI_PinButton() :
     GG::Button("", nullptr, ClientUI::WndInnerBorderColor())
 {
-    LeftClickedSignal.connect(-1,
-        &PlayCloseSound);
+    LeftClickedSignal.connect(-1, &PlayCloseSound);
     SetUnpressedGraphic(GetButtonSubTexture("pin.png"));
     SetPressedGraphic  (GetButtonSubTexture("pin.png"));
     SetRolloverGraphic (GetButtonSubTexture("pin_mouseover.png"));
 }
 
 void CUI_PinButton::Toggle(bool pinned) {
-    if (!pinned) {
-        SetUnpressedGraphic(GetButtonSubTexture("pin.png"));
-        SetPressedGraphic  (GetButtonSubTexture("pin.png"));
-        SetRolloverGraphic (GetButtonSubTexture("pin_mouseover.png"));
-    } else {
-        SetUnpressedGraphic(GetButtonSubTexture("pinned.png"));
-        SetPressedGraphic  (GetButtonSubTexture("pinned.png"));
-        SetRolloverGraphic (GetButtonSubTexture("pinned_mouseover.png"));
-    }
+    SetUnpressedGraphic(GetButtonSubTexture(pinned ? "pinned.png" : "pin.png"));
+    SetPressedGraphic  (GetButtonSubTexture(pinned ? "pinned.png" : "pin.png"));
+    SetRolloverGraphic (GetButtonSubTexture(pinned ? "pinned_mouseover.png" : "pin_mouseover.png"));
 }
 
 ////////////////////////////////////////////////
 // CUIWnd
 ////////////////////////////////////////////////
-GG::WndFlag MINIMIZABLE(1 << 10);
-GG::WndFlag CLOSABLE(1 << 11);
-GG::WndFlag PINABLE(1 << 12);
-
 namespace {
     bool RegisterWndFlags() {
         GG::FlagSpec<GG::WndFlag>::instance().insert(MINIMIZABLE, "MINIMIZABLE");
@@ -250,7 +239,7 @@ void CUIWnd::SetName(std::string name) {
 }
 
 void CUIWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
-    GG::Pt old_sz = Size();
+    const auto old_sz = Size();
     if (m_config_save) {    // can write position/size to OptionsDB
 
         GG::Pt available_size;
@@ -636,14 +625,9 @@ void CUIWnd::SetDefaultedOptions() {
 
 void CUIWnd::SaveDefaultedOptions() {
     OptionsDB& db = GetOptionsDB();
-    std::string config_prefix = "ui." + m_config_name;
-    std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ?
-                              ".fullscreen" : ".windowed";
-    GG::Pt size;
-    if (m_minimized)
-        size = m_original_size;
-    else
-        size = Size();
+    const std::string config_prefix = "ui." + m_config_name;
+    const std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ? ".fullscreen" : ".windowed";
+    const auto size = m_minimized ? m_original_size : Size();
 
     std::string config_name = config_prefix + window_mode + ".left";
     int int_value = Value(RelativeUpperLeft().x);
@@ -688,7 +672,7 @@ void CUIWnd::SaveOptions() const {
 
     // The default empty string means 'do not save/load properties'
     // Also do not save while the window is being dragged.
-    auto gui = GG::GUI::GetGUI();
+    const auto gui = GG::GUI::GetGUI();
     std::string option_prefix = "ui." + m_config_name;
     if (m_config_name.empty() || !m_config_save || !gui || gui->DragWnd(this, 0)) {
         return;
@@ -700,13 +684,9 @@ void CUIWnd::SaveOptions() const {
         return;
     }
 
-    GG::Pt size;
-    if (m_minimized)
-        size = m_original_size;
-    else
-        size = Size();
+    const auto size = m_minimized ? m_original_size : Size();
 
-    std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ?
+    const std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ?
                               ".fullscreen" : ".windowed";
 
     db.Set(option_prefix + window_mode + ".left",      Value(RelativeUpperLeft().x));
@@ -908,7 +888,7 @@ void CUIWnd::InvalidateUnusedOptions() {
     db.Commit();
 }
 
-void CUIWnd::SetParent(std::shared_ptr<GG::Wnd> wnd) {
+void CUIWnd::SetParent(std::shared_ptr<GG::Wnd> wnd) noexcept {
     GG::Wnd::SetParent(std::move(wnd));
     m_vertex_buffer.clear();    // force buffer re-init on next Render call, so background is properly positioned for new parent-relative position
 }
@@ -955,7 +935,7 @@ void CUIEditWnd::CompleteConstruction() {
 void CUIEditWnd::ModalInit()
 { GG::GUI::GetGUI()->SetFocusWnd(m_edit); }
 
-void CUIEditWnd::KeyPress(GG::Key key, std::uint32_t key_code_point,
+void CUIEditWnd::KeyPress(GG::Key key, uint32_t key_code_point,
                           GG::Flags<GG::ModKey> mod_keys)
 {
     switch (key) {

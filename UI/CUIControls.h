@@ -84,15 +84,13 @@ public:
     CUIArrowButton(ShapeOrientation orientation, bool fill_background,
                    GG::Flags<GG::WndFlag> flags = GG::INTERACTIVE);
 
-    bool InWindow(GG::Pt pt) const override;
+    bool InWindow(GG::Pt pt) const noexcept override;
 
     void MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
 
 protected:
     void RenderPressed() override;
-
     void RenderRollover() override;
-
     void RenderUnpressed() override;
 
 private:
@@ -266,7 +264,7 @@ public:
     void CompleteConstruction() override;
 
     void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void KeyPress(GG::Key key, std::uint32_t key_code_point,
+    void KeyPress(GG::Key key, uint32_t key_code_point,
                   GG::Flags<GG::ModKey> mod_keys) override;
     void AcceptPastedText(const std::string& text) override;
     void GainingFocus() override;

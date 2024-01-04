@@ -78,7 +78,7 @@ class MessageWndEdit : public CUIEdit {
 public:
     MessageWndEdit();
 
-    void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
+    void KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
     bool AutoComplete() override;   //!< Autocomplete current word
 
     /** emitted when user presses enter/return while entering text */
@@ -111,7 +111,7 @@ MessageWndEdit::MessageWndEdit() :
     CUIEdit("")
 {}
 
-void MessageWndEdit::KeyPress(GG::Key key, std::uint32_t key_code_point,
+void MessageWndEdit::KeyPress(GG::Key key, uint32_t key_code_point,
                               GG::Flags<GG::ModKey> mod_keys)
 {
     switch (key) {
@@ -351,7 +351,7 @@ std::string MessageWnd::GetText() const
 { return *m_display; }
 
 void MessageWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     CUIWnd::SizeMove(ul, lr);
     if (old_size != Size())
         RequirePreRender();

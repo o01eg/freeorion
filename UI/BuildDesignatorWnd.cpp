@@ -120,7 +120,7 @@ namespace {
         }
 
         void SizeMove(GG::Pt ul, GG::Pt lr) override {
-            const GG::Pt old_size = Size();
+            const auto old_size = Size();
             GG::Control::SizeMove(ul, lr);
             if (old_size != Size())
                 DoLayout();
@@ -636,7 +636,7 @@ namespace {
         const ProductionQueue::ProductionItem& Item() const noexcept { return m_item; }
 
         void SizeMove(GG::Pt ul, GG::Pt lr) override {
-            const GG::Pt old_size = Size();
+            const auto old_size = Size();
             GG::ListBox::Row::SizeMove(ul, lr);
             if (!empty() && old_size != Size() && m_panel)
                 m_panel->Resize(Size());
@@ -666,7 +666,7 @@ namespace {
         }
 
         void SizeMove(GG::Pt ul, GG::Pt lr) override {
-            const GG::Pt old_size = Size();
+            const auto old_size = Size();
             CUIListBox::SizeMove(ul, lr);
             if (old_size != Size()) {
                 const GG::Pt row_size = ListRowSize();
@@ -1286,23 +1286,23 @@ void BuildDesignatorWnd::CompleteConstruction() {
     Clear(context.ContextObjects());
 }
 
-const std::set<BuildType>& BuildDesignatorWnd::GetBuildTypesShown() const
+const std::set<BuildType>& BuildDesignatorWnd::GetBuildTypesShown() const noexcept
 { return m_build_selector->GetBuildTypesShown(); }
 
-std::pair<bool, bool> BuildDesignatorWnd::GetAvailabilitiesShown() const
+std::pair<bool, bool> BuildDesignatorWnd::GetAvailabilitiesShown() const noexcept
 { return m_build_selector->GetAvailabilitiesShown(); }
 
-bool BuildDesignatorWnd::InWindow(GG::Pt pt) const
+bool BuildDesignatorWnd::InWindow(GG::Pt pt) const noexcept
 { return (m_enc_detail_panel->InWindow(pt) && m_enc_detail_panel->Visible()) || m_build_selector->InWindow(pt) || m_side_panel->InWindow(pt); }
 
-bool BuildDesignatorWnd::InClient(GG::Pt pt) const
+bool BuildDesignatorWnd::InClient(GG::Pt pt) const noexcept
 { return m_enc_detail_panel->InClient(pt) || m_build_selector->InClient(pt) || m_side_panel->InClient(pt); }
 
-int BuildDesignatorWnd::SelectedPlanetID() const
+int BuildDesignatorWnd::SelectedPlanetID() const noexcept
 { return m_side_panel->SelectedPlanetID(); }
 
 void BuildDesignatorWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size()) {
         m_enc_detail_panel->ValidatePosition();

@@ -367,17 +367,17 @@ void Wnd::OffsetMove(Pt pt)
 
 void Wnd::SizeMove(Pt ul_, Pt lr_)
 {
-    Pt ul = ul_, lr = lr_;
-    Pt original_sz = Size();
-    bool resized = (original_sz != (lr - ul));
+    auto ul = ul_, lr = lr_;
+    const auto original_sz = Size();
+    const bool resized = (original_sz != (lr - ul));
     if (resized)
         ClampRectWithMinAndMaxSize(ul, lr);
 
     m_upperleft = ul;
     m_lowerright = lr;
     if (resized) {
-        bool size_changed = Size() != original_sz;
-        auto&& layout = GetLayout();
+        const bool size_changed = Size() != original_sz;
+        auto layout = GetLayout();
         if (layout && size_changed)
             layout->Resize(ClientSize());
         if (size_changed && !dynamic_cast<Layout*>(this))
@@ -929,10 +929,10 @@ void Wnd::CheckDrops(Pt pt, std::map<const Wnd*, bool>& drop_wnds_acceptable,
 void Wnd::DragDropLeave()
 { if (!Interactive()) ForwardEventToParent(); }
 
-void Wnd::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
+void Wnd::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 { if (!Interactive()) ForwardEventToParent(); }
 
-void Wnd::KeyRelease(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
+void Wnd::KeyRelease(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 { if (!Interactive()) ForwardEventToParent(); }
 
 void Wnd::TextInput(const std::string&)

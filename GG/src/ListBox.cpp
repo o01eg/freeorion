@@ -81,11 +81,13 @@ private:
     bool m_invert;
 };
 
-ListBox::Row* SafeDeref(const ListBox::iterator& it, const ListBox::iterator& end)
-{ return it == end ? nullptr : it->get(); }
+namespace {
+    auto* SafeDeref(const ListBox::iterator it, const ListBox::iterator end) noexcept
+    { return it == end ? nullptr : it->get(); }
 
-std::shared_ptr<ListBox::Row> IteratorToShared(const ListBox::iterator& it, const ListBox::iterator& end)
-{ return it == end ? std::shared_ptr<ListBox::Row>() : std::shared_ptr<ListBox::Row>(*it); }
+    auto IteratorToShared(const ListBox::iterator it, const ListBox::iterator end)
+    { return it == end ? std::shared_ptr<ListBox::Row>() : std::shared_ptr<ListBox::Row>(*it); }
+}
 
 bool RowAboveOrIsRow(ListBox::iterator lhs, ListBox::iterator rhs, ListBox::iterator end)
 {
@@ -435,7 +437,7 @@ void ListBox::Row::RClick(Pt pt, GG::Flags<GG::ModKey> mod) {
 }
 
 namespace {
-    auto RowPtrIteratorLess = [](const ListBox::iterator& lhs, const ListBox::iterator& rhs)
+    auto RowPtrIteratorLess = [](const ListBox::iterator lhs, const ListBox::iterator rhs)
     { return (*lhs)->Top() < (*rhs)->Top(); };
 }
 
@@ -823,7 +825,7 @@ void ListBox::Render()
 
 void ListBox::SizeMove(Pt ul, Pt lr)
 {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     Wnd::SizeMove(ul, lr);
     AdjustScrolls(old_size != Size());
     if (old_size != Size())
@@ -1339,7 +1341,7 @@ ListBox::iterator ListBox::RowUnderPt(Pt pt) const
     return retval;
 }
 
-void ListBox::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
+void ListBox::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 {
     if (!Disabled()) {
         bool bring_caret_into_view = true;

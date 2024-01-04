@@ -38,7 +38,7 @@ namespace {
     public:
         QueueTechPanel(GG::X x, GG::Y y, GG::X w, std::string_view tech_name,
                        double allocated_rp, int turns_left, double turns_completed,
-                       int empire_id, bool paused = false);
+                       int empire_id, bool paused);
 
         void CompleteConstruction() override;
         void Render() override;
@@ -80,18 +80,16 @@ namespace {
             const auto empire = context.GetEmpire(elem.empire_id);
 
             const Tech* tech = GetTech(elem.name);
-            const double per_turn_cost = tech ? tech->PerTurnCost(elem.empire_id, context) : 1;
-            double progress = 0.0;
-            if (empire && empire->TechResearched(elem.name))
-                progress = tech ? tech->ResearchCost(elem.empire_id, context) : 0.0;
-            else if (empire)
-                progress = empire->ResearchProgress(elem.name, context);
+            const double per_turn_cost = tech ? tech->PerTurnCost(elem.empire_id, context) : 1.0;
+            const double progress = (empire && empire->TechResearched(elem.name)) ?
+                (tech ? tech->ResearchCost(elem.empire_id, context) : 0.0) :
+                (empire ? empire->ResearchProgress(elem.name, context) : 0.0);
 
             panel = GG::Wnd::Create<QueueTechPanel>(GG::X(GetLayout()->BorderMargin()),
                                                     GG::Y(GetLayout()->BorderMargin()),
                                                     ClientWidth(), elem.name, elem.allocated_rp,
                                                     elem.turns_left, progress / per_turn_cost,
-                                                    elem.empire_id);
+                                                    elem.empire_id, elem.paused);
             push_back(panel); // DO NOT MOVE; panel is a member
 
             SetDragDropDataType("RESEARCH_QUEUE_ROW");
@@ -153,14 +151,13 @@ namespace {
         const GG::X METER_WIDTH = std::max(Width() - GRAPHIC_SIZE - 4*MARGIN - 3, GG::X1);
         const GG::X TURNS_AND_COST_WIDTH = std::max(NAME_WIDTH/2 - MARGIN, GG::X1);
 
-        ScriptingContext context;
+        const ScriptingContext context;
         const Tech* tech = GetTech(m_tech_name);
-        if (tech)
-            m_total_turns = tech->ResearchTime(m_empire_id, context);
+        m_total_turns = tech ? tech->ResearchTime(m_empire_id, context) : 1;
 
-        GG::Clr clr = m_in_progress
-                        ? GG::LightenClr(ClientUI::ResearchableTechTextAndBorderColor())
-                        : ClientUI::ResearchableTechTextAndBorderColor();
+        const auto clr = m_in_progress ?
+            GG::LightenClr(ClientUI::ResearchableTechTextAndBorderColor()) :
+            ClientUI::ResearchableTechTextAndBorderColor();
 
         GG::Y top{MARGIN};
         GG::X left{MARGIN};
@@ -168,10 +165,11 @@ namespace {
         m_icon = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::TechIcon(m_tech_name), GG::GRAPHIC_FITGRAPHIC);
         m_icon->MoveTo(GG::Pt(left, top));
         m_icon->Resize(GG::Pt(GG::X(GRAPHIC_SIZE), GG::Y(GRAPHIC_SIZE)));
-        m_icon->SetColor(tech ? ClientUI::CategoryColor(tech->Category()) : GG::Clr());
+        m_icon->SetColor(tech ? ClientUI::CategoryColor(tech->Category()) : GG::CLR_ZERO);
         left += m_icon->Width() + MARGIN;
 
-        m_name_text = GG::Wnd::Create<CUILabel>(m_paused ? UserString("PAUSED") : UserString(m_tech_name), GG::FORMAT_TOP | GG::FORMAT_LEFT);
+        m_name_text = GG::Wnd::Create<CUILabel>(m_paused ? UserString("PAUSED") : UserString(m_tech_name),
+                                                GG::FORMAT_TOP | GG::FORMAT_LEFT);
         m_name_text->MoveTo(GG::Pt(left, top));
         m_name_text->Resize(GG::Pt(NAME_WIDTH, GG::Y(FONT_PTS + 2*MARGIN)));
         m_name_text->SetTextColor(clr);
@@ -179,35 +177,25 @@ namespace {
         m_name_text->SetChildClippingMode(ChildClippingMode::ClipToClient);
         top += m_name_text->Height();
 
-        int total_time = 0;
-        float perc_complete = 0.0f;
-        float next_progress = 0.0f;
-        float research_cost = 0.0f;
-        if (tech) {
-            total_time = m_total_turns;
-            perc_complete = total_time > 0 ? turns_completed / total_time : 0.0f;
-            research_cost = tech->ResearchCost(m_empire_id, context);
-            next_progress = turn_spending / std::max(1.0f, research_cost);
-        }
-        GG::Clr outline_color = ClientUI::ResearchableTechFillColor();
-        if (m_in_progress)
-            outline_color = GG::LightenClr(outline_color);
+        const int total_time = tech ? m_total_turns : 0;
+        const float perc_complete = (tech && total_time > 0) ? (turns_completed / total_time) : 0.0f;
+        const float research_cost = tech ? tech->ResearchCost(m_empire_id, context) : 0.0f;
+        const float next_progress = turn_spending / std::max(1.0f, research_cost);
 
-        m_progress_bar = GG::Wnd::Create<MultiTurnProgressBar>(total_time,
-                                                               perc_complete,
-                                                               next_progress,
-                                                               GG::LightenClr(ClientUI::TechWndProgressBarBackgroundColor()),
-                                                               ClientUI::TechWndProgressBarColor(),
-                                                               outline_color);
+        const auto fill_clr = ClientUI::ResearchableTechFillColor();
+        const auto outline_color = m_in_progress ? GG::LightenClr(fill_clr) : fill_clr;
+
+        m_progress_bar = GG::Wnd::Create<MultiTurnProgressBar>(
+            total_time, perc_complete, next_progress,
+            GG::LightenClr(ClientUI::TechWndProgressBarBackgroundColor()),
+            ClientUI::TechWndProgressBarColor(), outline_color);
 
         m_progress_bar->MoveTo(GG::Pt(left, top));
         m_progress_bar->Resize(GG::Pt(METER_WIDTH, METER_HEIGHT));
         top += m_progress_bar->Height() + MARGIN;
 
-        using boost::io::str;
-
-        double max_spending_per_turn = research_cost;
-        std::string turns_cost_text = str(FlexibleFormat(UserString("TECH_TURN_COST_STR"))
+        const double max_spending_per_turn = research_cost;
+        std::string turns_cost_text = boost::io::str(FlexibleFormat(UserString("TECH_TURN_COST_STR"))
             % DoubleToString(turn_spending, 3, false)
             % DoubleToString(max_spending_per_turn, 3, false));
         m_RPs_and_turns_text = GG::Wnd::Create<CUILabel>(std::move(turns_cost_text), GG::FORMAT_LEFT);
@@ -219,8 +207,10 @@ namespace {
 
         left += TURNS_AND_COST_WIDTH;
 
-        std::string turns_left_text = turns_left < 0 ? UserString("TECH_TURNS_LEFT_NEVER")
-                                                     : str(FlexibleFormat(UserString("TECH_TURNS_LEFT_STR")) % turns_left);
+        std::string turns_left_text = m_paused ? UserString("PAUSED") :
+            (turns_left < 0) ? UserString("TECH_TURNS_LEFT_NEVER") :
+            str(FlexibleFormat(UserString("TECH_TURNS_LEFT_STR")) % turns_left);
+
         m_turns_remaining_text = GG::Wnd::Create<CUILabel>(std::move(turns_left_text), GG::FORMAT_RIGHT);
         m_turns_remaining_text->MoveTo(GG::Pt(left, top));
         m_turns_remaining_text->Resize(GG::Pt(TURNS_AND_COST_WIDTH, GG::Y(FONT_PTS + MARGIN)));
@@ -239,8 +229,8 @@ namespace {
     }
 
     void QueueTechPanel::Render() {
-        GG::Clr fill = m_in_progress ? GG::LightenClr(ClientUI::ResearchableTechFillColor()) : ClientUI::ResearchableTechFillColor();
-        GG::Clr text_and_border = m_in_progress ? GG::LightenClr(ClientUI::ResearchableTechTextAndBorderColor()) : ClientUI::ResearchableTechTextAndBorderColor();
+        const auto fill = m_in_progress ? GG::LightenClr(ClientUI::ResearchableTechFillColor()) : ClientUI::ResearchableTechFillColor();
+        const auto text_and_border = m_in_progress ? GG::LightenClr(ClientUI::ResearchableTechTextAndBorderColor()) : ClientUI::ResearchableTechTextAndBorderColor();
 
         glDisable(GL_TEXTURE_2D);
         Draw(fill, true);
@@ -385,7 +375,7 @@ public:
     }
 
     void SizeMove(GG::Pt ul, GG::Pt lr) override {
-        GG::Pt sz = Size();
+        const auto sz = Size();
         CUIWnd::SizeMove(ul, lr);
         if (Size() != sz)
             DoLayout();
@@ -461,7 +451,7 @@ void ResearchWnd::CompleteConstruction() {
 }
 
 void ResearchWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size())
         DoLayout();

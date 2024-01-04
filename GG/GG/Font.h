@@ -19,10 +19,10 @@
 
 
 #include <memory>
-#include <set>
 #include <stack>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 #include <GG/AlignmentFlags.h>
+#include <GG/GLClientAndServerBuffer.h>
 #include <GG/FontFwd.h>
 #include <GG/Texture.h>
 #include <GG/UnicodeCharsets.h>
@@ -103,7 +103,7 @@ GG_API std::string RgbaTag(Clr c);
     will know nothing about the semantics of the new tags, it is possible to
     let Font know about them, in order for Font to render them invisible as it
     does with the tags listed above.  See the static methods
-    RegisterKnownTag(), RemoveKnownTag(), and ClearKnownTags() for details.
+    RegisterKnownTags(), RemoveKnownTag(), and ClearKnownTags() for details.
     It is not possible to remove the built-in tags using these methods.  If
     you wish not to use tags at all, call DetermineLines() and RenderText()
     with the format parameter containing FORMAT_IGNORETAGS, or include a
@@ -168,8 +168,7 @@ public:
         bool operator==(const Substring& rhs) const;
 
         /** Concatenation with base.  \a rhs.first must be <= \a rhs.second.
-            .second must be equal to \a rhs.first (*this and \a rhs must be
-            contiguous). */
+          * .second must be equal to \a rhs.first (*this and \a rhs must be contiguous). */
         Substring& operator+=(const IterPair& rhs);
 
     private:
@@ -182,8 +181,7 @@ public:
         using GG::Font. */
     struct GG_API TextElement
     {
-        /** The types of token-like entities that can be represented by a
-            TextElement. */
+        /** The types of token-like entities that can be represented by a TextElement. */
         enum class TextElementType : uint8_t {
             OPEN_TAG,   ///< An opening text formatting tag (e.g. "<rgba 0 0 0 255>").
             CLOSE_TAG,  ///< A closing text formatting tag (e.g. "</rgba>").
@@ -198,9 +196,10 @@ public:
 
         /** Ctor.  \a ws indicates that the element contains only whitespace;
             \a nl indicates that it is a newline element. */
-        TextElement(bool ws, bool nl);
-
-        virtual ~TextElement() = default;
+        TextElement(bool ws, bool nl) noexcept :
+            whitespace(ws),
+            newline(nl)
+        {}
 
         /** Attach this TextElement to the string \p whole_text, by
             attaching the SubString data member text to \p whole_text.
@@ -223,23 +222,35 @@ public:
             entire vectors of TextElement with different std::strings
             without re-parsing the std::string.
          */
-        virtual void Bind(const std::string& whole_text);
+        virtual void Bind(const std::string& whole_text) noexcept
+        { text.Bind(whole_text); }
 
         /** Returns the TextElementType of the element. */
-        virtual TextElementType Type() const;
+        virtual TextElementType Type() const noexcept
+        {
+            return newline ? TextElementType::NEWLINE :
+                whitespace ? TextElementType::WHITESPACE :
+                             TextElementType::TEXT;
+        }
 
         /** Returns the width of the element. */
         X Width() const;
 
         /* Returns the number of characters in the original string that the
            element represents. */
-        StrSize StringSize() const;
+        StrSize StringSize() const noexcept
+        { return StrSize(text.size()); }
 
         /** Returns the number of code points in the original string that the
             element represents. */
-        CPSize CodePointSize() const;
+        CPSize CodePointSize() const noexcept
+        { return CPSize(widths.size()); }
 
-        virtual bool operator==(const TextElement &rhs) const; // ignores cached_width
+        virtual bool operator==(const TextElement &rhs) const noexcept
+        { // ignores cached_width
+            return (text == rhs.text && widths == rhs.widths
+                    && whitespace == rhs.whitespace && newline == rhs.newline);
+        }
 
         /** The text from the original string represented by the element. */
         Substring text;
@@ -274,15 +285,15 @@ public:
         const std::vector<std::shared_ptr<TextElement>>& Elements() const;
 
         /** Add an open tag iff it exists as a recognized tag.*/
-        TextAndElementsAssembler& AddOpenTag(const std::string& tag);
+        TextAndElementsAssembler& AddOpenTag(std::string_view tag);
         /** Add an open tag iff it exists as a recognized tag.*/
-        TextAndElementsAssembler& AddOpenTag(const std::string& tag, const std::vector<std::string>& params);
+        TextAndElementsAssembler& AddOpenTag(std::string_view tag, const std::vector<std::string>& params);
         /** Add a close tag iff it exists as a recognized tag.*/
-        TextAndElementsAssembler& AddCloseTag(const std::string& tag);
+        TextAndElementsAssembler& AddCloseTag(std::string_view tag);
         /** Add a text element.  Any whitespace in this text element will be non-breaking.*/
-        TextAndElementsAssembler& AddText(const std::string& text);
+        TextAndElementsAssembler& AddText(std::string_view text);
         /** Add a white space element.*/
-        TextAndElementsAssembler& AddWhitespace(const std::string& whitespace);
+        TextAndElementsAssembler& AddWhitespace(std::string_view whitespace);
         /** Add a new line element.*/
         TextAndElementsAssembler& AddNewline();
 
@@ -307,12 +318,26 @@ public:
         /** Attach to \p whole_text by binding all Substring data members,
             both the base class and the data member tag_name to the string
             \p whole_text.*/
-        void Bind(const std::string& whole_text) override;
+        void Bind(const std::string& whole_text) noexcept override
+        {
+            TextElement::Bind(whole_text);
+            tag_name.Bind(whole_text);
+            for (Substring& substring : params)
+                substring.Bind(whole_text);
+        }
 
         TextElementType Type() const noexcept override
         { return close_tag ? TextElementType::CLOSE_TAG : TextElementType::OPEN_TAG; }
 
-        bool operator==(const TextElement &rhs) const override;
+        bool operator==(const TextElement &rhs) const noexcept override
+        {
+            Font::FormattingTag const* ft = dynamic_cast<Font::FormattingTag const*>(&rhs);
+            return (ft &&
+                    Font::TextElement::operator==(rhs) &&
+                    params == ft->params &&
+                    tag_name == ft->tag_name &&
+                    close_tag == ft->close_tag);
+        }
 
         /** The parameter strings within the tag, e.g. "0", "0", "0", and "255"
             for the tag "<rgba 0 0 0 255>". */
@@ -347,16 +372,13 @@ public:
             CharData(X extent_, StrSize str_index, StrSize str_size, CPSize cp_index,
                      const std::vector<std::shared_ptr<TextElement>>& tags_);
 
-            /** The furthest-right extent of this glyph as it appears on the
-                line. */
+            /** The furthest-right extent of this glyph as it appears on the line. */
             X extent = X0;
 
-            /** The position in the original string of the first character of
-                this glyph. */
+            /** The position in the original string of the first character of this glyph. */
             StrSize string_index = S0;
 
-            /** The size in the original string of the characters that make up
-                this glyph. */
+            /** The size in the original string of the characters that make up this glyph. */
             StrSize string_size = S0;
 
             /** The code point index of this glyph. */
@@ -389,20 +411,22 @@ public:
 
         RenderState(Clr color); //< Takes default text color as parameter
 
+        void clear();
+
         /** The count of open \<i> tags seen since the last \</i> seen. */
-        std::size_t     use_italics = 0;
+        uint8_t use_italics = 0;
 
         /** The count of open \<s> tags seen since the last \</s> seen. */
-        std::size_t     use_shadow = 0;
+        uint8_t use_shadow = 0;
 
         /** The count of open \<u> tags seen since the last \</u> seen. */
-        std::size_t     draw_underline = 0;
+        uint8_t draw_underline = 0;
 
         /** The count of open \<super> (positive) minus \<sub> tags seen. */
-        int             super_sub_shift = 0;
+        int8_t super_sub_shift = 0;
 
         /** The stack of text color indexes (as set by previous tags). */
-        std::stack<int> color_index_stack;
+        std::stack<uint8_t> color_index_stack;
 
         /** All colors that have been used. **/
         std::vector<Clr> used_colors;
@@ -422,19 +446,22 @@ public:
         bool ColorsEmpty() const noexcept { return color_index_stack.size() <= 1; }
     };
 
-    /** \brief Holds precomputed glyph position information for rendering.
-     */
+    /** \brief Holds precomputed glyph position information for rendering. */
     struct RenderCache
     {
-        std::unique_ptr<GL2DVertexBuffer> vertices;
-        std::unique_ptr<GLTexCoordBuffer> coordinates;
-        std::unique_ptr<GLRGBAColorBuffer> colors;
+        GL2DVertexBuffer vertices;
+        GLTexCoordBuffer coordinates;
+        GLRGBAColorBuffer colors;
+        GL2DVertexBuffer underline_vertices;
+        GLRGBAColorBuffer underline_colors;
 
-        std::unique_ptr<GL2DVertexBuffer> underline_vertices;
-        std::unique_ptr<GLRGBAColorBuffer> underline_colors;
-
-        RenderCache();
-        ~RenderCache(); // needed for unique_ptr<forward_declared_class>
+        void clear() {
+            vertices.clear();
+            coordinates.clear();
+            colors.clear();
+            underline_vertices.clear();
+            underline_colors.clear();
+        }
     };
 
     /** Construct a font using only the printable ASCII characters.
@@ -577,7 +604,6 @@ public:
 
         changed text:              "<i>Ship:<\i> New Ship Name ID:"
         changed text_elements:     [<OPEN_TAG i>, <TEXT "Ship:">, <CLOSE_TAG i>, <WHITESPACE>, <TEXT New Ship Name>, <WHITESPACE>, <TEXT ID:>]
-
     */
     void ChangeTemplatedText(std::string& text,
                              std::vector<std::shared_ptr<TextElement>>& text_elements,
@@ -607,12 +633,11 @@ public:
     /** Adds \a tag to the list of embedded tags that Font should not print
         when rendering text.  Passing "foo" will cause Font to treat "<foo>",
         "<foo [arg1 [arg2 ...]]>", and "</foo>" as tags. */
-    static void RegisterKnownTag(const std::string& tag);
-    static void RegisterKnownTag(std::string_view tag);
+    static void RegisterKnownTags(std::vector<std::string_view> tags);
 
     /** Removes \a tag from the known tag list.  Does not remove the built in
         tags: \<i>, \<u>, \<rgba r g b a>, and \<pre>. */
-    static void RemoveKnownTag(const std::string& tag);
+    static void RemoveKnownTag(std::string_view tag);
 
     /** Removes all tags from the known tag list.  Does not remove the built
         in tags: \<i>, \<u>, \<rgba r g b a>, and \<pre>. */
@@ -650,7 +675,7 @@ public:
         character (if possible), or as a Unicode code point.  \a format_str
         should contain the Boost.Format positional notation formatting tag
         "%1%" where the code point should appear. */
-    static void ThrowBadGlyph(const std::string& format_str, std::uint32_t c);
+    static void ThrowBadGlyph(const std::string& format_str, uint32_t c);
 
 protected:
     Font() = default;
@@ -661,23 +686,23 @@ private:
     struct Glyph
     {
         Glyph() = default;
-        Glyph(std::shared_ptr<Texture> texture, Pt ul, Pt lr, Y y_ofs, X lb, X adv);
+        Glyph(std::shared_ptr<Texture> texture, Pt ul, Pt lr, int16_t y_ofs, int16_t lb, int16_t adv);
 
-        SubTexture  sub_texture;       ///< The subtexture containing just this glyph
-        Y           y_offset = Y0;     ///< The vertical offset to draw this glyph (may be negative!)
-        X           left_bearing = X0; ///< The space that should remain before the glyph
-        X           advance = X0;      ///< The amount of space the glyph should occupy, including glyph graphic and inter-glyph spacing
-        X           width = X0;        ///< The width of the glyph only
+        SubTexture  sub_texture;      ///< The subtexture containing just this glyph
+        int16_t     y_offset = 0;     ///< The vertical offset to draw this glyph (may be negative!)
+        int16_t     left_bearing = 0; ///< The space that should remain before the glyph
+        int16_t     advance = 0;      ///< The amount of space the glyph should occupy, including glyph graphic and inter-glyph spacing
+        int16_t     width = 0;        ///< The width of the glyph only
     };
 
-    typedef std::unordered_map<std::uint32_t, Glyph> GlyphMap;
+    using GlyphMap = boost::unordered_map<uint32_t, Glyph>;
 
     FT_Error          GetFace(FT_Face& face);
     FT_Error          GetFace(const std::vector<uint8_t>& file_contents, FT_Face& face);
     void              CheckFace(FT_Face font, FT_Error error);
     void              Init(FT_Face& font);
 
-    bool              GenerateGlyph(FT_Face font, std::uint32_t ch);
+    bool              GenerateGlyph(FT_Face font, uint32_t ch);
 
     void              ValidateFormat(Flags<TextFormat>& format) const;
 
@@ -691,25 +716,26 @@ private:
                                          Y underline_height, Y underline_offset) const;
 
     void              HandleTag(const std::shared_ptr<FormattingTag>& tag, RenderState& render_state) const;
-    bool              IsDefaultFont();
+    bool              IsDefaultFont() const noexcept;
 
-    std::shared_ptr<Font> GetDefaultFont(unsigned int pts);
+    static std::shared_ptr<Font> GetDefaultFont(unsigned int pts);
 
-    std::string          m_font_filename;
-    unsigned int         m_pt_sz = 0;
-    std::vector<UnicodeCharset>
-                         m_charsets;               ///< The sets of glyphs that are covered by this font object
-    Y                    m_ascent = Y0;            ///< Maximum amount above the baseline the text can go
-    Y                    m_descent = Y0;           ///< Maximum amount below the baseline the text can go
-    Y                    m_height = Y0;            ///< Ascent - descent
-    Y                    m_lineskip = Y0;          ///< Distance that should be placed between lines
-    double               m_underline_offset = 0.0; ///< Amount below the baseline that the underline sits
-    double               m_underline_height = 0.0; ///< Height (thickness) of underline
-    double               m_italics_offset = 0.0;   ///< Amount that the top of an italicized glyph is left of the bottom
-    double               m_super_sub_offset = 0.0; ///< Ammount to shift super or subscript text
-    double               m_shadow_offset = 0.0;    ///< Amount that shadows rendered under texts are displaced from the text
-    X                    m_space_width = X0;       ///< The width of the glyph for the space character
-    GlyphMap             m_glyphs;                 ///< The locations of the images of each glyph within the textures
+    std::string                 m_font_filename;
+    unsigned int                m_pt_sz = 0;
+    std::vector<UnicodeCharset> m_charsets; ///< The sets of glyphs that are covered by this font object
+
+    Y       m_ascent = Y0;            ///< Maximum amount above the baseline the text can go
+    Y       m_descent = Y0;           ///< Maximum amount below the baseline the text can go
+    Y       m_height = Y0;            ///< Ascent - descent
+    Y       m_lineskip = Y0;          ///< Distance that should be placed between lines
+    double  m_underline_offset = 0.0; ///< Amount below the baseline that the underline sits
+    double  m_underline_height = 0.0; ///< Height (thickness) of underline
+    double  m_italics_offset = 0.0;   ///< Amount that the top of an italicized glyph is left of the bottom
+    double  m_super_sub_offset = 0.0; ///< Ammount to shift super or subscript text
+    double  m_shadow_offset = 0.0;    ///< Amount that shadows rendered under texts are displaced from the text
+    X       m_space_width = X0;       ///< The width of the glyph for the space character
+
+    GlyphMap m_glyphs;                ///< The locations of the images of each glyph within the textures
 
     /** The OpenGL texture object in which the glyphs can be found. */
     std::shared_ptr<Texture> m_texture;
@@ -779,30 +805,30 @@ private:
 public:
     /** Returns true iff this manager contains a font with the given filename
         and point size, regardless of charsets. */
-    bool HasFont(std::string font_filename, unsigned int pts) const;
+    bool HasFont(std::string_view font_filename, unsigned int pts) const noexcept;
 
     /** Returns true iff this manager contains a font with the given filename
         and point size, containing the given charsets. */
     template <typename CharSetIter>
-    bool HasFont(std::string font_filename, unsigned int pts,
+    bool HasFont(std::string_view font_filename, unsigned int pts,
                  CharSetIter first, CharSetIter last) const;
 
     /** Returns a shared_ptr to the requested font, supporting all printable
         ASCII characters.  \note May load font if unavailable at time of
         request. */
-    std::shared_ptr<Font> GetFont(std::string font_filename, unsigned int pts);
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts);
 
     /** Returns a shared_ptr to the requested font, supporting all printable
         ASCII characters, from the in-memory contents \a file_contents.  \note
         May load font if unavailable at time of request. */
-    std::shared_ptr<Font> GetFont(std::string font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
                                   const std::vector<uint8_t>& file_contents);
 
     /** Returns a shared_ptr to the requested font, supporting all the
         code points in the UnicodeCharsets in the range [first, last).  \note
         May load font if unavailable at time of request. */
     template <typename CharSetIter>
-    std::shared_ptr<Font> GetFont(std::string font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
                                   CharSetIter first, CharSetIter last);
 
     /** Returns a shared_ptr to the requested font, supporting all the code
@@ -810,23 +836,35 @@ public:
         in-memory contents \a file_contents.  \note May load font if
         unavailable at time of request. */
     template <typename CharSetIter>
-    std::shared_ptr<Font> GetFont(std::string font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
                                   const std::vector<uint8_t>& file_contents,
                                   CharSetIter first, CharSetIter last);
 
     /** Removes the indicated font from the font manager.  Due to shared_ptr
         semantics, the font may not be deleted until much later. */
-    void                    FreeFont(std::string font_filename, unsigned int pts);
+    void FreeFont(std::string_view font_filename, unsigned int pts);
 
 private:
     FontManager() = default;
 
     template <typename CharSetIter>
-    std::shared_ptr<Font> GetFontImpl(std::string font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFontImpl(std::string_view font_filename, unsigned int pts,
                                       const std::vector<uint8_t>* file_contents,
                                       CharSetIter first, CharSetIter last);
 
-    std::map<FontKey, std::shared_ptr<Font>> m_rendered_fonts;
+    using FontContainer = std::vector<std::pair<FontKey, std::shared_ptr<Font>>>;
+    using FontContainerIt = FontContainer::const_iterator;
+
+    FontContainerIt FontLookup(std::string_view font_filename, unsigned int pts) const noexcept
+    {
+        return std::find_if(m_rendered_fonts.begin(), m_rendered_fonts.end(),
+                            [font_filename, pts](const auto& key_font) {
+                                return key_font.first.filename == font_filename &&
+                                    key_font.first.points == pts;
+                            });
+    }
+
+    FontContainer m_rendered_fonts;
 
     static const std::shared_ptr<Font> EMPTY_FONT;
 
@@ -872,12 +910,7 @@ GG::Font::Font(std::string font_filename, unsigned int pts,
                CharSetIter first, CharSetIter last) :
     m_font_filename(std::move(font_filename)),
     m_pt_sz(pts),
-    m_charsets(first, last),
-    m_underline_offset(0.0),
-    m_underline_height(0.0),
-    m_italics_offset(0.0),
-    m_super_sub_offset(0.0),
-    m_shadow_offset(0.0)
+    m_charsets(first, last)
 {
     if (!m_font_filename.empty()) {
         detail::FTFaceWrapper wrapper;
@@ -893,12 +926,7 @@ GG::Font::Font(std::string font_filename, unsigned int pts,
                CharSetIter first, CharSetIter last) :
     m_font_filename(std::move(font_filename)),
     m_pt_sz(pts),
-    m_charsets(first, last),
-    m_underline_offset(0.0),
-    m_underline_height(0.0),
-    m_italics_offset(0.0),
-    m_super_sub_offset(0.0),
-    m_shadow_offset(0.0)
+    m_charsets(first, last)
 {
     assert(!file_contents.empty());
     detail::FTFaceWrapper wrapper;
@@ -908,42 +936,42 @@ GG::Font::Font(std::string font_filename, unsigned int pts,
 }
 
 template <typename CharSetIter>
-bool GG::FontManager::HasFont(std::string font_filename, unsigned int pts,
+bool GG::FontManager::HasFont(std::string_view font_filename, unsigned int pts,
                               CharSetIter first, CharSetIter last) const
 {
-    bool retval = false;
-    auto it = m_rendered_fonts.find(FontKey(std::move(font_filename), pts));
-    if (it != m_rendered_fonts.end()) {
-        std::set<UnicodeCharset> requested_charsets(first, last);
-        std::set<UnicodeCharset> found_charsets(it->second->UnicodeCharsets().begin(),
-                                                it->second->UnicodeCharsets().end());
-        retval = requested_charsets == found_charsets;
-    }
-    return retval;
+    const auto it = FontLookup(font_filename, pts);
+    if (it == m_rendered_fonts.end())
+        return false;
+
+    std::vector<UnicodeCharset> requested_charsets(first, last);
+    std::sort(requested_charsets.begin(), requested_charsets.end());
+    std::vector<UnicodeCharset> found_charsets(it->second->UnicodeCharsets());
+    std::sort(found_charsets.begin(), found_charsets.end());
+
+    return (requested_charsets == found_charsets);
 }
 
 template <typename CharSetIter>
 std::shared_ptr<GG::Font>
-GG::FontManager::GetFont(std::string font_filename, unsigned int pts,
+GG::FontManager::GetFont(std::string_view font_filename, unsigned int pts,
                          CharSetIter first, CharSetIter last)
-{ return GetFontImpl(std::move(font_filename), pts, nullptr, first, last); }
+{ return GetFontImpl(font_filename, pts, nullptr, first, last); }
 
 template <typename CharSetIter>
 std::shared_ptr<GG::Font>
-GG::FontManager::GetFont(std::string font_filename, unsigned int pts,
+GG::FontManager::GetFont(std::string_view font_filename, unsigned int pts,
                          const std::vector<uint8_t>& file_contents,
                          CharSetIter first, CharSetIter last)
-{ return GetFontImpl(std::move(font_filename), pts, &file_contents, first, last); }
+{ return GetFontImpl(font_filename, pts, &file_contents, first, last); }
 
 
 template <typename CharSetIter>
 std::shared_ptr<GG::Font>
-GG::FontManager::GetFontImpl(std::string font_filename, unsigned int pts,
+GG::FontManager::GetFontImpl(std::string_view font_filename, unsigned int pts,
                              const std::vector<uint8_t>* file_contents,
                              CharSetIter first, CharSetIter last)
 {
-    FontKey key(font_filename, pts);
-    auto it = m_rendered_fonts.find(key);
+    const auto it = FontLookup(font_filename, pts);
     if (it == m_rendered_fonts.end()) { // if no such font has been created, create it now
         if (font_filename.empty()) {
             // keeps this function from throwing; "" is the only invalid font
@@ -951,35 +979,38 @@ GG::FontManager::GetFontImpl(std::string font_filename, unsigned int pts,
             return EMPTY_FONT;
         } else {
             auto font = file_contents ?
-                std::make_shared<Font>(std::move(font_filename), pts, *file_contents, first, last) :
-                std::make_shared<Font>(std::move(font_filename), pts, first, last);
-            return m_rendered_fonts.emplace(std::move(key), std::move(font)).first->second;
+                std::make_shared<Font>(std::string(font_filename), pts, *file_contents, first, last) :
+                std::make_shared<Font>(std::string(font_filename), pts, first, last);
+            return m_rendered_fonts.emplace_back(FontKey{font_filename, pts}, std::move(font)).second;
         }
 
     // if a font like this has been created, but it doesn't have all the right
     // glyphs, release it and create a new one
     } else {
-        std::set<UnicodeCharset> requested_charsets(first, last);
-        std::set<UnicodeCharset> found_charsets(it->second->UnicodeCharsets().begin(),
-                                                it->second->UnicodeCharsets().end());
-        if (requested_charsets != found_charsets) {
-            std::vector<UnicodeCharset> united_charsets;
-            std::set_union(requested_charsets.begin(), requested_charsets.end(),
-                           found_charsets.begin(), found_charsets.end(),
-                           std::back_inserter(united_charsets));
-            m_rendered_fonts.erase(it);
-            auto font = file_contents ?
-                std::make_shared<Font>(std::move(font_filename), pts, *file_contents,
-                                       united_charsets.begin(), united_charsets.end()) :
-                std::make_shared<Font>(std::move(font_filename), pts,
-                                       united_charsets.begin(), united_charsets.end());
-            return m_rendered_fonts.emplace(std::move(key), std::move(font)).first->second;
+        std::vector<UnicodeCharset> requested_charsets(first, last);
+        std::sort(requested_charsets.begin(), requested_charsets.end());
+        const auto requested_unique_it = std::unique(requested_charsets.begin(), requested_charsets.end());
+        std::vector<UnicodeCharset> found_charsets(it->second->UnicodeCharsets());
+        std::sort(found_charsets.begin(), found_charsets.end());
+        const auto found_unique_it = std::unique(found_charsets.begin(), found_charsets.end());
 
-        } else { // otherwise, the font we found works, so just return it
+        if (requested_charsets == found_charsets)
             return it->second;
-        }
-    }
 
+        std::vector<UnicodeCharset> united_charsets;
+        united_charsets.reserve(std::max(requested_charsets.size(), found_charsets.size()));
+
+        std::set_union(requested_charsets.begin(), requested_unique_it,
+                       found_charsets.begin(), found_unique_it,
+                       std::back_inserter(united_charsets));
+        m_rendered_fonts.erase(it);
+        auto font = file_contents ?
+            std::make_shared<Font>(std::string(font_filename), pts, *file_contents,
+                                   united_charsets.begin(), united_charsets.end()) :
+            std::make_shared<Font>(std::string(font_filename), pts,
+                                   united_charsets.begin(), united_charsets.end());
+        return m_rendered_fonts.emplace_back(FontKey{font_filename, pts}, std::move(font)).second;
+    }
 }
 
 

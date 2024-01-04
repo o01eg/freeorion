@@ -384,8 +384,7 @@ public:
     [[nodiscard]] Y Top() const noexcept { return UpperLeft().y; }
 
     /** Returns (one pixel past) the lower-right corner of window in \a screen
-        \a coordinates (taking into account parent's screen position, if
-        any) */
+        \a coordinates (taking into account parent's screen position, if any) */
     [[nodiscard]] Pt LowerRight() const noexcept;
     [[nodiscard]] X Right() const noexcept { return LowerRight().x; }
     [[nodiscard]] Y Bottom() const noexcept { return LowerRight().y; }
@@ -395,8 +394,7 @@ public:
     [[nodiscard]] Pt RelativeUpperLeft() const noexcept { return m_upperleft; }
 
     /** Returns (one pixel past) the lower-right corner of window, relative to
-        its parent's client area, or in screen coordinates if no parent
-        exists. */
+        its parent's client area, or in screen coordinates if no parent exists. */
     [[nodiscard]] Pt RelativeLowerRight() const noexcept { return m_lowerright; }
 
     [[nodiscard]] X Width() const noexcept { return m_lowerright.x - m_upperleft.x; }
@@ -440,16 +438,21 @@ public:
     /** Returns \a pt translated from screen- to client-coordinates. */
     [[nodiscard]] Pt ScreenToClient(Pt pt) const noexcept { return pt - ClientUpperLeft(); }
 
-    /** Returns true if screen-coordinate point \a pt falls within the
-        window. */
+    /** Returns true if screen-coordinate point \a pt falls within the window. */
     [[nodiscard]] virtual bool InWindow(Pt pt) const { return pt >= UpperLeft() && pt < LowerRight(); }
 
-    /** Returns true if screen-coordinate point \a pt falls within the
-        window's client area. */
-    [[nodiscard]] virtual bool InClient(Pt pt) const { return pt >= ClientUpperLeft() && pt < ClientLowerRight(); }
+    /** Returns true if screen-coordinates Rect \a r all or partly falls within the window's client area. */
+    [[nodiscard]] virtual bool InWindow(Rect r) const
+    { return r.LowerRight() >= UpperLeft() && r.UpperLeft() <= LowerRight(); }
 
-    /** Returns child list; the list is const, but the children may be
-        manipulated. */
+    /** Returns true if screen-coordinate point \a pt falls within the window's client area. */
+    [[nodiscard]] virtual bool InClient(Pt pt) const noexcept { return pt >= ClientUpperLeft() && pt < ClientLowerRight(); }
+
+    /** Returns true if screen-coordinates Rect \a r all or partly falls within the window's client area. */
+    [[nodiscard]] virtual bool InClient(Rect r) const noexcept
+    { return r.LowerRight() >= ClientUpperLeft() && r.UpperLeft() <= ClientLowerRight(); }
+
+    /** Returns child list; the list is const, but the children may be manipulated. */
     [[nodiscard]] const auto& Children() const noexcept { return m_children; }
 
     /** Returns the window's parent (may be null). */
@@ -907,14 +910,14 @@ protected:
         KeyPress(), not KeyRelease(); in fact, by default no Wnd class does
         anything at all on a KeyRelease event.  \note \a key_code_point will
         be zero if Unicode support is unavailable. */
-    virtual void KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys);
+    virtual void KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys);
 
     /** Respond to up-keystrokes (focus window only).  A window may receive
         KeyRelease() messages passed up to it from its children.  For
         instance, Control-derived classes pass KeyRelease() messages to their
         Parent() windows by default.  \note \a key_code_point will be zero if
         Unicode support is unavailable. */
-    virtual void KeyRelease(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys);
+    virtual void KeyRelease(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys);
 
     /** Respond to text input regardless of the method. Focus window only.
         A window may receive TextInput() messages passed up to it from its
@@ -935,16 +938,14 @@ protected:
         message. */
     virtual bool EventFilter(Wnd* w, const WndEvent& event) { return false; }
 
-    /** Handles all messages, and calls appropriate function (LButtonDown(),
-        LDrag(), etc.). */
+    /** Handles all messages, and calls appropriate function (LButtonDown(), LDrag(), etc.). */
     void HandleEvent(const WndEvent& event);
 
-    /** Sends the current event to Parent() for processing, if Parent() is
-        non-null.  This must only be called from within a WndEvent handler
-        (e.g. LClick()). */
+    /** Sends the current event to Parent() for processing, if Parent() is non-null.
+        This must only be called from within a WndEvent handler (e.g. LClick()). */
     void ForwardEventToParent();
 
-    /** Sets up child clipping for this window. */
+    /** Sets up child clipping for this window (with OpenGL) */
     void BeginClipping();
 
     /** Restores state to what it was before BeginClipping() was called. */
@@ -960,7 +961,7 @@ protected:
         GetChildClippingMode() is ClipToClientAndWindowSeparately. */
     void EndNonclientClipping();
 
-    virtual void SetParent(std::shared_ptr<Wnd> wnd) { m_parent = std::move(wnd); }
+    virtual void SetParent(std::shared_ptr<Wnd> wnd) noexcept { m_parent = std::move(wnd); }
 
     /** Modal Wnd's set this to true to stop modal loop. */
     std::atomic<bool> m_modal_done{false};

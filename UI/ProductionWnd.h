@@ -18,11 +18,11 @@ public:
     ProductionWnd(GG::X w, GG::Y h);
     void CompleteConstruction() override;
 
-    int SelectedPlanetID() const;
-    int ShownEmpireID() const { return m_empire_shown_id; }
+    int SelectedPlanetID() const noexcept;
+    int ShownEmpireID() const noexcept { return m_empire_shown_id; }
 
-    bool InWindow(GG::Pt pt) const override;
-    bool InClient(GG::Pt pt) const override;
+    bool InWindow(GG::Pt pt) const noexcept override;
+    bool InClient(GG::Pt pt) const noexcept override;
     void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
     void Render() override;
@@ -97,7 +97,7 @@ private:
     void ChangeBuildQuantityBlockSlot(int queue_idx, int quantity, int blocksize);
 
     void DeleteQueueItem(GG::ListBox::iterator it, bool do_delete);
-    void QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::ListBox::iterator& original_position_it);
+    void QueueItemMoved(const GG::ListBox::iterator row_it, const GG::ListBox::iterator original_position_it);
     void QueueItemClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
     void QueueItemDoubleClickedSlot(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys);
     void QueueItemRallied(GG::ListBox::iterator it, int object_id);

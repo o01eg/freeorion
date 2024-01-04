@@ -42,8 +42,8 @@ HueSaturationPicker::HueSaturationPicker(X x, Y y, X w, Y h) :
 
 void HueSaturationPicker::Render()
 {
-    Pt ul = UpperLeft(), lr = LowerRight();
-    Pt size = Size();
+    const auto ul = UpperLeft(), lr = LowerRight();
+    const auto size = Size();
     glDisable(GL_TEXTURE_2D);
 
     glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
@@ -509,7 +509,7 @@ void ColorDlg::Render()
     }
 }
 
-void ColorDlg::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
+void ColorDlg::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 {
     if (key == Key::GGK_RETURN || key == Key::GGK_KP_ENTER)
         OkClicked();

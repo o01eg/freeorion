@@ -30,7 +30,7 @@ void PromptRow::CompleteConstruction() {
 }
 
 void PromptRow::SizeMove(GG::Pt ul, GG::Pt lr)  {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     GG::ListBox::Row::SizeMove(ul, lr);
     if (!empty() && old_size != Size() && m_prompt)
         m_prompt->Resize(Size());
@@ -73,7 +73,7 @@ void QueueListBox::CompleteConstruction() {
 GG::X QueueListBox::RowWidth() const
 { return ClientWidth(); }
 
-void QueueListBox::KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys)
+void QueueListBox::KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys)
 {
     if (Disabled()) {
         CUIListBox::KeyPress(key, key_code_point, mod_keys);
@@ -123,7 +123,7 @@ void QueueListBox::Render() {
 }
 
 void QueueListBox::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     CUIListBox::SizeMove(ul, lr);
     if (old_size != Size() && !Empty()) {
         const GG::Pt row_size(RowWidth(), (*begin())->Height());

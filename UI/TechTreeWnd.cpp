@@ -1174,7 +1174,7 @@ void TechTreeWnd::LayoutPanel::Render() {
 }
 
 void TechTreeWnd::LayoutPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size())
         DoLayout();
@@ -1183,12 +1183,12 @@ void TechTreeWnd::LayoutPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
 void TechTreeWnd::LayoutPanel::DoLayout() {
     const int SCRLWDTH = ClientUI::ScrollWidth();
 
-    GG::Pt vscroll_ul = GG::Pt(Width() - SCRLWDTH, GG::Y0);
-    GG::Pt vscroll_lr = GG::Pt(Width(), Height() - SCRLWDTH);
+    const auto vscroll_ul = GG::Pt(Width() - SCRLWDTH, GG::Y0);
+    const auto vscroll_lr = GG::Pt(Width(), Height() - SCRLWDTH);
     m_vscroll->SizeMove(vscroll_ul, vscroll_lr);
 
-    GG::Pt hscroll_ul = GG::Pt(GG::X0, Height() - SCRLWDTH);
-    GG::Pt hscroll_lr = GG::Pt(Width() - SCRLWDTH, Height());
+    const auto hscroll_ul = GG::Pt(GG::X0, Height() - SCRLWDTH);
+    const auto hscroll_lr = GG::Pt(Width() - SCRLWDTH, Height());
     m_hscroll->SizeMove(hscroll_ul, hscroll_lr);
 
     const GG::X ZBSIZE{ClientUI::ScrollWidth() * 2};
@@ -1242,7 +1242,7 @@ void TechTreeWnd::LayoutPanel::SetScale(double scale) {
 }
 
 void TechTreeWnd::LayoutPanel::ShowCategory(std::string category) {
-    if (const auto did_emplace = m_categories_shown.emplace(std::move(category)).second)
+    if (m_categories_shown.emplace(std::move(category)).second)
         Layout(true);
 }
 
@@ -1338,8 +1338,8 @@ GG::Pt TechTreeWnd::LayoutPanel::ConvertPtZoomedToScreen(GG::Pt pt) const {
 }
 
 void TechTreeWnd::LayoutPanel::Layout(bool keep_position) {
-    const GG::X TECH_PANEL_MARGIN_X{ClientUI::Pts()*16};
-    const GG::Y TECH_PANEL_MARGIN_Y{ClientUI::Pts()*16 + 100};
+    //const GG::X TECH_PANEL_MARGIN_X{ClientUI::Pts()*16};
+    //const GG::Y TECH_PANEL_MARGIN_Y{ClientUI::Pts()*16 + 100};
     const double RANK_SEP = Value(TechPanelWidth()) * GetOptionsDB().Get<double>("ui.research.tree.spacing.horizontal");
     const double NODE_SEP = Value(TechPanelHeight()) * GetOptionsDB().Get<double>("ui.research.tree.spacing.vertical");
     const double WIDTH = Value(TechPanelWidth());
@@ -1688,9 +1688,9 @@ void TechTreeWnd::TechListBox::TechRow::Update() {
     auto this_row_status = empire ? empire->GetTechStatus(m_tech) : TechStatus::TS_RESEARCHABLE;
     if (this_row_status == TechStatus::TS_COMPLETE) {
         foreground_color.a = m_background_color.a;  // preserve users 'wnd-color' trasparency
-        AdjustBrightness(foreground_color, 0.3);
-        m_background_color = foreground_color;
+        m_background_color = AdjustBrightness(foreground_color, 0.3);
         foreground_color = ClientUI::TextColor();
+
     } else if (this_row_status == TechStatus::TS_UNRESEARCHABLE ||
                this_row_status == TechStatus::TS_HAS_RESEARCHED_PREREQ)
     { foreground_color.a = 96; }
@@ -1891,7 +1891,7 @@ void TechTreeWnd::TechListBox::Populate(bool update ) {
 }
 
 void TechTreeWnd::TechListBox::ShowCategory(std::string category) {
-    if (const auto did_emplace = m_categories_shown.emplace(std::move(category)).second)
+    if (m_categories_shown.emplace(std::move(category)).second)
         Populate();
 }
 
@@ -1918,12 +1918,12 @@ void TechTreeWnd::TechListBox::HideAllCategories() {
 }
 
 void TechTreeWnd::TechListBox::ShowStatus(TechStatus status) {
-    if (const auto did_emplace = m_tech_statuses_shown.emplace(status).second)
+    if (m_tech_statuses_shown.emplace(status).second)
         Populate();
 }
 
 void TechTreeWnd::TechListBox::HideStatus(TechStatus status) {
-    auto removed_count = m_tech_statuses_shown.erase(status);
+    const auto removed_count = m_tech_statuses_shown.erase(status);
     if (removed_count > 0)
         Populate();
 }
@@ -2070,7 +2070,7 @@ void TechTreeWnd::CompleteConstruction() {
 }
 
 void TechTreeWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size()) {
         m_enc_detail_panel->ValidatePosition();

@@ -2140,8 +2140,8 @@ public:
     void SizeMove(GG::Pt ul, GG::Pt lr) override;
     void ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds,
                              const GG::Wnd* destination) override;
-    virtual void QueueItemMoved(const GG::ListBox::iterator& row_it,
-                                const GG::ListBox::iterator& original_position_it) {}
+    virtual void QueueItemMoved(const GG::ListBox::iterator row_it,
+                                const GG::ListBox::iterator original_position_it) {}
     void SetEmpireShown(int empire_id, bool refresh_list = true);
     virtual void Populate();
 
@@ -2309,7 +2309,7 @@ void BasesListBox::BasesListBoxRow::Render() {
 }
 
 void BasesListBox::BasesListBoxRow::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     CUIListBox::Row::SizeMove(ul, lr);
     if (!empty() && old_size != Size())
         at(0)->Resize(Size());
@@ -2383,7 +2383,7 @@ void BasesListBox::CompleteConstruction() {
 }
 
 void BasesListBox::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     CUIListBox::SizeMove(ul, lr);
     if (old_size != Size()) {
         const GG::Pt row_size = ListRowSize();
@@ -2488,7 +2488,8 @@ public:
 protected:
     void PopulateCore() override;
     std::shared_ptr<Row> ChildrenDraggedAwayCore(const GG::Wnd* const wnd) override;
-    void QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::ListBox::iterator& original_position_it) override;
+    void QueueItemMoved(const GG::ListBox::iterator row_it,
+                        const GG::ListBox::iterator original_position_it) override;
 
     void BaseDoubleClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override;
     void BaseLeftClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override;
@@ -2506,7 +2507,8 @@ protected:
     void PopulateCore() override;
     void ResetEmptyListPrompt() override;
     std::shared_ptr<Row> ChildrenDraggedAwayCore(const GG::Wnd* const wnd) override;
-    void QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::ListBox::iterator& original_position_it) override;
+    void QueueItemMoved(const GG::ListBox::iterator row_it,
+                        const GG::ListBox::iterator original_position_it) override;
     void BaseDoubleClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override;
     void BaseLeftClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override;
     void BaseRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override;
@@ -2536,7 +2538,8 @@ protected:
     void PopulateCore() override;
     void ResetEmptyListPrompt() override;
     std::shared_ptr<Row> ChildrenDraggedAwayCore(const GG::Wnd* const wnd) override;
-    void QueueItemMoved(const GG::ListBox::iterator& row_it, const GG::ListBox::iterator& original_position_it) override;
+    void QueueItemMoved(const GG::ListBox::iterator row_it,
+                        const GG::ListBox::iterator original_position_it) override;
 
     void BaseDoubleClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override;
     void BaseLeftClicked(GG::ListBox::iterator it, GG::Pt pt, GG::Flags<GG::ModKey> modkeys) override;
@@ -3176,8 +3179,8 @@ void SavedDesignsListBox::BaseRightClicked(GG::ListBox::iterator it, GG::Pt pt,
     popup->Run();
 }
 
-void EmptyHullsListBox::QueueItemMoved(const GG::ListBox::iterator& row_it,
-                                       const GG::ListBox::iterator& original_position_it)
+void EmptyHullsListBox::QueueItemMoved(const GG::ListBox::iterator row_it,
+                                       const GG::ListBox::iterator original_position_it)
 {
     const auto control = dynamic_cast<HullAndPartsListBoxRow*>(row_it->get());
     if (!control || !GetEmpire(EmpireID()))
@@ -3197,8 +3200,8 @@ void EmptyHullsListBox::QueueItemMoved(const GG::ListBox::iterator& row_it,
     GetDisplayedDesignsManager().InsertHullBefore(hull_name, insert_before_hull);
 }
 
-void CompletedDesignsListBox::QueueItemMoved(const GG::ListBox::iterator& row_it,
-                                             const GG::ListBox::iterator& original_position_it)
+void CompletedDesignsListBox::QueueItemMoved(const GG::ListBox::iterator row_it,
+                                             const GG::ListBox::iterator original_position_it)
 {
     const auto control = dynamic_cast<BasesListBox::CompletedDesignListBoxRow*>(row_it->get());
     if (!control || !GetEmpire(EmpireID()))
@@ -3218,8 +3221,8 @@ void CompletedDesignsListBox::QueueItemMoved(const GG::ListBox::iterator& row_it
     GetDisplayedDesignsManager().MoveBefore(design_id, insert_before_id);
 }
 
-void SavedDesignsListBox::QueueItemMoved(const GG::ListBox::iterator& row_it,
-                                         const GG::ListBox::iterator& original_position_it)
+void SavedDesignsListBox::QueueItemMoved(const GG::ListBox::iterator row_it,
+                                         const GG::ListBox::iterator original_position_it)
 {
     const auto control = dynamic_cast<SavedDesignsListBox::SavedDesignListBoxRow*>(row_it->get());
     if (!control)
@@ -3405,7 +3408,7 @@ void DesignWnd::BaseSelector::CompleteConstruction() {
 }
 
 void DesignWnd::BaseSelector::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     CUIWnd::SizeMove(ul, lr);
     if (old_size != Size())
         DoLayout();
@@ -4496,56 +4499,60 @@ void DesignWnd::MainPanel::DoLayout() {
     // position labels and text edit boxes for name and description and buttons to clear and confirm design
 
     const int PTS = ClientUI::Pts();
-    const GG::X PTS_WIDE{PTS / 2};           // guess at how wide per character the font needs
     static constexpr int PAD = 6;
 
-    GG::Pt ul,lr,ll,mus;
-    lr = ClientSize() - GG::Pt(GG::X{PAD}, GG::Y{PAD});
+    const auto cl_sz = ClientSize();
+    const auto [cl_width, cl_height] = cl_sz;
+
+    auto lr = cl_sz - GG::Pt(GG::X{PAD}, GG::Y{PAD});
     m_confirm_button->SizeMove(lr - m_confirm_button->MinUsableSize(), lr);
 
-    mus=m_replace_button->MinUsableSize();
-    ul = m_confirm_button->RelativeUpperLeft() - GG::Pt(mus.x+PAD, GG::Y0);
+    auto mus = m_replace_button->MinUsableSize();
+    auto ul = m_confirm_button->RelativeUpperLeft() - GG::Pt(mus.x+PAD, GG::Y0);
     m_replace_button->SizeMove(ul, ul+mus);
 
-    ll= GG::Pt(GG::X(PAD), ClientHeight() - PAD);
-    mus=m_clear_button->MinUsableSize();
-    ul = ll-GG::Pt(GG::X0, mus.y);
-    m_clear_button->SizeMove(ul, ul+mus);
+    const auto ll = GG::Pt(GG::X(PAD), cl_sz.y - PAD);
+    mus = m_clear_button->MinUsableSize();
+    ul = ll - GG::Pt(GG::X0, mus.y);
+    m_clear_button->SizeMove(ul, ul + mus);
 
     ul = GG::Pt(GG::X(PAD), GG::Y(PAD));
     // adjust based on the (bigger) height of the edit bar 
-    lr= ul+GG::Pt(m_design_name_label->MinUsableSize().x, m_design_name->MinUsableSize().y);
+    lr = ul + GG::Pt(m_design_name_label->MinUsableSize().x, m_design_name->MinUsableSize().y);
     m_design_name_label->SizeMove(ul, lr);
 
-    ul= GG::Pt(m_design_name_label->RelativeLowerRight().x+PAD, GG::Y(PAD));
-    m_design_name->SizeMove(ul, GG::Pt(GG::X(ClientWidth()-PAD), ul.y+m_design_name->MinUsableSize().y));
+    ul = GG::Pt(m_design_name_label->RelativeLowerRight().x+PAD, GG::Y(PAD));
+    m_design_name->SizeMove(ul, GG::Pt(cl_sz.x-PAD, ul.y+m_design_name->MinUsableSize().y));
 
-    ul=GG::Pt(GG::X(PAD), GG::Y(m_design_name->RelativeLowerRight().y+PAD));
+    ul = GG::Pt(GG::X(PAD), GG::Y(m_design_name->RelativeLowerRight().y+PAD));
     // Apparently calling minuseablesize on the button itself doesn't work
-    lr= ul+GG::Pt(m_design_description_toggle->GetLabel()->MinUsableSize().x+10, m_design_name->MinUsableSize().y);
+    lr = ul + GG::Pt(m_design_description_toggle->GetLabel()->MinUsableSize().x + 10,
+                     m_design_name->MinUsableSize().y);
     m_design_description_toggle->SizeMove(ul, lr);
 
     ul.x = m_design_description_toggle->RelativeLowerRight().x + PAD;
-    m_design_description_edit->SizeMove(ul, GG::Pt(GG::X(ClientWidth()-PAD),ul.y+PTS*4+8));
-    if (m_design_description_toggle->Checked()) { m_design_description_edit->Show() ; }
-    else { m_design_description_edit->Hide(); }
+    m_design_description_edit->SizeMove(ul, GG::Pt(cl_sz.x-PAD, ul.y+PTS*4+8));
+    if (m_design_description_toggle->Checked())
+        m_design_description_edit->Show();
+    else
+        m_design_description_edit->Hide();
 
     // place background image of hull
     ul.x = GG::X0;
     ul.y += m_design_name->Height();
-    GG::Rect background_rect = GG::Rect(ul, ClientLowerRight());
 
+    auto bg_rect = GG::Rect(ul, ClientLowerRight());
     if (m_background_image) {
-        GG::Pt bg_ul = background_rect.UpperLeft();
-        GG::Pt bg_lr = ClientSize();
-        m_background_image->SizeMove(bg_ul, bg_lr);
-        background_rect = m_background_image->RenderedArea();
+        m_background_image->SizeMove(bg_rect.UpperLeft(), ClientSize());
+        bg_rect = m_background_image->RenderedArea();
     }
 
     // place slot controls over image of hull
+    const auto slot_ref_ul = bg_rect.UpperLeft() - ClientUpperLeft();
+
     for (auto& slot : m_slots) {
-        GG::X x(background_rect.Left() - GG::ToX(slot->Width()/2.0 - ClientUpperLeft().x + slot->XPositionFraction() * background_rect.Width()));
-        GG::Y y(background_rect.Top() - GG::ToY(slot->Height()/2.0 - ClientUpperLeft().y + slot->YPositionFraction() * background_rect.Height()));
+        GG::X x = slot_ref_ul.x - slot->Width()/2 + GG::ToX(slot->XPositionFraction() * bg_rect.Width());
+        GG::Y y = slot_ref_ul.y - slot->Height()/2 + GG::ToY(slot->YPositionFraction() * bg_rect.Height());
         slot->MoveTo(GG::Pt(x, y));
     }
 }
@@ -4554,7 +4561,7 @@ void DesignWnd::MainPanel::DesignChanged() {
     m_replace_button->ClearBrowseInfoWnd();
     m_confirm_button->ClearBrowseInfoWnd();
 
-    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     m_disabled_by_name = false;
     m_disabled_by_part_conflict = false;
 
@@ -5014,7 +5021,7 @@ void DesignWnd::CompleteConstruction() {
 }
 
 void DesignWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
-    const GG::Pt old_size = Size();
+    const auto old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
     if (old_size != Size()) {
         m_detail_panel->ValidatePosition();

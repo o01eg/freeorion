@@ -797,7 +797,7 @@ namespace {
             CUIEdit("")
         { DisallowChars("\n\r"); }
 
-        void KeyPress(GG::Key key, std::uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override {
+        void KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override {
             switch (key) {
             case GG::Key::GGK_RETURN:
             case GG::Key::GGK_KP_ENTER:
@@ -883,15 +883,19 @@ void EncyclopediaDetailPanel::CompleteConstruction() {
     factory->LinkRightClickedSignal.connect(
         boost::bind(&EncyclopediaDetailPanel::HandleLinkDoubleClick, this, ph::_1, ph::_2));
 
-    // make local copy of default block factories map
-    const auto& default_block_factory_map{*GG::RichText::DefaultBlockFactoryMap()};
-    auto factory_map = std::make_shared<GG::RichText::BlockFactoryMap>(default_block_factory_map);
+    // make copy of default block factories map
+    auto custom_block_factory_map{GG::RichText::DefaultBlockFactoryMap()};
 
-    // set the plaintext block factory to the one handling link clicks via this panel
-    (*factory_map)[std::string{GG::RichText::PLAINTEXT_TAG}] = std::move(factory);
+    // insert or replace plain text factory with one made above
+    auto plain_text_it = std::find_if(custom_block_factory_map.begin(), custom_block_factory_map.end(),
+                                      [](const auto& fac) { return fac.first == GG::RichText::PLAINTEXT_TAG; });
+    if (plain_text_it == custom_block_factory_map.end())
+        custom_block_factory_map.emplace_back(GG::RichText::PLAINTEXT_TAG, std::move(factory));
+    else
+        plain_text_it->second = std::move(factory);
 
     // use block factory map modified copy for this control
-    m_description_rich_text->SetBlockFactoryMap(std::move(factory_map));
+    m_description_rich_text->SetBlockFactoryMap(std::move(custom_block_factory_map));
 
 
     m_description_rich_text->SetPadding(DESCRIPTION_PADDING);
@@ -1017,7 +1021,7 @@ void EncyclopediaDetailPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
         RequirePreRender();
 }
 
-void EncyclopediaDetailPanel::KeyPress(GG::Key key, std::uint32_t key_code_point,
+void EncyclopediaDetailPanel::KeyPress(GG::Key key, uint32_t key_code_point,
                                        GG::Flags<GG::ModKey> mod_keys)
 {
     if (key == GG::Key::GGK_RETURN || key == GG::Key::GGK_KP_ENTER) {
@@ -3680,7 +3684,7 @@ namespace {
     // to be lower-case. Returns true if it is OK or handled. Returns false
     // to indicate that CustomToLower won't check for that char or make it
     // lower case if it is not already.
-    inline bool IsOK3CharCode(const std::string::iterator& it) {
+    inline bool IsOK3CharCode(const std::string::iterator it) {
         uint8_t c1 = *it;
         uint8_t c2 = *(it + 1);
         uint8_t c3 = *(it + 2);

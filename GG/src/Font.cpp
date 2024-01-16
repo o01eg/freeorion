@@ -70,12 +70,12 @@ constexpr T NextPowerOfTwo(T input)
 struct TempGlyphData
 {
     constexpr TempGlyphData() = default;
-    constexpr TempGlyphData(Pt ul_, Pt lr_, int16_t y_ofs, int16_t lb, int16_t a) noexcept :
+    constexpr TempGlyphData(Pt ul_, Pt lr_, int8_t y_ofs, int8_t lb, int8_t a) noexcept :
         ul(ul_), lr(lr_), y_offset(y_ofs), left_b(lb), adv(a) {}
     Pt       ul, lr;        ///< area of glyph subtexture within texture
-    int16_t  y_offset = 0;  ///< vertical offset to draw texture (may be negative!)
-    int16_t  left_b = 0;    ///< left bearing (see Glyph)
-    int16_t  adv = 0;       ///< advance of glyph (see Glyph)
+    int8_t   y_offset = 0;  ///< vertical offset to draw texture (may be negative!)
+    int8_t   left_b = 0;    ///< left bearing (see Glyph)
+    int8_t   adv = 0;       ///< advance of glyph (see Glyph)
 };
 
 /// A two dimensional grid of pixels that expands to
@@ -322,41 +322,7 @@ namespace {
 ///////////////////////////////////////
 // class GG::Font::Substring
 ///////////////////////////////////////
-namespace {
-    const std::string EMPTY_STRING;
-}
-
-Font::Substring::Substring() noexcept :
-    str(&EMPTY_STRING)
-{}
-
-Font::Substring::Substring(const std::string& str_,
-                           std::string::const_iterator first_,
-                           std::string::const_iterator second_) :
-    str(&str_)
-{
-    assert(str->begin() <= first_);
-    assert(first_ <= second_);
-    assert(second_ <= str->end());
-    first = std::distance(str->begin(), first_);
-    second = std::distance(str->begin(), second_);
-}
-
-Font::Substring::Substring(const std::string& str_, const IterPair& pair) :
-    str(&str_)
-{
-    assert(str->begin() <= pair.first);
-    assert(pair.first <= pair.second);
-    assert(pair.second <= str->end());
-    first = std::distance(str->begin(), pair.first);
-    second = std::distance(str->begin(), pair.second);
-}
-
-void Font::Substring::Bind(const std::string& str_) noexcept
-{
-    assert(std::distance(str_.begin(), str_.end()) >= second);
-    str = &str_;
-}
+const std::string Font::Substring::EMPTY_STRING{};
 
 bool Font::Substring::operator==(const std::string& rhs) const
 { return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data(), size()); }
@@ -366,15 +332,6 @@ bool Font::Substring::operator==(std::string_view rhs) const
 
 bool Font::Substring::operator==(const Substring& rhs) const
 { return size() == rhs.size() && !std::memcmp(str->data() + first, rhs.data() + rhs.first, size()); }
-
-Font::Substring& Font::Substring::operator+=(const IterPair& rhs)
-{
-    assert(rhs.first <= rhs.second);
-    assert(std::distance(str->begin(), rhs.first) == second);
-    second = std::distance(str->begin(), rhs.second);
-    return *this;
-}
-
 
 ///////////////////////////////////////
 // Free Functions
@@ -676,23 +633,15 @@ public:
 
         m_are_widths_calculated = false;
 
-        // Create the opening part of an open tag, like this: "<tag"
-        auto element = std::make_shared<Font::FormattingTag>(false);
+        // Create open tag like "<tag>" with no parameters
+        const auto tag_begin = m_text.size();
+        const auto tag_name_begin = m_text.append("<").size();
+        const auto tag_name_end = m_text.append(tag).size();
+        const auto tag_end = m_text.append(">").size();
 
-        auto tag_begin = m_text.size();
-        auto tag_name_begin = m_text.append("<").size();
-        auto tag_name_end = m_text.append(tag).size();
-        auto tag_end = m_text.append(">").size();
-
-        element->tag_name = Substring(m_text,
-                                      std::next(m_text.begin(), tag_name_begin),
-                                      std::next(m_text.begin(), tag_name_end));
-        // Create the close part of an open tag to complete the tag, like this:"<tag param1 param2>"
-        element->text = Substring(m_text,
-                                  std::next(m_text.begin(), tag_begin),
-                                  std::next(m_text.begin(), tag_end));
-
-        m_text_elements.push_back(std::move(element));
+        Substring text{m_text, tag_begin, tag_end};
+        Substring tag_name{m_text, tag_name_begin, tag_name_end};
+        m_text_elements.emplace_back(text, tag_name, Font::TextElement::TextElementType::OPEN_TAG);
     }
 
     /** Add an open tag iff it exists as a recognized tag.*/
@@ -703,33 +652,28 @@ public:
 
         m_are_widths_calculated = false;
 
-        // Create the opening part of an open tag, like this: "<tag"
-        auto element = std::make_shared<Font::FormattingTag>(false);
-        auto tag_begin = m_text.size();
-        auto tag_name_begin = m_text.append("<").size();
-        auto tag_name_end = m_text.append(tag).size();
-        element->tag_name = Substring(m_text,
-                                      std::next(m_text.begin(), tag_name_begin),
-                                      std::next(m_text.begin(), tag_name_end));
+        const auto tag_begin = m_text.size();
 
-        // add params, like: "<tag param1 param2"
+        // Create the opening part of an open tag, like "<tag"
+        const auto tag_name_begin = m_text.append("<").size();
+        const auto tag_name_end = m_text.append(tag).size();
+        Substring tag_name{m_text, tag_name_begin, tag_name_end};
+
+        std::vector<Substring> pass_params;
+        pass_params.reserve(params.size());
+        // add params, like: "... param1 param2 ..."
         for (const auto& param : params) {
             m_text.append(" ");
-            auto param_begin = m_text.size();
-            auto param_end = m_text.append(param).size();
-
-            element->params.emplace_back(m_text,
-                                         std::next(m_text.begin(), param_begin),
-                                         std::next(m_text.begin(), param_end));
+            const auto param_begin = m_text.size();
+            const auto param_end = m_text.append(param).size();
+            pass_params.emplace_back(m_text, param_begin, param_end);
         }
 
-        // Create the close part of an open tag to complete the tag, like this:"<tag param1 param2>"
+        // Create the close part of an open tag to complete the tag, like ">"
         auto tag_end = m_text.append(">").size();
-        element->text = Substring(m_text,
-                                  std::next(m_text.begin(), tag_begin),
-                                  std::next(m_text.begin(), tag_end));
+        Substring text{m_text, tag_begin, tag_end};
 
-        m_text_elements.push_back(std::move(element));
+        m_text_elements.emplace_back(text, tag_name, std::move(pass_params), TextElement::TextElementType::OPEN_TAG);
     }
 
     /** Add a close tag iff it exists as a recognized tag.*/
@@ -740,22 +684,15 @@ public:
 
         m_are_widths_calculated = false;
 
-        // Create a close tag that looks like this: "</tag>"
-        auto element = std::make_shared<Font::FormattingTag>(true);
-
+        // Create a close tag that looks like "</tag>"
         const auto tag_begin = m_text.size();
         const auto tag_name_begin = m_text.append("</").size();
         const auto tag_name_end = m_text.append(tag).size();
         const auto tag_end = m_text.append(">").size();
 
-        element->text = Substring(m_text,
-                                  std::next(m_text.begin(), tag_begin),
-                                  std::next(m_text.begin(), tag_end));
-        element->tag_name = Substring(m_text,
-                                      std::next(m_text.begin(), tag_name_begin),
-                                      std::next(m_text.begin(), tag_name_end));
-
-        m_text_elements.push_back(std::move(element));
+        Substring text{m_text, tag_begin, tag_end};
+        Substring tag_name{m_text, tag_name_begin, tag_name_end};
+        m_text_elements.emplace_back(text, tag_name, TextElement::TextElementType::CLOSE_TAG);
     }
 
     /** Add a text element.  Any whitespace in this text element will be non-breaking.*/
@@ -763,13 +700,9 @@ public:
     {
         m_are_widths_calculated = false;
 
-        auto element = std::make_shared<Font::TextElement>(false, false);
-        auto begin = m_text.size();
-        auto end = m_text.append(text).size();
-        element->text = Substring(m_text,
-                                  std::next(m_text.begin(), begin),
-                                  std::next(m_text.begin(), end));
-        m_text_elements.push_back(std::move(element));
+        const auto begin = m_text.size();
+        const auto end = m_text.append(text).size();
+        m_text_elements.emplace_back(Substring{m_text, begin, end});
     }
 
     /** Add a white space element.*/
@@ -777,20 +710,18 @@ public:
     {
         m_are_widths_calculated = false;
 
-        auto element = std::make_shared<Font::TextElement>(true, false);
         auto begin = m_text.size();
         auto end = m_text.append(whitespace).size();
-        element->text = Substring(m_text,
-                                  std::next(m_text.begin(), begin),
-                                  std::next(m_text.begin(), end));
-        m_text_elements.push_back(std::move(element));
+
+        m_text_elements.emplace_back(Substring(m_text, begin, end),
+                                     Font::TextElement::TextElementType::WHITESPACE);
     }
 
     /** Add a newline element.*/
     void AddNewline()
     {
         m_are_widths_calculated = false;
-        m_text_elements.push_back(std::make_shared<Font::TextElement>(false, true));
+        m_text_elements.emplace_back(Font::TextElement::TextElementType::NEWLINE);
     }
 
     /** Add open color tag.*/
@@ -807,7 +738,7 @@ public:
 private:
     const Font& m_font;
     std::string m_text;
-    std::vector<std::shared_ptr<TextElement>> m_text_elements;
+    std::vector<TextElement> m_text_elements;
     bool m_are_widths_calculated = false;
 };
 
@@ -822,7 +753,7 @@ Font::TextAndElementsAssembler::~TextAndElementsAssembler() = default;
 const std::string& Font::TextAndElementsAssembler::Text() const
 { return m_impl->Text(); }
 
-const std::vector<std::shared_ptr<Font::TextElement>>& Font::TextAndElementsAssembler::Elements() const
+const std::vector<Font::TextElement>& Font::TextAndElementsAssembler::Elements() const
 { return m_impl->Elements(); }
 
 Font::TextAndElementsAssembler& Font::TextAndElementsAssembler::AddOpenTag(std::string_view tag)
@@ -893,20 +824,6 @@ Font::RenderState::RenderState()
 Font::RenderState::RenderState(Clr color)
 { PushColor(color.r, color.g, color.b, color.a); }
 
-void Font::RenderState::clear()
-{
-    use_italics = 0;
-    use_shadow = 0;
-    draw_underline = 0;
-    super_sub_shift = 0;
-    color_index_stack = std::stack<uint8_t>{};
-    used_colors.clear();
-
-    // Re-initialize the color stack with the current color
-    auto clr = GetCurrentByteColor();
-    PushColor(clr[0], clr[1], clr[2], clr[3]);
-}
-
 void Font::RenderState::PushColor(GLubyte r, GLubyte g, GLubyte b, GLubyte a)
 {
     // The same color may end up being stored multiple times, but the cost of
@@ -914,6 +831,9 @@ void Font::RenderState::PushColor(GLubyte r, GLubyte g, GLubyte b, GLubyte a)
     color_index_stack.push(static_cast<uint8_t>(used_colors.size()));
     used_colors.emplace_back(r, g, b, a);
 }
+
+void Font::RenderState::PushColor(Clr clr)
+{ PushColor(clr.r, clr.g, clr.b, clr.a); }
 
 void Font::RenderState::PopColor()
 {
@@ -930,7 +850,7 @@ Clr Font::RenderState::CurrentColor() const
 // class GG::Font::LineData::CharData
 ///////////////////////////////////////
 Font::LineData::CharData::CharData(X extent_, StrSize str_index, StrSize str_size, CPSize cp_index,
-                                   const std::vector<std::shared_ptr<TextElement>>& tags_) :
+                                   const std::vector<TextElement>& tags_) :
     extent(extent_),
     string_index(str_index),
     string_size(str_size),
@@ -938,19 +858,20 @@ Font::LineData::CharData::CharData(X extent_, StrSize str_index, StrSize str_siz
 {
     tags.reserve(tags_.size());
     for (auto& tag : tags_)
-        tags.push_back(std::dynamic_pointer_cast<FormattingTag>(tag));
+        if (tag.IsTag())
+            tags.push_back(tag);
 }
 
 
 ///////////////////////////////////////
 // struct GG::Font::Glyph
 ///////////////////////////////////////
-Font::Glyph::Glyph(std::shared_ptr<Texture> texture, Pt ul, Pt lr, int16_t y_ofs, int16_t lb, int16_t adv) :
+Font::Glyph::Glyph(std::shared_ptr<Texture> texture, Pt ul, Pt lr, int8_t y_ofs, int8_t lb, int8_t adv) :
     sub_texture(std::move(texture), ul.x, ul.y, lr.x, lr.y),
     y_offset(y_ofs),
     left_bearing(lb),
     advance(adv),
-    width(Value(ul.x - lr.x))
+    width(std::min<int8_t>(std::numeric_limits<int8_t>::max(), Value(ul.x - lr.x)))
 {}
 
 ///////////////////////////////////////
@@ -958,7 +879,6 @@ Font::Glyph::Glyph(std::shared_ptr<Texture> texture, Pt ul, Pt lr, int16_t y_ofs
 ///////////////////////////////////////
 namespace {
     Font::RenderCache shared_cache{};
-    Font::RenderState shared_render_state{};
 }
 
 Font::Font(std::string font_filename, unsigned int pts) :
@@ -985,14 +905,13 @@ Font::Font(std::string font_filename, unsigned int pts,
     Init(wrapper.m_face);
 }
 
-X Font::RenderText(Pt pt, const std::string& text) const
+X Font::RenderText(Pt pt, const std::string_view text, const RenderState& render_state) const
 {
     const X orig_x = pt.x;
 
     glBindTexture(GL_TEXTURE_2D, m_texture->OpenGLId());
 
     shared_cache.clear();
-    shared_render_state.clear();
 
     for (auto text_it = text.begin(); text_it != text.end();) {
         const uint32_t c = utf8::next(text_it, text.end());
@@ -1000,7 +919,7 @@ X Font::RenderText(Pt pt, const std::string& text) const
         if (it == m_glyphs.end())
             pt.x += m_space_width; // move forward by the extent of the character when a whitespace or unprintable glyph is requested
         else
-            pt.x += StoreGlyph(pt, it->second, &shared_render_state, shared_cache);
+            pt.x += StoreGlyph(pt, it->second, render_state, shared_cache);
     }
 
     shared_cache.vertices.createServerBuffer();
@@ -1011,16 +930,14 @@ X Font::RenderText(Pt pt, const std::string& text) const
     return pt.x - orig_x;
 }
 
-void Font::RenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& format,
-                      const std::vector<LineData>& line_data, RenderState* render_state) const
+void Font::RenderText(Pt ul, Pt lr, const std::string& text, const Flags<TextFormat> format,
+                      const std::vector<LineData>& line_data, RenderState& render_state) const
 {
-    RenderText(ul, lr, text, format, line_data,
-               render_state ? *render_state : shared_render_state,
-               0, CP0, line_data.size(),
+    RenderText(ul, lr, text, format, line_data, render_state, 0, CP0, line_data.size(),
                line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()));
 }
 
-void Font::RenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& format,
+void Font::RenderText(Pt ul, Pt lr, const std::string& text, const Flags<TextFormat> format,
                       const std::vector<LineData>& line_data, RenderState& render_state,
                       std::size_t begin_line, CPSize begin_char,
                       std::size_t end_line, CPSize end_char) const
@@ -1030,13 +947,11 @@ void Font::RenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& 
     RenderCachedText(shared_cache);
 }
 
-void Font::PreRenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat>& format,
-                         RenderCache& cache,
-                         const std::vector<LineData>& line_data, RenderState* render_state) const
+void Font::PreRenderText(Pt ul, Pt lr, const std::string& text, const Flags<TextFormat> format,
+                         RenderCache& cache, const std::vector<LineData>& line_data,
+                         RenderState& render_state) const
 {
-    PreRenderText(ul, lr, text, format, line_data,
-                  render_state ? *render_state : shared_render_state,
-                  0, CP0, line_data.size(),
+    PreRenderText(ul, lr, text, format, line_data, render_state, 0, CP0, line_data.size(),
                   line_data.empty() ? CP0 : CPSize(line_data.back().char_data.size()), cache);
 }
 
@@ -1065,11 +980,11 @@ namespace {
     }
 
     constexpr Y LinePosY(const Y origin, const std::size_t line_num,
-                         const std::size_t begin_line, const Y lineskip)
+                         const std::size_t begin_line, const Y lineskip) noexcept
     { return origin + (static_cast<int>(line_num) - static_cast<int>(begin_line)) * lineskip; }
 }
 
-void Font::PreRenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat> format,
+void Font::PreRenderText(Pt ul, Pt lr, const std::string& text, const Flags<TextFormat> format,
                          const std::vector<LineData>& line_data, RenderState& render_state,
                          std::size_t begin_line, CPSize begin_char,
                          std::size_t end_line, CPSize end_char,
@@ -1081,9 +996,7 @@ void Font::PreRenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat
                                                     std::next(line_data.begin(), end_line),
                                                     0, std::plus{},
                                                     [](const auto& line) { return line.char_data.size(); });
-
     cache.clear();
-    render_state.clear();
 
     //std::cout << "glyphs: " << glyph_count << ": lines " << begin_line << " to " << end_line << ": ";
     //for (std::size_t i = begin_line; i < end_line; ++i) {
@@ -1125,7 +1038,7 @@ void Font::PreRenderText(Pt ul, Pt lr, const std::string& text, Flags<TextFormat
             if (it == m_glyphs.end()) {
                 x = x_origin + char_data.extent; // move forward by the extent of the character when a whitespace or unprintable glyph is requested
             } else {
-                x += StoreGlyph(Pt(x, y), it->second, &render_state, cache);
+                x += StoreGlyph(Pt(x, y), it->second, render_state, cache);
             }
         }
     }
@@ -1242,70 +1155,70 @@ void Font::ThrowBadGlyph(const std::string& format_str, uint32_t c)
 }
 
 namespace DebugOutput {
-    void PrintParseResults(const std::vector<std::shared_ptr<Font::TextElement>>& text_elements) {
+    void PrintParseResults(const std::vector<Font::TextElement>& text_elements) {
         std::cout << "results of parse:\n";
-        for (auto& elem : text_elements) {
-            if (auto tag_elem = std::dynamic_pointer_cast<Font::FormattingTag>(elem)) {
-                std::cout << "FormattingTag\n    text=\"" << tag_elem->text << "\" (@ "
-                          << static_cast<const void*>(&tag_elem->text.front()) << ")\n    widths=";
-                for (const X& width : tag_elem->widths)
-                    std::cout << Value(width) << " ";
-                std::cout << "\n    whitespace=" << tag_elem->whitespace << "\n    newline="
-                          << tag_elem->newline << "\n    params=\n";
-                for (const Font::Substring& param : tag_elem->params)
+        for (const auto& elem : text_elements) {
+            if (elem.IsTag()) {
+                std::cout << "FormattingTag\n    text=\"" << elem.text << "\" (@ "
+                          << static_cast<const void*>(elem.text.data()) << ")\n    widths=";
+                for (const auto width : elem.widths)
+                    std::cout << width << " ";
+                std::cout << "\n    whitespace=" << elem.IsWhiteSpace() << "\n    newline="
+                          << elem.IsNewline() << "\n    params=\n";
+                for (const auto& param : elem.params)
                     std::cout << "        \"" << param << "\"\n";
-                std::cout << "    tag_name=\"" << tag_elem->tag_name << "\"\n    close_tag="
-                          << tag_elem->close_tag << "\n";
+                std::cout << "    tag_name=\"" << elem.tag_name << "\"\n    close_tag="
+                          << elem.IsCloseTag() << "\n";
+
             } else {
-                std::cout << "TextElement\n    text=\"" << elem->text << "\" (@ "
-                          << static_cast<const void*>(&elem->text.front()) << ")\n    widths=";
-                for (const X& width : elem->widths)
-                    std::cout << Value(width) << " ";
-                std::cout << "\n    whitespace=" << elem->whitespace << "\n    newline=" << elem->newline << "\n";
+                std::cout << "TextElement\n    text=\"" << elem.text << "\" (@ "
+                          << static_cast<const void*>(elem.text.data()) << ")\n    widths=";
+                for (const auto width : elem.widths)
+                    std::cout << width << " ";
+                std::cout << "\n    whitespace=" << elem.IsWhiteSpace() << "\n    newline=" << elem.IsNewline() << "\n";
             }
-            std::cout << "    string_size=" << Value(elem->StringSize()) << "\n";
+            std::cout << "    string_size=" << Value(elem.StringSize()) << "\n";
             std::cout << "\n";
         }
         std::cout << std::endl;
     }
 
-    void PrintLineBreakdown(const std::string& text,
-                            const Flags<TextFormat>& format,
-                            const X box_width,
-                            const std::vector<Font::LineData>& line_data)
+    void PrintLineBreakdown(const std::string& text, const Flags<TextFormat> format,
+                            const X box_width, const std::vector<Font::LineData>& line_data)
     {
         std::cout << "Font::DetermineLines(text=\"" << text << "\" (@ "
-                  << static_cast<const void*>(&text.front()) << ") format="
+                  << static_cast<const void*>(text.c_str()) << ") format="
                   << format << " box_width=" << Value(box_width) << ")" << std::endl;
 
         std::cout << "Line breakdown:\n";
         for (std::size_t i = 0; i < line_data.size(); ++i) {
+            auto& char_data = line_data[i].char_data;
+
             std::cout << "Line " << i << ":\n    extents=";
-            for (const auto& character : line_data[i].char_data)
+            for (const auto& character : char_data)
                 std::cout << Value(character.extent) << " ";
             std::cout << "\n    string indices=";
-            for (const auto& character : line_data[i].char_data)
+            for (const auto& character : char_data)
                 std::cout << Value(character.string_index) << " ";
             std::cout << "\n    code point indices=";
-            for (const auto& character : line_data[i].char_data)
+            for (const auto& character : char_data)
                 std::cout << Value(character.code_point_index) << " ";
             std::cout << "\n    chars on line: \"";
-            for (const auto& character : line_data[i].char_data)
+            for (const auto& character : char_data)
                 std::cout << text[Value(character.string_index)];
             std::cout << "\"\n";
-            for (std::size_t j = 0; j < line_data[i].char_data.size(); ++j) {
-                for (auto& tag_elem : line_data[i].char_data[j].tags) {
-                    if (tag_elem) {
-                        std::cout << "FormattingTag @" << j << "\n    text=\"" << tag_elem->text << "\"\n    widths=";
-                        for (const auto width : tag_elem->widths)
-                            std::cout << Value(width) << " ";
-                        std::cout << "\n    whitespace=" << tag_elem->whitespace
-                                  << "\n    newline=" << tag_elem->newline << "\n    params=\n";
-                        for (const auto& param : tag_elem->params)
-                            std::cout << "        \"" << param << "\"\n";
-                        std::cout << "    tag_name=\"" << tag_elem->tag_name << "\"\n    close_tag="
-                                  << tag_elem->close_tag << "\n";
-                    }
+
+            for (std::size_t j = 0; j < char_data.size(); ++j) {
+                for (auto& tag_elem : char_data[j].tags) {
+                    std::cout << "FormattingTag @" << j << "\n    text=\"" << tag_elem.text << "\"\n    widths=";
+                    for (const auto width : tag_elem.widths)
+                        std::cout << width << " ";
+                    std::cout << "\n    whitespace=" << tag_elem.IsWhiteSpace()
+                              << "\n    newline=" << tag_elem.IsNewline() << "\n    params=\n";
+                    for (const auto& param : tag_elem.params)
+                        std::cout << "        \"" << param << "\"\n";
+                    std::cout << "    tag_name=\"" << tag_elem.tag_name << "\"\n    close_tag="
+                              << tag_elem.IsCloseTag() << "\n";
                 }
             }
             std::cout << "    justification=" << line_data[i].justification << "\n" << std::endl;
@@ -1313,31 +1226,32 @@ namespace DebugOutput {
     }
 }
 
-std::vector<std::shared_ptr<Font::TextElement>>
-Font::ExpensiveParseFromTextToTextElements(const std::string& text, Flags<TextFormat> format) const
+std::vector<Font::TextElement>
+Font::ExpensiveParseFromTextToTextElements(const std::string& text, const Flags<TextFormat> format) const
 {
-    std::vector<std::shared_ptr<TextElement>> text_elements;
+    std::vector<TextElement> text_elements;
 
     using namespace boost::xpressive;
 
     if (text.empty())
         return text_elements;
 
-    bool ignore_tags = format & FORMAT_IGNORETAGS;
+    const bool ignore_tags = format & FORMAT_IGNORETAGS;
 
     // Fetch and use the regular expression from the TagHandler which parses all the known XML tags.
-    sregex& regex = tag_handler.Regex(text, ignore_tags);
+    const sregex& regex = tag_handler.Regex(text, ignore_tags);
     sregex_iterator it(text.begin(), text.end(), regex);
 
     // These are the types found by the regular expression: XML open/close tags, text and
     // whitespace.  Each type will correspond to a type of TextElement.
-    mark_tag tag_name_tag(1);
-    mark_tag open_bracket_tag(2);
-    mark_tag close_bracket_tag(3);
-    mark_tag whitespace_tag(4);
-    mark_tag text_tag(5);
+    static const mark_tag full_regex(0);
+    static const mark_tag tag_name_tag(1);
+    static const mark_tag open_bracket_tag(2);
+    static const mark_tag close_bracket_tag(3);
+    static const mark_tag whitespace_tag(4);
+    static const mark_tag text_tag(5);
 
-    sregex_iterator end_it;
+    const sregex_iterator end_it;
     while (it != end_it)
     {
         // Consolidate adjacent blocks of text.  If adjacent found substrings are all text, merge
@@ -1359,51 +1273,53 @@ Font::ExpensiveParseFromTextToTextElements(const std::string& text, Flags<TextFo
 
         // If the element is not a text element then it must be an open tag, a close tag or whitespace.
         if (combined_text.empty()) {
+            const auto& it_elem = *it;
 
-            // Open XML tag.
-            if ((*it)[open_bracket_tag].matched) {
-                auto element = std::make_shared<Font::FormattingTag>(false);
-                element->text = Substring(text, (*it)[0]);
+            if (it_elem[open_bracket_tag].matched) {
+                // Open XML tag.
+                Substring text_substr{text, it_elem[full_regex]};
+                Substring tag_name_substr{text, it_elem[tag_name_tag]};
 
-                // Check open tags for submatches which are parameters.  For example a Color tag
+                // Check open tags for submatches which are parameters.  For example, a color tag
                 // might have RGB parameters.
-                if (1 < (*it).nested_results().size()) {
-                    element->params.reserve((*it).nested_results().size() - 1);
-                    for (auto nested_it = ++(*it).nested_results().begin();
-                         nested_it != (*it).nested_results().end(); ++nested_it)
+                const auto& nested_results{it_elem.nested_results()};
+                std::vector<Substring> params;
+                if (1 < nested_results.size()) {
+                    params.reserve(nested_results.size() - 1);
+                    for (auto nested_it = ++nested_results.begin();
+                         nested_it != nested_results.end(); ++nested_it)
                     {
-                        element->params.emplace_back(text, (*nested_it)[0]);
+                        const auto& nested_elem = *nested_it;
+                        params.emplace_back(text, nested_elem[full_regex]);
                     }
                 }
-                element->tag_name = Substring(text, (*it)[tag_name_tag]);
-                text_elements.push_back(std::move(element));
 
-            // Close XML tag
-            } else if ((*it)[close_bracket_tag].matched) {
-                auto element = std::make_shared<Font::FormattingTag>(true);
-                element->text = Substring(text, (*it)[0]);
-                element->tag_name = Substring(text, (*it)[tag_name_tag]);
-                text_elements.push_back(std::move(element));
+                text_elements.emplace_back(text_substr, tag_name_substr, std::move(params),
+                                           Font::TextElement::TextElementType::OPEN_TAG);
 
-            // Whitespace element
-            } else if ((*it)[whitespace_tag].matched) {
-                auto element = std::make_shared<Font::TextElement>(true, false);
-                element->text = Substring(text, (*it)[whitespace_tag]);
-                char last_char = *std::prev(element->text.end());
+            } else if (it_elem[close_bracket_tag].matched) {
+                // Close XML tag
+                Substring text_substr{text, it_elem[full_regex]};
+                Substring tag_substr{text, it_elem[tag_name_tag]};
+                text_elements.emplace_back(text_substr, tag_substr,
+                                           Font::TextElement::TextElementType::CLOSE_TAG);
 
-                text_elements.push_back(std::move(element));
+            } else if (it_elem[whitespace_tag].matched) {
+                // Whitespace element
+                Substring text_substr{text, it_elem[whitespace_tag]};
+                const auto& ws_elem = text_elements.emplace_back(
+                    text_substr, Font::TextElement::TextElementType::WHITESPACE);
+                const char last_char = ws_elem.text.empty() ? static_cast<char>(0) : *std::prev(ws_elem.text.end());
 
                 // If the last character of a whitespace element is a line ending then create a
                 // newline TextElement.
                 if (last_char == '\n' || last_char == '\f' || last_char == '\r')
-                    text_elements.push_back(std::make_shared<Font::TextElement>(false, true));
+                    text_elements.emplace_back(Font::TextElement::TextElementType::NEWLINE);
             }
 
         // Basic text element.
         } else {
-            auto element = std::make_shared<Font::TextElement>(false, false);
-            element->text = std::move(combined_text);
-            text_elements.push_back(std::move(element));
+            text_elements.emplace_back(combined_text);
         }
 
         if (need_increment)
@@ -1420,38 +1336,32 @@ Font::ExpensiveParseFromTextToTextElements(const std::string& text, Flags<TextFo
 }
 
 
-void Font::FillTemplatedText(
-    const std::string& text,
-    std::vector<std::shared_ptr<Font::TextElement>>& text_elements,
-    std::vector<std::shared_ptr<Font::TextElement>>::iterator start) const
+void Font::FillTemplatedText(const std::string& text, std::vector<Font::TextElement>& text_elements,
+                             std::vector<Font::TextElement>::iterator start) const
 {
     // For each TextElement in text_elements starting from start.
-    auto& te_it = start;
-    for (; te_it != text_elements.end(); ++te_it) {
-        std::shared_ptr<TextElement> elem = (*te_it);
+    for (auto te_it = start; te_it != text_elements.end(); ++te_it) {
+        auto& elem = *te_it;
 
         // For each character in the TextElement.
-        auto text_it = elem->text.begin();
-        auto end_it = elem->text.end();
+        auto text_it = elem.text.begin();
+        const auto end_it = elem.text.end();
         while (text_it != end_it) {
             // Find and set the width of the character glyph.
-            elem->widths.push_back(X0);
+            elem.widths.push_back(0);
             uint32_t c = utf8::next(text_it, end_it);
             if (c != WIDE_NEWLINE) {
                 auto it = m_glyphs.find(c);
                 // use a space when an unrendered glyph is requested (the
                 // space chararacter is always renderable)
-                elem->widths.back() = (it != m_glyphs.end()) ? X{it->second.advance} : m_space_width;
+                elem.widths.back() = (it != m_glyphs.end()) ? it->second.advance : m_space_width;
             }
         }
     }
 }
 
-void Font::ChangeTemplatedText(
-    std::string& text,
-    std::vector<std::shared_ptr<Font::TextElement>>& text_elements,
-    const std::string& new_text,
-    std::size_t targ_offset) const
+void Font::ChangeTemplatedText(std::string& text, std::vector<Font::TextElement>& text_elements,
+                               const std::string& new_text, std::size_t targ_offset) const
 {
     if (targ_offset >= text_elements.size())
         return;
@@ -1465,19 +1375,17 @@ void Font::ChangeTemplatedText(
     std::size_t curr_offset = 0;
     auto te_it = text_elements.begin();
     while (te_it != text_elements.end()) {
-        if ((*te_it)->Type() == TextElement::TextElementType::TEXT) {
+        if (te_it->Type() == TextElement::TextElementType::TEXT) {
             // Change the target text element
             if (targ_offset == curr_offset) {
                 // Change text
-                auto ii_sub_begin = (*te_it)->text.begin() - text.begin();
-                auto sub_len = (*te_it)->text.end() - (*te_it)->text.begin();
+                auto ii_sub_begin = static_cast<std::size_t>(te_it->text.begin() - text.begin());
+                auto sub_len = static_cast<std::size_t>(te_it->text.end() - te_it->text.begin());
                 text.erase(ii_sub_begin, sub_len);
                 text.insert(ii_sub_begin, new_text);
 
                 change_of_len = new_text.size() - sub_len;
-                (*te_it)->text = Substring(text,
-                                           std::next(text.begin(), ii_sub_begin),
-                                           std::next(text.begin(), ii_sub_begin + new_text.size()));
+                te_it->text = Substring(text, ii_sub_begin, ii_sub_begin + new_text.size());
                 break;
             }
             ++curr_offset;
@@ -1495,11 +1403,9 @@ void Font::ChangeTemplatedText(
         // Adjust the offset of each subsequent text_element
         while (te_it != text_elements.end())
         {
-            auto ii_sub_begin = (*te_it)->text.begin() - text.begin();
-            auto ii_sub_end = (*te_it)->text.end() - text.begin();
-            (*te_it)->text = Substring(text,
-                                       std::next(text.begin(), ii_sub_begin + change_of_len),
-                                       std::next(text.begin(), ii_sub_end + change_of_len));
+            auto ii_sub_begin = te_it->text.begin() - text.begin();
+            auto ii_sub_end = te_it->text.end() - text.begin();
+            te_it->text = Substring(text, ii_sub_begin + change_of_len, ii_sub_end + change_of_len);
 
             ++te_it;
         }
@@ -1508,9 +1414,37 @@ void Font::ChangeTemplatedText(
     FillTemplatedText(text, text_elements, start_of_reflow);
 }
 
+
+namespace {
+    [[nodiscard]] constexpr Flags<TextFormat> ValidateFormat(Flags<TextFormat> format) noexcept
+    {
+        // correct any disagreements in the format flags
+        uint8_t dup_ct = 0;   // duplication count
+        if (format & FORMAT_LEFT) ++dup_ct;
+        if (format & FORMAT_RIGHT) ++dup_ct;
+        if (format & FORMAT_CENTER) ++dup_ct;
+        if (dup_ct != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_LEFT by default
+            format &= ~(FORMAT_RIGHT | FORMAT_CENTER);
+            format |= FORMAT_LEFT;
+        }
+        uint8_t dup_ct2 = 0;
+        if (format & FORMAT_TOP) ++dup_ct2;
+        if (format & FORMAT_BOTTOM) ++dup_ct2;
+        if (format & FORMAT_VCENTER) ++dup_ct2;
+        if (dup_ct2 != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_TOP by default
+            format &= ~(FORMAT_BOTTOM | FORMAT_VCENTER);
+            format |= FORMAT_TOP;
+        }
+        if ((format & FORMAT_WORDBREAK) && (format & FORMAT_LINEWRAP))   // only one of these can be picked; FORMAT_WORDBREAK overrides FORMAT_LINEWRAP
+            format &= ~FORMAT_LINEWRAP;
+
+        return format;
+    }
+}
+
 std::vector<Font::LineData> Font::DetermineLines(
-    const std::string& text, Flags<TextFormat>& format, X box_width,
-    const std::vector<std::shared_ptr<TextElement>>& text_elements) const
+    const std::string& text, Flags<TextFormat> format, X box_width,
+    const std::vector<TextElement>& text_elements) const
 {
     // HACK - Workaround for #2166
     // On OSX, right clicking an unowned planet at game start may result in utf8::invalid_utf8 or utf8::not_enough_room
@@ -1519,36 +1453,31 @@ std::vector<Font::LineData> Font::DetermineLines(
         return std::vector<Font::LineData>{};
     }
 
-    ValidateFormat(format); // may modify format
+    format = ValidateFormat(format); // may modify format
 
-    RenderState render_state;
     static constexpr int tab_width = 8; // default tab width
-    X tab_pixel_width = tab_width * m_space_width; // get the length of a tab stop
-    bool expand_tabs = format & FORMAT_LEFT; // tab expansion only takes place when the lines are left-justified (otherwise, tabs are just spaces)
-    Alignment orig_just = ALIGN_NONE;
-    if (format & FORMAT_LEFT)
-        orig_just = ALIGN_LEFT;
-    if (format & FORMAT_CENTER)
-        orig_just = ALIGN_CENTER;
-    if (format & FORMAT_RIGHT)
-        orig_just = ALIGN_RIGHT;
+    const X tab_pixel_width = X{tab_width * m_space_width}; // get the length of a tab stop
+    const bool expand_tabs = format & FORMAT_LEFT; // tab expansion only takes place when the lines are left-justified (otherwise, tabs are just spaces)
+    const Alignment orig_just =
+        (format & FORMAT_LEFT) ? ALIGN_LEFT :
+        (format & FORMAT_CENTER) ? ALIGN_CENTER :
+        (format & FORMAT_RIGHT) ? ALIGN_RIGHT : ALIGN_NONE;
     bool last_line_of_curr_just = false; // is this the last line of the current justification? (for instance when a </right> tag is encountered)
 
     std::vector<Font::LineData> line_data;
-    if (!text_elements.empty()) {
-        line_data.emplace_back();
-        line_data.back().justification = orig_just;
-    }
+    if (!text_elements.empty())
+        line_data.emplace_back(orig_just);
 
     X x = X0;
     // the position within the original string of the current TextElement
     StrSize original_string_offset(S0);
     // the index of the first code point of the current TextElement
     CPSize code_point_offset(CP0);
-    std::vector<std::shared_ptr<TextElement>> pending_formatting_tags;
+    std::vector<TextElement> pending_formatting_tags;
+
     for (const auto& elem : text_elements) {
         // if a newline is explicitly requested, start a new one
-        if (elem->Type() == TextElement::TextElementType::NEWLINE) {
+        if (elem.Type() == TextElement::TextElementType::NEWLINE) {
             line_data.emplace_back();
             SetJustification(last_line_of_curr_just,
                              line_data.back(),
@@ -1556,13 +1485,13 @@ std::vector<Font::LineData> Font::DetermineLines(
                              line_data[line_data.size() - 2].justification);
             x = X0;
 
-        } else if (elem->Type() == TextElement::TextElementType::WHITESPACE) {
-            auto it = elem->text.begin();
-            const auto end_it = elem->text.end();
+        } else if (elem.Type() == TextElement::TextElementType::WHITESPACE) {
+            auto it = elem.text.begin();
+            const auto end_it = elem.text.end();
             while (it != end_it) {
-                const StrSize char_index{static_cast<std::size_t>(std::distance(elem->text.begin(), it))};
+                const StrSize char_index{static_cast<std::size_t>(std::distance(elem.text.begin(), it))};
                 const uint32_t c = utf8::next(it, end_it);
-                const StrSize char_size{std::distance(elem->text.begin(), it) - Value(char_index)};
+                const StrSize char_size{std::distance(elem.text.begin(), it) - Value(char_index)};
                 if (c != WIDE_CR && c != WIDE_FF) {
                     X advance_position = x + m_space_width;
                     if (c == WIDE_TAB && expand_tabs)
@@ -1593,6 +1522,7 @@ std::vector<Font::LineData> Font::DetermineLines(
                                 char_size,
                                 code_point_offset,
                                 pending_formatting_tags);
+
                             pending_formatting_tags.clear();
                             SetJustification(last_line_of_curr_just,
                                              line_data.back(),
@@ -1612,11 +1542,11 @@ std::vector<Font::LineData> Font::DetermineLines(
                 }
                 ++code_point_offset;
             }
-        } else if (elem->Type() == TextElement::TextElementType::TEXT) {
+        } else if (elem.Type() == TextElement::TextElementType::TEXT) {
             if (format & FORMAT_WORDBREAK) {
                 // if the text "word" overruns this line, and isn't alone on
                 // this line, move it down to the next line
-                if (box_width < x + elem->Width() && x != X0) {
+                if (box_width < x + elem.Width() && x != X0) {
                     line_data.emplace_back();
                     x = X0;
                     SetJustification(last_line_of_curr_just,
@@ -1624,14 +1554,14 @@ std::vector<Font::LineData> Font::DetermineLines(
                                      orig_just,
                                      line_data[line_data.size() - 2].justification);
                 }
-                auto it = elem->text.begin();
-                const auto end_it = elem->text.end();
+                auto it = elem.text.begin();
+                const auto end_it = elem.text.end();
                 std::size_t j = 0;
                 while (it != end_it) {
-                    const StrSize char_index{static_cast<std::size_t>(std::distance(elem->text.begin(), it))};
+                    const StrSize char_index{static_cast<std::size_t>(std::distance(elem.text.begin(), it))};
                     utf8::next(it, end_it);
-                    const StrSize char_size{std::distance(elem->text.begin(), it) - Value(char_index)};
-                    x += elem->widths[j];
+                    const StrSize char_size{std::distance(elem.text.begin(), it) - Value(char_index)};
+                    x += elem.widths[j];
                     line_data.back().char_data.emplace_back(
                         x,
                         original_string_offset + char_index,
@@ -1643,18 +1573,18 @@ std::vector<Font::LineData> Font::DetermineLines(
                     ++code_point_offset;
                 }
             } else {
-                auto it = elem->text.begin();
-                const auto end_it = elem->text.end();
+                auto it = elem.text.begin();
+                const auto end_it = elem.text.end();
                 std::size_t j = 0;
                 while (it != end_it) {
-                    const StrSize char_index{static_cast<std::size_t>(std::distance(elem->text.begin(), it))};
+                    const StrSize char_index{static_cast<std::size_t>(std::distance(elem.text.begin(), it))};
                     utf8::next(it, end_it);
-                    const StrSize char_size{std::distance(elem->text.begin(), it) - Value(char_index)};
+                    const StrSize char_size{std::distance(elem.text.begin(), it) - Value(char_index)};
                     // if the char overruns this line, and isn't alone on this
                     // line, move it down to the next line
-                    if ((format & FORMAT_LINEWRAP) && box_width < x + elem->widths[j] && x != X0) {
+                    if ((format & FORMAT_LINEWRAP) && box_width < x + elem.widths[j] && x != X0) {
                         line_data.emplace_back();
-                        x = elem->widths[j];
+                        x = X{elem.widths[j]};
                         line_data.back().char_data.emplace_back(
                             x,
                             original_string_offset + char_index,
@@ -1669,7 +1599,7 @@ std::vector<Font::LineData> Font::DetermineLines(
                     } else {
                         // there's room for this char on this line, or there's
                         // no wrapping in use
-                        x += elem->widths[j];
+                        x += elem.widths[j];
                         line_data.back().char_data.emplace_back(
                             x,
                             original_string_offset + char_index,
@@ -1682,32 +1612,28 @@ std::vector<Font::LineData> Font::DetermineLines(
                     ++code_point_offset;
                 }
             }
-        } else if (elem->Type() == TextElement::TextElementType::OPEN_TAG) {
-            assert(std::dynamic_pointer_cast<FormattingTag>(elem));
-            const auto elem_as_tag = std::static_pointer_cast<FormattingTag>(elem);
-            if (elem_as_tag->tag_name == ALIGN_LEFT_TAG)
+        } else if (elem.Type() == TextElement::TextElementType::OPEN_TAG) {
+            if (elem.tag_name == ALIGN_LEFT_TAG)
                 line_data.back().justification = ALIGN_LEFT;
-            else if (elem_as_tag->tag_name == ALIGN_CENTER_TAG)
+            else if (elem.tag_name == ALIGN_CENTER_TAG)
                 line_data.back().justification = ALIGN_CENTER;
-            else if (elem_as_tag->tag_name == ALIGN_RIGHT_TAG)
+            else if (elem.tag_name == ALIGN_RIGHT_TAG)
                 line_data.back().justification = ALIGN_RIGHT;
-            else if (elem_as_tag->tag_name != PRE_TAG)
+            else if (elem.tag_name != PRE_TAG)
                 pending_formatting_tags.push_back(elem);
             last_line_of_curr_just = false;
-            code_point_offset += elem->CodePointSize();
+            code_point_offset += elem.CodePointSize();
 
-        } else if (elem->Type() == TextElement::TextElementType::CLOSE_TAG) {
-            assert(std::dynamic_pointer_cast<FormattingTag>(elem));
-            const auto elem_as_tag = std::static_pointer_cast<FormattingTag>(elem);
-            if ((elem_as_tag->tag_name == ALIGN_LEFT_TAG && line_data.back().justification == ALIGN_LEFT) ||
-                (elem_as_tag->tag_name == ALIGN_CENTER_TAG && line_data.back().justification == ALIGN_CENTER) ||
-                (elem_as_tag->tag_name == ALIGN_RIGHT_TAG && line_data.back().justification == ALIGN_RIGHT))
+        } else if (elem.Type() == TextElement::TextElementType::CLOSE_TAG) {
+            if ((elem.tag_name == ALIGN_LEFT_TAG && line_data.back().justification == ALIGN_LEFT) ||
+                (elem.tag_name == ALIGN_CENTER_TAG && line_data.back().justification == ALIGN_CENTER) ||
+                (elem.tag_name == ALIGN_RIGHT_TAG && line_data.back().justification == ALIGN_RIGHT))
                 last_line_of_curr_just = true;
-            else if (elem_as_tag->tag_name != PRE_TAG)
+            else if (elem.tag_name != PRE_TAG)
                 pending_formatting_tags.push_back(elem);
-            code_point_offset += elem->CodePointSize();
+            code_point_offset += elem.CodePointSize();
         }
-        original_string_offset += elem->StringSize();
+        original_string_offset += elem.StringSize();
     }
     // disregard the final pending formatting tag, if any, since this is the
     // end of the text, and so it cannot have any effect
@@ -1813,12 +1739,12 @@ void Font::Init(FT_Face& face)
             if ((glyph_bitmap.width > TEX_MAX_SIZE) || (glyph_bitmap.rows > TEX_MAX_SIZE))
                 ThrowBadGlyph("GG::Font::Init : Glyph too large for buffer'%1%'", c); // catch broken fonts
 
-            if (Value(x) + glyph_bitmap.width >= TEX_MAX_SIZE) { // start a new row of glyph images
+            if (static_cast<std::size_t>(Value(x)) + glyph_bitmap.width >= TEX_MAX_SIZE) { // start a new row of glyph images
                 if (x > max_x) max_x = x;
                 x = X0;
                 y = max_y;
             }
-            if (Value(y) + glyph_bitmap.rows >= TEX_MAX_SIZE) {
+            if (static_cast<std::size_t>(Value(y)) + glyph_bitmap.rows >= TEX_MAX_SIZE) {
                 // We cannot make the texture any larger. The font does not fit.
                 ThrowBadGlyph("GG::Font::Init : Face too large for buffer. First glyph to no longer fit: '%1%'", c);
             }
@@ -1843,14 +1769,45 @@ void Font::Init(FT_Face& face)
             }
 
             // record info on how to find and use this glyph later
+            int16_t y_offset = static_cast<int16_t>(Value(m_height - 1 + m_descent - face->glyph->bitmap_top));
+            int16_t left_b = static_cast<int16_t>(std::ceil(face->glyph->metrics.horiBearingX / 64.0));
+            int16_t adv = static_cast<int16_t>(std::ceil(face->glyph->metrics.horiAdvance / 64.0));
+
+            static constexpr int16_t int8max = std::numeric_limits<int8_t>::max();
+            static constexpr int16_t int8min = std::numeric_limits<int8_t>::min();
+            if (y_offset > int8max) {
+                std::cout << "glyph " << c << " y offset too big: " << y_offset;
+                y_offset = int8max;
+            }
+            if (y_offset < int8min) {
+                std::cout << "glyph " << c << " y offset too small: " << y_offset;
+                y_offset = int8min;
+            }
+            if (left_b > int8max) {
+                std::cout << "glyph " << c << " left bearing too big: " << left_b;
+                left_b = int8max;
+            }
+            if (left_b < int8min) {
+                std::cout << "glyph " << c << " left bearing too small: " << left_b;
+                left_b = int8min;
+            }
+            if (adv > int8max) {
+                std::cout << "glyph " << c << " advance too big: " << adv;
+                adv = int8max;
+            }
+            if (adv < int8min) {
+                std::cout << "glyph " << c << " advance too small: " << adv;
+                adv = int8min;
+            }
+
             temp_glyph_data.emplace_back(std::piecewise_construct,
                                          std::forward_as_tuple(c),
                                          std::forward_as_tuple(
                                              Pt(x, y),
                                              Pt(x + X(glyph_bitmap.width), y + Y(glyph_bitmap.rows)),
-                                             Value(m_height - 1 + m_descent - face->glyph->bitmap_top),
-                                             static_cast<int16_t>((std::ceil(face->glyph->metrics.horiBearingX / 64.0))),
-                                             static_cast<int16_t>((std::ceil(face->glyph->metrics.horiAdvance / 64.0)))));
+                                             static_cast<int8_t>(y_offset),
+                                             static_cast<int8_t>(left_b),
+                                             static_cast<int8_t>(adv)));
 
             // advance buffer write-position
             x += X(glyph_bitmap.width + 1); //Leave a one pixel gap between glyphs
@@ -1865,16 +1822,15 @@ void Font::Init(FT_Face& face)
                     (uint8_t*)buffer.Buffer(), GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, 2);
 
     // create Glyph objects from temp glyph data
-    for (const auto& glyph_data : temp_glyph_data) {
-        m_glyphs[glyph_data.first] = Glyph(m_texture, glyph_data.second.ul, glyph_data.second.lr,
-                                           glyph_data.second.y_offset, glyph_data.second.left_b,
-                                           glyph_data.second.adv);
+    for (const auto& [codepoint, glyph_data] : temp_glyph_data) {
+        m_glyphs[codepoint] = Glyph(m_texture, glyph_data.ul, glyph_data.lr, glyph_data.y_offset,
+                                    glyph_data.left_b, glyph_data.adv);
     }
 
     // record the width of the space character
     auto glyph_it = m_glyphs.find(WIDE_SPACE);
     assert(glyph_it != m_glyphs.end());
-    m_space_width = X{glyph_it->second.advance};
+    m_space_width = glyph_it->second.advance;
 }
 
 bool Font::GenerateGlyph(FT_Face face, uint32_t ch)
@@ -1905,29 +1861,6 @@ bool Font::GenerateGlyph(FT_Face face, uint32_t ch)
     }
 
     return retval;
-}
-
-void Font::ValidateFormat(Flags<TextFormat>& format) const
-{
-    // correct any disagreements in the format flags
-    uint8_t dup_ct = 0;   // duplication count
-    if (format & FORMAT_LEFT) ++dup_ct;
-    if (format & FORMAT_RIGHT) ++dup_ct;
-    if (format & FORMAT_CENTER) ++dup_ct;
-    if (dup_ct != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_LEFT by default
-        format &= ~(FORMAT_RIGHT | FORMAT_CENTER);
-        format |= FORMAT_LEFT;
-    }
-    uint8_t dup_ct2 = 0;
-    if (format & FORMAT_TOP) ++dup_ct2;
-    if (format & FORMAT_BOTTOM) ++dup_ct2;
-    if (format & FORMAT_VCENTER) ++dup_ct2;
-    if (dup_ct2 != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_TOP by default
-        format &= ~(FORMAT_BOTTOM | FORMAT_VCENTER);
-        format |= FORMAT_TOP;
-    }
-    if ((format & FORMAT_WORDBREAK) && (format & FORMAT_LINEWRAP))   // only one of these can be picked; FORMAT_WORDBREAK overrides FORMAT_LINEWRAP
-        format &= ~FORMAT_LINEWRAP;
 }
 
 void Font::StoreGlyphImpl(Font::RenderCache& cache, Clr color, Pt pt,
@@ -1966,19 +1899,18 @@ void Font::StoreUnderlineImpl(Font::RenderCache& cache, Clr color, Pt pt, const 
     cache.underline_colors.store(color);
 }
 
-X Font::StoreGlyph(Pt pt, const Glyph& glyph, const Font::RenderState* render_state,
+X Font::StoreGlyph(Pt pt, const Glyph& glyph, const Font::RenderState& render_state,
                    Font::RenderCache& cache) const
 {
     int italic_top_offset = 0;
     int shadow_offset = 0;
     int super_sub_offset = 0;
 
-    if (render_state && render_state->use_italics) // Should we enable sub pixel italics offsets?
+    if (render_state.use_italics) // Should we enable sub pixel italics offsets?
         italic_top_offset = static_cast<int>(m_italics_offset);
-    if (render_state && render_state->use_shadow)
+    if (render_state.use_shadow)
         shadow_offset = static_cast<int>(m_shadow_offset);
-    if (render_state)
-        super_sub_offset = -static_cast<int>(render_state->super_sub_shift * m_super_sub_offset);
+    super_sub_offset = -static_cast<int>(render_state.super_sub_shift * m_super_sub_offset);
 
     // render shadows?
     if (shadow_offset > 0) {
@@ -1986,7 +1918,7 @@ X Font::StoreGlyph(Pt pt, const Glyph& glyph, const Font::RenderState* render_st
         StoreGlyphImpl(cache, CLR_BLACK, pt + Pt(X0, Y1), glyph, italic_top_offset, super_sub_offset);
         StoreGlyphImpl(cache, CLR_BLACK, pt + Pt(-X1, Y0), glyph, italic_top_offset, super_sub_offset);
         StoreGlyphImpl(cache, CLR_BLACK, pt + Pt(X0, -Y1), glyph, italic_top_offset, super_sub_offset);
-        if (render_state && render_state->draw_underline) {
+        if (render_state.draw_underline) {
             StoreUnderlineImpl(cache, CLR_BLACK, pt + Pt(X0, Y1), glyph, m_descent,
                                m_height, Y(m_underline_height), Y(m_underline_offset));
             StoreUnderlineImpl(cache, CLR_BLACK, pt + Pt(X0, -Y1), glyph, m_descent,
@@ -1995,12 +1927,10 @@ X Font::StoreGlyph(Pt pt, const Glyph& glyph, const Font::RenderState* render_st
     }
 
     // render main text
-    if (render_state) {
-        StoreGlyphImpl(cache, render_state->CurrentColor(), pt, glyph, italic_top_offset, super_sub_offset);
-        if (render_state->draw_underline) {
-            StoreUnderlineImpl(cache, render_state->CurrentColor(), pt, glyph, m_descent,
-                               m_height, Y(m_underline_height), Y(m_underline_offset));
-        }
+    StoreGlyphImpl(cache, render_state.CurrentColor(), pt, glyph, italic_top_offset, super_sub_offset);
+    if (render_state.draw_underline) {
+        StoreUnderlineImpl(cache, render_state.CurrentColor(), pt, glyph, m_descent,
+                           m_height, Y(m_underline_height), Y(m_underline_offset));
     }
 
     return X{glyph.advance};
@@ -2058,56 +1988,53 @@ namespace {
     }
 }
 
-void Font::HandleTag(const std::shared_ptr<FormattingTag>& tag, RenderState& render_state) const
+void Font::HandleTag(const TextElement& tag, RenderState& render_state) const
 {
-    if (tag->tag_name == ITALIC_TAG) {
-        if (tag->close_tag) {
-            if (render_state.use_italics) {
+    if (tag.tag_name == ITALIC_TAG) {
+        if (tag.IsCloseTag()) {
+            if (render_state.use_italics)
                 --render_state.use_italics;
-            }
         } else {
             ++render_state.use_italics;
         }
-    } else if (tag->tag_name == UNDERLINE_TAG) {
-        if (tag->close_tag) {
-            if (render_state.draw_underline) {
+    } else if (tag.tag_name == UNDERLINE_TAG) {
+        if (tag.IsCloseTag()) {
+            if (render_state.draw_underline)
                 --render_state.draw_underline;
-            }
         } else {
             ++render_state.draw_underline;
         }
-    } else if (tag->tag_name == SHADOW_TAG) {
-        if (tag->close_tag) {
-            if (render_state.use_shadow) {
+    } else if (tag.tag_name == SHADOW_TAG) {
+        if (tag.IsCloseTag()) {
+            if (render_state.use_shadow)
                 --render_state.use_shadow;
-            }
         } else {
             ++render_state.use_shadow;
         }
-    } else if (tag->tag_name == SUPERSCRIPT_TAG) {
-        if (tag->close_tag) {
+    } else if (tag.tag_name == SUPERSCRIPT_TAG) {
+        if (tag.IsCloseTag())
             --render_state.super_sub_shift;
-        } else {
+        else
             ++render_state.super_sub_shift;
-        }
-    } else if (tag->tag_name == SUBSCRIPT_TAG) {
-        if (tag->close_tag) {
+
+    } else if (tag.tag_name == SUBSCRIPT_TAG) {
+        if (tag.IsCloseTag())
             ++render_state.super_sub_shift;
-        } else {
+        else
             --render_state.super_sub_shift;
-        }
-    } else if (tag->tag_name == RGBA_TAG) {
-        if (tag->close_tag) {
+
+    } else if (tag.tag_name == RGBA_TAG) {
+        if (tag.IsCloseTag()) {
             // Popping is ok also for an empty color stack.
             render_state.PopColor();
 
         } else {
-            auto [color, well_formed_tag] = TagParamsToColor(tag->params);
+            auto [color, well_formed_tag] = TagParamsToColor(tag.params);
             if (well_formed_tag) {
                 glColor4ubv(color.data());
                 render_state.PushColor(color[0], color[1], color[2], color[3]);
             } else {
-                std::cerr << "GG::Font : Encountered malformed <rgba> formatting tag: " << tag->text;
+                std::cerr << "GG::Font : Encountered malformed <rgba> formatting tag: " << tag.text;
             }
         }
     }

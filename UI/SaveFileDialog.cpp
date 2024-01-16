@@ -94,14 +94,12 @@ namespace {
 
     /// Creates a text control that support resizing and word wrap.
     std::shared_ptr<GG::Label> CreateResizingText(std::string str, GG::X width) {
+        const auto font = ClientUI::GetFont();
         // Calculate the extent manually to ensure the control stretches to full
         // width when possible.  Otherwise it would always word break.
-        GG::Flags<GG::TextFormat> fmt = GG::FORMAT_NONE;
-        std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements =
-            ClientUI::GetFont()->ExpensiveParseFromTextToTextElements(str, fmt);
-        std::vector<GG::Font::LineData> lines =
-            ClientUI::GetFont()->DetermineLines(str, fmt, width, text_elements);
-        GG::Pt extent = ClientUI::GetFont()->TextExtent(std::move(lines));
+        auto text_elements = font->ExpensiveParseFromTextToTextElements(str, GG::FORMAT_NONE);
+        const auto extent = font->TextExtent(font->DetermineLines(str, GG::FORMAT_NONE, width, text_elements));
+
         auto text = GG::Wnd::Create<CUILabel>(std::move(str), std::move(text_elements),
                                               GG::FORMAT_WORDBREAK | GG::FORMAT_LEFT,
                                               GG::NO_WND_FLAGS, GG::X0, GG::Y0, extent.x, extent.y);
@@ -682,9 +680,8 @@ void SaveFileDialog::Init() {
     m_layout->SetRowStretch      (1, 1.0 );
     GG::Flags<GG::TextFormat> fmt = GG::FORMAT_NONE;
     std::string cancel_text(cancel_btn->Text());
-    std::vector<std::shared_ptr<GG::Font::TextElement>> text_elements =
-    font->ExpensiveParseFromTextToTextElements(cancel_text, fmt);
-    std::vector<GG::Font::LineData> lines = ClientUI::GetFont()->DetermineLines(
+    auto text_elements = font->ExpensiveParseFromTextToTextElements(cancel_text, fmt);
+    auto lines = ClientUI::GetFont()->DetermineLines(
         cancel_text, fmt, GG::X(1 << 15), text_elements);
     GG::Pt extent = ClientUI::GetFont()->TextExtent(lines);
     m_layout->SetMinimumRowHeight(3, extent.y);

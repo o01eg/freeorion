@@ -608,20 +608,32 @@ X Font::TextElement::Width() const
 class Font::TextAndElementsAssembler::Impl
 {
 public:
-    Impl(const Font& font) :
+    explicit Impl(const Font& font) :
         m_font(font)
     {}
+    Impl(const Font& font, std::size_t text_capacity, std::size_t elements_capacity) :
+        m_font(font)
+    {
+        m_text.reserve(text_capacity);
+        m_text_elements.reserve(elements_capacity);
+    }
 
     /** Return the constructed text.*/
     const auto& Text() const noexcept
     { return m_text; }
+
+    std::pair<std::string, std::vector<TextElement>> Extract()
+    {
+        if (!m_are_widths_calculated)
+            m_font.FillTemplatedText(m_text, m_text_elements, m_text_elements.begin());
+        return std::pair(std::move(m_text), std::move(m_text_elements));
+    }
 
     /** Return the constructed TextElements.*/
     const auto& Elements()
     {
         if (!m_are_widths_calculated)
             m_font.FillTemplatedText(m_text, m_text_elements, m_text_elements.begin());
-
         return m_text_elements;
     }
 
@@ -747,14 +759,22 @@ Font::TextAndElementsAssembler::TextAndElementsAssembler(const Font& font) :
     m_impl(std::make_unique<Impl>(font))
 {}
 
+Font::TextAndElementsAssembler::TextAndElementsAssembler(const Font& font, std::size_t text_capacity,
+                                                         std::size_t elements_capacity) :
+    m_impl(std::make_unique<Impl>(font, text_capacity, elements_capacity))
+{}
+
 // Required because Impl is defined here
 Font::TextAndElementsAssembler::~TextAndElementsAssembler() = default;
 
-const std::string& Font::TextAndElementsAssembler::Text() const
+const std::string& Font::TextAndElementsAssembler::Text() const noexcept
 { return m_impl->Text(); }
 
 const std::vector<Font::TextElement>& Font::TextAndElementsAssembler::Elements() const
 { return m_impl->Elements(); }
+
+std::pair<std::string, std::vector<Font::TextElement>> Font::TextAndElementsAssembler::Extract()
+{ return m_impl->Extract(); }
 
 Font::TextAndElementsAssembler& Font::TextAndElementsAssembler::AddOpenTag(std::string_view tag)
 {
@@ -1126,17 +1146,16 @@ std::string Font::StripTags(std::string_view text, bool strip_unpaired_tags)
     return retval;
 }
 
-Pt Font::TextExtent(const std::vector<LineData>& line_data) const
+Pt Font::TextExtent(const std::vector<LineData>& line_data) const noexcept
 {
-    Pt retval;
-    for (const LineData& line : line_data) {
-        if (retval.x < line.Width())
-            retval.x = line.Width();
-    }
-    bool is_empty = line_data.empty()
-        || (line_data.size() == 1 && line_data.front().Empty());
-    retval.y = is_empty ? Y0 : (static_cast<int>(line_data.size()) - 1) * m_lineskip + m_height;
-    return retval;
+    X x = X0;
+    for (const LineData& line : line_data)
+        x = std::max(x, line.Width());
+
+    const auto ld_size = static_cast<int>(line_data.size());
+    const bool is_empty = line_data.empty() || (ld_size == 1 && line_data.front().Empty());
+    Y y = is_empty ? Y0 : ((ld_size - 1) * m_lineskip + m_height);
+    return {x, y};
 }
 
 void Font::RegisterKnownTags(std::vector<std::string_view> tags)

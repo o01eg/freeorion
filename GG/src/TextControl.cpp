@@ -151,10 +151,10 @@ std::string_view TextControl::Text(CPSize from, CPSize to) const
     }
 }
 
-Pt TextControl::TextUpperLeft() const
+Pt TextControl::TextUpperLeft() const noexcept
 { return UpperLeft() + m_text_ul; }
 
-Pt TextControl::TextLowerRight() const
+Pt TextControl::TextLowerRight() const noexcept
 { return UpperLeft() + m_text_lr; }
 
 void TextControl::Render()
@@ -200,6 +200,11 @@ void TextControl::SetText(std::string str, std::vector<Font::TextElement> text_e
 {
     if (!utf8::is_valid(str.begin(), str.end()))
         return;
+
+    // before rebinding text elements to str, they may be invalid if whatever they were
+    // pointing to before the call to this function may have been moved from to create
+    // str. this is OK though, as the elem.text.size() calls don't depend on the
+    // pointed-to string of the Substring elem.text
 
     std::size_t expected_length(0);
     for (auto& elem : text_elements)
@@ -252,18 +257,22 @@ void TextControl::SizeMove(Pt ul, Pt lr)
 {
     const auto old_size = Size();
     Wnd::SizeMove(ul, lr);
-    bool resized = old_size != Size();
+    const bool resized = old_size != Size();
     bool redo_determine_lines = false;
     X client_width = ClientSize().x;
 
     if (m_text.empty()) {
         // don't redo lines
-    } else if (resized && m_format != FORMAT_LEFT && m_format != FORMAT_NONE) {
-        // for text with non-trivial alignment, be that centred, justified,
-        // right, or multi-line, or vertical alignments, need to redo for any
-        // resize
+    } else if (resized && m_format != FORMAT_LEFT &&
+               m_format != FORMAT_NONE)
+    {
+        // for text with non-trivial alignment, be that centred, justified, right,
+        // or multi-line, or vertical alignments, need to redo for any resize
         redo_determine_lines = true;
-    } else if (resized && !(m_format & FORMAT_NOWRAP) && (m_format & FORMAT_WORDBREAK || m_format & FORMAT_LINEWRAP)) {
+    } else if (resized &&
+               !(m_format & FORMAT_NOWRAP) &&
+               (m_format & FORMAT_WORDBREAK || m_format & FORMAT_LINEWRAP))
+    {
         // if breaking text across lines, need to redo layout when the available
         // width is less than that needed to fit the text on one line
         X text_width = m_text_lr.x - m_text_ul.x;
@@ -390,13 +399,20 @@ void TextControl::Erase(std::size_t line1, CPSize pos1, std::size_t line2, CPSiz
 
 void TextControl::AdjustMinimumSize()
 {
-    if (m_set_min_size)
-        SetMinSize(m_text_lr - m_text_ul);
+    if (!m_set_min_size)
+        return;
+
+    // disable while doing to prevent recursive loop via
+    // SetMinSize(..) -> AdjustMinimumSize() -> RecomputeTextBounds() -> Resize(..) -> SetMinSize(..)
+    // which occurred when Font::TextExtent returned a large value
+    m_set_min_size = false;
+    SetMinSize(m_text_lr - m_text_ul);
+    m_set_min_size = true;
 }
 
 void TextControl::RecomputeTextBounds()
 {
-    Pt text_sz = TextLowerRight() - TextUpperLeft();
+    const Pt text_sz = TextLowerRight() - TextUpperLeft();
     m_text_ul.y = Y0; // default value for FORMAT_TOP
     if (m_format & FORMAT_BOTTOM)
         m_text_ul.y = Size().y - text_sz.y;

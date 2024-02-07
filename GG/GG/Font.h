@@ -351,13 +351,17 @@ public:
     class GG_API TextAndElementsAssembler
     {
     public:
-        TextAndElementsAssembler(const Font& font);
+        explicit TextAndElementsAssembler(const Font& font);
+        TextAndElementsAssembler(const Font& font, std::size_t text_capacity, std::size_t elements_capacity);
         ~TextAndElementsAssembler(); // needed for unique_ptr<Impl>
 
         /** Return the constructed text.*/
-        const std::string& Text() const;
+        [[nodiscard]] const std::string& Text() const noexcept;
         /** Return the constructed TextElements.*/
-        const std::vector<TextElement>& Elements() const;
+        [[nodiscard]] const std::vector<TextElement>& Elements() const;
+
+        /** Destructively extract and return the constructed text and elements */
+        [[nodiscard]] std::pair<std::string, std::vector<TextElement>> Extract();
 
         /** Add an open tag iff it exists as a recognized tag.*/
         TextAndElementsAssembler& AddOpenTag(std::string_view tag);
@@ -653,7 +657,7 @@ public:
                                          const std::vector<TextElement>& text_elements) const;
 
     /** Returns the maximum dimensions of the text in x and y. */
-    Pt TextExtent(const std::vector<LineData>& line_data) const;
+    Pt TextExtent(const std::vector<LineData>& line_data) const noexcept;
 
     /** Adds \a tag to the list of embedded tags that Font should not print
         when rendering text.  Passing "foo" will cause Font to treat "<foo>",

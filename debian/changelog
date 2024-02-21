@@ -1,3 +1,9 @@
+freeorion (0.5.0.9999.fo0026+git20240214.395bd4cppa1~jammy) jammy; urgency=medium
+
+  * Update weekly test build.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Wed, 21 Feb 2024 09:06:17 +0300
+
 freeorion (0.5.0.9999.fo0026+git20240213.547a8ecppa1~jammy) jammy; urgency=medium
 
   * Update weekly test build.

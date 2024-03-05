@@ -59,7 +59,6 @@ include(CPackComponent)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 option(BUILD_SHARED_LIBS "Build project as shared libraries." ON)
@@ -348,7 +347,7 @@ set_property(DIRECTORY APPEND
         # Forcing backtrace using api for boost stacktrace due to lacking on ::Unwind side
         $<$<PLATFORM_ID:FreeBSD>:BOOST_STACKTRACE_USE_LIBC_BACKTRACE_FUNCTION>
         # Workaround for boost 1.81 issue https://github.com/boostorg/phoenix/issues/111
-        $<$<VERSION_EQUAL:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.81>:BOOST_PHOENIX_STL_TUPLE_H_>
+        $<$<VERSION_GREATER_EQUAL:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.81>:BOOST_PHOENIX_STL_TUPLE_H_>
 )
 
 
@@ -717,6 +716,7 @@ if(BUILD_CLIENT_GODOT)
                 -D CMAKE_CONFIGURATION_TYPES=${GODOT_CPP_BUILD_TYPE}
                 -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                 -D PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
+                -D Python3_EXECUTABLE=${PYTHON_EXECUTABLE}
                 ${CL_ARGS}
             INSTALL_COMMAND ""
         )

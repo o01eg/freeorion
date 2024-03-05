@@ -1,4 +1,4 @@
-FROM docker.io/ubuntu:kinetic
+FROM docker.io/debian:stable-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -27,14 +27,14 @@ APT::Install-Suggests \"false\";\n\
 RUN apt-get update --assume-yes
 RUN apt-get install --assume-yes \
         git \
-        g++-12 \
-	make \
+        g++ \
+        make \
         cmake \
         python3 \
         ccache \
         coreutils \
         libpython3-dev \
-        libfreetype6-dev \
+        libfreetype-dev \
         libglew-dev \
         libopenal-dev \
         libogg-dev \

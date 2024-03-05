@@ -3,7 +3,7 @@ name: "Ubuntu PPA"
 on:
   push:
     tags:
-      - 'ppa-2[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].[0-9a-f]+_[0-9]+'
+      - 'ppa-stable-2[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].[0-9a-f]+_[0-9]+'
 
 jobs:
   build-ppa:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        dist: [focal, jammy, kinetic, lunar]
+        dist: [focal, jammy, mantic, noble]
 
     steps:
       - name: Checkout sources

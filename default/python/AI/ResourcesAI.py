@@ -115,6 +115,8 @@ class PlanetFocusInfo:
         If another focus produces better, returns a negative rating, giving how much it is worse than best.
         """
         sqrt_population = min(1.0, self.planet.currentMeterValue(fo.meterType.population)) ** 0.5
+        if sqrt_population == 0:
+            sqrt_population = 0.0001  # prevent Zero division
         if focus == self.rated_foci[0][1]:
             return self.best_over_second() / sqrt_population
         else:
@@ -529,7 +531,8 @@ class PlanetFocusManager:
         while industry_or_research:
             # Mini offset to avoid comparing 0 vs 0, so higher priority wins if we have not baked anything yet.
             pp_per_priority = (current_pp_target + 0.1) / self.priority_industry
-            ip_per_priority = (current_rp_target + 0.1) / self.priority_research
+            # When the AI finished all research, research prio becomes 0
+            ip_per_priority = (current_rp_target + 0.1) / self.priority_research if self.priority_research else 0.0
             debug(
                 f"pp: {current_pp_target}/{self.priority_industry}={pp_per_priority}, "
                 f"rp: {current_rp_target}/{self.priority_research}={ip_per_priority}"

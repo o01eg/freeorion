@@ -2,6 +2,8 @@
 
 # got from https://blogs.itemis.com/en/secure-your-travis-ci-releases-part-2-signature-with-openpgp
 
+# encrypt secrets with `gpg --sign --local-user D27D872E002C9BE98DDADA04F620567D0AB6F387 --symmetric --cipher-algo AES256 --output .ci/secring.auto.gpg D27D872E002C9BE98DDADA04F620567D0AB6F387.sub_priv.asc`
+
 end_with_error()
 {
  echo "ERROR: ${1:-"Unknown Error"} Exiting." 1>&2

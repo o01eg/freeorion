@@ -1,8 +1,8 @@
 import freeorion as fo
 import sys
 from collections import defaultdict
-from math import acos, ceil, cos, floor, pi, sin, sqrt
-from random import gauss, randint, random, uniform
+from math import acos, ceil, cos, floor, pi, sin, sqrt, log, tan
+from random import gauss, randint, random, uniform, triangular, betavariate
 
 import universe_tables
 import util
@@ -401,26 +401,50 @@ def spiral_galaxy_calc_positions(positions, adjacency_grid, arms, size, width):
     """
     Calculate positions for the spiral galaxy shapes.
     """
-    arm_offset = uniform(0.0, 2.0 * pi)
+    arm_offset = pi/4
     arm_angle = (2.0 * pi) / float(arms)
-    arm_spread = (0.3 * pi) / float(arms)
-    arm_length = 1.5 * pi
-    center = 0.25
+    spiral_tightness = 1.75 / float(arms)
+    arm_length = 2.0 * pi * spiral_tightness
 
+    # radius of the core circular region
+    r_core = 0.3
+
+    logarithmic_pitch_degrees = 50
+    k = tan(logarithmic_pitch_degrees * pi/180)
+
+    arm = 0    
     for i in range(size):
         attempts = 100
+        arm += 1
+        arm %= arms # try to fill in arms uniformly rather than selecting at random
         while attempts > 0:
             radius = random()
-            if radius < center:
+            if radius < r_core:
                 angle = uniform(0.0, 2.0 * pi)
                 x = radius * cos(arm_offset + angle)
                 y = radius * sin(arm_offset + angle)
             else:
-                arm = randint(0, arms - 1) * arm_angle
-                angle = gauss(0.0, arm_spread)
-                x = radius * cos(arm_offset + arm + angle + radius * arm_length)
-                y = radius * sin(arm_offset + arm + angle + radius * arm_length)
-
+                #set arm spread to be proportionate to distance from core region's edge, down to zero at the tip
+                #however scale down a bit so there are slightly less connections between arms right outside of the edge,
+                #because it makes the center slightly larger than set by r_core
+                #this scaling factor could probably be computed somehow based on average starlane length and size and/or width of the galaxy
+                tip_scale = 0.05
+                thickness_scale = 0.7
+                max_angle = arm_angle * (tip_scale+(1.0 - tip_scale)*(1.0 - radius)/(1.0 - r_core)) * thickness_scale
+                angle =  -random() * max_angle
+                
+                #arithmetic
+                #x = -(radius) * cos(arm_offset + angle + arm * arm_angle + radius*arm_length)
+                #y = (radius) * sin(arm_offset + angle + arm * arm_angle + radius*arm_length) 
+                
+                #logarithmic
+                x = -(radius) * cos(arm_offset + angle + arm * arm_angle + log(radius)/k)
+                y = (radius) * sin(arm_offset + angle + arm * arm_angle + log(radius)/k) 
+                 
+                #parabolic
+                #x = radius * cos( arm_offset + angle + arm * arm_angle + arm_length * sqrt(radius ))
+                #y = radius * sin( arm_offset + angle + arm * arm_angle + arm_length * sqrt(radius ))
+                
             x = (x + 1) * width / 2.0
             y = (y + 1) * width / 2.0
             if (x < 0.0) or (width <= x) or (y < 0.0) or (width <= y):

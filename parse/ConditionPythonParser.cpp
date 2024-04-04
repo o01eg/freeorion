@@ -161,11 +161,13 @@ namespace {
         }
 
         std::unique_ptr<ValueRef::ValueRef<double>> sortkey;
-        auto sortkey_args = boost::python::extract<value_ref_wrapper<double>>(kw["sortkey"]);
-        if (sortkey_args.check()) {
-            sortkey = ValueRef::CloneUnique(sortkey_args().value_ref);
-        } else {
-            sortkey = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["sortkey"])());
+        if (kw.has_key("sortkey")) {
+            auto sortkey_args = boost::python::extract<value_ref_wrapper<double>>(kw["sortkey"]);
+            if (sortkey_args.check()) {
+                sortkey = ValueRef::CloneUnique(sortkey_args().value_ref);
+            } else {
+                sortkey = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["sortkey"])());
+            }
         }
 
         auto condition = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["condition"])().condition);
@@ -580,6 +582,18 @@ namespace {
             std::move(condition)));
     }
 
+    condition_wrapper insert_produced_by_empire_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<ValueRef::ValueRef<int>> empire;
+        auto empire_args = boost::python::extract<value_ref_wrapper<int>>(kw["empire"]);
+        if (empire_args.check()) {
+            empire = ValueRef::CloneUnique(empire_args().value_ref);
+        } else {
+            empire = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["empire"])());
+        }
+
+        return condition_wrapper(std::make_shared<Condition::ProducedByEmpire>(std::move(empire)));
+    }
+
     condition_wrapper insert_owner_has_tech_(const boost::python::tuple& args, const boost::python::dict& kw) {
         std::unique_ptr<ValueRef::ValueRef<std::string>> name;
         auto name_args = boost::python::extract<value_ref_wrapper<std::string>>(kw["name"]);
@@ -769,6 +783,7 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["Location"] = boost::python::raw_function(insert_location_);
     globals["Enqueued"] = boost::python::raw_function(insert_enqueued_);
     globals["Number"] = boost::python::raw_function(insert_number_);
+    globals["ProducedByEmpire"] = boost::python::raw_function(insert_produced_by_empire_);
 
     // non_ship_part_meter_enum_grammar
     for (const auto& meter : std::initializer_list<std::pair<const char*, MeterType>>{
@@ -832,7 +847,8 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     {
         const auto sm = op.second;
         globals[op.first] = boost::python::raw_function([sm](const auto& args, const auto& kw) { return insert_sorted_number_of_(args, kw, sm); });
-    }            
+    }
+    globals["NumberOf"] = boost::python::raw_function([](const auto& args, const auto& kw) { return insert_sorted_number_of_(args, kw, Condition::SortingMethod::SORT_RANDOM); });
 
     globals["HasSpecies"] = boost::python::raw_function(insert_has_species_);
     globals["IsField"] = boost::python::raw_function(insert_is_field_);

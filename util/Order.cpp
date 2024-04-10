@@ -1890,12 +1890,6 @@ bool AggressiveOrder::Check(int empire_id, int object_id, FleetAggression aggres
         return false;
     }
 
-    // ToDo: remove when it will be fixed
-    if (aggression == FleetAggression::FLEET_OBSTRUCTIVE) {
-        ErrorLogger() << "IssueAggressionOrder : not allowed by home rules";
-        return false;
-    }
-
     return true;
 }
 

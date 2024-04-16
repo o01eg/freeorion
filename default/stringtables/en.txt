@@ -1303,6 +1303,12 @@ Extrasolar Ship Detection
 RULE_EXTRASOLAR_SHIP_DETECTION_DESC
 Ships outside systems provide detection.
 
+RULE_OVERRIDE_VIS_LEVEL
+Stealthy Blockader Visibility
+
+RULE_OVERRIDE_VIS_LEVEL_DESC
+Visibility level at which otherwise stealthy fleets and ships are revealed to the empire that owns a fleet that is blockaded.
+
 RULE_UNSEEN_STEALTHY_PLANETS_INVISIBLE
 Undetectable Stealthy Planets
 
@@ -1462,6 +1468,24 @@ Maximum Colonies When Conceding
 
 RULE_CONCEDE_COLONIES_THRESHOLD_DESC
 Empires with more than this number of colonies may not concede.
+
+RULE_CONCEDE_DESTROY_COLONIES
+Depopulate Conceded Colonies
+
+RULE_CONCEDE_DESTROY_COLONIES_DESC
+If true, colonies owned by empires that concede are depopulated. If false, ships are set to unowned.
+
+RULE_CONCEDE_DESTROY_BUILDINGS
+Destroy Conceded Buildings
+
+RULE_CONCEDE_DESTROY_BUILDINGS_DESC
+If true, buildings owned by empires that concede are destroyed. If false, buildings are set to unowned.
+
+RULE_CONCEDE_DESTROY_SHIPS
+Destroy Conceded Ships
+
+RULE_CONCEDE_DESTROY_SHIPS_DESC
+If true, ships owned by empires that concede are destroyed. If false, ships are set to unowned.
 
 RULE_THRESHOLD_HUMAN_PLAYER_WIN
 Max human player winners
@@ -8049,6 +8073,21 @@ At %system%: the %empire% fleet '%fleet%' (%rawtext% ships) has arrived.
 SITREP_FOREIGN_FLEET_ARRIVED_AT_DESTINATION_LABEL
 Foreign Fleet Arrived
 
+SITREP_FLEET_BLOCKADED
+At %system%: the %empire:blockaded% fleet %fleet% was forced to halt by a %empire:blockader% blockade.
+
+SITREP_FLEET_BLOCKADED_NEUTRAL
+At %system%: the fleet %fleet% was forced to halt by a blockade.
+
+SITREP_FLEET_BLOCKADED_LABEL
+Fleet Blockaded
+
+SITREP_FLEET_BLOCKADED_NO_EMPIRE
+At %system%: the fleet %fleet% was forced to halt by a blockade.
+
+SITREP_FLEET_BLOCKADED_NO_EMPIRE_LABEL
+Fleet Blockaded
+
 SITREP_POP_THRESHOLD
 On %planet%: The colony has reached sufficient size and [[metertype METER_HAPPINESS]] to be a settler source for colonizing other planets. Also [[metertype METER_INDUSTRY]] and [[metertype METER_RESEARCH]] may start growing.
 
@@ -11117,10 +11156,10 @@ DESC_VAR_TARGET
 target
 
 DESC_VAR_LOCAL_CANDIDATE
-local condition candidate
+candidate
 
 DESC_VAR_ROOT_CANDIDATE
-root condition candidate
+root candidate
 
 DESC_STAT_TYPE
 stat type
@@ -11296,6 +11335,18 @@ ID
 DESC_VAR_AGE
 age in turns
 
+DESC_VAR_TURNSSINCEFOCUSCHANGE
+turns since focus change
+
+DESC_VAR_TURNSSINCEANNEXATION
+turns since annexation
+
+DESC_VAR_TURNSSINCECOLONIZATION
+turns since colonization
+
+DESC_VAR_TURNSSINCELASTCONQUERED
+turns since being conquered
+
 DESC_VAR_PRODUCEDBYEMPIREID
 producer empire
 
@@ -11322,6 +11373,15 @@ next system id
 
 DESC_VAR_PREVIOUSSYSTEMID
 previous system id
+
+DESC_VAR_PREVIOUSTOFINALDESTINATIONID
+previous final destination id
+
+DESC_VAR_ARRIVALSTARLANEID
+arrival starlane id
+
+DESC_VAR_LASTTURNMOVEORDERED
+last turn ordered to move id
 
 DESC_VAR_NUMSHIPS
 number of ships
@@ -11364,6 +11424,30 @@ owner's top priority enqueued tech
 
 DESC_VAR_LASTTURNBATTLEHERE
 last turn a battle occurred here
+
+DESC_VAR_LASTTURNATTACKEDBYSHIP
+last turn attacked by ship
+
+DESC_VAR_LASTTURNCOLONIZED
+last turn colonized
+
+DESC_VAR_LASTTURNCONQUERED
+last turn conquered
+
+DESC_VAR_LASTTURNANNEXED
+last turn annexed
+
+DESC_VAR_ORDEREDGIVENTOEMPIRE
+ordered given to empire
+
+DESC_VAR_OWNERBEFORELASTCONQUERED
+owner before last conquered
+
+DESC_VAR_LASTINVADEDBYEMPIRE
+last invaded by empire
+
+DESC_VAR_LASTCOLONIZEDBYEMPIRE
+last colonized by empire
 
 DESC_VAR_JUMPSBETWEEN
 starlane jumps between systems containing objects with ids %1% and %2%

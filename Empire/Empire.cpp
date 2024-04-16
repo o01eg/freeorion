@@ -600,7 +600,7 @@ const Meter* Empire::GetMeter(std::string_view name) const {
         return nullptr;
 }
 
-void Empire::BackPropagateMeters() {
+void Empire::BackPropagateMeters() noexcept {
     for (auto& meter : m_meters)
         meter.second.BackPropagate();
 }

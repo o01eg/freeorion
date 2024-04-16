@@ -20,6 +20,7 @@
 #include "../util/Logger.h"
 #include "../util/Random.h"
 #include "../util/i18n.h"
+#include <numeric>
 
 
 Ship::Ship(int empire_id, int design_id, std::string species_name,
@@ -94,7 +95,8 @@ Ship::Ship(int empire_id, int design_id, std::string species_name,
 }
 
 std::shared_ptr<UniverseObject> Ship::Clone(const Universe& universe, int empire_id) const {
-    Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
+    const Visibility vis = empire_id == ALL_EMPIRES ?
+        Visibility::VIS_FULL_VISIBILITY : universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
@@ -121,7 +123,8 @@ void Ship::Copy(const Ship& copied_ship, const Universe& universe, int empire_id
         return;
 
     const int copied_object_id = copied_ship.ID();
-    const Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
+    const Visibility vis = empire_id == ALL_EMPIRES ?
+        Visibility::VIS_FULL_VISIBILITY : universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
     const auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
     UniverseObject::Copy(copied_ship, vis, visible_specials, universe);
@@ -507,22 +510,16 @@ float Ship::WeaponPartShipDamage(const ShipPart* part, const ScriptingContext& c
 
 float Ship::TotalWeaponsFighterDamage(const ScriptingContext& context, bool launch_fighters) const {
     // sum up all individual weapons' attack strengths
-    float total_shots = 0.0f;
     const auto all_weapons_shots = AllWeaponsFighterDamage(context, launch_fighters);
-    for (float shots : all_weapons_shots)
-        total_shots += shots;
-    return total_shots;
+    return std::accumulate(all_weapons_shots.begin(), all_weapons_shots.end(), 0.0f);
 }
 
 float Ship::TotalWeaponsShipDamage(const ScriptingContext& context, float shield_DR,
                                    bool launch_fighters) const
 {
     // sum up all individual weapons' attack strengths
-    float total_attack = 0.0f;
     const auto all_weapons_damage = AllWeaponsShipDamage(context, shield_DR, launch_fighters);
-    for (float attack : all_weapons_damage)
-        total_attack += attack;
-    return total_attack;
+    return std::accumulate(all_weapons_damage.begin(), all_weapons_damage.end(), 0.0f);
 }
 
 std::vector<float> Ship::AllWeaponsFighterDamage(const ScriptingContext& context,
@@ -581,7 +578,7 @@ void Ship::SetArrivedOnTurn(int turn) {
     }
 }
 
-void Ship::BackPropagateMeters() {
+void Ship::BackPropagateMeters() noexcept {
     UniverseObject::BackPropagateMeters();
 
     // ship part meter back propagation, since base class function doesn't do this...

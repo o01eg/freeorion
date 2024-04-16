@@ -121,133 +121,53 @@ std::shared_ptr<const Empire> CombatInfo::GetEmpire(int id) const
 std::shared_ptr<Empire> CombatInfo::GetEmpire(int id)
 { return empires.GetEmpire(id); }
 
-float CombatInfo::GetMonsterDetection() const {
-    float monster_detection = 0.0;
-    constexpr auto unowned = [](const auto* obj) { return obj->Unowned(); };
-    constexpr auto detection = [](const auto* obj) { return obj->GetMeter(MeterType::METER_DETECTION)->Initial(); };
-
-    for (const auto det : objects.allRaw<Ship>() | range_filter(unowned) | range_transform(detection))
-        monster_detection = std::max(monster_detection, det); // TODO: could use ranges::max_element
-    for (const auto det : objects.allRaw<Planet>() | range_filter(unowned)| range_transform(detection))
-        monster_detection = std::max(monster_detection, det);
-    return monster_detection;
-}
-
 namespace {
-    // collect detection strengths of all empires (and neutrals) in \a combat_info
-    auto GetEmpiresDetectionStrengths(const CombatInfo& combat_info) {
-        std::vector<std::pair<int, float>> retval;
-        retval.reserve(combat_info.empire_ids.size());
-        for (auto empire_id : combat_info.empire_ids) { // loop over participating empires
-            if (empire_id == ALL_EMPIRES) {
-                retval.emplace_back(ALL_EMPIRES, combat_info.GetMonsterDetection());
-                continue;
-            }
-            const auto empire = combat_info.GetEmpire(empire_id);
-            if (!empire) {
-                ErrorLogger() << "GetEmpiresDetectionStrengths(CombatInfo) couldn't find empire with id " << empire_id;
-                continue;
-            }
-            const Meter* meter = empire->GetMeter("METER_DETECTION_STRENGTH");
-            if (!meter)
-                ErrorLogger() << "GetEmpiresDetectionStrengths(CombatInfo) found empire with no detection meter?";
-            else
-                retval.emplace_back(empire_id, meter->Current());
-        }
-
-        std::sort(retval.begin(), retval.end(),
-                  [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first;});
-        return retval;
-    }
-
-    Visibility GetObjectVisibilityByEmpire(int obj_id, int empire_id, const CombatInfo& combat_info) {
-        auto empire_it = combat_info.empire_object_visibility.find(empire_id);
-        if (empire_it == combat_info.empire_object_visibility.end())
-            return Visibility::VIS_NO_VISIBILITY;
-        auto obj_it = empire_it->second.find(obj_id);
-        return obj_it == empire_it->second.end() ? Visibility::VIS_NO_VISIBILITY : obj_it->second;
-    }
+    constexpr auto not_null = [](const auto* o) noexcept -> bool { return !!o; };
 }
 
 void CombatInfo::InitializeObjectVisibility() {
-    // initialize combat-local visibility of objects by empires and combat-local
-    // empire ObjectMaps with object state info that empires know at start of battle
-    const auto det_strengths = GetEmpiresDetectionStrengths(*this);
+    // visibility in this empire_object_visibility in this CombatInfo should
+    // have been initially set in the constructor from the passed-in Universe
+    // visibility state.
+    // this function adjusts those values
 
     for (int empire_id : empire_ids) {
-        DebugLogger() << "Initializing CombatInfo object visibility and known objects for empire: " << empire_id;
+        DebugLogger(combat) << "Tweaking CombatInfo object visibility and known objects for empire: " << empire_id;
 
-        float empire_detection = [empire_id, &det_strengths]() {
-            const auto it = std::find_if(det_strengths.begin(), det_strengths.end(),
-                                         [empire_id](auto& id_ds) { return empire_id == id_ds.first; });
-            if (it != det_strengths.end())
-                return it->second;
-            return 0.0f;
-        }();
+        auto& empire_vis{empire_object_visibility[empire_id]};
 
-        static constexpr auto not_null = [](const auto* o) -> bool { return o; };
-        for (const auto* obj : objects.allRaw() | range_filter(not_null)) {
-            if (obj->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
-                // systems always visible to empires with objects in them
-                empire_object_visibility[empire_id][obj->ID()] = Visibility::VIS_PARTIAL_VISIBILITY;
-                DebugLogger() << "System " << obj->Name() << " always visible";
+        for (const System* obj : objects.allRaw<System>() | range_filter(not_null)) {
+            // systems always visible to empires with objects in them
+            empire_vis[obj->ID()] = Visibility::VIS_PARTIAL_VISIBILITY;
+            DebugLogger(combat) << "   System " << obj->Name() << " always visible";
+        }
 
-            } else if (obj->ObjectType() == UniverseObjectType::OBJ_PLANET) {
-                // planets always at least basically visible to empires with objects in them
-                Visibility vis = Visibility::VIS_BASIC_VISIBILITY;
-                if (empire_id != ALL_EMPIRES) {
-                    Visibility vis_univ = GetObjectVisibilityByEmpire(obj->ID(), empire_id, *this);
-                    if (vis_univ > vis) {
-                        vis = vis_univ;
-                        DebugLogger() << "Planet " << obj->Name() << " visible from universe state";
-                    }
-                }
-                if (vis < Visibility::VIS_PARTIAL_VISIBILITY && empire_detection >= obj->GetMeter(MeterType::METER_STEALTH)->Current()) {
-                    vis = Visibility::VIS_PARTIAL_VISIBILITY;
-                    DebugLogger() << "Planet " << obj->Name() << " visible empire stealth check: " << empire_detection
-                                  << " >= " << obj->GetMeter(MeterType::METER_STEALTH)->Current();
-                }
-                if (vis == Visibility::VIS_BASIC_VISIBILITY) {
-                    DebugLogger() << "Planet " << obj->Name() << " has just basic visibility by default";
-                }
+        for (const Planet* obj : objects.allRaw<Planet>() | range_filter(not_null)) {
+            // planets always at least basically visible to empires with objects in the system
+            auto& obj_vis{empire_vis[obj->ID()]};
+            DebugLogger(combat) << "   Planet " << obj->Name()
+                                << ((obj_vis > Visibility::VIS_BASIC_VISIBILITY) ?
+                                    " visible from universe state" : " has default basic visibility");
+            obj_vis = std::max(Visibility::VIS_BASIC_VISIBILITY, obj_vis);
+        }
 
-                empire_object_visibility[empire_id][obj->ID()] = vis;
+        const bool aggressive_rule = GetGameRules().Get<bool>("RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE");
 
-            } else if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-                // ships only visible if detected or they attack later in combat
-                Visibility vis = Visibility::VIS_NO_VISIBILITY;
-                if (empire_id != ALL_EMPIRES) {
-                    Visibility vis_univ = GetObjectVisibilityByEmpire(obj->ID(), empire_id, *this);
-                    if (vis_univ > vis) {
-                        vis = vis_univ;
-                        DebugLogger() << "Ship " << obj->Name() << " visible from universe state";
-                    }
-                }
-                if (vis < Visibility::VIS_PARTIAL_VISIBILITY &&
-                    empire_detection >= obj->GetMeter(MeterType::METER_STEALTH)->Current())
-                {
-                    vis = Visibility::VIS_PARTIAL_VISIBILITY;
-                    DebugLogger() << "Ship " << obj->Name() << " visible empire stealth check: " << empire_detection
-                                  << " >= " << obj->GetMeter(MeterType::METER_STEALTH)->Current();
-                }
-                if (vis < Visibility::VIS_PARTIAL_VISIBILITY && GetGameRules().Get<bool>("RULE_AGGRESSIVE_SHIPS_COMBAT_VISIBLE")) {
-                    if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-                        const auto* ship = static_cast<const Ship*>(obj);
-                        if (auto fleet = objects.getRaw<const Fleet>(ship->FleetID())) {
-                            if (fleet->Aggressive()) {
-                                vis = Visibility::VIS_PARTIAL_VISIBILITY;
-                                DebugLogger() << "Ship " << obj->Name() << " visible from aggressive fleet";
-                            }
-                        }
-                    }
-                }
+        for (const Ship* obj : objects.allRaw<Ship>() | range_filter(not_null)) {
+            // ships only initially visible if already detected or if the aggressive fleet rule applies
+            auto& obj_vis{empire_vis[obj->ID()]};
 
-                if (vis > Visibility::VIS_NO_VISIBILITY) {
-                    empire_object_visibility[empire_id][obj->ID()] = vis;
-                } else {
-                    DebugLogger() << "Ship " << obj->Name() << " initially hidden";
+            if (aggressive_rule && obj_vis < Visibility::VIS_PARTIAL_VISIBILITY) {
+                const auto* fleet = objects.getRaw<const Fleet>(obj->FleetID());
+                if (fleet && fleet->Aggressive()) {
+                    obj_vis = Visibility::VIS_PARTIAL_VISIBILITY;
+                    DebugLogger(combat) << "   Ship " << obj->Name() << " visible due to aggressive fleet rule";
+                    continue;
                 }
             }
+            DebugLogger(combat) << "   Ship " << obj->Name()
+                                << ((obj_vis >= Visibility::VIS_BASIC_VISIBILITY) ?
+                                    " visible from universe state" : " initially hidden");
         }
     }
 }

@@ -23,13 +23,13 @@ struct [[nodiscard]] ScriptingContext {
         UniverseObjectType, Visibility, std::string, std::vector<std::string>>;
     inline static CONSTEXPR_VEC_AND_STRING const CurrentValueVariant DEFAULT_CURRENT_VALUE{0};
 
-    ScriptingContext() noexcept :
+    [[nodiscard]] ScriptingContext() noexcept :
         ScriptingContext(GetUniverse(), ::Empires(), GetGalaxySetupData(),
                          GetSpeciesManager(), GetSupplyManager())
     {}
 
-    ScriptingContext(const ScriptingContext& parent_context,
-                     const UniverseObject* condition_local_candidate_) noexcept :
+    [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
+                                   const UniverseObject* condition_local_candidate_) noexcept :
         source(                   parent_context.source),
         effect_target(            parent_context.effect_target),
         condition_root_candidate( parent_context.condition_root_candidate ?
@@ -55,7 +55,7 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(           parent_context.diplo_statuses)
     {}
 
-    explicit ScriptingContext(const UniverseObject* source_) noexcept :
+    [[nodiscard]] explicit ScriptingContext(const UniverseObject* source_) noexcept :
         source(           source_),
         galaxy_setup_data(GetGalaxySetupData()),
         species(          GetSpeciesManager()),
@@ -67,8 +67,8 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(   ::Empires().GetDiplomaticStatuses())
     {}
 
-    ScriptingContext(const UniverseObject* source_,
-                     const ScriptingContext& parent_context) noexcept :
+    [[nodiscard]] ScriptingContext(const UniverseObject* source_,
+                                   const ScriptingContext& parent_context) noexcept :
         source(                   source_),
         effect_target(            parent_context.effect_target),
         condition_root_candidate( parent_context.condition_root_candidate),
@@ -92,11 +92,11 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(           parent_context.diplo_statuses)
     {}
 
-    ScriptingContext(const ScriptingContext& parent_context,
-                     const Universe::EmpireObjectVisibilityMap& vis,
-                     const Universe::EmpireObjectVisibilityTurnMap& vis_turns,
-                     const UniverseObject* source_ = nullptr,
-                     UniverseObject* target_ = nullptr) noexcept :
+    [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
+                                   const Universe::EmpireObjectVisibilityMap& vis,
+                                   const Universe::EmpireObjectVisibilityTurnMap& vis_turns,
+                                   const UniverseObject* source_ = nullptr,
+                                   UniverseObject* target_ = nullptr) noexcept :
         source(                   source_),
         effect_target(            target_),
         condition_root_candidate( parent_context.condition_root_candidate),
@@ -120,8 +120,8 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(           parent_context.diplo_statuses)
     {}
 
-    ScriptingContext(const ScriptingContext& parent_context,
-                     const CurrentValueVariant& current_value_) noexcept :
+    [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
+                                   const CurrentValueVariant& current_value_) noexcept :
         source(                   parent_context.source),
         effect_target(            parent_context.effect_target),
         condition_root_candidate( parent_context.condition_root_candidate),
@@ -145,8 +145,8 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(           parent_context.diplo_statuses)
     {}
 
-    ScriptingContext(ScriptingContext&& parent_context,
-                     const CurrentValueVariant& current_value_) noexcept :
+    [[nodiscard]] ScriptingContext(ScriptingContext&& parent_context,
+                                   const CurrentValueVariant& current_value_) noexcept :
         source(                   parent_context.source),
         effect_target(            parent_context.effect_target),
         condition_root_candidate( parent_context.condition_root_candidate),
@@ -193,10 +193,10 @@ struct [[nodiscard]] ScriptingContext {
     ScriptingContext(const ScriptingContext&, std::vector<std::string>) = delete;
 
 
-    ScriptingContext(const ScriptingContext& parent_context,
-                     const UniverseObject* source_,
-                     UniverseObject* target_,
-                     int in_design_id_, int production_block_size_) noexcept :
+    [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
+                                   const UniverseObject* source_,
+                                   UniverseObject* target_,
+                                   int in_design_id_, int production_block_size_) noexcept :
         source(                   source_),
         effect_target(            target_),
         condition_root_candidate( parent_context.condition_root_candidate),
@@ -220,10 +220,11 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(           parent_context.diplo_statuses)
     {}
 
-    ScriptingContext(const ScriptingContext& parent_context,
-                     UniverseObject* target_,
-                     const CurrentValueVariant& current_value_) noexcept :
-        source(                   parent_context.source),
+    [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
+                                   UniverseObject* target_,
+                                   const CurrentValueVariant& current_value_,
+                                   const UniverseObject* source_ = nullptr) noexcept :
+        source(                   source_ ? source_ : parent_context.source),
         effect_target(            target_),
         condition_root_candidate( parent_context.condition_root_candidate),
         condition_local_candidate(parent_context.condition_local_candidate),
@@ -245,57 +246,80 @@ struct [[nodiscard]] ScriptingContext {
         const_empires(            parent_context.const_empires),
         diplo_statuses(           parent_context.diplo_statuses)
     {}
-
-    ScriptingContext(ScriptingContext&& parent_context,
-                     UniverseObject* target_,
-                     const CurrentValueVariant& current_value_) noexcept :
-        source(                   parent_context.source),
-        effect_target(            target_),
-        condition_root_candidate( parent_context.condition_root_candidate),
-        condition_local_candidate(parent_context.condition_local_candidate),
-        current_value(            current_value_),
-        combat_bout(              parent_context.combat_bout),
-        current_turn(             parent_context.current_turn),
-        in_design_id(             parent_context.in_design_id),
-        production_block_size(    parent_context.production_block_size),
-        galaxy_setup_data(        parent_context.galaxy_setup_data),
-        species(                  parent_context.species),
-        supply(                   parent_context.supply),
-        universe(                 parent_context.universe),
-        const_universe(           parent_context.const_universe),
-        objects(                  parent_context.objects),
-        const_objects(            parent_context.const_objects),
-        empire_object_vis(        parent_context.empire_object_vis),
-        empire_object_vis_turns(  parent_context.empire_object_vis_turns),
-        empires(                  parent_context.empires),
-        const_empires(            parent_context.const_empires),
-        diplo_statuses(           parent_context.diplo_statuses)
-    {}
-
 
     // disable implicit conversions to CurrentValueVariant
     ScriptingContext(const ScriptingContext&, UniverseObject*, int) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, int) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, double) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, double) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, PlanetType) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, PlanetType) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, PlanetSize) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, PlanetSize) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, ::PlanetEnvironment) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, ::PlanetEnvironment) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, StarType) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, StarType) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, UniverseObjectType) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, UniverseObjectType) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, Visibility) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, Visibility) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, std::string) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, std::string) = delete;
-    ScriptingContext(ScriptingContext&&, UniverseObject*, std::vector<std::string>) = delete;
     ScriptingContext(const ScriptingContext&, UniverseObject*, std::vector<std::string>) = delete;
 
-    ScriptingContext(const UniverseObject* source_, UniverseObject* target_) noexcept :
+    ScriptingContext(const ScriptingContext&, UniverseObject*, int, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, double, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, PlanetType, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, PlanetSize, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, ::PlanetEnvironment, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, StarType, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, UniverseObjectType, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, Visibility, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, std::string, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, UniverseObject*, std::vector<std::string>, const UniverseObject*) = delete;
+
+    ScriptingContext(ScriptingContext&&, UniverseObject*, int, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, double, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, PlanetType, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, PlanetSize, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, ::PlanetEnvironment, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, StarType, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, UniverseObjectType, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, Visibility, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, std::string, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, std::vector<std::string>, const UniverseObject*) = delete;
+
+    [[nodiscard]] ScriptingContext(ScriptingContext&& parent_context,
+                                   UniverseObject* target_,
+                                   const CurrentValueVariant& current_value_) noexcept :
+        source(                   parent_context.source),
+        effect_target(            target_),
+        condition_root_candidate( parent_context.condition_root_candidate),
+        condition_local_candidate(parent_context.condition_local_candidate),
+        current_value(            current_value_),
+        combat_bout(              parent_context.combat_bout),
+        current_turn(             parent_context.current_turn),
+        in_design_id(             parent_context.in_design_id),
+        production_block_size(    parent_context.production_block_size),
+        galaxy_setup_data(        parent_context.galaxy_setup_data),
+        species(                  parent_context.species),
+        supply(                   parent_context.supply),
+        universe(                 parent_context.universe),
+        const_universe(           parent_context.const_universe),
+        objects(                  parent_context.objects),
+        const_objects(            parent_context.const_objects),
+        empire_object_vis(        parent_context.empire_object_vis),
+        empire_object_vis_turns(  parent_context.empire_object_vis_turns),
+        empires(                  parent_context.empires),
+        const_empires(            parent_context.const_empires),
+        diplo_statuses(           parent_context.diplo_statuses)
+    {}
+
+    // disable implicit conversions to CurrentValueVariant
+    ScriptingContext(ScriptingContext&&, UniverseObject*, int) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, double) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, PlanetType) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, PlanetSize) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, ::PlanetEnvironment) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, StarType) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, UniverseObjectType) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, Visibility) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, std::string) = delete;
+    ScriptingContext(ScriptingContext&&, UniverseObject*, std::vector<std::string>) = delete;
+
+    [[nodiscard]] ScriptingContext(const UniverseObject* source_, UniverseObject* target_) noexcept :
         source(           source_),
         effect_target(    target_),
         galaxy_setup_data(GetGalaxySetupData()),
@@ -308,10 +332,10 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(   ::Empires().GetDiplomaticStatuses())
     {}
 
-    ScriptingContext(Universe& universe, EmpireManager& empires_,
-                     const GalaxySetupData& galaxy_setup_data_ = GetGalaxySetupData(),
-                     SpeciesManager& species_ = GetSpeciesManager(),
-                     const SupplyManager& supply_ = GetSupplyManager()) noexcept :
+    [[nodiscard]] ScriptingContext(Universe& universe, EmpireManager& empires_,
+                                   const GalaxySetupData& galaxy_setup_data_ = GetGalaxySetupData(),
+                                   SpeciesManager& species_ = GetSpeciesManager(),
+                                   const SupplyManager& supply_ = GetSupplyManager()) noexcept :
         galaxy_setup_data(galaxy_setup_data_),
         species(          species_),
         supply(           supply_),
@@ -322,13 +346,13 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(   empires_.GetDiplomaticStatuses())
     {}
 
-    explicit ScriptingContext(CombatInfo& info, // in CombatSystem.cpp
-                              UniverseObject* attacker_as_source = nullptr) noexcept;
+    [[nodiscard]] explicit ScriptingContext(CombatInfo& info, // in CombatSystem.cpp
+                                            UniverseObject* attacker_as_source = nullptr) noexcept;
 
-    ScriptingContext(const Universe& universe, const EmpireManager& empires_,
-                     const UniverseObject* source_ = nullptr,
-                     UniverseObject* target_ = nullptr,
-                     const CurrentValueVariant& current_value_ = DEFAULT_CURRENT_VALUE) noexcept :
+    [[nodiscard]] ScriptingContext(const Universe& universe, const EmpireManager& empires_,
+                                   const UniverseObject* source_ = nullptr,
+                                   UniverseObject* target_ = nullptr,
+                                   const CurrentValueVariant& current_value_ = DEFAULT_CURRENT_VALUE) noexcept :
         source(        source_),
         effect_target( target_),
         current_value( current_value_),
@@ -339,6 +363,39 @@ struct [[nodiscard]] ScriptingContext {
         diplo_statuses(empires_.GetDiplomaticStatuses())
     {}
 
+    // disable implicit conversions to CurrentValueVariant
+    ScriptingContext(const Universe&, const EmpireManager&, int) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, double) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, PlanetType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, PlanetSize) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, ::PlanetEnvironment) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, StarType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, UniverseObjectType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, Visibility) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, std::string) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, std::vector<std::string>) = delete;
+
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, int) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, double) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, PlanetType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, PlanetSize) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, ::PlanetEnvironment) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, StarType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObjectType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, Visibility) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, std::string) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, std::vector<std::string>) = delete;
+
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, int) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, double) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, PlanetType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, PlanetSize) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, ::PlanetEnvironment) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, StarType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, UniverseObjectType) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, Visibility) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, std::string) = delete;
+    ScriptingContext(const Universe&, const EmpireManager&, const UniverseObject*, UniverseObject*, std::vector<std::string>) = delete;
 
 
     // helper functions for accessing state in this context

@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <numeric>
-#include <boost/cast.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
@@ -54,6 +53,13 @@
 class RotatingPlanetControl;
 
 namespace {
+
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
+    const std::string EMPTY_STRING;
+#endif
+
     constexpr int EDGE_PAD(3);
     boost::container::flat_map<std::pair<int, int>, float, std::less<>>         colony_projections; // indexed by {ship_id, planet_id}
     boost::container::flat_map<std::pair<std::string, int>, float, std::less<>> species_colony_projections;
@@ -391,8 +397,8 @@ namespace {
         glEnable(GL_LIGHT0);
 
         auto& colour = StarLightColour(star_type);
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, &colour[0]);
-        glLightfv(GL_LIGHT0, GL_SPECULAR, &colour[0]);
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, colour.data());
+        glLightfv(GL_LIGHT0, GL_SPECULAR, colour.data());
         glEnable(GL_TEXTURE_2D);
 
         glTranslated(Value(center.x), Value(center.y), -(diameter / 2 + 1));// relocate to locatin on screen where planet is to be rendered
@@ -658,11 +664,11 @@ public:
 private:
     void DoLayout();
     void RefreshPlanetGraphic();
-    void SetFocus(std::string focus); ///< set the focus of the planet to \a focus
-    void ClickAnnex();                ///< called if annex button is pressed
-    void ClickColonize();             ///< called if colonize button is pressed
-    void ClickInvade();               ///< called if invade button is pressed
-    void ClickBombard();              ///< called if bombard button is pressed
+    void SetFocus(std::string focus) const; ///< set the focus of the planet to \a focus
+    void ClickAnnex();                      ///< called if annex button is pressed
+    void ClickColonize();                   ///< called if colonize button is pressed
+    void ClickInvade();                     ///< called if invade button is pressed
+    void ClickBombard();                    ///< called if bombard button is pressed
 
     void FocusDropListSelectionChangedSlot(GG::DropDownList::iterator selected); ///< called when droplist selection changes, emits FocusChangedSignal
 
@@ -860,9 +866,8 @@ ScanlineRenderer RotatingPlanetControl::s_scanline_shader;
 
 
 namespace {
-    int SystemNameFontSize() {
-        return ClientUI::Pts()*1.5;
-    }
+    int SystemNameFontSize()
+    { return ClientUI::Pts()*3/2; }
 
     class SystemRow : public GG::ListBox::Row {
     public:
@@ -876,8 +881,7 @@ namespace {
         }
 
         void Init() {
-            auto name(GG::Wnd::Create<OwnerColoredSystemName>(m_system_id, SystemNameFontSize(), false));
-            push_back(name);
+            push_back(GG::Wnd::Create<OwnerColoredSystemName>(m_system_id, SystemNameFontSize(), false));
             SetColAlignment(0, GG::ALIGN_CENTER);
             GetLayout()->PreRender();
         }
@@ -890,10 +894,9 @@ namespace {
             GG::ListBox::Row::PreRender();
         }
 
-        int SystemID() const { return m_system_id; }
+        [[nodiscard]] int SystemID() const noexcept { return m_system_id; }
 
-        SortKeyType SortKey(std::size_t column) const override
-        { return Objects().get<System>(m_system_id)->Name() + std::to_string(m_system_id); }
+        [[nodiscard]] SortKeyType SortKey(std::size_t) const noexcept { return EMPTY_STRING; }
 
     private:
         int m_system_id;
@@ -965,12 +968,6 @@ namespace {
         }
         return retval;
     }
-
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
-    constexpr std::string EMPTY_STRING;
-#else
-    const std::string EMPTY_STRING;
-#endif
 
     const std::string& GetPlanetSizeName(const Planet* planet) {
         if (!planet || planet->Size() == PlanetSize::SZ_ASTEROIDS || planet->Size() == PlanetSize::SZ_GASGIANT)
@@ -1655,9 +1652,21 @@ namespace {
                                           const UniverseObject* candidate)
     {
         if (!annexation_condition || !source_context.source || ! candidate)
-            return "";
-
+            return EMPTY_STRING;
         return ConditionDescription(std::vector{annexation_condition}, source_context, candidate);
+    }
+
+    bool FlexibleContains(const auto& container, const auto num) {
+        if constexpr (requires { container.contains(num); })
+            return container.contains(num);
+        else if constexpr (requires { container.find(num); container.end(); })
+            return container.find(num) != container.end();
+        else if constexpr (requires { container.begin(); container.end(); *container.begin() == num; })
+            return std::any_of(container.begin(), container.end(), [num](const auto& val) noexcept { return num == val; });
+        else if constexpr (requires { container.begin(); container.end(); *container.begin()->ID() == num; })
+            return std::any_of(container.begin(), container.end(), [num](const auto& val) noexcept { return num == val->ID(); });
+        else
+            return false;
     }
 }
 
@@ -1692,33 +1701,25 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context_in) {
 
     // apply formatting tags around planet name to indicate:
     //    Italic for homeworlds
-    //    Underline for shipyard(s), and
-    bool homeworld = false, has_shipyard = false;
+    //    Underline for shipyard(s)
 
-    // need to check all species for homeworlds
-    for (const auto& homeworld_ids : sm.GetSpeciesHomeworldsMap() | range_values) { // TODO: any_of
-        if (homeworld_ids.contains(m_planet_id)) {
-            homeworld = true;
-            break;
-        }
-    }
+    const bool is_homeworld = range_any_of(sm.GetSpeciesHomeworldsMap() | range_values,
+                                           [this](const auto& ids) { return FlexibleContains(ids, m_planet_id); });
 
-    // check for shipyard
     const auto& known_destroyed_object_ids = u.EmpireKnownDestroyedObjectIDs(client_empire_id);
-    for (const auto* building : objects.findRaw<const Building>(planet->BuildingIDs())) { // TODO: any_of
-        if (!building || known_destroyed_object_ids.contains(building->ID()))
-            continue;
-        if (building->HasTag(TAG_SHIPYARD, source_context)) {
-            has_shipyard = true;
-            break;
-        }
-    }
+    const auto not_destroyed_is_shipyard_tag = [&known_destroyed_object_ids](const Building* building) {
+        return building &&
+            !known_destroyed_object_ids.contains(building->ID()) &&
+            building->HasTag(TAG_SHIPYARD);
+    };
+    const bool has_shipyard = range_any_of(objects.findRaw<const Building>(planet->BuildingIDs()),
+                                           not_destroyed_is_shipyard_tag);
 
     // wrap with formatting tags
     std::string wrapped_planet_name;
     wrapped_planet_name.reserve(planet->Name().length() + 32);  // extra space for wrappings 3*3 + 3*4 + 2 + 1 = 24 + 8 for number
     wrapped_planet_name = planet->Name();
-    if (homeworld)
+    if (is_homeworld)
         wrapped_planet_name = "<i>" + wrapped_planet_name + "</i>";
     if (has_shipyard)
         wrapped_planet_name = "<u>" + wrapped_planet_name + "</u>";
@@ -1757,7 +1758,7 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context_in) {
     if (bombard_ships.empty())
         bombard_ships = AutomaticallyChosenBombardShips(m_planet_id, source_context);
 
-    const std::string_view colony_ship_species_name = selected_colony_ship ? selected_colony_ship->SpeciesName() : std::string_view{""};
+    const std::string_view colony_ship_species_name = selected_colony_ship ? selected_colony_ship->SpeciesName() : EMPTY_STRING;
     const float colony_ship_capacity = selected_colony_ship ? selected_colony_ship->ColonyCapacity(u) : 0.0f;
     const Species* colony_ship_species = sm.GetSpecies(colony_ship_species_name);
     const PlanetEnvironment planet_env_for_colony_species = colony_ship_species ?
@@ -2224,10 +2225,8 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context_in) {
     // which should be connected to SidePanel::PlanetPanel::DoLayout
 
     m_planet_connection = planet->StateChangedSignal.connect(
-        [this]() {
-            ScriptingContext context;
-            Refresh(context);
-        }, boost::signals2::at_front);
+        [this]() { ScriptingContext context; Refresh(context); }, // own new local context, not from containing scope context, since this is a callback that could be invoked later
+        boost::signals2::at_front);
 }
 
 void SidePanel::PlanetPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
@@ -2239,18 +2238,18 @@ void SidePanel::PlanetPanel::SizeMove(GG::Pt ul, GG::Pt lr) {
         RequirePreRender();
 }
 
-void SidePanel::PlanetPanel::SetFocus(std::string focus) {
+void SidePanel::PlanetPanel::SetFocus(std::string focus) const {
+    const int app_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     ScriptingContext context;
     const ObjectMap& objects{context.ContextObjects()};
     auto planet = objects.get<Planet>(m_planet_id);
-    if (!planet || !planet->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()))
+    if (!planet || !planet->OwnedBy(app_empire_id))
         return;
-    const int app_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    // todo: if focus is already equal to planet's focus, return early.
+    // TODO: if focus is already equal to planet's focus, return early.
     colony_projections.clear();// in case new or old focus was Growth (important that be cleared BEFORE Order is issued)
     species_colony_projections.clear();
     GGHumanClientApp::GetApp()->Orders().IssueOrder(
-        std::make_shared<ChangeFocusOrder>(app_empire_id, planet->ID(), std::move(focus), context),
+        std::make_shared<ChangeFocusOrder>(app_empire_id, m_planet_id, std::move(focus), context),
         context);
 }
 
@@ -2298,7 +2297,7 @@ void SidePanel::PlanetPanel::LDoubleClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_k
 }
 
 void SidePanel::PlanetPanel::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
 
     ScriptingContext context;
     const Universe& u = context.ContextUniverse();
@@ -2336,10 +2335,10 @@ void SidePanel::PlanetPanel::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
 
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
-    if (planet->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()) && m_order_issuing_enabled
+    if (planet->OwnedBy(client_empire_id) && m_order_issuing_enabled
         && m_planet_name->InClient(pt))
     {
-        auto rename_action = [context, this, planet]() mutable { // rename planet
+        auto rename_action = [context, this, planet, client_empire_id]() mutable { // rename planet
             auto edit_wnd = GG::Wnd::Create<CUIEditWnd>(
                 GG::X(350), UserString("SP_ENTER_NEW_PLANET_NAME"), planet->Name());
             edit_wnd->Run();
@@ -2347,11 +2346,10 @@ void SidePanel::PlanetPanel::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
             if (!m_order_issuing_enabled)
                 return;
 
-            auto result = edit_wnd->Result();
+            auto result{edit_wnd->Result()};
 
-            if (!RenameOrder::Check(GGHumanClientApp::GetApp()->EmpireID(),
-                                    planet->ID(), result, context))
-            { return; }
+            if (!RenameOrder::Check(client_empire_id, planet->ID(), result, context))
+                return;
 
             GGHumanClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<RenameOrder>(GGHumanClientApp::GetApp()->EmpireID(),
@@ -3781,8 +3779,10 @@ void SidePanel::SystemSelectionChangedSlot(GG::DropDownList::iterator it) {
         same way. Refresh should not update the list of systems if the list
         is open. */
     int system_id = INVALID_OBJECT_ID;
-    if (it != m_system_name->end())
-        system_id = boost::polymorphic_downcast<const SystemRow*>(it->get())->SystemID();
+    if (it != m_system_name->end()) {
+        if (const auto* sys_row = dynamic_cast<const SystemRow*>(it->get()))
+            system_id = sys_row->SystemID();
+    }
     if (SystemID() != system_id)
         SystemSelectedSignal(system_id);
 }
@@ -3805,7 +3805,7 @@ void SidePanel::NextButtonClicked() {
     SystemSelectionChangedSlot(m_system_name->CurrentItem());
 }
 
-void SidePanel::PlanetClickedSlot(int planet_id, const ObjectMap& objects) {
+void SidePanel::PlanetClickedSlot(int planet_id, const ObjectMap& objects) const {
     if (m_selection_enabled)
         SelectPlanet(planet_id, objects);
 }

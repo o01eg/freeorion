@@ -46,6 +46,14 @@ namespace std {
   #include <boost/lexical_cast.hpp>
 #endif
 
+#if !defined(CONSTEXPR_STRING)
+#  if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+#    define CONSTEXPR_STRING constexpr
+#  else
+#    define CONSTEXPR_STRING
+#  endif
+#endif
+
 std::vector<std::string_view> SpecialNames();
 
 namespace {
@@ -420,8 +428,8 @@ namespace {
     }
 
     constexpr int DATA_PANEL_BORDER = 1;
-
-    constexpr std::string_view EMPTY_STRING = "";
+    constexpr std::string_view EMPTY_STRINGVIEW;
+    CONSTEXPR_STRING const std::string EMPTY_STRING;
     constexpr std::string_view ALL_CONDITION(UserStringNop("CONDITION_ALL"));
     constexpr std::string_view EMPIREAFFILIATION_CONDITION(UserStringNop("CONDITION_EMPIREAFFILIATION"));
     constexpr std::string_view HOMEWORLD_CONDITION(UserStringNop("CONDITION_HOMEWORLD"));
@@ -463,7 +471,7 @@ namespace {
 
     std::string_view ConditionClassName(const Condition::Condition* const condition) {
         if (!condition)
-            return EMPTY_STRING;
+            return EMPTY_STRINGVIEW;
 
         if (dynamic_cast<const Condition::All* const>(condition))
             return ALL_CONDITION;
@@ -518,7 +526,7 @@ namespace {
         if (desc_it != object_list_cond_description_map.end())
             return desc_it->second;
 
-        return EMPTY_STRING;
+        return EMPTY_STRINGVIEW;
     }
 
     template <typename enumT>
@@ -612,21 +620,14 @@ private:
         std::shared_ptr<CUILabel> m_label;
     };
 
-    const auto& GetString() const noexcept {
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
-        static constexpr std::string EMPTY_STRING_X;
-#else
-        static const std::string EMPTY_STRING_X;
-#endif
+    const std::string& GetString() const noexcept {
         if (!m_string_drop)
-            return EMPTY_STRING_X;
-        auto row_it = m_string_drop->CurrentItem();
+            return EMPTY_STRING;
+        const auto row_it = m_string_drop->CurrentItem();
         if (row_it == m_string_drop->end())
-            return EMPTY_STRING_X;
-        auto string_row = dynamic_cast<const StringRow*>(row_it->get());
-        if (!string_row)
-            return EMPTY_STRING_X;
-        return string_row->Text();
+            return EMPTY_STRING;
+        const auto* string_row = dynamic_cast<const StringRow*>(row_it->get());
+        return string_row ? string_row->Text() : EMPTY_STRING;
     }
 
     auto GetStringValueRef() const
@@ -634,46 +635,30 @@ private:
 
     auto GetStringValueRefVec() const {
         std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> retval;
-        retval.emplace_back(GetStringValueRef());
+        retval.push_back(GetStringValueRef());
         return retval;
     }
 
-    int GetInt1() const {
-        if (m_param_spin1)
-            return m_param_spin1->Value();
-        else
-            return 0;
-    }
+    int GetInt1() const
+    { return m_param_spin1 ? m_param_spin1->Value() : 0; }
 
     auto GetInt1ValueRef() const
     { return std::make_unique<ValueRef::Constant<int>>(GetInt1()); }
 
-    int GetInt2() const {
-        if (m_param_spin2)
-            return m_param_spin2->Value();
-        else
-            return 0;
-    }
+    int GetInt2() const
+    { return m_param_spin2 ? m_param_spin2->Value() : 0; }
 
     auto GetInt2ValueRef() const
     { return std::make_unique<ValueRef::Constant<int>>(GetInt2()); }
 
-    double GetDouble1() const {
-        if (m_param_spin1)
-            return m_param_spin1->Value();
-        else
-            return 0;
-    }
+    double GetDouble1() const
+    { return m_param_spin1 ? m_param_spin1->Value() : 0; }
 
     auto GetDouble1ValueRef() const
     { return std::make_unique<ValueRef::Constant<double>>(GetDouble1()); }
 
-    double GetDouble2() const {
-        if (m_param_spin2)
-            return m_param_spin2->Value();
-        else
-            return 0;
-    }
+    double GetDouble2() const
+    { return m_param_spin2 ? m_param_spin2->Value() : 0; }
 
     auto GetDouble2ValueRef() const
     { return std::make_unique<ValueRef::Constant<double>>(GetDouble2()); }
@@ -681,20 +666,16 @@ private:
     template <typename T>
     T GetEnum() const {
         const auto& text = GetString();
-        if constexpr (std::is_same_v<T, MeterType>) {
+        if constexpr (std::is_same_v<T, MeterType>)
             return MeterTypeFromString(text, MeterType::INVALID_METER_TYPE);
-        } else if constexpr (std::is_same_v<T, StarType>) {
+        else if constexpr (std::is_same_v<T, StarType>)
             return StarTypeFromString(text, StarType::INVALID_STAR_TYPE);
-        } else if constexpr (std::is_same_v<T, PlanetType>) {
+        else if constexpr (std::is_same_v<T, PlanetType>)
             return PlanetTypeFromString(text, PlanetType::INVALID_PLANET_TYPE);
-        } else if constexpr (std::is_same_v<T, PlanetSize>) {
+        else if constexpr (std::is_same_v<T, PlanetSize>)
             return PlanetSizeFromString(text, PlanetSize::INVALID_PLANET_SIZE);
-        } else {
-            T retval{-1};
-            std::stringstream ss{text};
-            ss >> retval;
+        else
             return T{-1};
-        }
     }
 
     template <typename T>
@@ -702,9 +683,10 @@ private:
     { return std::make_unique<ValueRef::Constant<T>>(GetEnum<T>()); }
 
     template <typename T>
-    auto GetEnumValueRefVec() const {
+    auto GetEnumValueRefVec() const
+    {
         std::vector<std::unique_ptr<ValueRef::ValueRef<T>>> retval;
-        retval.emplace_back(GetEnumValueRef<T>());
+        retval.push_back(GetEnumValueRef<T>());
         return retval;
     }
 
@@ -1481,19 +1463,20 @@ public:
         RequirePreRender();
     }
 
-    std::string SortKey(std::size_t column) const {
-        // result cached? if not, calculate and cache
-        auto it = m_column_val_cache.find(column);
-        if (it != m_column_val_cache.end())
-            return it->second;
+    [[nodiscard]] const std::string& SortKey(std::size_t column) const {
+        const auto get_column_sort_key = [this, column]() -> std::string {
+            const auto ref = GetColumnValueRef(column);
+            return ref ? ref->Eval(ScriptingContext{Objects().getRaw(m_object_id)}) : std::string{};
+        };
 
-        auto ref = GetColumnValueRef(column);
-        std::string val = ref ? ref->Eval(ScriptingContext{Objects().getRaw(m_object_id)}) : "";
-        m_column_val_cache[column] = val;
-        return val;
+        try {
+            return m_column_val_cache.try_emplace(column, get_column_sort_key()).first->second;
+        } catch (...) {
+            return EMPTY_STRING;
+        }
     }
 
-    int ObjectID() const noexcept { return m_object_id; }
+    [[nodiscard]] int ObjectID() const noexcept { return m_object_id; }
 
     void PreRender() override {
         GG::Control::PreRender();
@@ -1628,7 +1611,7 @@ private:
         RequirePreRender();
     }
 
-    std::vector<std::shared_ptr<GG::Control>> GetControls() {
+    std::vector<std::shared_ptr<GG::Control>> GetControls() const {
         std::vector<std::shared_ptr<GG::Control>> retval;
         retval.reserve(NUM_COLUMNS);
 
@@ -1641,18 +1624,19 @@ private:
         return retval;
     }
 
-    bool    m_initialized = false;
     int     m_object_id = INVALID_OBJECT_ID;
     int     m_indent = 1;
-    bool    m_expanded = false;
-    bool    m_has_contents = false;
 
     std::shared_ptr<GG::Button>                 m_expand_button;
     std::shared_ptr<GG::StaticGraphic>          m_dot;
     std::shared_ptr<MultiTextureStaticGraphic>  m_icon;
     std::vector<std::shared_ptr<GG::Control>>   m_controls;
     mutable std::map<std::size_t, std::string>  m_column_val_cache;
-    bool                                        m_selected = false;
+
+    bool    m_selected = false;
+    bool    m_initialized = false;
+    bool    m_expanded = false;
+    bool    m_has_contents = false;
 };
 
 ////////////////////////////////////////////////
@@ -1694,19 +1678,16 @@ public:
         m_panel->Resize(Size() - border);
     }
 
-    GG::ListBox::Row::SortKeyType SortKey(std::size_t column) const override
-    { return m_panel ? m_panel->SortKey(column) : ""; }
+    [[nodiscard]] GG::ListBox::Row::SortKeyType SortKey(std::size_t column) const noexcept
+    { return m_panel ? m_panel->SortKey(column) : EMPTY_STRING; }
 
-    int ObjectID() const noexcept {
-        if (m_panel)
-            return m_panel->ObjectID();
-        return INVALID_OBJECT_ID;
-    }
+    [[nodiscard]] int ObjectID() const noexcept
+    { return m_panel ? m_panel->ObjectID() : INVALID_OBJECT_ID; }
 
-    int ContainedByPanel() const noexcept
+    [[nodiscard]] int ContainedByPanel() const noexcept
     { return m_container_object_panel; }
 
-    auto& ContainedPanels() const noexcept
+    [[nodiscard]] auto& ContainedPanels() const noexcept
     { return m_contained_object_panels; }
 
     void SetContainedPanels(boost::container::flat_set<int>&& contained_object_panels) {
@@ -1722,7 +1703,7 @@ public:
         m_panel->RequirePreRender();
     }
 
-    void Update()
+    void Update() noexcept
     { m_panel->RequirePreRender(); }
 
     void SizeMove(GG::Pt ul, GG::Pt lr) override {
@@ -1742,7 +1723,7 @@ public:
 
 private:
     std::shared_ptr<ObjectPanel>            m_panel;
-    int                                     m_container_object_panel;
+    int                                     m_container_object_panel = INVALID_OBJECT_ID;
     boost::container::flat_set<int>         m_contained_object_panels;
     std::shared_ptr<const UniverseObject>   m_obj_init;
     int                                     m_indent_init = 0;
@@ -1930,7 +1911,7 @@ namespace {
     }
 
     struct CustomRowCmp {
-        static bool StringCompare(const std::string& lhs_key, const std::string& rhs_key) {
+        [[nodiscard]] static bool StringCompare(const std::string& lhs_key, const std::string& rhs_key) {
 #if defined(FREEORION_MACOSX)
             // Collate on OSX seemingly ignores greek characters, resulting in sort order: X α I, X β I, X α II
             return lhs_key < rhs_key;
@@ -1939,7 +1920,7 @@ namespace {
 #endif
         }
 
-        static auto StringToFloat(const std::string_view key) {
+        [[nodiscard]] static auto StringToFloat(const std::string_view key) {
 #if defined(__cpp_lib_to_chars)
             float retval = 0.0f;
             auto result = std::from_chars(key.data(), key.data() + key.size(), retval);
@@ -1993,8 +1974,8 @@ namespace {
         }
 
         bool operator()(const GG::ListBox::Row& lhs, const GG::ListBox::Row& rhs, std::size_t column) const {
-            auto lhs_key = lhs.SortKey(column);
-            auto rhs_key = rhs.SortKey(column);
+            auto& lhs_key = lhs.SortKey(column);
+            auto& rhs_key = rhs.SortKey(column);
 
             auto [lhs_val, lhs_ec] = StringToFloat(lhs_key);
             if (lhs_ec != std::errc())
@@ -2082,7 +2063,7 @@ public:
 
     void CollapseObject(int object_id = INVALID_OBJECT_ID) {
         if (object_id == INVALID_OBJECT_ID) {
-            for (auto& row : *this)
+            for (const auto& row : *this)
                 if (const ObjectRow* object_row = dynamic_cast<const ObjectRow*>(row.get()))
                     m_collapsed_objects.insert(object_row->ObjectID());
         } else {
@@ -2606,10 +2587,8 @@ void ObjectListWnd::DoLayout() {
 
     SetMinSize(GG::Pt(3*BUTTON_WIDTH, 6*BUTTON_HEIGHT));
 
-    if (m_list_box->AnythingCollapsed())
-        m_collapse_button->SetText(UserString("EXPAND_ALL"));
-    else
-        m_collapse_button->SetText(UserString("COLLAPSE_ALL"));
+    m_collapse_button->SetText(m_list_box->AnythingCollapsed() ?
+                               UserString("EXPAND_ALL") : UserString("COLLAPSE_ALL"));
 }
 
 void ObjectListWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
@@ -2665,8 +2644,7 @@ void ObjectListWnd::ObjectDoubleClicked(GG::ListBox::iterator it, GG::Pt pt,
 std::set<int> ObjectListWnd::SelectedObjectIDs() const {
     std::set<int> sel_ids;
     for (const auto& entry : m_list_box->Selections()) {
-        ObjectRow *row = dynamic_cast<ObjectRow *>(entry->get());
-        if (row) {
+        if (ObjectRow *row = dynamic_cast<ObjectRow *>(entry->get())) {
             int selected_object_id = row->ObjectID();
             if (selected_object_id != INVALID_OBJECT_ID)
                 sel_ids.insert(selected_object_id);
@@ -2739,7 +2717,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
         popup->AddMenuItem(UserString("SP_PLANET_SUITABILITY"), false, false, suitability_action);
 
         for (const auto& entry : m_list_box->Selections()) {
-            ObjectRow* row = dynamic_cast<ObjectRow *>(entry->get());
+            auto* row = dynamic_cast<const ObjectRow*>(entry->get());
             if (!row)
                 continue;
 

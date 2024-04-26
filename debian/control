@@ -11,7 +11,7 @@ Build-Depends:
  dh-apparmor,
  dpkg-dev (>= 1.19),
  libboost-all-dev,
- pkgconf,
+ pkg-config,
  python3,
 Standards-Version: 4.7.0
 Homepage: http://www.freeorion.org

@@ -11,9 +11,9 @@ Build-Depends:
  dh-apparmor,
  dpkg-dev (>= 1.19),
  libboost-all-dev,
- pkg-config,
+ pkgconf,
  python3,
-Standards-Version: 4.0.0
+Standards-Version: 4.7.0
 Homepage: http://www.freeorion.org
 Vcs-Git: https://anonscm.debian.org/git/pkg-games/freeorion.git
 Vcs-Browser: https://anonscm.debian.org/cgit/pkg-games/freeorion.git

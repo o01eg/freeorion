@@ -73,11 +73,11 @@ RUN apt-get install --assume-yes \
 ENV RUSTUP_HOME=/usr/local/rustup \
 	CARGO_HOME=/usr/local/cargo \
 	PATH=/usr/local/cargo/bin:$PATH \
-	RUST_VERSION=1.73.0 \
-	RUSTUP_VERSION=1.26.0
+	RUST_VERSION=1.77.2 \
+	RUSTUP_VERSION=1.27.0
 
 RUN curl -o rustup-init https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init \
-    && echo "0b2f6c8f85a3d02fde2efc0ced4657869d73fccfce59defb4e8d29233116e6db *rustup-init" | sha256sum -c - \
+    && echo "a3d541a5484c8fa2f1c21478a6f6c505a778d473c21d60a18a4df5185d320ef8 *rustup-init" | sha256sum -c - \
     && chmod +x rustup-init
 
 RUN ./rustup-init --help

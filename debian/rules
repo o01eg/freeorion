@@ -35,7 +35,7 @@ override_dh_auto_configure:
 
 #workaround for 'dpkg-shlibdeps: error: couldn't find library libGiGi*.so'
 override_dh_shlibdeps:
-	LD_LIBRARY_PATH="$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/freeorion:$(LD_LIBRARY_PATH)" dh_shlibdeps
+	dh_shlibdeps -l "$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/freeorion"
 
 override_dh_installchangelogs:
 	dh_installchangelogs ChangeLog.md

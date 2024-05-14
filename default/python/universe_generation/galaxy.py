@@ -793,7 +793,7 @@ def recalc_universe_width(positions):
     return actual_width, new_positions
 
 
-def calc_star_system_positions(gsd):
+def calc_star_system_positions(gsd, total_players: int):
     """
     Calculates list of positions (x, y) for a given galaxy shape,
     number of systems and width
@@ -810,11 +810,11 @@ def calc_star_system_positions(gsd):
 
     print(f"Creating {gsd.shape} galaxy shape")
     if gsd.shape == fo.galaxyShape.spiral2:
-        spiral_galaxy_calc_positions(positions, adjacency_grid, 2, gsd.size, width)
+        spiral_galaxy_calc_positions(positions, adjacency_grid, total_players, gsd.size, width)
     elif gsd.shape == fo.galaxyShape.spiral3:
-        spiral_galaxy_calc_positions(positions, adjacency_grid, 3, gsd.size, width)
+        spiral_galaxy_calc_positions(positions, adjacency_grid, total_players, gsd.size, width)
     elif gsd.shape == fo.galaxyShape.spiral4:
-        spiral_galaxy_calc_positions(positions, adjacency_grid, 4, gsd.size, width)
+        spiral_galaxy_calc_positions(positions, adjacency_grid, total_players, gsd.size, width)
     elif gsd.shape == fo.galaxyShape.elliptical:
         elliptical_galaxy_calc_positions(positions, adjacency_grid, gsd.size, width)
     elif gsd.shape == fo.galaxyShape.disc:

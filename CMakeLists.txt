@@ -64,6 +64,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 option(BUILD_SHARED_LIBS "Build project as shared libraries." ON)
 option(BUILD_TESTING "Build the testing tree." OFF)
+option(BUILD_BENCHMARKING "Build the benchmarking tree." OFF)
 option(BUILD_CLIENT_GG "Build GiGi client" ON)
 option(BUILD_CLIENT_GODOT "Build Godot client (experimental)" OFF)
 option(BUILD_SERVER "Build server" ON)
@@ -81,6 +82,18 @@ if(BUILD_TESTING)
         add_custom_target(unittest
             COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure --build-config $<CONFIG>
             COMMENT "Run tests for ${CMAKE_PROJECT_NAME}"
+        )
+    endif()
+endif()
+
+if(BUILD_BENCHMARKING)
+    message( STATUS "Building Benchmarks")
+    enable_testing()
+
+    if(NOT TARGET benchmark)
+        add_custom_target(benchmark
+            COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure --build-config $<CONFIG>
+            COMMENT "Run benchmark for ${CMAKE_PROJECT_NAME}"
         )
     endif()
 endif()
@@ -299,6 +312,11 @@ if(BUILD_TESTING)
     find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS unit_test_framework REQUIRED)
 endif()
 
+
+if(BUILD_BENCHMARKING)
+    find_package(benchmark REQUIRED)
+endif()
+
 find_package(ZLIB REQUIRED)
 if(BUILD_CLIENT_GG)
     set(SDL_NO_MAIN true)
@@ -326,6 +344,10 @@ endif()
 
 if(BUILD_TESTING)
     add_subdirectory(test)
+endif()
+
+if(BUILD_BENCHMARKING)
+    add_subdirectory(benchmark)
 endif()
 
 if(BUILD_CLIENT_GG)

@@ -30,7 +30,7 @@ public:
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
 
     [[nodiscard]] int ContainerObjectID() const noexcept override { return m_fleet_id; }
-    [[nodiscard]] bool ContainedBy(int object_id) const override;
+    [[nodiscard]] bool ContainedBy(int object_id) const noexcept override;
 
     [[nodiscard]] const std::string& PublicName(int empire_id, const Universe& universe) const override;
     [[nodiscard]] const std::string& PublicName(int empire_id) const;
@@ -38,7 +38,7 @@ public:
     std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
 
     /** Back propagates part meters (which UniverseObject equivalent doesn't). */
-    void BackPropagateMeters() override;
+    void BackPropagateMeters() noexcept override;
 
     void ResetTargetMaxUnpairedMeters() override;
     void ResetPairedActiveMeters() override;
@@ -98,6 +98,8 @@ public:
     /** returns any nonzero weapons strengths after adjustment versus an enemy with a given @p shield_DR shield rating,
       * assuming the ship has been resupplied recently (i.e. this uses Max*Meters) */
     [[nodiscard]] std::vector<float> AllWeaponsMaxShipDamage(const ScriptingContext& context, float shield_DR = 0.0f, bool include_fighters = true) const;
+
+    [[nodiscard]] std::size_t        SizeInMemory() const override;
 
     void SetFleetID(int fleet_id); ///< sets the ID of the fleet the ship resides in
     void SetArrivedOnTurn(int turn);

@@ -30,6 +30,13 @@
 #include <boost/python/scope.hpp>
 #include <boost/uuid/random_generator.hpp>
 
+#include <utility>
+#if !defined(__cpp_lib_integer_comparison_functions)
+namespace std {
+    inline auto cmp_less_equal(auto&& lhs, auto&& rhs) { return lhs <= rhs; }
+}
+#endif
+
 namespace py = boost::python;
 
 
@@ -38,7 +45,7 @@ namespace py = boost::python;
 ////////////////////////
 namespace {
     // static string to save AI state
-    static std::string s_save_state_string("");
+    std::string s_save_state_string("");
 
     /** @brief Return the player name of the client identified by @a player_id
      *
@@ -118,15 +125,12 @@ namespace {
     auto AllEmpireIDs() -> std::vector<int>
     {
         const auto& players = AIClientApp::GetApp()->Players();
-        std::vector<int> empire_ids;
-        empire_ids.reserve(players.size());
-        for (auto& [player_id, player_info] : players) {
-            (void)player_id; // quiet warning
-            auto empire_id = player_info.empire_id;
-            if (empire_id != ALL_EMPIRES)
-                empire_ids.push_back(empire_id);
-        }
-        return empire_ids;
+        auto rng = players | range_transform([](const auto& id_pi) { return id_pi.second.empire_id; })
+            | range_filter([](int empire_id) { return empire_id != ALL_EMPIRES; });
+        std::vector<int> retval;
+        retval.reserve(players.size());
+        range_copy(rng, std::back_inserter(retval));
+        return retval;
     }
 
     void InitMeterEstimatesAndDiscrepancies() {
@@ -167,11 +171,11 @@ namespace {
             // to.
             unowned_planets.reserve(universe.Objects().size<Planet>());
             universe.InhibitUniverseObjectSignals(true);
-            for (auto planet : universe.Objects().allRaw<Planet>()) {
-                 if (planet->Unowned()) {
-                     unowned_planets.push_back(planet);
-                     planet->SetOwner(player_id);
-                 }
+            for (auto planet : universe.Objects().allRaw<Planet>()
+                 | range_filter([](const auto* p) { return p->Unowned(); }))
+            {
+                unowned_planets.push_back(planet);
+                planet->SetOwner(player_id);
             }
         }
 
@@ -188,13 +192,17 @@ namespace {
 
     void UpdateResourcePools() {
         ScriptingContext context;
-        int empire_id = AIClientApp::GetApp()->EmpireID();
+        const int empire_id = AIClientApp::GetApp()->EmpireID();
         auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "UpdateResourcePools : couldn't get empire with id " << empire_id;
             return;
         }
-        empire->UpdateResourcePools(context);
+        empire->UpdateResourcePools(context,
+                                    empire->TechCostsTimes(context),
+                                    empire->PlanetAnnexationCosts(context),
+                                    empire->PolicyAdoptionCosts(context),
+                                    empire->ProductionCostsTimes(context));
     }
 
     void UpdateResearchQueue() {
@@ -205,18 +213,18 @@ namespace {
             ErrorLogger() << "UpdateResearchQueue : couldn't get empire with id " << empire_id;
             return;
         }
-        empire->UpdateResearchQueue(context);
+        empire->UpdateResearchQueue(context, empire->TechCostsTimes(context));
     }
 
     void UpdateProductionQueue() {
         ScriptingContext context;
-        int empire_id = AIClientApp::GetApp()->EmpireID();
+        const int empire_id = AIClientApp::GetApp()->EmpireID();
         auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "UpdateProductionQueue : couldn't get empire with id " << empire_id;
             return;
         }
-        empire->UpdateProductionQueue(context);
+        empire->UpdateProductionQueue(context, empire->ProductionCostsTimes(context));
     }
 
     auto GetUserStringList(const std::string& list_key) -> py::list
@@ -461,7 +469,7 @@ namespace {
         }
 
         const ProductionQueue& queue = empire->GetProductionQueue();
-        if (queue_index < 0 || static_cast<int>(queue.size()) <= queue_index) {
+        if (queue_index < 0 || std::cmp_less_equal(queue.size(), queue_index)) {
             ErrorLogger() << "IssueChangeProductionQuantityOrder : passed queue_index outside range of items on queue.";
             return 0;
         }
@@ -499,7 +507,7 @@ namespace {
         }
 
         const ProductionQueue& queue = empire->GetProductionQueue();
-        if (old_queue_index < 0 || static_cast<int>(queue.size()) <= old_queue_index) {
+        if (old_queue_index < 0 || std::cmp_less_equal(queue.size(), old_queue_index)) {
             ErrorLogger() << "IssueRequeueProductionOrder : passed old_queue_index outside range of items on queue.";
             return 0;
         }
@@ -511,7 +519,7 @@ namespace {
         if (old_queue_index < new_queue_index)
             actual_new_index = new_queue_index - 1;
 
-        if (new_queue_index < 0 || static_cast<int>(queue.size()) <= actual_new_index) {
+        if (new_queue_index < 0 || std::cmp_less_equal(queue.size(), actual_new_index)) {
             ErrorLogger() << "IssueRequeueProductionOrder : passed new_queue_index outside range of items on queue.";
             return 0;
         }
@@ -539,7 +547,7 @@ namespace {
         }
 
         const ProductionQueue& queue = empire->GetProductionQueue();
-        if (queue_index < 0 || static_cast<int>(queue.size()) <= queue_index) {
+        if (queue_index < 0 || std::cmp_less_equal(queue.size(), queue_index)) {
             ErrorLogger() << "IssueDequeueProductionOrder : passed queue_index outside range of items on queue.";
             return 0;
         }
@@ -560,22 +568,22 @@ namespace {
     {
         ScriptingContext context;
 
-        int empire_id = AIClientApp::GetApp()->EmpireID();
-        auto empire = context.GetEmpire(empire_id);
+        const int empire_id = AIClientApp::GetApp()->EmpireID();
+        const auto empire = context.GetEmpire(empire_id);
         if (!empire) {
             ErrorLogger() << "IssuePauseProductionOrder : couldn't get empire with id " << empire_id;
             return 0;
         }
 
         const ProductionQueue& queue = empire->GetProductionQueue();
-        if (queue_index < 0 || static_cast<int>(queue.size()) <= queue_index) {
+        if (queue_index < 0 || std::cmp_less_equal(queue.size(), queue_index)) {
             ErrorLogger() << "IssueChangeProductionPauseOrder : passed queue_index outside range of items on queue.";
             return 0;
         }
 
-        auto queue_it = empire->GetProductionQueue().find(queue_index);
+        auto queue_it = queue.find(queue_index);
 
-        if (queue_it != empire->GetProductionQueue().end())
+        if (queue_it != queue.end())
             AIClientApp::GetApp()->Orders().IssueOrder(
                 std::make_shared<ProductionQueueOrder>(
                     ProductionQueueOrder::ProdQueueOrderAction::PAUSE_PRODUCTION,
@@ -597,7 +605,7 @@ namespace {
         }
 
         const ProductionQueue& queue = empire->GetProductionQueue();
-        if (queue_index < 0 || static_cast<int>(queue.size()) <= queue_index) {
+        if (queue_index < 0 || std::cmp_less_equal(queue.size(), queue_index)) {
             ErrorLogger() << "IssueChangeProductionStockpileOrder : passed queue_index outside range of items on queue.";
             return 0;
         }

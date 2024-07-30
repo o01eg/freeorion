@@ -29,18 +29,18 @@ void BrowseInfoWnd::Update(std::size_t mode, const Wnd* target)
     if (PositionWnd) {
         new_pos = PositionWnd(m_cursor_pos, GUI::GetGUI()->GetCursor(), *this, *target);
     } else {
-        static constexpr Y MARGIN(2);
+        static constexpr Y MARGIN{2};
         new_pos = m_cursor_pos - Pt(Width() / 2, Height() + MARGIN);
     }
     MoveTo(new_pos);
     Pt ul = UpperLeft(), lr = LowerRight();
     if (GUI::GetGUI()->AppWidth() <= lr.x)
         ul.x += GUI::GetGUI()->AppWidth() - lr.x;
-    else if (ul.x < 0)
+    else if (ul.x < X0)
         ul.x = X0;
     if (GUI::GetGUI()->AppHeight() <= lr.y)
         ul.y += GUI::GetGUI()->AppHeight() - lr.y;
-    else if (ul.y < 0)
+    else if (ul.y < Y0)
         ul.y = Y0;
     MoveTo(ul);
 }
@@ -94,7 +94,7 @@ void TextBoxBrowseInfoWnd::SetText(std::string str)
 {
     unsigned int margins = 2 * TextMargin();
     bool str_empty = str.empty();
-    Flags<TextFormat> fmt = GetTextFormat();
+    const auto fmt = GetTextFormat();
     auto text_elements = m_font->ExpensiveParseFromTextToTextElements(str, fmt);
     auto lines = m_font->DetermineLines(str, fmt, m_preferred_width - X(margins),
                                         text_elements);
@@ -110,7 +110,7 @@ void TextBoxBrowseInfoWnd::SetText(std::string str)
 
 void TextBoxBrowseInfoWnd::InitBuffer()
 {
-    GG::Pt sz = Size();
+    const auto sz = Size();
     m_buffer.clear();
     m_buffer.store(0.0f,        0.0f);
     m_buffer.store(Value(sz.x), 0.0f);
@@ -122,7 +122,7 @@ void TextBoxBrowseInfoWnd::InitBuffer()
 
 void TextBoxBrowseInfoWnd::SizeMove(Pt ul, Pt lr)
 {
-    Pt sz = Size();
+    const auto sz = Size();
     BrowseInfoWnd::SizeMove(ul, lr);
     if (sz != Size())
         InitBuffer();
@@ -130,7 +130,7 @@ void TextBoxBrowseInfoWnd::SizeMove(Pt ul, Pt lr)
 
 void TextBoxBrowseInfoWnd::Render()
 {
-    Pt ul = UpperLeft();
+    const auto ul = UpperLeft();
 
     glPushMatrix();
     glLoadIdentity();

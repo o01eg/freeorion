@@ -21,12 +21,6 @@
 #include <GG/WndEvent.h>
 #include <boost/signals2/signal.hpp>
 
-
-namespace boost { namespace archive {
-    class xml_oarchive;
-    class xml_iarchive;
-} }
-
 namespace GG {
 
 class Cursor;
@@ -223,7 +217,7 @@ public:
     virtual void    HandleSystemEvents() = 0;
 
     /** Event handler for GG events. */
-    void            HandleGGEvent(EventType event, Key key, std::uint32_t key_code_point,
+    void            HandleGGEvent(EventType event, Key key, uint32_t key_code_point,
                                   Flags<ModKey> mod_keys, Pt pos, Pt rel,
                                   std::string text = std::string());
 
@@ -295,24 +289,24 @@ public:
 
     /** Returns a shared_ptr to the desired font, supporting all printable
         ASCII characters. */
-    std::shared_ptr<Font> GetFont(const std::string& font_filename, unsigned int pts);
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts);
 
     /** Returns a shared_ptr to the desired font, supporting all printable
         ASCII characters, from the in-memory contents \a file_contents. */
-    std::shared_ptr<Font> GetFont(const std::string& font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
                                   const std::vector<uint8_t>& file_contents);
 
     /** Returns a shared_ptr to the desired font, supporting all the
         characters in the UnicodeCharsets in the range [first, last). */
     template <typename CharSetIter>
-    std::shared_ptr<Font> GetFont(const std::string& font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
                                   CharSetIter first, CharSetIter last);
 
     /** Returns a shared_ptr to the desired font, supporting all the
         characters in the UnicodeCharsets in the range [first, last), from the
         in-memory contents \a file_contents. */
     template <typename CharSetIter>
-    std::shared_ptr<Font> GetFont(const std::string& font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
                                   const std::vector<uint8_t>& file_contents,
                                   CharSetIter first, CharSetIter last);
 
@@ -321,7 +315,7 @@ public:
 
     /** Removes the desired font from the managed pool; since shared_ptr's are
         used, the font may be deleted much later. */
-    void                       FreeFont(const std::string& font_filename, unsigned int pts);
+    void FreeFont(std::string_view font_filename, unsigned int pts);
 
     /** Adds an already-constructed texture to the managed pool \warning
         calling code <b>must not</b> delete \a texture; the texture pool will
@@ -329,11 +323,8 @@ public:
     std::shared_ptr<Texture> StoreTexture(Texture* texture, const std::string& texture_name);
 
     /** Adds an already-constructed texture to the managed pool. */
-    std::shared_ptr<Texture> StoreTexture(const std::shared_ptr<Texture> &texture, const std::string& texture_name);
-
-    /** Loads the requested texture from file \a name; mipmap textures are
-      * generated if \a mipmap is true. */
-    std::shared_ptr<Texture> GetTexture(const std::string& name, bool mipmap = false);
+    std::shared_ptr<Texture> StoreTexture(const std::shared_ptr<Texture>& texture,
+                                          const std::string& texture_name);
 
     /** Loads the requested texture from file \a name; mipmap textures are
       * generated if \a mipmap is true. */
@@ -341,11 +332,7 @@ public:
 
     /** Removes the desired texture from the managed pool; since shared_ptr's
       * are used, the texture may be deleted much later. */
-    void                       FreeTexture(const std::string& name);
-
-    /** Removes the desired texture from the managed pool; since shared_ptr's
-      * are used, the texture may be deleted much later. */
-    void                       FreeTexture(const boost::filesystem::path& path);
+    void FreeTexture(const boost::filesystem::path& path);
 
     /** Sets the currently-installed style factory. */
     void SetStyleFactory(const std::shared_ptr<StyleFactory>& factory);
@@ -467,12 +454,12 @@ bool GUI::OrCombiner::operator()(InIt first, InIt last) const
 }
 
 template <typename CharSetIter>
-std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned int pts,
+std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts,
                                    CharSetIter first, CharSetIter last)
 { return GetFontManager().GetFont(font_filename, pts, first, last); }
 
 template <typename CharSetIter>
-std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned int pts,
+std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts,
                                    const std::vector<uint8_t>& file_contents,
                                    CharSetIter first, CharSetIter last)
 { return GetFontManager().GetFont(font_filename, pts, file_contents, first, last); }

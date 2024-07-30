@@ -19,7 +19,7 @@ GraphControl::GraphControl() :
     AutoSetRange();
 }
 
-void GraphControl::AddSeries(std::vector<std::pair<double, double>> data, const GG::Clr& clr) {
+void GraphControl::AddSeries(std::vector<std::pair<double, double>> data, GG::Clr clr) {
     if (!data.empty()) {
         m_data.emplace_back(std::move(data), clr);
         DoLayout();
@@ -132,7 +132,7 @@ void GraphControl::ScaleToZero(bool zero) {
 }
 
 void GraphControl::SizeMove(GG::Pt ul, GG::Pt lr) {
-    GG::Pt old_sz = Size();
+    const auto old_sz = Size();
     GG::Control::SizeMove(ul, lr);
     if (Size() != old_sz)
         DoLayout();
@@ -194,11 +194,11 @@ void GraphControl::Render() {
 
     if (m_show_scale && !m_y_scale_ticks.empty()) {
         glEnable(GL_TEXTURE_2D);
-        auto font = ClientUI::GetFont();
-        glColor(ClientUI::TextColor());
+        const auto font = ClientUI::GetFont();
+        GG::Font::RenderState rs{ClientUI::TextColor()};
         for (auto label : m_y_scale_ticks) {
-            auto roundedlabel = boost::format("%|1$.12|") % label.second;
-            font->RenderText({ul.x + GG::X1, lr.y + label.first}, roundedlabel.str());
+            const auto roundedlabel = boost::format("%|1$.12|") % label.second;
+            font->RenderText(GG::Pt{ul.x + GG::X1, lr.y + label.first}, roundedlabel.str(), rs);
         }
     }
 

@@ -53,9 +53,7 @@ void UniverseObject::Copy(const UniverseObject& copied_object,
         return;
 
     auto censored_meters = copied_object.CensoredMeters(vis);
-    for (auto& [type, copied_meter] : copied_object.m_meters) {
-        (void)copied_meter;
-
+    for (const auto type : copied_object.m_meters | range_keys) {
         // get existing meter in this object, or create a default one
         auto m_meter_it = m_meters.find(type);
         bool meter_already_known = (m_meter_it != m_meters.end());
@@ -112,7 +110,7 @@ void UniverseObject::Copy(const UniverseObject& copied_object,
 void UniverseObject::Init()
 { AddMeter(MeterType::METER_STEALTH); }
 
-int UniverseObject::AgeInTurns(int current_turn) const {
+int UniverseObject::AgeInTurns(int current_turn) const noexcept {
     if (m_created_on_turn == BEFORE_FIRST_TURN)
         return SINCE_BEFORE_TIME_AGE;
     if ((m_created_on_turn == INVALID_GAME_TURN) || (current_turn == INVALID_GAME_TURN))
@@ -128,17 +126,13 @@ bool UniverseObject::HasSpecial(std::string_view name) const {
 int UniverseObject::SpecialAddedOnTurn(std::string_view name) const {
     auto it = std::find_if(m_specials.begin(), m_specials.end(),
                            [name](const auto& s) { return name == s.first; });
-    if (it == m_specials.end())
-        return INVALID_GAME_TURN;
-    return it->second.first;
+    return (it == m_specials.end()) ? INVALID_GAME_TURN : it->second.first;
 }
 
 float UniverseObject::SpecialCapacity(std::string_view name) const {
     auto it = std::find_if(m_specials.begin(), m_specials.end(),
                            [name](const auto& s) { return name == s.first; });
-    if (it == m_specials.end())
-        return 0.0f;
-    return it->second.second;
+    return (it == m_specials.end()) ? 0.0f : it->second.second;
 }
 
 std::string UniverseObject::Dump(uint8_t ntabs) const {
@@ -189,16 +183,14 @@ std::string UniverseObject::Dump(uint8_t ntabs) const {
     return retval;
 }
 
-UniverseObject::IDSet UniverseObject::VisibleContainedObjectIDs(
-    int empire_id, const EmpireObjectVisMap& vis) const
-{
+UniverseObject::IDSet UniverseObject::VisibleContainedObjectIDs(int empire_id, const EmpireObjectVisMap& vis) const {
     auto object_id_visible = [empire_id, &vis](int object_id) -> bool {
         auto empire_it = vis.find(empire_id);
         if (empire_it == vis.end())
             return false;
         auto obj_it = empire_it->second.find(object_id);
-        return obj_it != empire_it->second.end()
-            && obj_it->second >= Visibility::VIS_BASIC_VISIBILITY;
+        return obj_it != empire_it->second.end() &&
+            obj_it->second >= Visibility::VIS_BASIC_VISIBILITY;
     };
 
     IDSet retval;
@@ -224,21 +216,12 @@ const Meter* UniverseObject::GetMeter(MeterType type) const noexcept {
     return nullptr;
 }
 
-void UniverseObject::AddMeter(MeterType meter_type) {
-    if (MeterType::INVALID_METER_TYPE == meter_type)
-        ErrorLogger() << "UniverseObject::AddMeter asked to add invalid meter type!";
-    else
-        m_meters[meter_type];
-}
-
 Visibility UniverseObject::GetVisibility(int empire_id, const EmpireIDtoObjectIDtoVisMap& v) const {
     auto empire_it = v.find(empire_id);
     if (empire_it == v.end())
         return Visibility::VIS_NO_VISIBILITY;
     auto obj_it = empire_it->second.find(m_id);
-    if (obj_it == empire_it->second.end())
-        return Visibility::VIS_NO_VISIBILITY;
-    return obj_it->second;
+    return (obj_it == empire_it->second.end()) ? Visibility::VIS_NO_VISIBILITY : obj_it->second;
 }
 
 Visibility UniverseObject::GetVisibility(int empire_id, const Universe& u) const
@@ -308,7 +291,7 @@ Meter* UniverseObject::GetMeter(MeterType type) noexcept {
     return nullptr;
 }
 
-void UniverseObject::BackPropagateMeters() {
+void UniverseObject::BackPropagateMeters() noexcept {
     for (auto& m : m_meters)
         m.second.BackPropagate();
 }
@@ -342,6 +325,16 @@ void UniverseObject::SetSpecialCapacity(std::string name, float capacity, int tu
         m_specials.emplace(std::piecewise_construct,
                            std::forward_as_tuple(std::move(name)),
                            std::forward_as_tuple(turn, capacity));
+}
+
+std::size_t UniverseObject::SizeInMemory() const {
+    std::size_t retval = 0;
+    retval += sizeof(UniverseObject);
+    retval += sizeof(MeterMap::value_type)*m_meters.capacity();
+    retval += sizeof(SpecialMap::value_type)*m_specials.capacity();
+    for (const auto& name : m_specials | range_keys)
+        retval += sizeof(std::decay_t<decltype(name)>::value_type)*name.capacity();
+    return retval;
 }
 
 void UniverseObject::RemoveSpecial(const std::string& name)

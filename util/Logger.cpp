@@ -21,6 +21,7 @@
 #include <boost/log/utility/setup/formatter_parser.hpp>
 
 #include <boost/optional.hpp>
+#include <boost/unordered_map.hpp>
 
 #ifdef _MSC_VER
 #  include <ctime>
@@ -29,7 +30,6 @@
 #endif
 #include <mutex>
 #include <regex>
-#include <unordered_map>
 
 namespace logging = boost::log;
 namespace expr = boost::log::expressions;
@@ -54,8 +54,7 @@ namespace {
 
 // Provide a LogLevel input formatter for filtering
 template<typename CharT, typename TraitsT>
-inline std::basic_istream<CharT, TraitsT >& operator>>(
-    std::basic_istream<CharT, TraitsT>& is, LogLevel& level)
+inline std::basic_istream<CharT, TraitsT >& operator>>(std::basic_istream<CharT, TraitsT>& is, LogLevel& level)
 {
     std::string tmp;
     is >> tmp; // to_string(level) ...?
@@ -63,17 +62,25 @@ inline std::basic_istream<CharT, TraitsT >& operator>>(
     return is;
 }
 
+#if !defined(CONSTINIT_STRING)
+#  if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+#    define CONSTINIT_STRING constinit
+#  else
+#    define CONSTINIT_STRING
+#  endif
+#endif
+
 namespace {
-    std::string& LocalUnnamedLoggerIdentifier() {
+    std::string& LocalUnnamedLoggerIdentifier() noexcept {
         // Create default logger name as a static function variable to avoid static initialization fiasco
-        static std::string unnamed_logger_identifier;
+        static CONSTINIT_STRING std::string unnamed_logger_identifier;
         return unnamed_logger_identifier;
     }
 
-    const std::string& DisplayName(const std::string& channel_name)
+    const std::string& DisplayName(const std::string& channel_name) noexcept 
     { return (channel_name.empty() ? LocalUnnamedLoggerIdentifier() : channel_name); }
 
-    boost::optional<LogLevel>& ForcedThreshold() {
+    boost::optional<LogLevel>& ForcedThreshold() noexcept {
         // Create forced threshold as a static function variable to avoid static initialization fiasco
         static boost::optional<LogLevel> forced_threshold = boost::none;
         return forced_threshold;
@@ -83,7 +90,7 @@ namespace {
 
     using LoggerFileSinkFrontEndConfigurer = std::function<void(LoggerTextFileSinkFrontend& sink_frontend)>;
 
-    boost::shared_ptr<LoggerTextFileSinkFrontend::sink_backend_type>& FileSinkBackend() {
+    boost::shared_ptr<LoggerTextFileSinkFrontend::sink_backend_type>& FileSinkBackend() noexcept {
         // Create the sink backend as a function local static variable to avoid the static
         // initilization fiasco.
         static boost::shared_ptr<LoggerTextFileSinkFrontend::sink_backend_type> m_sink_backend;
@@ -106,8 +113,8 @@ namespace {
     class LoggersToSinkFrontEnds {
         /// m_mutex serializes access from different threads
         std::mutex m_mutex;
-        std::unordered_map<std::string, boost::shared_ptr<LoggerTextFileSinkFrontend>> m_names_to_front_ends;
-        std::unordered_map<std::string, LoggerFileSinkFrontEndConfigurer> m_names_to_front_end_configurers;
+        boost::unordered_map<std::string, boost::shared_ptr<LoggerTextFileSinkFrontend>> m_names_to_front_ends;
+        boost::unordered_map<std::string, LoggerFileSinkFrontEndConfigurer> m_names_to_front_end_configurers;
     public:
 
         void AddOrReplaceLoggerName(const std::string& channel_name,
@@ -189,26 +196,23 @@ namespace {
         configure_front_end(*sink_frontend);
 
         // Replace any previous frontend for this channel
-        GetLoggersToSinkFrontEnds().AddOrReplaceLoggerName(channel_name, sink_frontend);
+        GetLoggersToSinkFrontEnds().AddOrReplaceLoggerName(channel_name, std::move(sink_frontend));
     }
 }
 
 void ApplyConfigurationToFileSinkFrontEnd(const std::string& channel_name,
                                           const LoggerFileSinkFrontEndConfigurer& configure_front_end)
 {
-    auto& file_sink_backend = FileSinkBackend();
-
-    // If the file sink backend has not been configured store the name so
-    // that a frontend can be added later.
-    if (!file_sink_backend) {
+    if (const auto& file_sink_backend = FileSinkBackend()) {
+        ConfigureToFileSinkFrontEndCore(file_sink_backend, channel_name, configure_front_end);
+    } else {
+        // If the file sink backend has not been configured store the name so
+        // that a frontend can be added later.
         GetLoggersToSinkFrontEnds().StoreConfigurerWithLoggerName(channel_name, configure_front_end);
-        return;
     }
-
-    ConfigureToFileSinkFrontEndCore(file_sink_backend, channel_name, configure_front_end);
 }
 
-const std::string& DefaultExecLoggerName()
+const std::string& DefaultExecLoggerName() noexcept
 { return LocalUnnamedLoggerIdentifier(); }
 
 std::vector<std::string> CreatedLoggersNames()

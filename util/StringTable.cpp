@@ -3,6 +3,7 @@
 #include "Logger.h"
 #include "Directories.h"
 #include "../parse/Parse.h"
+#include "ranges.h"
 
 #include <boost/filesystem/fstream.hpp>
 #include <boost/xpressive/xpressive.hpp>
@@ -28,8 +29,11 @@ struct IUnknown; // Workaround for "combaseapi.h(229,21): error C2760: syntax er
 
 
 namespace {
-    constexpr std::string_view DEFAULT_FILENAME = "en.txt";
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
     const std::string EMPTY_STRING;
+#endif
 }
 
 StringTable::StringTable(std::string filename, std::shared_ptr<const StringTable> fallback):
@@ -103,6 +107,28 @@ namespace {
         const auto& m{match[idx]};
         return {&*m.first, static_cast<std::size_t>(std::max(0, static_cast<int>(m.length())))};
     }
+
+    using namespace boost::xpressive;
+
+    const sregex IDENTIFIER = +_w;
+    const sregex COMMENT = '#' >> *(~_n) >> _n;
+    const sregex KEY = IDENTIFIER;
+    const sregex SINGLE_LINE_VALUE = *(~_n);
+    const sregex MULTI_LINE_VALUE = -*_;
+
+    const sregex ENTRY =
+        keep(*(space | keep(+COMMENT))) >>
+        KEY >> *blank >> (_n | COMMENT) >>
+        (("'''" >> MULTI_LINE_VALUE >> "'''" >> *space >> _n) | SINGLE_LINE_VALUE >> _n);
+
+    const sregex TRAILING_WS =
+        *(space | COMMENT);
+
+    const sregex REFERENCE =
+        keep("[[" >> (s1 = IDENTIFIER) >> +space >> (s2 = IDENTIFIER) >> "]]");
+
+    const sregex KEYEXPANSION =
+        keep("[[" >> (s1 = IDENTIFIER) >> "]]");
 }
 
 void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
@@ -136,31 +162,11 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
         fallback_lookup_strings = fallback->m_strings; //.insert(fallback->m_strings.begin(), fallback->m_strings.end());
     }
 
-    using namespace boost::xpressive;
-
-    const sregex IDENTIFIER = +_w;
-    const sregex COMMENT = '#' >> *(~_n) >> _n;
-    const sregex KEY = IDENTIFIER;
-    const sregex SINGLE_LINE_VALUE = *(~_n);
-    const sregex MULTI_LINE_VALUE = -*_;
-
-    const sregex ENTRY =
-        keep(*(space | keep(+COMMENT))) >>
-        KEY >> *blank >> (_n | COMMENT) >>
-        (("'''" >> MULTI_LINE_VALUE >> "'''" >> *space >> _n) | SINGLE_LINE_VALUE >> _n);
-
-    const sregex TRAILING_WS =
-        *(space | COMMENT);
-
-    const sregex REFERENCE =
-        keep("[[" >> (s1 = IDENTIFIER) >> +space >> (s2 = IDENTIFIER) >> "]]");
-
-    const sregex KEYEXPANSION =
-        keep("[[" >> (s1 = IDENTIFIER) >> "]]");
+    using boost::xpressive::smatch;
 
     // parse input text stream
     auto it = file_contents.begin();
-    auto end = file_contents.end();
+    const auto end = file_contents.end();
 
     smatch matches;
     bool well_formed = false;
@@ -304,8 +310,7 @@ void StringTable::Load(std::shared_ptr<const StringTable> fallback) {
         }
 
         // nonrecursively replace references -- convert [[type REF]] to <type REF>string for REF</type>
-        for ([[maybe_unused]] auto& [ignored_key, user_read_entry] : m_strings) {
-            (void)ignored_key;  // quiet unused variable warning
+        for (auto& user_read_entry : m_strings | range_values) {
             std::size_t position = 0; // position in the definition string, past the already processed part
             smatch match;
             while (regex_search(user_read_entry.begin() + position, user_read_entry.end(), match, REFERENCE)) {

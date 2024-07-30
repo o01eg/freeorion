@@ -95,7 +95,7 @@ void BuildingsPanel::Update() {
     }
     int system_id = planet->SystemID();
 
-    const int indicator_size = static_cast<int>(Value(Width() * 1.0 / m_columns));
+    const int indicator_size = static_cast<int>(Width() / static_cast<float>(m_columns));
 
     const int this_client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const ScriptingContext context;
@@ -170,14 +170,14 @@ void BuildingsPanel::ExpandCollapseButtonPressed()
 { ExpandCollapse(!s_expanded_map[m_planet_id]); }
 
 void BuildingsPanel::DoLayout() {
-    auto old_size = Size();
+    const auto old_size = Size();
     AccordionPanel::DoLayout();
 
     int row = 0;
     int column = 0;
     static constexpr int padding = 5; // space around and between adjacent indicators
     const GG::X effective_width = Width() - padding * (m_columns + 1);  // padding on either side and between
-    const int indicator_size = static_cast<int>(Value(effective_width * 1.0 / m_columns));
+    const int indicator_size = static_cast<int>(Value(effective_width) / m_columns);
     GG::Y height;
 
     // update size of panel and position and visibility of widgets
@@ -220,7 +220,7 @@ void BuildingsPanel::DoLayout() {
     }
 
     if (m_building_indicators.empty()) {
-        height = GG::Y(0);  // hide if empty
+        height = GG::Y0;  // hide if empty
         DetachChild(m_expand_button.get());
     } else {
         AttachChild(m_expand_button);
@@ -307,7 +307,9 @@ void BuildingIndicator::PreRender() {
 void BuildingIndicator::Refresh() {
     SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
-    auto building = Objects().get<Building>(m_building_id);
+    const ScriptingContext context;
+
+    auto building = context.ContextObjects().get<Building>(m_building_id);
     if (!building)
         return;
 
@@ -325,9 +327,9 @@ void BuildingIndicator::Refresh() {
 
         // Scanlines for not currently-visible objects?
         if (GetOptionsDB().Get<bool>("ui.map.scanlines.shown")) {
-            int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+            const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
             if (empire_id != ALL_EMPIRES &&
-                GetUniverse().GetObjectVisibilityByEmpire(m_building_id, empire_id) < Visibility::VIS_BASIC_VISIBILITY)
+                context.ContextUniverse().GetObjectVisibilityByEmpire(m_building_id, empire_id) < Visibility::VIS_BASIC_VISIBILITY)
             { AttachChild(m_scanlines); }
         }
 
@@ -354,10 +356,8 @@ void BuildingIndicator::Refresh() {
 }
 
 void BuildingIndicator::SizeMove(GG::Pt ul, GG::Pt lr) {
-    GG::Pt old_size = Size();
-
+    const auto old_size = Size();
     GG::Wnd::SizeMove(ul, lr);
-
     if (old_size != Size())
         DoLayout();
 }
@@ -403,7 +403,7 @@ void BuildingIndicator::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
 
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
-    if (m_order_issuing_enabled) {
+    if (m_order_issuing_enabled && ScrapOrder::Check(empire_id, m_building_id, context)) {
         if (!building->OrderedScrapped()) {
             // create popup menu with "Scrap" option
             popup->AddMenuItem(GG::MenuItem(UserString("ORDER_BUIDLING_SCRAP"), false, false,
@@ -435,13 +435,13 @@ void BuildingIndicator::DoLayout() {
     GG::Pt child_lr = Size() - GG::Pt(GG::X1, GG::Y1);   // extra pixel prevents graphic from overflowing border box
 
     if (m_graphic)
-        m_graphic->SizeMove(GG::Pt(GG::X0, GG::Y0), child_lr);
+        m_graphic->SizeMove(GG::Pt0, child_lr);
 
     if (m_scanlines)
-        m_scanlines->SizeMove(GG::Pt(GG::X0, GG::Y0), child_lr);
+        m_scanlines->SizeMove(GG::Pt0, child_lr);
 
     if (m_scrap_indicator)
-        m_scrap_indicator->SizeMove(GG::Pt(GG::X0, GG::Y0), child_lr);
+        m_scrap_indicator->SizeMove(GG::Pt0, child_lr);
 
     GG::Y bar_top = Height() * 4 / 5;
     if (m_progress_bar)

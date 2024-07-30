@@ -49,8 +49,6 @@ public:
     ~BuildingType(); // needed due to forward-declared Condition held in unique_ptr
 
     bool operator==(const BuildingType& rhs) const;
-    bool operator!=(const BuildingType& rhs) const
-    { return !(*this == rhs); }
 
     //! Returns the unique name for this type of building
     auto& Name() const noexcept { return m_name; }
@@ -94,7 +92,7 @@ public:
     auto& Tags() const noexcept { return m_tags; }
 
     auto HasTag(std::string_view tag) const -> bool
-    { return std::any_of(m_tags.begin(), m_tags.end(), [tag](const auto& t) { return t == tag; }); }
+    { return std::any_of(m_tags.begin(), m_tags.end(), [tag](const auto& t) noexcept { return t == tag; }); }
 
     //! Returns the condition that determines the locations where this building
     //! can be produced
@@ -159,6 +157,7 @@ class BuildingTypeManager {
 public:
     using container_type = std::map<std::string, std::unique_ptr<BuildingType>, std::less<>>;
     using iterator = container_type::const_iterator;
+    using const_iterator = iterator;
 
     //! Returns the building type with the name @p name; you should use the
     //! free function GetBuildingType(...) instead, mainly to save some typing.

@@ -14,13 +14,15 @@ namespace Effect {
 /** a class representing a region of space */
 class FO_COMMON_API Field final : public UniverseObject {
 public:
-    [[nodiscard]] TagVecs               Tags(const ScriptingContext&) const override;
-    [[nodiscard]] bool                  HasTag(std::string_view name, const ScriptingContext&) const override;
+    [[nodiscard]] TagVecs               Tags() const;
+    [[nodiscard]] TagVecs               Tags(const ScriptingContext&) const override { return Tags(); }
+    [[nodiscard]] bool                  HasTag(std::string_view name) const;
+    [[nodiscard]] bool                  HasTag(std::string_view name, const ScriptingContext&) const override { return HasTag(name); }
 
     [[nodiscard]] std::string           Dump(uint8_t ntabs = 0) const override;
 
     [[nodiscard]] int                   ContainerObjectID() const noexcept override { return this->SystemID(); }
-    [[nodiscard]] bool                  ContainedBy(int object_id) const override;
+    [[nodiscard]] bool                  ContainedBy(int object_id) const noexcept override;
 
     [[nodiscard]] const std::string&    PublicName(int empire_id, const Universe&) const override;
     [[nodiscard]] const std::string&    FieldTypeName() const noexcept { return m_type_name; }
@@ -30,6 +32,8 @@ public:
      * or objecs are within this field's area. */
     [[nodiscard]] bool                  InField(std::shared_ptr<const UniverseObject> obj) const;
     [[nodiscard]] bool                  InField(double x, double y) const;
+
+    [[nodiscard]] std::size_t           SizeInMemory() const override;
 
     std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
 

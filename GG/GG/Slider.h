@@ -96,7 +96,7 @@ protected:
     T       PtToPosn(Pt pt) const; ///< maps an arbitrary screen point to its nearest logical slider position
 
     void LClick(Pt pt, Flags<ModKey> mod_keys) override;
-    void KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys) override;
+    void KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys) override;
     bool EventFilter(Wnd* w, const WndEvent& event) override;
 
     void MoveTabToPosn(); ///< moves the tab to the current logical position
@@ -288,7 +288,7 @@ T Slider<T>::PtToPosn(Pt pt) const
         line_max = Value(Width() - (m_tab->Width() - m_tab->Width() / 2));
         pixel_nearest_to_pt_on_line = std::max(line_min, std::min(Value(pt.x - ul.x), line_max));
     }
-    double fractional_distance = static_cast<double>(pixel_nearest_to_pt_on_line) / (line_max - line_min);
+    double fractional_distance = static_cast<double>(pixel_nearest_to_pt_on_line) / static_cast<double>(line_max - line_min);
     return m_range_min + static_cast<T>((m_range_max - m_range_min) * fractional_distance);
 }
 
@@ -297,7 +297,7 @@ void Slider<T>::LClick(Pt pt, Flags<ModKey> mod_keys)
 { SlideToImpl(m_posn < PtToPosn(pt) ? m_posn + PageSize() : m_posn - PageSize(), true); }
 
 template <typename T>
-void Slider<T>::KeyPress(Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys)
+void Slider<T>::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 {
     if (!Disabled()) {
         switch (key) {

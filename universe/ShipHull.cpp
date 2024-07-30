@@ -7,6 +7,7 @@
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
 #include "../util/GameRules.h"
+#include "../util/GameRuleRanks.h"
 
 #define CHECK_COND_VREF_MEMBER(m_ptr) { if (m_ptr == rhs.m_ptr) {           \
                                             /* check next member */         \
@@ -21,16 +22,24 @@ namespace {
     void AddRules(GameRules& rules) {
         rules.Add<double>(UserStringNop("RULE_SHIP_SPEED_FACTOR"),
                           UserStringNop("RULE_SHIP_SPEED_FACTOR_DESC"),
-                          UserStringNop("BALANCE"), 1.0, true, RangedValidator<double>(0.1, 10.0));
+                          GameRuleCategories::GameRuleCategory::BALANCE, 1.0, true,
+                          GameRuleRanks::RULE_SHIP_SPEED_FACTOR_RANK,
+                          RangedValidator<double>(0.1, 10.0));
         rules.Add<double>(UserStringNop("RULE_SHIP_STRUCTURE_FACTOR"),
                           UserStringNop("RULE_SHIP_STRUCTURE_FACTOR_DESC"),
-                          UserStringNop("BALANCE"), 8.0, true, RangedValidator<double>(0.1, 80.0));
+                          GameRuleCategories::GameRuleCategory::BALANCE, 8.0, true,
+                          GameRuleRanks::RULE_SHIP_STRUCTURE_FACTOR_RANK,
+                          RangedValidator<double>(0.1, 80.0));
         rules.Add<double>(UserStringNop("RULE_SHIP_WEAPON_DAMAGE_FACTOR"),
                           UserStringNop("RULE_SHIP_WEAPON_DAMAGE_FACTOR_DESC"),
-                          UserStringNop("BALANCE"), 6.0, true, RangedValidator<double>(0.1, 60.0));
+                          GameRuleCategories::GameRuleCategory::BALANCE, 6.0, true,
+                          GameRuleRanks::RULE_SHIP_WEAPON_DAMAGE_FACTOR_RANK,
+                          RangedValidator<double>(0.1, 60.0));
         rules.Add<double>(UserStringNop("RULE_FIGHTER_DAMAGE_FACTOR"),
                           UserStringNop("RULE_FIGHTER_DAMAGE_FACTOR_DESC"),
-                          UserStringNop("BALANCE"), 6.0, true, RangedValidator<double>(0.1, 60.0));
+                          GameRuleCategories::GameRuleCategory::BALANCE, 6.0, true,
+                          GameRuleRanks::RULE_FIGHTER_DAMAGE_FACTOR_RANK,
+                          RangedValidator<double>(0.1, 60.0));
     }
     bool temp_bool = RegisterGameRules(&AddRules);
 
@@ -146,11 +155,9 @@ ShipHull::ShipHull(float fuel, float speed, float stealth, float structure,
                       [](auto& t) { boost::to_upper<std::string>(t); });
 
         // allocate storage for concatenated tags
+        std::size_t params_sz = std::transform_reduce(common_params.tags.begin(), common_params.tags.end(), 0u, std::plus{},
+                                                      [](const auto& tag) { return tag.size(); });
         std::string retval;
-        // TODO: transform_reduce when available on all platforms...
-        std::size_t params_sz = 0;
-        for (const auto& t : common_params.tags)
-            params_sz += t.size();
         retval.reserve(params_sz);
 
         // concatenate tags

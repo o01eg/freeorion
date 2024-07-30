@@ -157,25 +157,28 @@ namespace {
     /** Return true for fatal errors.*/
     bool HandleErrorMessage(const Error& msg, ServerApp& server) {
         std::stringstream ss;
-        std::string problem;
+        std::string problem_key, unlocalized_info;
         bool fatal = false;
         int player_id = Networking::INVALID_PLAYER_ID;
         try {
-            ExtractErrorMessageData(msg.m_message, player_id, problem, fatal);
+            ExtractErrorMessageData(msg.m_message, player_id, problem_key, unlocalized_info, fatal);
         } catch (...) {
-            problem = UserString("UNKNOWN");
+            problem_key = UserString("UNKNOWN");
         }
         ss << "Server received from player "
            << msg.m_player_connection->PlayerName() << "("
            << msg.m_player_connection->PlayerID() << ")"
            << (fatal?" a fatal":" an")
-           << " error message: " << problem;
+           << " error message: " << problem_key;
+        if (!unlocalized_info.empty())
+            ss << " info: " << unlocalized_info;
+        ErrorLogger(FSM) << ss.str();
 
         if (fatal) {
-            ErrorLogger(FSM) << ss.str();
-            SendMessageToAllPlayers(ErrorMessage(problem, fatal, player_id));
-        } else {
-            ErrorLogger(FSM) << ss.str();
+            if (unlocalized_info.empty())
+                SendMessageToAllPlayers(ErrorMessage(problem_key, fatal, player_id));
+            else
+                SendMessageToAllPlayers(ErrorMessage(problem_key, unlocalized_info, fatal, player_id));
         }
 
         return fatal;
@@ -197,17 +200,17 @@ namespace {
     { return IsExistingFile(path) && MP_SAVE_FILE_EXTENSION == path.extension(); }
 
     EmpireColor GetUnusedEmpireColour(const std::list<std::pair<int, PlayerSetupData>>& psd,
-                                  const std::map<int, SaveGameEmpireData> &sged = std::map<int, SaveGameEmpireData>())
+                                      const std::map<int, SaveGameEmpireData>& sged = std::map<int, SaveGameEmpireData>())
     {
         //DebugLogger(FSM) << "finding colours for empire of player " << player_name;
         EmpireColor empire_colour{{192, 192, 192, 255}};
-        for (const EmpireColor& possible_colour : EmpireColors()) {
+        for (const EmpireColor possible_colour : EmpireColors()) {
             //DebugLogger(FSM) << "trying colour " << possible_colour.r << ", " << possible_colour.g << ", " << possible_colour.b;
 
             // check if any other player / empire is using this colour
             bool colour_is_new = true;
             for (const std::pair<int, PlayerSetupData>& entry : psd) {
-                const EmpireColor& player_colour = entry.second.empire_color;
+                const auto player_colour = entry.second.empire_color;
                 if (player_colour == possible_colour) {
                     colour_is_new = false;
                     break;
@@ -216,7 +219,7 @@ namespace {
 
             if (colour_is_new) {
                 for (const auto& entry : sged) {
-                    const EmpireColor& player_colour = entry.second.color;
+                    const auto player_colour = entry.second.color;
                     if (player_colour == possible_colour) {
                         colour_is_new = false;
                         break;
@@ -558,7 +561,7 @@ bool ServerFSM::EstablishPlayer(PlayerConnectionPtr player_connection,
 
         player_connection->SendMessage(JoinAckMessage(player_id, cookie));
         if (!GetOptionsDB().Get<bool>("skip-checksum"))
-            player_connection->SendMessage(ContentCheckSumMessage());
+            player_connection->SendMessage(ContentCheckSumMessage(m_server.GetSpeciesManager()));
 
         // inform player of host
         player_connection->SendMessage(HostIDMessage(m_server.m_networking.HostPlayerID()));
@@ -591,7 +594,7 @@ bool ServerFSM::EstablishPlayer(PlayerConnectionPtr player_connection,
     }
 
     // disconnect "ghost" connection after establishing new
-    for (const auto& conn : to_disconnect)
+    for (auto& conn : to_disconnect)
         m_server.Networking().Disconnect(std::move(conn));
 
     return client_type != Networking::ClientType::INVALID_CLIENT_TYPE;
@@ -647,7 +650,7 @@ sc::result Idle::react(const HostMPGame& msg) {
     server.m_networking.SetHostPlayerID(host_player_id);
 
     if (!GetOptionsDB().Get<bool>("skip-checksum"))
-        player_connection->SendMessage(ContentCheckSumMessage());
+        player_connection->SendMessage(ContentCheckSumMessage(server.GetSpeciesManager()));
 
     DebugLogger(FSM) << "Idle::react(HostMPGame) about to send acknowledgement to host";
     player_connection->SetAuthRoles(Networking::AuthRoles{
@@ -701,7 +704,7 @@ sc::result Idle::react(const HostSPGame& msg) {
                                        std::move(client_version_string));
     server.m_networking.SetHostPlayerID(host_player_id);
     if (!GetOptionsDB().Get<bool>("skip-checksum"))
-        player_connection->SendMessage(ContentCheckSumMessage());
+        player_connection->SendMessage(ContentCheckSumMessage(server.GetSpeciesManager()));
     player_connection->SetAuthRoles(Networking::AuthRoles{
                                         Networking::RoleType::ROLE_HOST,
                                         Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER,
@@ -742,8 +745,8 @@ sc::result Idle::react(const Hostless&) {
     }
 
     ServerApp& server = Server();
-    std::shared_ptr<MultiplayerLobbyData> lobby_data(new MultiplayerLobbyData(server.m_galaxy_setup_data));
-    std::shared_ptr<ServerSaveGameData> server_save_game_data(new ServerSaveGameData());
+    auto lobby_data = std::make_shared<MultiplayerLobbyData>(server.m_galaxy_setup_data);
+    auto server_save_game_data = std::make_shared<ServerSaveGameData>();
     std::vector<PlayerSaveGameData> player_save_game_data;
     server.InitializePython();
     server.LoadChatHistory();
@@ -758,9 +761,8 @@ sc::result Idle::react(const Hostless&) {
             for (const auto& save : saves) {
                 // Filenames of saves lexicographically sorted with turns and timestamps so latest
                 // file will have greater string representation.
-                if (PathToString(save) > autostart_load_filename) {
+                if (PathToString(save) > autostart_load_filename)
                     autostart_load_filename = PathToString(save);
-                }
             }
         }
     }
@@ -860,8 +862,8 @@ namespace {
 
 MPLobby::MPLobby(my_context c) :
     my_base(c),
-    m_lobby_data(new MultiplayerLobbyData(std::move(Server().m_galaxy_setup_data))),
-    m_server_save_game_data(new ServerSaveGameData()),
+    m_lobby_data(std::make_shared<MultiplayerLobbyData>(std::move(Server().m_galaxy_setup_data))),
+    m_server_save_game_data(std::make_shared<ServerSaveGameData>()),
     m_ai_next_index(1)
 {
     TraceLogger(FSM) << "(ServerFSM) MPLobby";
@@ -2073,7 +2075,7 @@ sc::result MPLobby::react(const Error& msg) {
 WaitingForSPGameJoiners::WaitingForSPGameJoiners(my_context c) :
     my_base(c),
     m_single_player_setup_data(context<ServerFSM>().m_single_player_setup_data),
-    m_server_save_game_data(new ServerSaveGameData()),
+    m_server_save_game_data(std::make_shared<ServerSaveGameData>()),
     m_num_expected_players(0)
 {
     TraceLogger(FSM) << "(ServerFSM) WaitingForSPGameJoiners";
@@ -2186,7 +2188,7 @@ sc::result WaitingForSPGameJoiners::react(const JoinGame& msg) {
     TraceLogger(FSM) << "(ServerFSM) WaitingForSPGameJoiners.JoinGame";
     ServerApp& server = Server();
     const Message& message = msg.m_message;
-    const PlayerConnectionPtr& player_connection = msg.m_player_connection;
+    auto& player_connection = msg.m_player_connection;
 
     std::string player_name("Default_Player_Name_in_WaitingForSPGameJoiners::react(const JoinGame& msg)");
     Networking::ClientType client_type = Networking::ClientType::INVALID_CLIENT_TYPE;
@@ -2216,7 +2218,7 @@ sc::result WaitingForSPGameJoiners::react(const JoinGame& msg) {
                                                std::move(client_version_string));
             player_connection->SendMessage(JoinAckMessage(expected_it->second, boost::uuids::nil_uuid()));
             if (!GetOptionsDB().Get<bool>("skip-checksum"))
-                player_connection->SendMessage(ContentCheckSumMessage());
+                player_connection->SendMessage(ContentCheckSumMessage(server.GetSpeciesManager()));
 
             // Inform AI of logging configuration.
             player_connection->SendMessage(
@@ -2243,7 +2245,7 @@ sc::result WaitingForSPGameJoiners::react(const JoinGame& msg) {
                                                std::move(client_version_string));
             player_connection->SendMessage(JoinAckMessage(host_id, boost::uuids::nil_uuid()));
             if (!GetOptionsDB().Get<bool>("skip-checksum"))
-                player_connection->SendMessage(ContentCheckSumMessage());
+                player_connection->SendMessage(ContentCheckSumMessage(server.GetSpeciesManager()));
 
             DebugLogger(FSM) << "Initializing new SP game...";
             server.NewSPGameInit(*m_single_player_setup_data);
@@ -2358,7 +2360,7 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
     // to MPLobby or ShuttingDownServer gets context before disconnection
     ServerFSM& fsm = context<ServerFSM>();
     const Message& message = msg.m_message;
-    const PlayerConnectionPtr& player_connection = msg.m_player_connection;
+    auto& player_connection = msg.m_player_connection;
 
     std::string player_name("Default_Player_Name_in_WaitingForMPGameJoiners::react(const JoinGame& msg)");
     Networking::ClientType client_type = Networking::ClientType::INVALID_CLIENT_TYPE;
@@ -2494,7 +2496,7 @@ sc::result WaitingForMPGameJoiners::react(const JoinGame& msg) {
             }
         }
 
-        fsm.EstablishPlayer(std::move(player_connection), std::move(new_player_name), client_type,
+        fsm.EstablishPlayer(player_connection, std::move(new_player_name), client_type,
                             std::move(client_version_string), roles);
     } else {
         ErrorLogger(FSM) << "WaitingForMPGameJoiners::react(const JoinGame& msg): Received JoinGame message with invalid client type: " << client_type;
@@ -2553,7 +2555,7 @@ sc::result WaitingForMPGameJoiners::react(const AuthResponse& msg) {
                 to_disconnect.push_back(*it);
             }
         }
-        for (const auto& conn : to_disconnect)
+        for (auto& conn : to_disconnect)
             server.Networking().Disconnect(std::move(conn));
 
         // expected human player

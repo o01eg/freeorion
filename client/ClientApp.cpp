@@ -11,13 +11,10 @@
 #include <stdexcept>
 
 ClientApp::ClientApp() :
-    IApp(),
-    m_networking(std::make_shared<ClientNetworking>()),
-    m_empire_id(ALL_EMPIRES),
-    m_current_turn(INVALID_GAME_TURN)
+    m_networking(std::make_shared<ClientNetworking>())
 {}
 
-int ClientApp::PlayerID() const
+int ClientApp::PlayerID() const noexcept
 { return m_networking->PlayerID(); }
 
 Empire* ClientApp::GetEmpire(int empire_id)
@@ -85,7 +82,7 @@ bool ClientApp::VerifyCheckSum(const Message& msg) {
     std::map<std::string, uint32_t> server_checksums;
     ExtractContentCheckSumMessageData(msg, server_checksums);
 
-    const auto client_checksums = CheckSumContent();
+    const auto client_checksums = CheckSumContent(m_species_manager);
 
     if (server_checksums == client_checksums) {
         InfoLogger() << "Checksum received from server matches client checksum.";

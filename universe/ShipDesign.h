@@ -119,7 +119,7 @@ public:
     [[nodiscard]] float InfluenceGeneration() const noexcept  { return m_influence_generation; }  ///< returns the influence output from this ship design
     [[nodiscard]] bool  IsProductionLocation() const noexcept { return m_is_production_location;} ///< returns true if this ship design can be a production location
 
-    [[nodiscard]] bool  CanColonize() const;
+    [[nodiscard]] bool  CanColonize() const;                                                     ///< returns true iff the design has colonisation parts, or false otherwise
     [[nodiscard]] bool  HasTroops() const noexcept        { return (m_troop_capacity > 0.0f); }
     [[nodiscard]] bool  CanBombard() const noexcept       { return m_can_bombard; }
     [[nodiscard]] bool  IsArmed() const noexcept          { return m_is_armed; }
@@ -286,8 +286,6 @@ public:
     FO_COMMON_API void SetMonsterDesignTypes(Pending::Pending<ParsedShipDesignsType>&& pending_designs);
 
 private:
-    PredefinedShipDesignManager();
-
     /** Assigns any m_pending_designs. */
     void CheckPendingDesignsTypes() const;
 
@@ -306,8 +304,6 @@ private:
 
     mutable std::vector<boost::uuids::uuid> m_ship_ordering;
     mutable std::vector<boost::uuids::uuid> m_monster_ordering;
-
-    static PredefinedShipDesignManager* s_instance;
 };
 
 /** returns the singleton predefined ship design manager type manager */
@@ -320,8 +316,8 @@ private:
 [[nodiscard]] FO_COMMON_API std::tuple<
     bool,
     std::unordered_map<boost::uuids::uuid,
-        std::pair<std::unique_ptr<ShipDesign>, boost::filesystem::path>,
-        boost::hash<boost::uuids::uuid>>,
+                       std::pair<std::unique_ptr<ShipDesign>, boost::filesystem::path>,
+                       boost::hash<boost::uuids::uuid>>,
     std::vector<boost::uuids::uuid>>
 LoadShipDesignsAndManifestOrderFromParseResults(PredefinedShipDesignManager::ParsedShipDesignsType& parsed);
 

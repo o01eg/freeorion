@@ -30,7 +30,8 @@ Field::Field(std::string field_type, double x, double y, double radius, int crea
 }
 
 std::shared_ptr<UniverseObject> Field::Clone(const Universe& universe, int empire_id) const {
-    Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
+    const Visibility vis = empire_id == ALL_EMPIRES ?
+        Visibility::VIS_FULL_VISIBILITY : universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
@@ -56,7 +57,8 @@ void Field::Copy(const Field& copied_field, const Universe& universe, int empire
         return;
 
     int copied_object_id = copied_field.ID();
-    Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
+    const Visibility vis = empire_id == ALL_EMPIRES ?
+        Visibility::VIS_FULL_VISIBILITY : universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
     auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
     UniverseObject::Copy(copied_field, vis, visible_specials, universe);
@@ -67,13 +69,12 @@ void Field::Copy(const Field& copied_field, const Universe& universe, int empire
     }
 }
 
-UniverseObject::TagVecs Field::Tags(const ScriptingContext&) const {
-    if (const FieldType* type = GetFieldType(m_type_name))
-        return type->Tags();
-    return {};
+UniverseObject::TagVecs Field::Tags() const {
+    const FieldType* type = GetFieldType(m_type_name);
+    return type ? TagVecs{type->Tags()} : TagVecs{};
 }
 
-bool Field::HasTag(std::string_view name, const ScriptingContext&) const {
+bool Field::HasTag(std::string_view name) const {
     const FieldType* type = GetFieldType(m_type_name);
     return type && type->HasTag(name);
 }
@@ -93,7 +94,7 @@ const std::string& Field::PublicName(int empire_id, const Universe&) const {
 std::shared_ptr<UniverseObject> Field::Accept(const UniverseObjectVisitor& visitor) const
 { return visitor.Visit(std::const_pointer_cast<Field>(std::static_pointer_cast<const Field>(shared_from_this()))); }
 
-bool Field::ContainedBy(int object_id) const {
+bool Field::ContainedBy(int object_id) const noexcept {
     return object_id != INVALID_OBJECT_ID
         && object_id == this->SystemID();
 }
@@ -109,6 +110,15 @@ bool Field::InField(double x, double y) const {
 
     double dist2 = (x - this->X())*(x - this->X()) + (y - this->Y())*(y - this->Y());
     return dist2 < radius*radius;
+}
+
+std::size_t Field::SizeInMemory() const {
+    std::size_t retval = UniverseObject::SizeInMemory();
+    retval += sizeof(Field) - sizeof(UniverseObject);
+
+    retval += sizeof(decltype(m_type_name)::value_type)*m_type_name.capacity();
+
+    return retval;
 }
 
 void Field::ResetTargetMaxUnpairedMeters() {

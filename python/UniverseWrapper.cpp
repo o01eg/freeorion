@@ -55,7 +55,7 @@ namespace {
 
         std::transform(tags.first.begin(), tags.first.end(), std::back_inserter(result),
                        [](std::string_view sv) { return std::string{sv}; });
-        std::transform(tags.first.begin(), tags.first.end(), std::back_inserter(result),
+        std::transform(tags.second.begin(), tags.second.end(), std::back_inserter(result),
                        [](std::string_view sv) { return std::string{sv}; });
         return result;
     }
@@ -97,7 +97,7 @@ namespace {
         auto it = species_homeworlds.find(species.Name());
         if (it == species_homeworlds.end())
             return {};
-        return it->second;
+        return {it->second.begin(), it->second.end()};
     }
 
     void UpdateMetersWrapper(Universe& universe, const py::object&)
@@ -403,7 +403,6 @@ namespace FreeOrionPython {
                                                 py::return_value_policy<py::reference_existing_object>(),
                                                 "Returns the ship design (ShipDesign) with the indicated name (string).")
 
-            .add_property("allObjectIDs",       make_function(ObjectIDs<UniverseObject>,py::return_value_policy<py::return_by_value>()))
             .add_property("fleetIDs",           make_function(ObjectIDs<Fleet>,         py::return_value_policy<py::return_by_value>()))
             .add_property("systemIDs",          make_function(ObjectIDs<System>,        py::return_value_policy<py::return_by_value>()))
             .add_property("fieldIDs",           make_function(ObjectIDs<Field>,         py::return_value_policy<py::return_by_value>()))
@@ -667,6 +666,7 @@ namespace FreeOrionPython {
             .add_property("stealth",            &ShipHull::Stealth)
             .add_property("fuel",               &ShipHull::Fuel)
             .add_property("speed",              &ShipHull::Speed)
+            .add_property("detection",          &ShipHull::Detection)
             .def("numSlotsOfSlotType",          +[](const ShipHull& hull, ShipSlotType slot_type) -> unsigned int { return hull.NumSlots(slot_type); })
             .add_property("slots",              make_function(
                                                     HullSlots,
@@ -725,19 +725,19 @@ namespace FreeOrionPython {
             .add_property("type",                           &Planet::Type)
             .add_property("originalType",                   &Planet::OriginalType)
             .add_property("distanceFromOriginalType",       &Planet::DistanceFromOriginalType)
-            .def("environmentForSpecies",                   +[](const Planet& planet, const std::string& species) { return planet.EnvironmentForSpecies(ScriptingContext{}, species); })
+            .def("environmentForSpecies",                   +[](const Planet& planet, const std::string& species) { return planet.EnvironmentForSpecies(GetSpeciesManager(), species); })
             .def("nextBetterPlanetTypeForSpecies",          &Planet::NextBetterPlanetTypeForSpecies)
             .add_property("clockwiseNextPlanetType",        &Planet::ClockwiseNextPlanetType)
             .add_property("counterClockwiseNextPlanetType", &Planet::CounterClockwiseNextPlanetType)
             .add_property("nextLargerPlanetSize",           &Planet::NextLargerPlanetSize)
             .add_property("nextSmallerPlanetSize",          &Planet::NextSmallerPlanetSize)
-            .add_property("OrbitalPeriod",                  &Planet::OrbitalPeriod)
-            .add_property("InitialOrbitalPosition",         &Planet::InitialOrbitalPosition)
             .def("OrbitalPositionOnTurn",                   &Planet::OrbitalPositionOnTurn)
-            .add_property("RotationalPeriod",               &Planet::RotationalPeriod)
-            .add_property("LastTurnAttackedByShip",         &Planet::LastTurnAttackedByShip)
-            .add_property("LastTurnColonized",              &Planet::LastTurnColonized)
-            .add_property("LastTurnConquered",              &Planet::LastTurnConquered)
+            .add_property("lastTurnAttackedByShip",         &Planet::LastTurnAttackedByShip)
+            .add_property("lastTurnColonized",              &Planet::LastTurnColonized)
+            .add_property("lastTurnConquered",              &Planet::LastTurnConquered)
+            .add_property("ownerBeforeLastConquered",       &Planet::OwnerBeforeLastConquered)
+            .add_property("lastInvadedByEmpire",            &Planet::LastInvadedByEmpire)
+            .add_property("lastColonizedByEmpire",          &Planet::LastColonizedByEmpire)
             .add_property("buildingIDs",                    +[](const Planet& planet) { return ToVec(planet.BuildingIDs()); })
             .add_property("habitableSize",                  &Planet::HabitableSize)
         ;
@@ -747,16 +747,15 @@ namespace FreeOrionPython {
         //////////////////
         py::class_<System, py::bases<UniverseObject>, boost::noncopyable>("system", py::no_init)
             .add_property("starType",           &System::GetStarType)
-            .add_property("numStarlanes",       &System::NumStarlanes)
-            .add_property("numWormholes",       &System::NumWormholes, "Currently unused.")
-            .def("HasStarlaneToSystemID",       &System::HasStarlaneTo)
-            .def("HasWormholeToSystemID",       &System::HasWormholeTo, "Currently unused.")
-            .add_property("starlanesWormholes", make_function(&System::StarlanesWormholes,  py::return_value_policy<py::return_by_value>()), "Currently unused.")
-            .add_property("planetIDs",          +[](const System& system) { return ToVec(system.PlanetIDs()); })
-            .add_property("buildingIDs",        +[](const System& system) { return ToVec(system.BuildingIDs()); })
-            .add_property("fleetIDs",           +[](const System& system) { return ToVec(system.FleetIDs()); })
-            .add_property("shipIDs",            +[](const System& system) { return ToVec(system.ShipIDs()); })
-            .add_property("fieldIDs",           +[](const System& system) { return ToVec(system.FieldIDs()); })
+            .add_property("numStarlanes",       &System::NumStarlanes, "Number of starlanes connecting to this sytsem")
+            .def("HasStarlaneToSystemID",       &System::HasStarlaneTo, "true if the passed in ID (int) is the ID of a system this system has a starlane connection with")
+            .add_property("starlanesWormholes", +[](const System& system) { return ToVec(system.Starlanes()); }, "[deprecated] use starlanes")
+            .add_property("starlanes",          +[](const System& system) { return ToVec(system.Starlanes()); }, "IDs of systems to which this system has starlane connections")
+            .add_property("planetIDs",          +[](const System& system) { return ToVec(system.PlanetIDs()); }, "IDs of planets in this system")
+            .add_property("buildingIDs",        +[](const System& system) { return ToVec(system.BuildingIDs()); }, "IDs of buildings in this system")
+            .add_property("fleetIDs",           +[](const System& system) { return ToVec(system.FleetIDs()); }, "IDs of fleets in this system")
+            .add_property("shipIDs",            +[](const System& system) { return ToVec(system.ShipIDs()); }, "IDs of ships in this system")
+            .add_property("fieldIDs",           +[](const System& system) { return ToVec(system.FieldIDs()); }, "IDs of fields in this system. Other fields may enclose this system but not be contained within this system.")
             .add_property("lastTurnBattleHere", &System::LastTurnBattleHere)
         ;
 
@@ -802,7 +801,7 @@ namespace FreeOrionPython {
         py::class_<Species, boost::noncopyable>("species", py::no_init)
             .add_property("name",               make_function(&Species::Name,           py::return_value_policy<py::copy_const_reference>()))
             .add_property("description",        make_function(&Species::Description,    py::return_value_policy<py::copy_const_reference>()))
-            .add_property("homeworlds",         &SpeciesHomeworlds)
+            .add_property("homeworlds",         &SpeciesHomeworlds) // TODO: SpeciesManager::SpeciesShipsDestroyed, GetSpeciesEmpireOpinionsMap, GetSpeciesSpeciesOpinionsMap
             .add_property("foci",               &SpeciesFoci)
             .add_property("preferredFocus",     make_function(&Species::DefaultFocus,   py::return_value_policy<py::copy_const_reference>()))
             .add_property("canColonize",        make_function(&Species::CanColonize,    py::return_value_policy<py::return_by_value>()))

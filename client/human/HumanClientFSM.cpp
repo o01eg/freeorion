@@ -213,15 +213,15 @@ boost::statechart::result WaitingForSPHostAck::react(const Disconnection& d) {
 
 boost::statechart::result WaitingForSPHostAck::react(const Error& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) WaitingForSPHostAck.Error";
-    std::string problem;
+    std::string problem_key, unlocalized_info;
     bool fatal = false;
     try {
         int player_id = Networking::INVALID_PLAYER_ID;
-        ExtractErrorMessageData(msg.m_message, player_id, problem, fatal);
+        ExtractErrorMessageData(msg.m_message, player_id, problem_key, unlocalized_info, fatal);
     } catch (...) {
-        problem = UserString("UNKNOWN");
+        problem_key = UserString("UNKNOWN");
     }
-    ErrorLogger(FSM) << "WaitingForSPHostAck::react(const Error& msg) error: " << problem;
+    ErrorLogger(FSM) << "WaitingForSPHostAck::react(const Error& msg) error: " << problem_key;
 
     //Note: transit<> frees this pointer so Client() must be called before.
     GGHumanClientApp& client = Client();
@@ -230,8 +230,8 @@ boost::statechart::result WaitingForSPHostAck::react(const Error& msg) {
     auto retval = discard_event();
     if (fatal) {
         client.ResetToIntro(true);
-        ClientUI::MessageBox(UserString(problem), true);
-        client.GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO") + "\n");
+        ClientUI::MessageBox(UserString(problem_key), true);
+        client.GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO"));
     }
     return retval;
 }
@@ -239,7 +239,7 @@ boost::statechart::result WaitingForSPHostAck::react(const Error& msg) {
 boost::statechart::result WaitingForSPHostAck::react(const StartQuittingGame& e) {
     TraceLogger(FSM) << "(HumanClientFSM) Quit or reset to main menu.";
 
-    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO") + "\n");
+    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO"));
 
     post_event(e);
     return transit<QuittingGame>();
@@ -295,15 +295,15 @@ boost::statechart::result WaitingForMPHostAck::react(const Disconnection& d) {
 
 boost::statechart::result WaitingForMPHostAck::react(const Error& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) WaitingForMPHostAck.Error";
-    std::string problem;
+    std::string problem_key, unlocalized_info;
     bool fatal = false;
     try {
         int player_id = Networking::INVALID_PLAYER_ID;
-        ExtractErrorMessageData(msg.m_message, player_id, problem, fatal);
+        ExtractErrorMessageData(msg.m_message, player_id, problem_key, unlocalized_info, fatal);
     } catch (...) {
-        problem = UserString("UNKNOWN");
+        problem_key = UserString("UNKNOWN");
     }
-    ErrorLogger(FSM) << "WaitingForMPHostAck::react(const Error& msg) error: " << problem;
+    ErrorLogger(FSM) << "WaitingForMPHostAck::react(const Error& msg) error: " << problem_key;
 
     //Note: transit<> frees this pointer so Client() must be called before.
     GGHumanClientApp& client = Client();
@@ -312,8 +312,8 @@ boost::statechart::result WaitingForMPHostAck::react(const Error& msg) {
     auto retval = discard_event();
     if (fatal) {
         client.ResetToIntro(true);
-        ClientUI::MessageBox(UserString(problem), true);
-        client.GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO") + "\n");
+        ClientUI::MessageBox(UserString(problem_key), true);
+        client.GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO"));
     }
     return retval;
 }
@@ -321,7 +321,7 @@ boost::statechart::result WaitingForMPHostAck::react(const Error& msg) {
 boost::statechart::result WaitingForMPHostAck::react(const StartQuittingGame& e) {
     TraceLogger(FSM) << "(HumanClientFSM) Quit or reset to main menu.";
 
-    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO") + "\n");
+    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO"));
 
     post_event(e);
     return transit<QuittingGame>();
@@ -408,15 +408,15 @@ boost::statechart::result WaitingForMPJoinAck::react(const Disconnection& d) {
 
 boost::statechart::result WaitingForMPJoinAck::react(const Error& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) WaitingForMPJoinAck.Error";
-    std::string problem;
+    std::string problem_key, unlocalized_info;
     bool fatal = false;
     try {
         int player_id = Networking::INVALID_PLAYER_ID;
-        ExtractErrorMessageData(msg.m_message, player_id, problem, fatal);
+        ExtractErrorMessageData(msg.m_message, player_id, problem_key, unlocalized_info, fatal);
     } catch (...) {
-        problem = UserString("UNKNOWN");
+        problem_key = UserString("UNKNOWN");
     }
-    ErrorLogger(FSM) << "WaitingForMPJoinAck::react(const Error& msg) error: " << problem;
+    ErrorLogger(FSM) << "WaitingForMPJoinAck::react(const Error& msg) error: " << problem_key;
 
     //Note: transit<> frees this pointer so Client() must be called before.
     GGHumanClientApp& client = Client();
@@ -425,8 +425,8 @@ boost::statechart::result WaitingForMPJoinAck::react(const Error& msg) {
     auto retval = discard_event();
     if (fatal) {
         client.ResetToIntro(true);
-        ClientUI::MessageBox(UserString(problem), true);
-        client.GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO") + "\n");
+        ClientUI::MessageBox(UserString(problem_key), true);
+        client.GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO"));
     }
 
     return retval;
@@ -435,7 +435,7 @@ boost::statechart::result WaitingForMPJoinAck::react(const Error& msg) {
 boost::statechart::result WaitingForMPJoinAck::react(const StartQuittingGame& e) {
     TraceLogger(FSM) << "(HumanClientFSM) Quit or reset to main menu.";
 
-    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO") + "\n");
+    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO"));
 
     post_event(e);
     return transit<QuittingGame>();
@@ -560,15 +560,15 @@ boost::statechart::result MPLobby::react(const GameStart& msg) {
 
 boost::statechart::result MPLobby::react(const Error& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) MPLobby.Error";
-    std::string problem;
+    std::string problem_key, unlocalized_info;
     bool fatal = false;
     int player_id = Networking::INVALID_PLAYER_ID;
     try {
-        ExtractErrorMessageData(msg.m_message, player_id, problem, fatal);
+        ExtractErrorMessageData(msg.m_message, player_id, problem_key, unlocalized_info, fatal);
     } catch (...) {
-        problem = UserString("UNKNOWN");
+        problem_key = UserString("UNKNOWN");
     }
-    ErrorLogger(FSM) << "MPLobby::react(const Error& msg) error: " << problem;
+    ErrorLogger(FSM) << "MPLobby::react(const Error& msg) error: " << problem_key;
 
     //Note: transit<> frees this pointer so Client() must be called before.
     GGHumanClientApp& client = Client();
@@ -577,7 +577,7 @@ boost::statechart::result MPLobby::react(const Error& msg) {
     auto retval = discard_event();
     if (fatal) {
         client.ResetToIntro(true);
-        ClientUI::MessageBox(UserString(problem), true);
+        ClientUI::MessageBox(UserString(problem_key), true);
     }
 
     return retval;
@@ -586,7 +586,7 @@ boost::statechart::result MPLobby::react(const Error& msg) {
 boost::statechart::result MPLobby::react(const StartQuittingGame& e) {
     TraceLogger(FSM) << "(HumanClientFSM) Quit or reset to main menu.";
 
-    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO") + "\n");
+    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO"));
 
     post_event(e);
     return transit<QuittingGame>();
@@ -608,11 +608,12 @@ boost::statechart::result MPLobby::react(const ChatHistory& msg) {
         ExtractChatHistoryMessage(msg.m_message, chat_history);
     } catch (...) {}
 
-    const auto& wnd = Client().GetClientUI().GetMultiPlayerLobbyWnd();
+    auto& cui = Client().GetClientUI();
+    const auto& wnd = cui.GetMultiPlayerLobbyWnd();
     for (const auto& elem : chat_history)
         wnd->ChatMessage(elem.text,
                          elem.player_name,
-                         elem.player_name.empty() ? Client().GetClientUI().TextColor() : elem.text_color,
+                         elem.player_name.empty() ? cui.TextColor() : elem.text_color,
                          elem.timestamp);
 
     return discard_event();
@@ -694,13 +695,14 @@ boost::statechart::result PlayingGame::react(const PlayerChat& msg) {
     } catch (...) {}
 
     std::string player_name{UserString("PLAYER") + " " + std::to_string(sending_player_id)};
-    GG::Clr text_color{Client().GetClientUI().TextColor()};
+    auto& cui = Client().GetClientUI();
+    GG::Clr text_color{cui.TextColor()};
     if (sending_player_id != Networking::INVALID_PLAYER_ID) {
-        auto& players = Client().Players();
-        auto player_it = players.find(sending_player_id);
+        const auto& players = Client().Players();
+        const auto player_it = players.find(sending_player_id);
         if (player_it != players.end()) {
             player_name = player_it->second.name;
-            if (auto empire = Client().GetEmpire(player_it->second.empire_id))
+            if (const auto* empire = Client().GetEmpire(player_it->second.empire_id))
                 text_color = empire->Color();
         }
     } else {
@@ -708,7 +710,7 @@ boost::statechart::result PlayingGame::react(const PlayerChat& msg) {
         player_name.clear();
     }
 
-    Client().GetClientUI().GetMessageWnd()->HandlePlayerChatMessage(text, player_name, text_color, timestamp, Client().PlayerID(), pm);
+    cui.GetMessageWnd()->HandlePlayerChatMessage(text, player_name, text_color, timestamp, Client().PlayerID(), pm);
 
     return discard_event();
 }
@@ -793,7 +795,7 @@ boost::statechart::result PlayingGame::react(const EndGame& msg) {
 boost::statechart::result PlayingGame::react(const StartQuittingGame& e) {
     TraceLogger(FSM) << "(HumanClientFSM) Quit or reset to main menu.";
 
-    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO") + "\n");
+    Client().GetClientUI().GetMessageWnd()->HandleGameStatusUpdate(UserString("RETURN_TO_INTRO"));
 
     post_event(e);
     return transit<QuittingGame>();
@@ -801,16 +803,16 @@ boost::statechart::result PlayingGame::react(const StartQuittingGame& e) {
 
 boost::statechart::result PlayingGame::react(const Error& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) PlayingGame.Error";
-    std::string problem;
+    std::string problem_key, unlocalized_info;
     bool fatal = false;
     try {
         int player_id = Networking::INVALID_PLAYER_ID;
-        ExtractErrorMessageData(msg.m_message, player_id, problem, fatal);
+        ExtractErrorMessageData(msg.m_message, player_id, problem_key, unlocalized_info, fatal);
     } catch (...) {
-        problem = UserString("UNKNOWN");
+        problem_key = UserString("UNKNOWN");
     }
     ErrorLogger(FSM) << "PlayingGame::react(const Error& msg) error: "
-                     << problem << "\nProblem is" << (fatal ? "fatal" : "non-fatal");
+                     << problem_key << "\nProblem is" << (fatal ? "fatal" : "non-fatal");
 
     //Note: transit<> frees this pointer so Client() must be called before.
     GGHumanClientApp& client = Client();
@@ -825,7 +827,7 @@ boost::statechart::result PlayingGame::react(const Error& msg) {
     if (fatal)
         client.ResetToIntro(true);
 
-    ClientUI::MessageBox(UserString(problem), fatal);
+    ClientUI::MessageBox(UserString(problem_key), fatal);
 
     return retval;
 }
@@ -846,7 +848,7 @@ boost::statechart::result PlayingGame::react(const TurnPartialUpdate& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) PlayingGame.TurnPartialUpdate";
 
     try {
-        ExtractTurnPartialUpdateMessageData(msg.m_message,   Client().EmpireID(),    GetUniverse());
+        ExtractTurnPartialUpdateMessageData(msg.m_message, Client().EmpireID(), Client().GetUniverse());
         Client().GetClientUI().GetMapWnd()->MidTurnUpdate();
     } catch (...) {}
 
@@ -945,8 +947,7 @@ boost::statechart::result WaitingForGameStart::react(const GameStart& msg) {
 
         try {
             using GSDUN = GameStartDataUnpackedNotification;
-            auto unpacked_data = std::make_shared<GSDUN::UnpackedData>(
-                std::move(message));
+            auto unpacked_data = std::make_shared<GSDUN::UnpackedData>(std::move(message));
             auto unpacking_finished_event = boost::intrusive_ptr<const GSDUN>(new GSDUN(unpacked_data), true);
 
             unpacked_data->universe.InitializeSystemGraph(unpacked_data->empires,
@@ -960,7 +961,7 @@ boost::statechart::result WaitingForGameStart::react(const GameStart& msg) {
 
         } catch (const std::exception& e) {
             ErrorLogger(FSM) << "WaitingForGameStart::react(const GameStart& msg) unpacking failed: " << e.what();
-            client.GetClientUI().GetMessageWnd()->HandleLogMessage(UserString("ERROR_PROCESSING_SERVER_MESSAGE") + "\n");
+            client.GetClientUI().GetMessageWnd()->HandleLogMessage(UserString("ERROR_PROCESSING_SERVER_MESSAGE"));
             boost::intrusive_ptr<const UnpackFailedNotification> unpacking_failed_event{
                 new UnpackFailedNotification(), true};
             client.PostDeferredEvent(std::move(unpacking_failed_event));
@@ -1091,7 +1092,7 @@ boost::statechart::result WaitingForTurnData::react(const TurnUpdate& msg) {
 
         } catch (const std::exception& e) {
             ErrorLogger(FSM) << "WaitingForTurnData::react(const TurnUpdate& msg) unpacking failed: " << e.what();
-            client.GetClientUI().GetMessageWnd()->HandleLogMessage(UserString("ERROR_PROCESSING_SERVER_MESSAGE") + "\n");
+            client.GetClientUI().GetMessageWnd()->HandleLogMessage(UserString("ERROR_PROCESSING_SERVER_MESSAGE"));
             boost::intrusive_ptr<const UnpackFailedNotification> unpacking_failed_event{
                 new UnpackFailedNotification(), true};
             client.PostDeferredEvent(std::move(unpacking_failed_event));
@@ -1238,7 +1239,7 @@ boost::statechart::result PlayingTurn::react(const AdvanceTurn& d) {
 boost::statechart::result PlayingTurn::react(const TurnUpdate& msg) {
     TraceLogger(FSM) << "(HumanClientFSM) PlayingTurn.TurnUpdate";
 
-     Client().GetClientUI().GetMessageWnd()->HandleLogMessage(UserString("ERROR_EARLY_TURN_UPDATE") + "\n");
+     Client().GetClientUI().GetMessageWnd()->HandleLogMessage(UserString("ERROR_EARLY_TURN_UPDATE"));
 
     // need to re-post the game start message to be re-handled after
     // transitioning into WaitingForTurnData
@@ -1267,8 +1268,7 @@ boost::statechart::result PlayingTurn::react(const PlayerStatus& msg) {
     {
         // check status of all empires: are they all done their turns?
         bool all_participants_waiting = true;
-        for ([[maybe_unused]] auto& [ignored_id, empire] : Client().Empires()) {
-            (void)ignored_id;   // quiet unused variable warning
+        for (const auto& empire : Client().Empires() | range_values) { // TODO: could use any_of
             if (!empire->Ready()) {
                 all_participants_waiting = false;
                 break;

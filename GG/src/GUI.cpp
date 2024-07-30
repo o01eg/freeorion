@@ -79,7 +79,7 @@ void WriteWndToPNG(const Wnd* wnd, const std::string& filename)
     const Pt ul = wnd->UpperLeft();
     const Pt size = wnd->Size();
 
-    std::vector<GLubyte> bytes(Value(size.x) * Value(size.y) * 4);
+    std::vector<GLubyte> bytes(static_cast<std::size_t>(Value(size.x) * Value(size.y) * 4));
 
     glFinish();
 
@@ -108,7 +108,7 @@ void WriteWndToPNG(const Wnd* wnd, const std::string& filename)
             gil::interleaved_view(
                 Value(size.x),
                 Value(size.y),
-                static_cast<gil::rgba8_pixel_t*>(static_cast<void*>(&bytes[0])),
+                static_cast<gil::rgba8_pixel_t*>(static_cast<void*>(bytes.data())),
                 Value(size.x) * sizeof(gil::rgba8_pixel_t))),
         gil::png_tag());
 #endif
@@ -120,16 +120,16 @@ void WriteWndToPNG(const Wnd* wnd, const std::string& filename)
 // implementation data types
 struct GG::GUIImpl
 {
-    GUIImpl();
+    explicit GUIImpl(std::string app_name);
 
     void HandleMouseButtonPress(  unsigned int mouse_button, Pt pos, int curr_ticks);
     void HandleMouseDrag(         unsigned int mouse_button, Pt pos, int curr_ticks);
     void HandleMouseButtonRelease(unsigned int mouse_button, Pt pos, int curr_ticks);
     void HandleIdle(              Flags<ModKey> mod_keys, Pt pos, int curr_ticks);
 
-    void HandleKeyPress(          Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys, int curr_ticks);
+    void HandleKeyPress(          Key key, uint32_t key_code_point, Flags<ModKey> mod_keys, int curr_ticks);
 
-    void HandleKeyRelease(        Key key, std::uint32_t key_code_point, Flags<ModKey> mod_keys, int curr_ticks);
+    void HandleKeyRelease(        Key key, uint32_t key_code_point, Flags<ModKey> mod_keys, int curr_ticks);
 
     void HandleTextInput(         std::string text);
     void HandleMouseMove(         Flags<ModKey> mod_keys, Pt pos, Pt rel, int curr_ticks);
@@ -161,7 +161,7 @@ struct GG::GUIImpl
     int          m_key_press_repeat_interval = 66;
     int          m_last_key_press_repeat_time = 0;          // last time of a simulated key press message
 
-    std::pair<Key, std::uint32_t> m_last_pressed_key_code_point{Key::GGK_NONE, 0u};
+    std::pair<Key, uint32_t> m_last_pressed_key_code_point{Key::GGK_NONE, 0u};
 
     int          m_prev_key_press_time = -1;                // the time of the most recent key press
 
@@ -237,10 +237,11 @@ struct GG::GUIImpl
     std::string m_clipboard_text;
 };
 
-GUIImpl::GUIImpl() :
+GUIImpl::GUIImpl(std::string app_name) :
+    m_app_name(std::move(app_name)),
     m_last_FPS_time(std::chrono::high_resolution_clock::now()),
     m_last_frame_time(std::chrono::high_resolution_clock::now()),
-    m_style_factory(new StyleFactory())
+    m_style_factory(std::make_shared<StyleFactory>())
 {}
 
 void GUIImpl::HandleMouseButtonPress(unsigned int mouse_button, Pt pos, int curr_ticks)
@@ -627,7 +628,7 @@ void GUIImpl::HandleIdle(Flags<ModKey> mod_keys, const Pt pos, int curr_ticks)
         GUI::s_gui->ProcessBrowseInfo();
 }
 
-void GUIImpl::HandleKeyPress(Key key, std::uint32_t key_code_point,
+void GUIImpl::HandleKeyPress(Key key, uint32_t key_code_point,
                              Flags<ModKey> mod_keys, int curr_ticks)
 {
     m_browse_info_wnd.reset();
@@ -657,7 +658,7 @@ void GUIImpl::HandleKeyPress(Key key, std::uint32_t key_code_point,
             WndEvent::EventType::KeyPress, key, key_code_point, mod_keys));
 }
 
-void GUIImpl::HandleKeyRelease(Key key, std::uint32_t key_code_point,
+void GUIImpl::HandleKeyRelease(Key key, uint32_t key_code_point,
                                Flags<ModKey> mod_keys, int curr_ticks)
 {
     m_last_key_press_repeat_time = 0;
@@ -690,9 +691,9 @@ void GUIImpl::HandleMouseMove(Flags<ModKey> mod_keys, Pt pos, Pt rel,
     m_mouse_pos = pos; // record mouse position
     m_mouse_rel = rel; // record mouse movement
 
-    const auto&& m_drag_wnds_0 = LockAndResetIfExpired(m_drag_wnds[0]);
-    const auto&& m_drag_wnds_1 = LockAndResetIfExpired(m_drag_wnds[1]);
-    const auto&& m_drag_wnds_2 = LockAndResetIfExpired(m_drag_wnds[2]);
+    const auto m_drag_wnds_0 = LockAndResetIfExpired(m_drag_wnds[0]);
+    const auto m_drag_wnds_1 = LockAndResetIfExpired(m_drag_wnds[1]);
+    const auto m_drag_wnds_2 = LockAndResetIfExpired(m_drag_wnds[2]);
     if (m_drag_wnds_0 || m_drag_wnds_1 || m_drag_wnds_2) {
         if (m_drag_wnds_0)
             HandleMouseDrag(0, pos, curr_ticks);
@@ -724,7 +725,7 @@ void GUIImpl::HandleMouseWheel(Flags<ModKey> mod_keys, Pt pos, Pt rel, int curr_
     m_browse_target = nullptr;
     m_prev_wnd_under_cursor_time = curr_ticks;
     // don't send out 0-movement wheel messages
-    if (curr_wnd_under_cursor && rel.y)
+    if (curr_wnd_under_cursor && rel.y != Y0)
         curr_wnd_under_cursor->HandleEvent(WndEvent(
             WndEvent::EventType::MouseWheel, pos, Value(rel.y), mod_keys));
     m_prev_wnd_under_cursor = m_curr_wnd_under_cursor; // update this for the next time around
@@ -836,16 +837,15 @@ GUI* GUI::s_gui = nullptr;
 
 // member functions
 GUI::GUI(std::string app_name) :
-    m_impl(std::make_unique<GUIImpl>())
+    m_impl(std::make_unique<GUIImpl>(std::move(app_name)))
 {
     assert(!s_gui);
     s_gui = this;
-    m_impl->m_app_name = std::move(app_name);
 }
 
 GUI::~GUI()
 {
-    s_gui = nullptr;
+    s_gui = nullptr; // probly optimized away :/
     Wnd::s_default_browse_info_wnd.reset();
 }
 
@@ -1064,9 +1064,9 @@ std::vector<std::pair<StrSize, StrSize>> GUI::FindWordsStringIndices(std::string
         {
             auto word_pos_it = first;
             std::advance(word_pos_it, match_result.position());
-            StrSize start_idx(std::distance(begin, word_pos_it.base()));
+            StrSize start_idx{static_cast<std::size_t>(std::distance(begin, word_pos_it.base()))};
             std::advance(word_pos_it, match_result.length());
-            StrSize end_idx(std::distance(begin, word_pos_it.base()));
+            StrSize end_idx{static_cast<std::size_t>(std::distance(begin, word_pos_it.base()))};
 
             return {start_idx, end_idx};
         });
@@ -1120,9 +1120,9 @@ GUI::const_accel_iterator GUI::accel_end() const
 
 GUI::AcceleratorSignalType& GUI::AcceleratorSignal(Key key, Flags<ModKey> mod_keys) const
 {
-    std::shared_ptr<AcceleratorSignalType>& sig_ptr = m_impl->m_accelerator_sigs[{key, mod_keys}];
+    auto& sig_ptr = m_impl->m_accelerator_sigs[{key, mod_keys}];
     if (!sig_ptr)
-        sig_ptr.reset(new AcceleratorSignalType());
+        sig_ptr = std::make_shared<AcceleratorSignalType>();
     if (INSTRUMENT_ALL_SIGNALS)
         sig_ptr->connect(AcceleratorEcho(key, mod_keys));
     return *sig_ptr;
@@ -1140,7 +1140,7 @@ void GUI::SaveWndAsPNG(const Wnd* wnd, const std::string& filename) const
     m_impl->m_save_as_png_filename = filename;
 }
 
-void GUI::HandleGGEvent(EventType event, Key key, std::uint32_t key_code_point,
+void GUI::HandleGGEvent(EventType event, Key key, uint32_t key_code_point,
                         Flags<ModKey> mod_keys, Pt pos, Pt rel, std::string text)
 {
     m_impl->m_mod_keys = mod_keys;
@@ -1428,10 +1428,10 @@ void GUI::EnableModalAcceleratorSignals(bool allow)
 void GUI::SetMouseLRSwapped(bool swapped)
 { m_impl->m_mouse_lr_swap = swapped; }
 
-std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned int pts)
+std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts)
 { return GetFontManager().GetFont(font_filename, pts); }
 
-std::shared_ptr<Font> GUI::GetFont(const std::string& font_filename, unsigned int pts,
+std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts,
                                    const std::vector<uint8_t>& file_contents)
 { return GetFontManager().GetFont(font_filename, pts, file_contents); }
 
@@ -1448,7 +1448,7 @@ std::shared_ptr<Font> GUI::GetFont(const std::shared_ptr<Font>& font, unsigned i
     return retval;
 }
 
-void GUI::FreeFont(const std::string& font_filename, unsigned int pts)
+void GUI::FreeFont(std::string_view font_filename, unsigned int pts)
 { GetFontManager().FreeFont(font_filename, pts); }
 
 std::shared_ptr<Texture> GUI::StoreTexture(Texture* texture, const std::string& texture_name)
@@ -1467,7 +1467,7 @@ void GUI::SetStyleFactory(const std::shared_ptr<StyleFactory>& factory)
 {
     m_impl->m_style_factory = factory;
     if (!m_impl->m_style_factory)
-        m_impl->m_style_factory.reset(new StyleFactory());
+        m_impl->m_style_factory = std::make_shared<StyleFactory>();
 }
 
 void GUI::RenderCursor(bool render)
@@ -1615,45 +1615,100 @@ void GUI::PreRenderWindow(Wnd* wnd, bool even_if_not_visible)
 void GUI::RenderWindow(const std::shared_ptr<Wnd>& wnd)
 { RenderWindow(wnd.get()); }
 
+namespace {
+    bool WndClippedOut(const Rect clipped_rect, const Wnd* clipped_wnd, const Wnd* clipping_wnd)
+    {
+        const auto client_clipped_out = [clipped_rect](const Wnd* clipping_wnd) noexcept
+        { return !clipping_wnd->InClient(clipped_rect); };
+        const auto wnd_clipped_out = [clipped_rect](const Wnd* clipping_wnd)
+        { return !clipping_wnd->InWindow(clipped_rect); };
+
+        switch (clipping_wnd->GetChildClippingMode()) {
+        case Wnd::ChildClippingMode::DontClip:
+            return false;
+            break;
+        case Wnd::ChildClippingMode::ClipToClient:
+            return client_clipped_out(clipping_wnd);
+            break;
+        case Wnd::ChildClippingMode::ClipToWindow:
+            return wnd_clipped_out(clipping_wnd);
+            break;
+        case Wnd::ChildClippingMode::ClipToClientAndWindowSeparately:
+            return clipped_wnd->NonClientChild() ?
+                wnd_clipped_out(clipping_wnd) : client_clipped_out(clipping_wnd);
+            break;
+        case Wnd::ChildClippingMode::ClipToAncestorClient:
+            return false;
+        }
+        return false;
+    };
+}
+
 void GUI::RenderWindow(Wnd* wnd)
 {
     if (!wnd || !wnd->Visible())
         return;
-
     wnd->Render();
 
-    Wnd::ChildClippingMode clip_mode = wnd->GetChildClippingMode();
+    const auto clip_mode = wnd->GetChildClippingMode();
 
-    if (clip_mode != Wnd::ChildClippingMode::ClipToClientAndWindowSeparately) {
-        bool clip = clip_mode != Wnd::ChildClippingMode::DontClip;
-        if (clip)
-            wnd->BeginClipping();
+    if (clip_mode == Wnd::ChildClippingMode::DontClip) {
+        for (auto& child : wnd->Children())
+            if (child && child->Visible())
+                RenderWindow(child);
+
+    } else if (clip_mode == Wnd::ChildClippingMode::ClipToAncestorClient) {
         for (auto& child_wnd : wnd->Children()) {
-            if (child_wnd && child_wnd->Visible())
-                RenderWindow(child_wnd.get());
+            Wnd* const child  = child_wnd.get();
+            if (child && child->Visible()) {
+                const Rect clipped_rect{child->UpperLeft(), child->LowerRight()};
+                bool clipped_out = false;
+                const Wnd* clipping_wnd = wnd;
+                while (clipping_wnd && !clipped_out) {
+                    if (WndClippedOut(clipped_rect, child, clipping_wnd))
+                        clipped_out = true;
+                    else
+                        clipping_wnd = clipping_wnd->Parent().get();
+                }
+                if (!clipped_out)
+                    RenderWindow(child);
+            }
         }
-        if (clip)
-            wnd->EndClipping();
-    } else {
-        auto children_copy{wnd->Children()};
+
+    } else if (clip_mode != Wnd::ChildClippingMode::ClipToClientAndWindowSeparately) {
+        wnd->BeginClipping();
+        for (auto& child : wnd->Children())
+            if (child && child->Visible())
+                RenderWindow(child);
+        wnd->EndClipping();
+
+    } else { // clip_mode == Wnd::ChildClippingMode::ClipToClientAndWindowSeparately
+        const auto& wnd_children = wnd->Children();
+        std::vector<Wnd*> children;
+        children.reserve(wnd->Children().size());
+        std::transform(wnd_children.begin(), wnd_children.end(), std::back_inserter(children),
+                       [](const auto& child) { return child.get(); });
+
         const auto client_child_begin =
-            std::partition(children_copy.begin(), children_copy.end(),
+            std::partition(children.begin(), children.end(),
                            [](const auto& child) { return child->NonClientChild(); });
 
-        if (children_copy.begin() != client_child_begin) {
+        if (children.begin() != client_child_begin) {
             wnd->BeginNonclientClipping();
-            for (auto it = children_copy.begin(); it != client_child_begin; ++it) {
-                if ((*it) && (*it)->Visible())
-                    RenderWindow(it->get());
+            for (auto it = children.begin(); it != client_child_begin; ++it) {
+                Wnd* const child = *it;
+                if (child && child->Visible())
+                    RenderWindow(child);
             }
             wnd->EndNonclientClipping();
         }
 
-        if (client_child_begin != children_copy.end()) {
+        if (client_child_begin != children.end()) {
             wnd->BeginClipping();
-            for (auto it = client_child_begin; it != children_copy.end(); ++it) {
-                if ((*it) && (*it)->Visible())
-                    RenderWindow(it->get());
+            for (auto it = client_child_begin; it != children.end(); ++it) {
+                Wnd* const child = *it;
+                if (child && child->Visible())
+                    RenderWindow(child);
             }
             wnd->EndClipping();
         }
@@ -1792,7 +1847,7 @@ bool GUI::ProcessBrowseInfoImpl(Wnd* wnd)
                     if (m_impl->m_browse_target != wnd || m_impl->m_browse_info_wnd != it->wnd || m_impl->m_browse_info_mode != static_cast<int>(i)) {
                         m_impl->m_browse_target = wnd;
                         m_impl->m_browse_info_wnd = it->wnd;
-                        m_impl->m_browse_info_mode = i;
+                        m_impl->m_browse_info_mode = static_cast<decltype(m_impl->m_browse_info_mode)>(i);
                         m_impl->m_browse_info_wnd->SetCursorPosition(m_impl->m_mouse_pos);
                     }
                     retval = true;

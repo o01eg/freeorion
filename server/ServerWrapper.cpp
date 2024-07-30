@@ -87,8 +87,8 @@ namespace {
         }
 
         if (empire_id == ALL_EMPIRES) {
-            for (const auto& entry : context.Empires()) {
-                entry.second->AddSitRepEntry(CreateSitRep(
+            for (const auto& empire : context.Empires() | range_values) {
+                empire->AddSitRepEntry(CreateSitRep(
                     template_string, sitrep_turn, icon, params));  // copy params for each...
             }
         } else {
@@ -449,11 +449,11 @@ namespace {
             m_fleet_plan(std::make_shared<FleetPlan>(std::move(fleet_plan)))
         {}
 
-        FleetPlanWrapper(const std::string& fleet_name, const py::list& py_designs) {
+        FleetPlanWrapper(std::string fleet_name, const py::list& py_designs) {
             std::vector<std::string> designs;
             for (int i = 0; i < len(py_designs); i++)
                 designs.push_back(py::extract<std::string>(py_designs[i]));
-            m_fleet_plan = std::make_shared<FleetPlan>(fleet_name, designs, false); // TODO: std::move
+            m_fleet_plan = std::make_shared<FleetPlan>(std::move(fleet_name), designs, false);
         }
 
         // name accessors
@@ -490,7 +490,7 @@ namespace {
             m_monster_fleet_plan(std::make_shared<MonsterFleetPlan>(std::move(monster_fleet_plan)))
         {}
 
-        MonsterFleetPlanWrapper(const std::string& fleet_name, const py::list& py_designs,
+        MonsterFleetPlanWrapper(std::string fleet_name, const py::list& py_designs,
                                 double spawn_rate, int spawn_limit)
         {
             std::vector<std::string> designs;
@@ -498,7 +498,7 @@ namespace {
                 designs.push_back(py::extract<std::string>(py_designs[i]));
 
             m_monster_fleet_plan =
-                std::make_shared<MonsterFleetPlan>(fleet_name, designs, spawn_rate,
+                std::make_shared<MonsterFleetPlan>(std::move(fleet_name), designs, spawn_rate,
                                                    spawn_limit, nullptr, false);
         }
 
@@ -657,7 +657,7 @@ namespace {
     auto GetSystems() -> py::list
     {
         py::list py_systems;
-        for (const auto& system : Objects().all<System>())
+        for (const auto* system : Objects().allRaw<System>())
             py_systems.append(system->ID());
         return py_systems;
     }
@@ -1104,14 +1104,8 @@ namespace {
             return py_starlanes;
         }
         // get list of systems the source system has starlanes to
-        // we actually get a map of ids and a bool indicating if the entry is a starlane (false) or wormhole (true)
-        // iterate over the map we got, only copy starlanes to the python list object we are going to return
-        for (const auto& [lane_to_id, is_wormhole] : system->StarlanesWormholes()) {
-            // if the bool value is false, we have a starlane
-            // in this case copy the destination system id to our starlane list
-            if (!is_wormhole)
-                py_starlanes.append(lane_to_id);
-        }
+        for (const auto lane_to_id : system->Starlanes())
+            py_starlanes.append(lane_to_id);
         return py_starlanes;
     }
 

@@ -25,7 +25,7 @@
 #include "../util/Random.h"
 #include "../util/SitRepEntry.h"
 #include "../util/i18n.h"
-
+#include "../util/ranges.h"
 
 namespace {
     DeclareThreadSafeLogger(effects);
@@ -110,9 +110,7 @@ namespace {
       * with the MoveTo effect, as otherwise the system wouldn't get explored,
       * and objects being moved into unexplored systems might disappear for
       * players or confuse the AI. */
-    void ExploreSystem(int system_id, const UniverseObject* target_object,
-                       ScriptingContext& context)
-    {
+    void ExploreSystem(int system_id, const UniverseObject* target_object, ScriptingContext& context) {
         if (!target_object || target_object->Unowned() || system_id == INVALID_OBJECT_ID)
             return;
         if (auto empire = context.GetEmpire(target_object->Owner()))
@@ -307,6 +305,8 @@ std::string EffectsGroup::Dump(uint8_t ntabs) const {
     if (!m_content_name.empty())
         retval += " // from " + m_content_name;
     retval += "\n";
+    if (!m_description.empty())
+        retval += DumpIndent(ntabs+1) + "description = \"" + m_description + "\"\n";
     retval += DumpIndent(ntabs+1) + "scope =\n";
     retval += m_scope->Dump(ntabs+2);
     if (m_activation) {
@@ -510,7 +510,7 @@ namespace {
         if (!target)
             return {Meter::INVALID_VALUE, m};
 
-        ScriptingContext::CurrentValueVariant cvv{m->Current()};
+        const ScriptingContext::CurrentValueVariant cvv{m->Current()};
         const ScriptingContext target_meter_context{std::forward<C>(context), std::forward<T>(target), cvv};
         return {value_ref->Eval(target_meter_context), m};
     }
@@ -640,7 +640,11 @@ void SetMeter::Execute(ScriptingContext& context,
 }
 
 void SetMeter::Execute(ScriptingContext& context, const TargetSet& targets) const {
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    static constexpr const EffectCause default_effect_cause;
+#else
     static const EffectCause default_effect_cause;
+#endif
     Execute(context, targets, nullptr, default_effect_cause);
 }
 
@@ -1153,9 +1157,9 @@ void SetEmpireMeter::Execute(ScriptingContext& context, const TargetSet& targets
             meter->SetCurrent(new_val);
 
     } else if (m_value->SimpleIncrement()) {
-        auto op_ref = static_cast<ValueRef::Operation<double>*>(m_value.get());
-        auto op_type = op_ref->GetOpType();
-        auto rhs = op_ref->RHS()->Eval(context);
+        const auto op_ref = static_cast<ValueRef::Operation<double>*>(m_value.get());
+        const auto op_type = op_ref->GetOpType();
+        const auto rhs = op_ref->RHS()->Eval(context);
         [[maybe_unused]] auto lhs_ref = op_ref->LHS();
         assert(lhs_ref && lhs_ref->GetReferenceType() == ValueRef::ReferenceType::EFFECT_TARGET_VALUE_REFERENCE);
 
@@ -1204,7 +1208,7 @@ uint32_t SetEmpireMeter::GetCheckSum() const {
 }
 
 std::unique_ptr<Effect> SetEmpireMeter::Clone() const {
-    auto meter = m_meter;
+    auto meter{m_meter};
     return std::make_unique<SetEmpireMeter>(ValueRef::CloneUnique(m_empire_id),
                                             meter,
                                             ValueRef::CloneUnique(m_value));
@@ -1256,8 +1260,8 @@ void SetEmpireStockpile::Execute(ScriptingContext& context) const {
         return;
     }
 
-    ScriptingContext::CurrentValueVariant cvv{empire->ResourceStockpile(m_stockpile)};
-    ScriptingContext stockpile_context{context, cvv};
+    const ScriptingContext::CurrentValueVariant cvv{empire->ResourceStockpile(m_stockpile)};
+    const ScriptingContext stockpile_context{context, cvv};
     empire->SetResourceStockpile(m_stockpile, m_value->Eval(stockpile_context));
 }
 
@@ -1369,9 +1373,9 @@ void SetPlanetType::Execute(ScriptingContext& context) const {
         return;
     auto p = static_cast<Planet*>(context.effect_target);
 
-    ScriptingContext::CurrentValueVariant cvv{p->Type()};
-    ScriptingContext type_context{context, cvv};
-    PlanetType type = m_type->Eval(type_context);
+    const ScriptingContext::CurrentValueVariant cvv{p->Type()};
+    const ScriptingContext type_context{context, cvv};
+    const PlanetType type = m_type->Eval(type_context);
     p->SetType(type);
 
     if (type == PlanetType::PT_ASTEROIDS)
@@ -1418,8 +1422,8 @@ void SetOriginalType::Execute(ScriptingContext& context) const {
         return;
     auto p = static_cast<Planet*>(context.effect_target);
 
-    ScriptingContext::CurrentValueVariant cvv{p->OriginalType()};
-    ScriptingContext type_context{context, cvv};
+    const ScriptingContext::CurrentValueVariant cvv{p->OriginalType()};
+    const ScriptingContext type_context{context, cvv};
     PlanetType type = m_type->Eval(type_context);
     p->SetOriginalType(type);
 
@@ -1467,8 +1471,8 @@ void SetPlanetSize::Execute(ScriptingContext& context) const {
         return;
     auto p = static_cast<Planet*>(context.effect_target);
 
-    ScriptingContext::CurrentValueVariant cvv{p->Size()};
-    ScriptingContext size_context{context, cvv};
+    const ScriptingContext::CurrentValueVariant cvv{p->Size()};
+    const ScriptingContext size_context{context, cvv};
     PlanetSize size = m_size->Eval(size_context);
     p->SetSize(size);
 
@@ -1503,6 +1507,52 @@ std::unique_ptr<Effect> SetPlanetSize::Clone() const
 
 
 ///////////////////////////////////////////////////////////
+// SetFocus                                            //
+///////////////////////////////////////////////////////////
+SetFocus::SetFocus(std::unique_ptr<ValueRef::ValueRef<std::string>>&& focus) :
+    m_focus_name(std::move(focus))
+{}
+
+void SetFocus::Execute(ScriptingContext& context) const {
+    if (!context.effect_target || !m_focus_name ||
+        context.effect_target->ObjectType() != UniverseObjectType::OBJ_PLANET)
+    { return; }
+
+    Planet* const planet = static_cast<Planet*>(context.effect_target);
+
+    const ScriptingContext::CurrentValueVariant cvv{planet->Focus()};
+    const ScriptingContext name_context{context, cvv};
+    auto new_focus = m_focus_name->Eval(name_context);
+    if (new_focus.empty() || new_focus == planet->Focus())
+        return;
+
+    // only change focus if new focus is available
+    if (planet->FocusAvailable(new_focus, context))
+        planet->SetFocus(std::move(new_focus), context);
+}
+
+std::string SetFocus::Dump(uint8_t ntabs) const
+{ return DumpIndent(ntabs) + "SetFocus name = " + m_focus_name->Dump(ntabs) + "\n"; }
+
+void SetFocus::SetTopLevelContent(const std::string& content_name) {
+    if (m_focus_name)
+        m_focus_name->SetTopLevelContent(content_name);
+}
+
+uint32_t SetFocus::GetCheckSum() const {
+    uint32_t retval{0};
+
+    CheckSums::CheckSumCombine(retval, "SetFocus");
+    CheckSums::CheckSumCombine(retval, m_focus_name);
+
+    TraceLogger(effects) << "GetCheckSum(SetFocus): retval: " << retval;
+    return retval;
+}
+
+std::unique_ptr<Effect> SetFocus::Clone() const
+{ return std::make_unique<SetFocus>(ValueRef::CloneUnique(m_focus_name)); }
+
+///////////////////////////////////////////////////////////
 // SetSpecies                                            //
 ///////////////////////////////////////////////////////////
 SetSpecies::SetSpecies(std::unique_ptr<ValueRef::ValueRef<std::string>>&& species) :
@@ -1515,17 +1565,19 @@ void SetSpecies::Execute(ScriptingContext& context) const {
 
     if (context.effect_target->ObjectType() == UniverseObjectType::OBJ_SHIP) {
         auto ship = static_cast<Ship*>(context.effect_target);
-        ScriptingContext::CurrentValueVariant cvv{ship->SpeciesName()};
-        ScriptingContext name_context{context, cvv};
+        const ScriptingContext::CurrentValueVariant cvv{ship->SpeciesName()};
+        const ScriptingContext name_context{context, cvv};
         ship->SetSpecies(m_species_name->Eval(name_context), context.species);
         return;
 
     } else if (context.effect_target->ObjectType() == UniverseObjectType::OBJ_PLANET) {
         auto planet = static_cast<Planet*>(context.effect_target);
 
-        ScriptingContext::CurrentValueVariant cvv{planet->SpeciesName()};
-        ScriptingContext name_context{context, cvv};
+        const ScriptingContext::CurrentValueVariant cvv{planet->SpeciesName()};
+        const ScriptingContext name_context{context, cvv};
         planet->SetSpecies(m_species_name->Eval(name_context), context.current_turn, context.species);
+        if (!planet->SpeciesName().empty())
+            planet->SetLastColonizedByEmpire(planet->Owner());
 
         // ensure non-empty and permissible focus setting for new species
         auto& initial_focus = planet->Focus();
@@ -1589,7 +1641,7 @@ void SetOwner::Execute(ScriptingContext& context) const {
         return;
     int initial_owner = context.effect_target->Owner();
 
-    ScriptingContext owner_context{context, ScriptingContext::CurrentValueVariant{initial_owner}};
+    const ScriptingContext owner_context{context, ScriptingContext::CurrentValueVariant{initial_owner}};
     int empire_id = m_empire_id->Eval(owner_context);
     if (initial_owner == empire_id)
         return;
@@ -1661,11 +1713,12 @@ std::unique_ptr<Effect> SetOwner::Clone() const
 SetSpeciesEmpireOpinion::SetSpeciesEmpireOpinion(
     std::unique_ptr<ValueRef::ValueRef<std::string>>&& species_name,
     std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
-    std::unique_ptr<ValueRef::ValueRef<double>>&& opinion
-) :
+    std::unique_ptr<ValueRef::ValueRef<double>>&& opinion,
+    bool target_opinion) :
     m_species_name(std::move(species_name)),
     m_empire_id(std::move(empire_id)),
-    m_opinion(std::move(opinion))
+    m_opinion(std::move(opinion)),
+    m_target(target_opinion)
 {}
 
 void SetSpeciesEmpireOpinion::Execute(ScriptingContext& context) const {
@@ -1674,7 +1727,7 @@ void SetSpeciesEmpireOpinion::Execute(ScriptingContext& context) const {
     if (!m_species_name || !m_opinion || !m_empire_id)
         return;
 
-    int empire_id = m_empire_id->Eval(context);
+    const int empire_id = m_empire_id->Eval(context);
     if (empire_id == ALL_EMPIRES)
         return;
 
@@ -1682,16 +1735,19 @@ void SetSpeciesEmpireOpinion::Execute(ScriptingContext& context) const {
     if (species_name.empty())
         return;
 
-    double initial_opinion = context.species.SpeciesEmpireOpinion(species_name, empire_id);
-    ScriptingContext::CurrentValueVariant cvv{initial_opinion};
-    ScriptingContext opinion_context{context, cvv};
-    float opinion = static_cast<float>(m_opinion->Eval(opinion_context));
+    double previous_value_opinion = context.species.SpeciesEmpireOpinion(species_name, empire_id, m_target, true);
+    const ScriptingContext::CurrentValueVariant cvv{previous_value_opinion};
+    const ScriptingContext opinion_context{context, cvv};
+    float new_value_opinion = static_cast<float>(m_opinion->Eval(opinion_context));
 
-    context.species.SetSpeciesEmpireOpinion(species_name, empire_id, opinion);
+    TraceLogger(effects) << "SetSpeciesEmpire" << (m_target ? "Target" : "") << "Opinion "
+                         << " initially: " << previous_value_opinion << " new: " << new_value_opinion;
+
+    context.species.SetSpeciesEmpireOpinion(species_name, empire_id, new_value_opinion, m_target);
 }
 
 std::string SetSpeciesEmpireOpinion::Dump(uint8_t ntabs) const
-{ return DumpIndent(ntabs) + "SetSpeciesEmpireOpinion empire = " + m_empire_id->Dump(ntabs) + "\n"; }
+{ return DumpIndent(ntabs) + "SetSpeciesEmpireOpinion empire = " + m_empire_id->Dump(ntabs) + "\n"; } // TODO: complete this
 
 void SetSpeciesEmpireOpinion::SetTopLevelContent(const std::string& content_name) {
     if (m_empire_id)
@@ -1709,6 +1765,7 @@ uint32_t SetSpeciesEmpireOpinion::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_species_name);
     CheckSums::CheckSumCombine(retval, m_empire_id);
     CheckSums::CheckSumCombine(retval, m_opinion);
+    CheckSums::CheckSumCombine(retval, m_target);
 
     TraceLogger(effects) << "GetCheckSum(SetSpeciesEmpireOpinion): retval: " << retval;
     return retval;
@@ -1717,7 +1774,8 @@ uint32_t SetSpeciesEmpireOpinion::GetCheckSum() const {
 std::unique_ptr<Effect> SetSpeciesEmpireOpinion::Clone() const {
     return std::make_unique<SetSpeciesEmpireOpinion>(ValueRef::CloneUnique(m_species_name),
                                                      ValueRef::CloneUnique(m_empire_id),
-                                                     ValueRef::CloneUnique(m_opinion));
+                                                     ValueRef::CloneUnique(m_opinion),
+                                                     m_target);
 }
 
 
@@ -1727,11 +1785,12 @@ std::unique_ptr<Effect> SetSpeciesEmpireOpinion::Clone() const {
 SetSpeciesSpeciesOpinion::SetSpeciesSpeciesOpinion(
     std::unique_ptr<ValueRef::ValueRef<std::string>>&& opinionated_species_name,
     std::unique_ptr<ValueRef::ValueRef<std::string>>&& rated_species_name,
-    std::unique_ptr<ValueRef::ValueRef<double>>&& opinion
-) :
+    std::unique_ptr<ValueRef::ValueRef<double>>&& opinion,
+    bool target_opinion) :
     m_opinionated_species_name(std::move(opinionated_species_name)),
     m_rated_species_name(std::move(rated_species_name)),
-    m_opinion(std::move(opinion))
+    m_opinion(std::move(opinion)),
+    m_target(target_opinion)
 {}
 
 void SetSpeciesSpeciesOpinion::Execute(ScriptingContext& context) const {
@@ -1740,20 +1799,21 @@ void SetSpeciesSpeciesOpinion::Execute(ScriptingContext& context) const {
     if (!m_opinionated_species_name || !m_opinion || !m_rated_species_name)
         return;
 
-    std::string opinionated_species_name = m_opinionated_species_name->Eval(context);
+    const std::string opinionated_species_name = m_opinionated_species_name->Eval(context);
     if (opinionated_species_name.empty())
         return;
 
-    std::string rated_species_name = m_rated_species_name->Eval(context);
+    const std::string rated_species_name = m_rated_species_name->Eval(context);
     if (rated_species_name.empty())
         return;
 
-    float initial_opinion = context.species.SpeciesSpeciesOpinion(opinionated_species_name, rated_species_name);
-    ScriptingContext::CurrentValueVariant cvv{initial_opinion};
-    ScriptingContext opinion_context{context, cvv};
-    float opinion = static_cast<float>(m_opinion->Eval(opinion_context));
+    const float previous_value_opinion = context.species.SpeciesSpeciesOpinion(opinionated_species_name,
+                                                                               rated_species_name, m_target, true);
+    const ScriptingContext::CurrentValueVariant cvv{previous_value_opinion};
+    const ScriptingContext opinion_context{context, cvv};
+    const float new_value_opinion = static_cast<float>(m_opinion->Eval(opinion_context));
 
-    context.species.SetSpeciesSpeciesOpinion(opinionated_species_name, rated_species_name, opinion);
+    context.species.SetSpeciesSpeciesOpinion(opinionated_species_name, rated_species_name, new_value_opinion, m_target);
 }
 
 std::string SetSpeciesSpeciesOpinion::Dump(uint8_t ntabs) const
@@ -1775,6 +1835,7 @@ uint32_t SetSpeciesSpeciesOpinion::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_opinionated_species_name);
     CheckSums::CheckSumCombine(retval, m_rated_species_name);
     CheckSums::CheckSumCombine(retval, m_opinion);
+    CheckSums::CheckSumCombine(retval, m_target);
 
     TraceLogger(effects) << "GetCheckSum(SetSpeciesSpeciesOpinion): retval: " << retval;
     return retval;
@@ -1783,7 +1844,8 @@ uint32_t SetSpeciesSpeciesOpinion::GetCheckSum() const {
 std::unique_ptr<Effect> SetSpeciesSpeciesOpinion::Clone() const {
     return std::make_unique<SetSpeciesSpeciesOpinion>(ValueRef::CloneUnique(m_opinionated_species_name),
                                                       ValueRef::CloneUnique(m_rated_species_name),
-                                                      ValueRef::CloneUnique(m_opinion));
+                                                      ValueRef::CloneUnique(m_opinion),
+                                                      m_target);
 }
 
 
@@ -1819,11 +1881,11 @@ void CreatePlanet::Execute(ScriptingContext& context) const {
         target_type = location_planet->Type();
     }
 
-    ScriptingContext::CurrentValueVariant size_cvv{target_size};
-    ScriptingContext size_context{context, size_cvv};
+    const ScriptingContext::CurrentValueVariant size_cvv{target_size};
+    const ScriptingContext size_context{context, size_cvv};
     PlanetSize size = m_size->Eval(size_context);
-    ScriptingContext::CurrentValueVariant type_cvv{target_type};
-    ScriptingContext type_context{context, type_cvv};
+    const ScriptingContext::CurrentValueVariant type_cvv{target_type};
+    const ScriptingContext type_context{context, type_cvv};
     PlanetType type = m_type->Eval(type_context);
     if (size == PlanetSize::INVALID_PLANET_SIZE || type == PlanetType::INVALID_PLANET_TYPE) {
         ErrorLogger(effects) << "CreatePlanet::Execute got invalid size or type of planet to create...";
@@ -2556,8 +2618,8 @@ void AddSpecial::Execute(ScriptingContext& context) const {
     float initial_capacity = context.effect_target->SpecialCapacity(name);  // returns 0.0f if no such special yet present
     float capacity = initial_capacity;
     if (m_capacity) {
-        ScriptingContext::CurrentValueVariant cvv{capacity};
-        ScriptingContext capacity_context{context, cvv};
+        const ScriptingContext::CurrentValueVariant cvv{capacity};
+        const ScriptingContext capacity_context{context, cvv};
         capacity = static_cast<float>(m_capacity->Eval(capacity_context));
     }
 
@@ -2644,15 +2706,23 @@ AddStarlanes::AddStarlanes(std::unique_ptr<Condition::Condition>&& other_lane_en
     m_other_lane_endpoint_condition(std::move(other_lane_endpoint_condition))
 {}
 
+namespace {
+    constexpr auto not_null = [](const auto* o) -> bool { return o; };
+}
+
 void AddStarlanes::Execute(ScriptingContext& context) const {
+    const auto to_system = [&context](UniverseObject* o) -> System* {
+        if (o->ObjectType() == UniverseObjectType::OBJ_SYSTEM)
+            return static_cast<System*>(o);
+        return context.ContextObjects().getRaw<System>(o->SystemID()); // may be nullptr
+    };
+
     // get target system
     if (!context.effect_target) {
         ErrorLogger(effects) << "AddStarlanes::Execute passed no target object";
         return;
     }
-    auto target_system = dynamic_cast<System*>(context.effect_target);
-    if (!target_system)
-        target_system = context.ContextObjects().getRaw<System>(context.effect_target->SystemID());
+    auto* target_system = to_system(context.effect_target);
     if (!target_system)
         return; // nothing to do!
 
@@ -2667,17 +2737,13 @@ void AddStarlanes::Execute(ScriptingContext& context) const {
     // get systems containing at least one endpoint object
     std::vector<System*> endpoint_systems;
     endpoint_systems.reserve(endpoint_objects.size());
-    for (auto endpoint_object : endpoint_objects) {
-        auto endpoint_system = dynamic_cast<System*>(endpoint_object);
-        if (!endpoint_system)
-            endpoint_system = context.ContextObjects().getRaw<System>(endpoint_object->SystemID());
-        if (!endpoint_system)
-            continue;
-        endpoint_systems.push_back(endpoint_system);
-    }
+    auto end_sys_rng = endpoint_objects | range_filter(not_null)
+        | range_transform(to_system) | range_filter(not_null);
+    range_copy(end_sys_rng, std::back_inserter(endpoint_systems));
+
     // ensure uniqueness of results
     std::sort(endpoint_systems.begin(), endpoint_systems.end());
-    auto it = std::unique(endpoint_systems.begin(), endpoint_systems.end());
+    const auto it = std::unique(endpoint_systems.begin(), endpoint_systems.end());
     endpoint_systems.resize(std::distance(endpoint_systems.begin(), it));
 
     // add starlanes from target to endpoint systems
@@ -2790,8 +2856,8 @@ void SetStarType::Execute(ScriptingContext& context) const {
     }
     if (context.effect_target->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
         auto s = static_cast<System*>(context.effect_target);
-        ScriptingContext::CurrentValueVariant cvv{s->GetStarType()};
-        ScriptingContext type_context{context, cvv};
+        const ScriptingContext::CurrentValueVariant cvv{s->GetStarType()};
+        const ScriptingContext type_context{context, cvv};
         s->SetStarType(m_type->Eval(type_context));
     } else {
         ErrorLogger(effects) << "SetStarType::Execute given a non-system target";
@@ -3168,13 +3234,13 @@ void MoveInOrbit::Execute(ScriptingContext& context) const {
 
     double focus_x = 0.0, focus_y = 0.0, speed = 1.0;
     if (m_focus_x) {
-        ScriptingContext::CurrentValueVariant cvv{target->X()};
-        ScriptingContext x_context{context, cvv};
+        const ScriptingContext::CurrentValueVariant cvv{target->X()};
+        const ScriptingContext x_context{context, cvv};
         focus_x = m_focus_x->Eval(x_context);
     }
     if (m_focus_y) {
-        ScriptingContext::CurrentValueVariant cvv{target->Y()};
-        ScriptingContext y_context{context, cvv};
+        const ScriptingContext::CurrentValueVariant cvv{target->Y()};
+        const ScriptingContext y_context{context, cvv};
         focus_y = m_focus_y->Eval(y_context);
     }
     if (m_speed)
@@ -3326,13 +3392,13 @@ void MoveTowards::Execute(ScriptingContext& context) const {
 
     double dest_x = 0.0, dest_y = 0.0, speed = 1.0;
     if (m_dest_x) {
-        ScriptingContext::CurrentValueVariant cvv{target->X()};
-        ScriptingContext x_context{context, cvv};
+        const ScriptingContext::CurrentValueVariant cvv{target->X()};
+        const ScriptingContext x_context{context, cvv};
         dest_x = m_dest_x->Eval(x_context);
     }
     if (m_dest_y) {
-        ScriptingContext::CurrentValueVariant cvv{target->Y()};
-        ScriptingContext y_context{context, cvv};
+        const ScriptingContext::CurrentValueVariant cvv{target->Y()};
+        const ScriptingContext y_context{context, cvv};
         dest_y = m_dest_y->Eval(y_context);
     }
     if (m_speed)
@@ -3516,9 +3582,8 @@ void SetDestination::Execute(ScriptingContext& context) const {
         return;
 
     // find shortest path for fleet's owner
-    auto [route_list, ignored_length] = context.ContextUniverse().GetPathfinder()->ShortestPath(
-        start_system_id, destination_system_id, target_fleet->Owner(), context.ContextObjects());
-    (void)ignored_length; // suppress ignored variable warning
+    auto route_list = context.ContextUniverse().GetPathfinder()->ShortestPath(
+        start_system_id, destination_system_id, target_fleet->Owner(), context.ContextObjects()).first;
 
     // reject empty move paths (no path exists).
     if (route_list.empty())
@@ -3673,10 +3738,9 @@ void SetEmpireTechProgress::Execute(ScriptingContext& context) const {
         return;
     }
 
-    ScriptingContext::CurrentValueVariant cvv{empire->ResearchProgress(tech_name, context)};
-    ScriptingContext progress_context{context, cvv};
-    empire->SetTechResearchProgress(tech_name, m_research_progress->Eval(progress_context),
-                                    context);
+    const ScriptingContext::CurrentValueVariant cvv{empire->ResearchProgress(tech_name, context)};
+    const ScriptingContext progress_context{context, cvv};
+    empire->SetTechResearchProgress(tech_name, m_research_progress->Eval(progress_context), context);
 }
 
 std::string SetEmpireTechProgress::Dump(uint8_t ntabs) const {
@@ -3726,19 +3790,16 @@ GiveEmpireContent::GiveEmpireContent(std::unique_ptr<ValueRef::ValueRef<std::str
                                      std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id) :
     m_content_name(std::move(content_name)),
     m_unlock_type(unlock_type),
-    m_empire_id(std::move(empire_id))
-{
-    if (!m_empire_id)
-        m_empire_id.reset(new ValueRef::Variable<int>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner"));
-}
+    m_empire_id(empire_id ?
+                    std::move(empire_id) :
+                    std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::EFFECT_TARGET_REFERENCE, "Owner")
+               )
+{}
 
 void GiveEmpireContent::Execute(ScriptingContext& context) const {
-    if (!m_empire_id) return;
+    if (!m_empire_id || !m_content_name) return;
     auto empire = context.GetEmpire(m_empire_id->Eval(context));
     if (!empire) return;
-
-    if (!m_content_name)
-        return;
 
     switch (m_unlock_type) {
     case UnlockableItemType::UIT_BUILDING:  empire->AddBuildingType(m_content_name->Eval(context), context.current_turn); break;
@@ -3858,9 +3919,7 @@ GenerateSitRepMessage::GenerateSitRepMessage(std::string message_string,
 {}
 
 void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
-    int recipient_id = ALL_EMPIRES;
-    if (m_recipient_empire_id)
-        recipient_id = m_recipient_empire_id->Eval(context);
+    const int recipient_id = m_recipient_empire_id ? m_recipient_empire_id->Eval(context) : ALL_EMPIRES;
 
     // track any ship designs used in message, which any recipients must be
     // made aware of so sitrep won't have errors
@@ -3887,6 +3946,10 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
         parameter_tag_values.emplace_back(param_tag, std::move(param_val));
     }
 
+    const auto not_recipient = [recipient_id](const auto empire_id) { return recipient_id != empire_id; };
+    const auto to_id_status = [&context, recipient_id](const auto empire_id)
+    { return std::pair(empire_id, context.ContextDiploStatus(recipient_id, empire_id)); };
+
     // whom to send to?
     std::set<int> recipient_empire_ids;
     switch (m_affiliation) {
@@ -3898,64 +3961,66 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
     }
 
     case EmpireAffiliationType::AFFIL_ALLY: {
-        // add allies of specified empire
-        for ([[maybe_unused]] auto& [empire_id, ignored_empire] : context.Empires()) {
-            (void)ignored_empire; // quiet unused variable warnings
-            if (empire_id == recipient_id || recipient_id == ALL_EMPIRES)
-                continue;
+        static constexpr auto are_allied = [](const auto& id_status)
+        { return id_status.second >= DiplomaticStatus::DIPLO_ALLIED; };
 
-            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id);
-            if (status >= DiplomaticStatus::DIPLO_ALLIED)
-                recipient_empire_ids.insert(empire_id);
+        // add allies of specified empire
+        if (recipient_id != ALL_EMPIRES) {
+            auto allies_rng = context.EmpireIDs() | range_filter(not_recipient)
+                | range_transform(to_id_status) | range_filter(are_allied) | range_keys;
+            recipient_empire_ids.insert(allies_rng.begin(), allies_rng.end());
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_PEACE: {
-        // add empires at peace with the specified empire
-        for ([[maybe_unused]] auto& [empire_id, ignored_empire] : context.Empires()) {
-            (void)ignored_empire;
-            if (empire_id == recipient_id || recipient_id == ALL_EMPIRES)
-                continue;
+        static constexpr auto are_peacy = [](const auto& id_status)
+        { return id_status.second >= DiplomaticStatus::DIPLO_PEACE; };
 
-            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id);
-            if (status == DiplomaticStatus::DIPLO_PEACE)
-                recipient_empire_ids.insert(empire_id);
+        // add empires at peace with the specified empire
+        if (recipient_id != ALL_EMPIRES) {
+            auto peacey_rng = context.EmpireIDs() | range_filter(not_recipient)
+                | range_transform(to_id_status) | range_filter(are_peacy) | range_keys;
+            recipient_empire_ids.insert(peacey_rng.begin(), peacey_rng.end());
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_ENEMY: {
-        // add enemies of specified empire
-        for ([[maybe_unused]] auto& [empire_id, unused_empire] : context.Empires()) {
-            (void)unused_empire; // quiet unused variable warning
-            if (empire_id == recipient_id || recipient_id == ALL_EMPIRES)
-                continue;
+        static constexpr auto are_warring = [](const auto& id_status)
+        { return id_status.second == DiplomaticStatus::DIPLO_WAR; };
 
-            DiplomaticStatus status = context.ContextDiploStatus(recipient_id, empire_id);
-            if (status == DiplomaticStatus::DIPLO_WAR)
-                recipient_empire_ids.insert(empire_id);
+        // add enemies of specified empire
+        if (recipient_id != ALL_EMPIRES) {
+            auto warring_rng = context.EmpireIDs() | range_filter(not_recipient)
+                | range_transform(to_id_status) | range_filter(are_warring) | range_keys;
+            recipient_empire_ids.insert(warring_rng.begin(), warring_rng.end());
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_CAN_SEE: {
-        // evaluate condition
-        Condition::ObjectSet condition_matches;
-        if (m_condition)
-            condition_matches = m_condition->Eval(std::as_const(context));
+        if (!m_condition)
+            break;
+        const auto objs = m_condition->Eval(std::as_const(context)); // TODO: use lazy condition evaluation
+        const auto obj_ids_rng = objs | range_transform([](const auto* obj) { return obj->ID(); });
+        const auto& eov = context.empire_object_vis;
+
+        // can an empire see an object that matches the condition?
+        const auto can_see_any_obj_id = [obj_ids_rng, &eov](const auto empire_id) {
+            const auto eov_it = eov.find(empire_id);
+            if (eov_it == eov.end())
+                return false;
+            const auto can_see_obj_id = [&ov{eov_it->second}](const auto obj_id) {
+                const auto ov_it = ov.find(obj_id);
+                return ov_it != ov.end() && ov_it->second >= Visibility::VIS_BASIC_VISIBILITY;
+            };
+            return range_any_of(obj_ids_rng, can_see_obj_id);
+        };
 
         // add empires that can see any condition-matching object
-        for ([[maybe_unused]] auto& [empire_id, unused_empire] : context.Empires()) {
-            (void)unused_empire;
-            for (auto* object : condition_matches) {
-                auto vis = context.ContextVis(object->ID(), empire_id);
-                if (vis >= Visibility::VIS_BASIC_VISIBILITY) {
-                    recipient_empire_ids.insert(empire_id);
-                    break; // can move to the next empire, since this one has seen a matching object
-                }
-            }
-        }
+        auto empires_that_can_see_something = context.EmpireIDs() | range_filter(can_see_any_obj_id);
+        recipient_empire_ids.insert(empires_that_can_see_something.begin(), empires_that_can_see_something.end());
         break;
     }
 
@@ -3970,15 +4035,13 @@ void GenerateSitRepMessage::Execute(ScriptingContext& context) const {
     case EmpireAffiliationType::AFFIL_ANY:
     default: {
         // add all empires
-        for ([[maybe_unused]] auto& [empire_id, unused_empire] : context.Empires()) {
-            (void)unused_empire; // quiet unused variable warning
-            recipient_empire_ids.insert(empire_id);
-        }
+        const auto& all_empires_rng = context.EmpireIDs();
+        recipient_empire_ids.insert(all_empires_rng.begin(), all_empires_rng.end());
         break;
     }
     }
 
-    int sitrep_turn = context.current_turn + 1;
+    const int sitrep_turn = context.current_turn + 1;
 
     // send to recipient empires
     for (int empire_id : recipient_empire_ids) {
@@ -4124,19 +4187,14 @@ uint32_t SetOverlayTexture::GetCheckSum() const {
 }
 
 std::unique_ptr<Effect> SetOverlayTexture::Clone() const {
-    auto texture = m_texture;
-    return std::make_unique<SetOverlayTexture>(texture,
-                                               ValueRef::CloneUnique(m_size));
+    auto texture{m_texture};
+    return std::make_unique<SetOverlayTexture>(texture, ValueRef::CloneUnique(m_size));
 }
 
 
 ///////////////////////////////////////////////////////////
 // SetTexture                                            //
 ///////////////////////////////////////////////////////////
-SetTexture::SetTexture(std::string& texture) :
-    m_texture(std::move(texture))
-{}
-
 void SetTexture::Execute(ScriptingContext& context) const {
     if (!context.effect_target || context.effect_target->ObjectType() != UniverseObjectType::OBJ_PLANET)
         return;
@@ -4158,7 +4216,7 @@ uint32_t SetTexture::GetCheckSum() const {
 }
 
 std::unique_ptr<Effect> SetTexture::Clone() const {
-    auto texture = m_texture;
+    auto texture{m_texture};
     return std::make_unique<SetTexture>(texture);
 }
 
@@ -4180,63 +4238,64 @@ void SetVisibility::Execute(ScriptingContext& context) const {
     if (!context.effect_target)
         return;
 
-    // Note: currently ignoring upgrade-only flag
+    // Note: TODO: currently ignoring upgrade-only flag
 
     if (!m_vis)
         return; // nothing to evaluate!
 
-    int empire_id = ALL_EMPIRES;
-    if (m_empire_id)
-        empire_id = m_empire_id->Eval(context);
+    const int main_empire_id = m_empire_id ? m_empire_id->Eval(context) : ALL_EMPIRES;
+    const auto not_main_empire = [main_empire_id](const auto other_id) { return main_empire_id != other_id; };
+    const auto to_id_status = [&context, main_empire_id](const auto other_empire_id)
+    { return std::pair(other_empire_id, context.ContextDiploStatus(main_empire_id, other_empire_id)); };
+
 
     // whom to set visbility for?
-    std::set<int> empire_ids;
+    const auto all_empire_ids{context.EmpireIDs()};
+    std::vector<int> empire_ids;
+
     switch (m_affiliation) {
     case EmpireAffiliationType::AFFIL_SELF: {
         // add just specified empire
-        if (empire_id != ALL_EMPIRES)
-            empire_ids.insert(empire_id);
+        if (main_empire_id != ALL_EMPIRES)
+            empire_ids.push_back(main_empire_id);
         break;
     }
 
     case EmpireAffiliationType::AFFIL_ALLY: {
-        // add allies of specified empire
-        for ([[maybe_unused]] auto& [loop_empire_id, unused_empire] : context.Empires()) {
-            (void)unused_empire; // quiet unused variable warning
-            if (loop_empire_id == empire_id || empire_id == ALL_EMPIRES)
-                continue;
+        static constexpr auto are_allied = [](const auto& id_status)
+        { return id_status.second >= DiplomaticStatus::DIPLO_ALLIED; };
 
-            DiplomaticStatus status = context.ContextDiploStatus(empire_id, loop_empire_id);
-            if (status >= DiplomaticStatus::DIPLO_ALLIED)
-                empire_ids.insert(loop_empire_id);
+        // add allies of specified empire
+        if (main_empire_id != ALL_EMPIRES) {
+            auto allied_rng = all_empire_ids | range_filter(not_main_empire)
+                | range_transform(to_id_status) | range_filter(are_allied) | range_keys;
+            empire_ids.insert(empire_ids.end(), allied_rng.begin(), allied_rng.end());
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_PEACE: {
-        // add empires at peace with the specified empire
-        for ([[maybe_unused]] auto& [loop_empire_id, unused_empire] : context.Empires()) {
-            (void)unused_empire; // quiet unused variable warning
-            if (loop_empire_id == empire_id || empire_id == ALL_EMPIRES)
-                continue;
+        static constexpr auto are_peacey = [](const auto& id_status)
+        { return id_status.second >= DiplomaticStatus::DIPLO_PEACE; };
 
-            DiplomaticStatus status = context.ContextDiploStatus(empire_id, loop_empire_id);
-            if (status == DiplomaticStatus::DIPLO_PEACE)
-                empire_ids.insert(loop_empire_id);
+        // add empires at peace with specified empire
+        if (main_empire_id != ALL_EMPIRES) {
+            auto peacey_rng = all_empire_ids | range_filter(not_main_empire)
+                | range_transform(to_id_status) | range_filter(are_peacey) | range_keys;
+            empire_ids.insert(empire_ids.end(), peacey_rng.begin(), peacey_rng.end());
         }
         break;
     }
 
     case EmpireAffiliationType::AFFIL_ENEMY: {
-        // add enemies of specified empire
-        for ([[maybe_unused]] auto& [loop_empire_id, unused_empire] : context.Empires()) {
-            (void)unused_empire; // quiet unused variable warning
-            if (loop_empire_id == empire_id || empire_id == ALL_EMPIRES)
-                continue;
+        static constexpr auto are_warring = [](const auto& id_status)
+        { return id_status.second == DiplomaticStatus::DIPLO_WAR; };
 
-            DiplomaticStatus status = context.ContextDiploStatus(empire_id, loop_empire_id);
-            if (status == DiplomaticStatus::DIPLO_WAR)
-                empire_ids.insert(loop_empire_id);
+        // add enemies of specified empire
+        if (main_empire_id != ALL_EMPIRES) {
+            auto warring_rng = all_empire_ids | range_filter(not_main_empire)
+                | range_transform(to_id_status) | range_filter(are_warring) | range_keys;
+            empire_ids.insert(empire_ids.end(), warring_rng.begin(), warring_rng.end());
         }
         break;
     }
@@ -4250,14 +4309,9 @@ void SetVisibility::Execute(ScriptingContext& context) const {
         break;
 
     case EmpireAffiliationType::AFFIL_ANY:
-    default: {
-        // add all empires
-        for ([[maybe_unused]] auto& [loop_empire_id, unused_empire] : context.Empires()) {
-            (void)unused_empire; // quiet unused variable warning
-            empire_ids.insert(loop_empire_id);
-        }
+    default: 
+        empire_ids.insert(empire_ids.end(), all_empire_ids.begin(), all_empire_ids.end());
         break;
-    }
     }
 
     // what to set visibility of?
@@ -4277,14 +4331,10 @@ void SetVisibility::Execute(ScriptingContext& context) const {
         object_ids.resize(std::distance(object_ids.begin(), unique_it));
     }
 
-    int source_id = INVALID_OBJECT_ID;
-    if (context.source)
-        source_id = context.source->ID();
+    const int source_id = context.source ? context.source->ID() : INVALID_OBJECT_ID;
 
-    for (int emp_id : empire_ids) {
-        if (!context.GetEmpire(emp_id))
-            continue;
-        for (int obj_id : object_ids) {
+    for (const int emp_id : empire_ids) {
+        for (const int obj_id : object_ids) {
             // store source object id and ValueRef to evaluate to determine
             // what visibility level to set at time of application
             context.ContextUniverse().SetEffectDerivedVisibility(emp_id, obj_id, source_id, m_vis.get());

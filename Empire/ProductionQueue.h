@@ -68,6 +68,7 @@ struct FO_COMMON_API ProductionQueue {
         [[nodiscard]] std::pair<float, int> ProductionCostAndTime(int empire_id, int location_id,
                                                                   const ScriptingContext& context) const;
 
+        // non-defaulted operator< to handle different build_type differently
         [[nodiscard]] bool operator<(const ProductionItem& rhs) const noexcept {
             if (build_type < rhs.build_type)
                 return true;
@@ -80,13 +81,7 @@ struct FO_COMMON_API ProductionQueue {
             return false;
         }
 
-        [[nodiscard]] bool operator==(const ProductionItem& rhs) const noexcept {
-            return build_type == rhs.build_type &&
-                design_id == rhs.design_id &&
-                name == rhs.name;
-        }
-        [[nodiscard]] bool operator!=(const ProductionItem& rhs) const noexcept
-        { return !operator==(rhs); }
+        [[nodiscard]] bool operator==(const ProductionItem&) const noexcept  = default;
 
         [[nodiscard]] bool EnqueueConditionPassedAt(int location_id, const ScriptingContext& context) const;
 
@@ -212,7 +207,8 @@ struct FO_COMMON_API ProductionQueue {
       * systems.  Does not actually "spend" the PP; a later call to
       * empire->CheckProductionProgress(...) will actually spend PP, remove
       * items from queue and create them in the universe. */
-    void Update(const ScriptingContext& context);
+    void Update(const ScriptingContext& context,
+                const std::vector<std::tuple<std::string_view, int, float, int>>& prod_costs);
 
     // STL container-like interface
     void     push_back(Element element);
@@ -230,10 +226,11 @@ struct FO_COMMON_API ProductionQueue {
     mutable boost::signals2::signal<void ()> ProductionQueueChangedSignal;
 
 private:
+    using int_flat_set = boost::container::flat_set<int>;
     QueueType                       m_queue;
     int                             m_projects_in_progress = 0;
-    std::map<std::set<int>, float>  m_object_group_allocated_pp;
-    std::map<std::set<int>, float>  m_object_group_allocated_stockpile_pp;
+    std::map<int_flat_set, float>   m_object_group_allocated_pp;
+    std::map<int_flat_set, float>   m_object_group_allocated_stockpile_pp;
     float                           m_expected_new_stockpile_amount = 0.0f;
     float                           m_expected_project_transfer_to_stockpile = 0.0f;
     int                             m_empire_id = ALL_EMPIRES;

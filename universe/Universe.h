@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -70,6 +71,7 @@ public:
     typedef std::map<Visibility, int>               VisibilityTurnMap;              ///< Most recent turn number on which a something, such as a Universe object, was observed at various Visibility ratings or better
     typedef std::map<int, VisibilityTurnMap>        ObjectVisibilityTurnMap;        ///< Most recent turn number on which the objects were observed at various Visibility ratings; keyed by object id
     typedef std::map<int, ObjectVisibilityTurnMap>  EmpireObjectVisibilityTurnMap;  ///< Each empire's most recent turns on which object information was known; keyed by empire id
+    using IDSet = UniverseObject::IDSet;
 
 private:
     typedef std::map<int, std::unordered_set<int>>  ObjectKnowledgeMap;             ///< IDs of Empires which know information about an object (or deleted object); keyed by object id
@@ -118,7 +120,7 @@ public:
     /** Returns IDs of objects that the Empire with id \a empire_id has vision
       * of on the current turn, or objects that at least one empire has vision
       * of on the current turn if \a empire_id = ALL_EMPIRES */
-    [[nodiscard]] std::set<int> EmpireVisibleObjectIDs(int empire_id, const EmpireManager& empires) const;
+    [[nodiscard]] IDSet EmpireVisibleObjectIDs(int empire_id, const EmpireManager& empires) const;
 
     /** Returns IDs of objects that have been destroyed. */
     [[nodiscard]] auto& DestroyedObjectIds() const noexcept { return m_destroyed_object_ids; }
@@ -149,9 +151,9 @@ public:
       * ids is returned */
     [[nodiscard]] const std::set<int>& EmpireKnownShipDesignIDs(int empire_id) const;
 
-    /** Returns the Visibility level of empire with id \a empire_id of
-      * UniverseObject with id \a object_id as determined by calling
-      * UpdateEmpireObjectVisibilities. */
+    /** Returns the Visibility level of empire with id \a empire_id of UniverseObject with
+      * id \a object_id as determined by calling UpdateEmpireObjectVisibilities.
+      * Monsters/neutrals are treated as an empire with id ALL_EMPIRES. */
     [[nodiscard]] Visibility GetObjectVisibilityByEmpire(int object_id, int empire_id) const;
 
     /* Return the map from empire id to (map from id to that empire's current
@@ -177,11 +179,11 @@ public:
     /** Returns map from empire ID to map from location (X, Y) to detection range
       * that empire has at that location. */
     [[nodiscard]] std::map<int, std::map<std::pair<double, double>, float>>
-        GetEmpiresPositionDetectionRanges(const ObjectMap& objects) const;
+        GetEmpiresAndNeutralPositionDetectionRanges(const ObjectMap& objects) const;
 
     [[nodiscard]] std::map<int, std::map<std::pair<double, double>, float>>
-        GetEmpiresPositionDetectionRanges(const ObjectMap& objects,
-                                          const std::unordered_set<int>& exclude_ids) const;
+        GetEmpiresAndNeutralPositionDetectionRanges(const ObjectMap& objects,
+                                                    const std::unordered_set<int>& exclude_ids) const;
 
     /** Returns map from empire ID to map from location (X, Y) to detection range
       * that empire is expected to have at that location after the next turn's
@@ -199,6 +201,8 @@ public:
     [[nodiscard]] Effect::AccountingMap& GetEffectAccountingMap() noexcept { return m_effect_accounting_map; }
 
     [[nodiscard]] const auto& GetStatRecords() const noexcept { return m_stat_records; }
+
+    [[nodiscard]] std::size_t SizeInMemory() const;
 
     mutable UniverseObjectDeleteSignalType UniverseObjectDeleteSignal; ///< the state changed signal object for this UniverseObject
 
@@ -273,9 +277,13 @@ public:
     /** Sets all objects' meters' initial values to their current values. */
     void BackPropagateObjectMeters();
 
-    /** Determines which empires can see which objects at what visibility
-      * level, based on  */
-    void UpdateEmpireObjectVisibilities(EmpireManager& empires);
+    /** Determines which empires, or neutrals, can see which objects at what visibility
+      * level, based on detection strengths and ranges and any applicable overrides to that. */
+    void UpdateEmpireObjectVisibilities(const ScriptingContext& context);
+
+    /** Sets visibility by empires of objects with specified ids. */
+    void SetObjectVisibilityOverrides(std::map<int, std::vector<int>> empires_ids);
+    void ApplyObjectVisibilityOverrides();
 
     /** Sets a special record of visibility that overrides the standard
       * empire-object visibility after the latter is processed. */
@@ -283,14 +291,15 @@ public:
                                     const ValueRef::ValueRef<Visibility>* vis);
 
     /** Applies empire-object visibilities set by effects. */
-    void ApplyEffectDerivedVisibilities(EmpireManager& empires);
+    void ApplyEffectDerivedVisibilities(const ScriptingContext& context);
 
     /** If an \p empire_id can't currently see \p object_id, then remove
      * \p object_id' object from the object map and the set of known objects. */
     void ForgetKnownObject(int empire_id, int object_id);
 
     /** Sets visibility for indicated \a empire_id of object with \a object_id
-      * a vis */
+      * to at least * \a vis. If visibility is already equal or higher, does nothing.
+      * For ship object ids, also sets the ship's design to be known to the empire. */
     void SetEmpireObjectVisibility(int empire_id, int object_id, Visibility vis);
 
     /** Sets visibility for indicated \a empire_id for the indicated \a special */
@@ -340,14 +349,14 @@ public:
       * or limited versions of objects remain in empires latest known objects
       * ObjectMap, regardless of whether the empire knows the object is
       * destroyed. */
-    void Destroy(int object_id, const std::vector<int>& empire_ids,
+    void Destroy(int object_id, const std::span<const int> empire_ids,
                  bool update_destroyed_object_knowers = true);
 
     /** Destroys object with ID \a object_id, and destroys any associted
       * objects, such as contained buildings of planets, contained anything of
       * systems, or fleets if their last ship has id \a object_id and the fleet
       * is thus empty. Returns the ids of all destroyed objects. */
-    std::set<int> RecursiveDestroy(int object_id, const std::vector<int>& empire_ids);
+    std::vector<int> RecursiveDestroy(int object_id, const std::span<const int> empire_ids);
 
     /** Used by the Destroy effect to mark an object for destruction later
       * during turn processing. (objects can't be destroyed immediately as
@@ -493,9 +502,6 @@ private:
                               const ScriptingContext& context,
                               bool only_meter_effects = false) const;
 
-    void ResetObjectMeters(const std::vector<std::shared_ptr<UniverseObject>>& objects,
-                           bool target_max_unpaired = true, bool active = true);
-
     /** Executes all effects.  For use on server when processing turns.
       * If \a only_meter_effects is true, then only SetMeter effects are
       * executed.  This is useful on server or clients to update meter
@@ -523,6 +529,7 @@ private:
     EmpireObjectVisibilityMap       m_empire_object_visibility;         ///< map from empire id to (map from object id to visibility of that object for that empire)
     EmpireObjectVisibilityTurnMap   m_empire_object_visibility_turns;   ///< map from empire id to (map from object id to (map from Visibility rating to turn number on which the empire last saw the object at the indicated Visibility rating or higher)
 
+    std::map<int, std::vector<int>> m_fleet_blockade_ship_visibility_overrides; // map from empire id to (list of ship ids that are visibile to that empire due to being revealed by participating in a blockade)
     EmpireObjectVisValueRefMap      m_effect_specified_empire_object_visibilities;
 
     EmpireObjectSpecialsMap         m_empire_object_visible_specials;   ///< map from empire id to (map from object id to (set of names of specials that empire can see are on that object) )
@@ -611,10 +618,11 @@ private:
     friend void serialize(Archive&, Universe&, unsigned int const);
 };
 
+class SpeciesManager;
 
 /** Compute a checksum for each of the universe's content managers. Each value will be of the form
     ("BuildingManager", <checksum>) */
-FO_COMMON_API std::map<std::string, unsigned int> CheckSumContent();
+FO_COMMON_API std::map<std::string, unsigned int> CheckSumContent(const SpeciesManager& species);
 
 
 #endif

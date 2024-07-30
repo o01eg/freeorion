@@ -7,6 +7,7 @@
 //! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
 //! SPDX-License-Identifier: LGPL-2.1-or-later
 
+#include <utility>
 #include <valarray>
 #include <GG/ClrConstants.h>
 #include <GG/DrawUtil.h>
@@ -14,11 +15,20 @@
 #include <GG/GUI.h>
 
 
+#if !defined(__cpp_lib_integer_comparison_functions)
+constexpr bool cmp_less_equal(std::size_t l, int r) noexcept { return l <= r; }
+constexpr bool cmp_greater(std::size_t l, int r) noexcept { return l > r; }
+#else
+using std::cmp_less_equal;
+using std::cmp_greater;
+#endif
+
 using namespace GG;
 
 namespace {
 
-constexpr double PI = 3.141594; // probably intentionally slightly more than Pi
+constexpr double PI = 3.141594; // intentionally slightly more than Pi
+constexpr double twoPI = 2*PI;
 constexpr float SQRT2OVER2 = 0.70710678118654757274f; //std::sqrt(2.0) / 2.0;
 
 /// a stack of the currently-active clipping rects, in GG coordinates, not OpenGL scissor coordinates
@@ -91,29 +101,33 @@ void Rectangle(Pt ul, Pt lr, Clr color, Clr border_color1, Clr border_color2,
 
 void Check(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3)
 {
-    X wd = lr.x - ul.x;
-    Y ht = lr.y - ul.y;
+    const GLfloat wdhalf = Value(lr.x - ul.x) / 2.0f;
+    const GLfloat hthalf = Value(lr.y - ul.y) / 2.0f;
+    const GLfloat x = Value(ul.x);
+    const GLfloat y = Value(ul.y);
 
     // all vertices
-    GLfloat verts[][2] = {{-0.2f,  0.2f}, {-0.6f, -0.2f}, {-0.6f,  0.0f},
-                          {-0.2f,  0.4f}, {-0.8f,  0.0f}, {-0.2f,  0.6f},
-                          { 0.8f, -0.4f}, { 0.6f, -0.4f}, { 0.8f, -0.8f}};
+    static constexpr std::array<std::array<GLfloat, 2>, 9> verts =
+        {{{-0.2f,  0.2f}, {-0.6f, -0.2f}, {-0.6f,  0.0f},
+          {-0.2f,  0.4f}, {-0.8f,  0.0f}, {-0.2f,  0.6f},
+          { 0.8f, -0.4f}, { 0.6f, -0.4f}, { 0.8f, -0.8f}}};
 
     glPushMatrix();
-    static constexpr float sf = 1.25f;                                          // scale factor to make the check look right
-    glTranslatef(Value(ul.x + wd / 2.0f), Value(ul.y + ht / 2.0f * sf), 0.0f);  // move origin to the center of the rectangle
-    glScalef(Value(wd / 2.0f * sf), Value(ht / 2.0f * sf), 1.0f);               // map the range [-1,1] to the rectangle in both directions
+    static constexpr float sf = 1.25f;              // scale factor to make the check look right
+    glTranslatef(x + wdhalf, y + hthalf*sf, 0.0f);  // move origin to the center of the rectangle
+    glScalef(     wdhalf*sf,     hthalf*sf, 1.0f);  // map the range [-1,1] to the rectangle in both directions
 
-    static std::size_t indices[22] = { 1,  4,  2,
-                                       8,  0,  3,  7,
-                                       2,  4,  5,  3,  7,  3,  5,  6,
-                                       8,  7,  6,
-                                       0,  1,  2,  3};
+    static constexpr std::array<std::size_t, 22> indices =
+      { 1,  4,  2,
+        8,  0,  3,  7,
+        2,  4,  5,  3,  7,  3,  5,  6,
+        8,  7,  6,
+        0,  1,  2,  3};
 
     GL2DVertexBuffer vert_buf;
-    vert_buf.reserve(22);
-    for (std::size_t i = 0; i < 22; ++i)
-        vert_buf.store(verts[indices[i]][0], verts[indices[i]][1]);
+    vert_buf.reserve(indices.size());
+    for (const auto index : indices)
+        vert_buf.store(verts[index][0], verts[index][1]);
 
     glDisable(GL_TEXTURE_2D);
     glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
@@ -142,32 +156,34 @@ void Check(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3)
 
 void XMark(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3)
 {
-    X wd = lr.x - ul.x;
-    Y ht = lr.y - ul.y;
-    glDisable(GL_TEXTURE_2D);
+    const GLfloat wdhalf = Value(lr.x - ul.x) / 2.0f;
+    const GLfloat hthalf = Value(lr.y - ul.y) / 2.0f;
 
     // all vertices
-    static constexpr GLfloat verts[][2] = {{-0.4f, -0.6f}, {-0.6f, -0.4f}, {-0.4f, -0.4f}, {-0.2f,  0.0f}, {-0.6f,  0.4f},
-                                           {-0.4f,  0.6f}, {-0.4f,  0.4f}, { 0.0f,  0.2f}, { 0.4f,  0.6f}, { 0.6f,  0.4f},
-                                           { 0.4f,  0.4f}, { 0.2f,  0.0f}, { 0.6f, -0.4f}, { 0.4f, -0.6f}, { 0.4f, -0.4f},
-                                           { 0.0f, -0.2f}, { 0.0f,  0.0f}};
+    static constexpr std::array<std::array<GLfloat, 2>, 17> verts =
+        {{{-0.4f, -0.6f}, {-0.6f, -0.4f}, {-0.4f, -0.4f}, {-0.2f,  0.0f}, {-0.6f,  0.4f},
+         {-0.4f,  0.6f}, {-0.4f,  0.4f}, { 0.0f,  0.2f}, { 0.4f,  0.6f}, { 0.6f,  0.4f},
+         { 0.4f,  0.4f}, { 0.2f,  0.0f}, { 0.6f, -0.4f}, { 0.4f, -0.6f}, { 0.4f, -0.4f},
+         { 0.0f, -0.2f}, { 0.0f,  0.0f}}};
 
+    glDisable(GL_TEXTURE_2D);
     glPushMatrix();
-    static constexpr float sf = 1.75f;                                      // scale factor; the check wasn't the right size as drawn originally
-    glTranslatef(Value(ul.x + wd / 2.0f), Value(ul.y + ht / 2.0f), 0.0f);   // move origin to the center of the rectangle
-    glScalef(Value(wd / 2.0f * sf), Value(ht / 2.0f * sf), 1.0f);           // map the range [-1,1] to the rectangle in both directions
+    static constexpr GLfloat sf = 1.75f;                            // scale factor; the check wasn't the right size as drawn originally
+    glTranslatef(Value(ul.x) + wdhalf, Value(ul.y) + hthalf, 0.0f); // move origin to the center of the rectangle
+    glScalef(wdhalf*sf, hthalf*sf, 1.0f);                           // map the range [-1,1] to the rectangle in both directions
 
-    static constexpr std::size_t indices[44] = {12, 13, 14,
-                                                15,  0,  2, 16,  9, 11, 16, 10,
-                                                0,  1,  2,
-                                                13, 15, 16, 14,  3,  4,  6, 16,
-                                                4,  5,  6,  8,  9, 10,
-                                                14, 16, 11, 12,  2,  1,  3, 16, 16,  6,  5,  7, 16,  7,  8, 10};
+    static constexpr std::array<std::size_t, 44> indices =
+        {12, 13, 14,
+         15,  0,  2, 16,  9, 11, 16, 10,
+         0,  1,  2,
+         13, 15, 16, 14,  3,  4,  6, 16,
+         4,  5,  6,  8,  9, 10,
+         14, 16, 11, 12,  2,  1,  3, 16, 16,  6,  5,  7, 16,  7,  8, 10};
 
     GL2DVertexBuffer vert_buf;
-    vert_buf.reserve(44);
-    for (std::size_t i = 0; i < 44; ++i)
-        vert_buf.store(verts[indices[i]][0], verts[indices[i]][1]);
+    vert_buf.reserve(indices.size());
+    for (std::size_t idx : indices)
+        vert_buf.store(verts[idx][0], verts[idx][1]);
 
     glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
     glEnableClientState(GL_VERTEX_ARRAY);
@@ -196,22 +212,22 @@ void XMark(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3)
 
 void BubbleArc(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3, double theta1, double theta2)
 {
-    X wd = lr.x - ul.x;
-    Y ht = lr.y - ul.y;
+    const GLfloat wd = Value(lr.x - ul.x);
+    const GLfloat ht = Value(lr.y - ul.y);
     glDisable(GL_TEXTURE_2D);
 
-    // correct theta* values to range [0, 2pi)
+    // adjust angles to range [0, 2pi)
     if (theta1 < 0)
-        theta1 += (int(-theta1 / (2 * PI)) + 1) * 2 * PI;
-    else if (theta1 >= 2 * PI)
-        theta1 -= int(theta1 / (2 * PI)) * 2 * PI;
+        theta1 += (int(-theta1 / twoPI) + 1) * twoPI;
+    else if (theta1 >= twoPI)
+        theta1 -= int(theta1 / twoPI) * twoPI;
     if (theta2 < 0)
-        theta2 += (int(-theta2 / (2 * PI)) + 1) * 2 * PI;
-    else if (theta2 >= 2 * PI)
-        theta2 -= int(theta2 / (2 * PI)) * 2 * PI;
+        theta2 += (int(-theta2 / twoPI) + 1) * twoPI;
+    else if (theta2 >= twoPI)
+        theta2 -= int(theta2 / twoPI) * twoPI;
 
-    const int      SLICES = std::min(3 + std::max(Value(wd), Value(ht)), 50);  // this is a good guess at how much to tesselate the circle coordinates (50 segments max)
-    const double   HORZ_THETA = (2 * PI) / SLICES;
+    const int    SLICES = static_cast<int>(std::min(3.0 + std::max(wd, ht), 50.0)); // this is a guess at how much to tesselate the circle coordinates
+    const double HORZ_THETA = twoPI / SLICES;
 
     auto& unit_vertices = unit_circle_coords[SLICES];
     auto& colors = color_arrays[SLICES];
@@ -225,7 +241,7 @@ void BubbleArc(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3, double theta1, 
         }
         colors.resize(SLICES + 1, Clr()); // create but don't initialize (this is essentially just scratch space, since the colors are different call-to-call)
     }
-    int first_slice_idx = int(theta1 / HORZ_THETA + 1);
+    const int first_slice_idx = int(theta1 / HORZ_THETA + 1);
     int last_slice_idx = int(theta2 / HORZ_THETA - 1);
     if (theta1 >= theta2)
         last_slice_idx += SLICES;
@@ -236,8 +252,8 @@ void BubbleArc(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3, double theta1, 
     }
 
     glPushMatrix();
-    glTranslatef(Value(ul.x + wd / 2.0), Value(ul.y + ht / 2.0), 0.0);   // move origin to the center of the rectangle
-    glScalef(Value(wd / 2.0), Value(ht / 2.0), 1.0);                 // map the range [-1,1] to the rectangle in both (x- and y-) directions
+    glTranslatef(Value(ul.x) + wd/2.0f, Value(ul.y) + ht/2.0f, 0.0f); // move origin to the center of the rectangle
+    glScalef(wd/2.0f, ht/2.0f, 1.0);                                  // map the range [-1,1] to the rectangle in both (x- and y-) directions
 
     glColor(color1);
     glBegin(GL_TRIANGLE_FAN);
@@ -271,61 +287,62 @@ void CircleArc(Pt ul, Pt lr, Clr color, Clr border_color1, Clr border_color2,
                unsigned int bevel_thick, double theta1, double theta2)
 {
     //std::cout << "GG::CircleArc ul: " << ul << "  lr: " << lr << " bevel thick: " << bevel_thick << "  theta1: " << theta1 << "  theta2: " << theta2 << std::endl;
-    X wd = lr.x - ul.x;
-    Y ht = lr.y - ul.y;
+    const GLfloat wd = Value(lr.x - ul.x);
+    const GLfloat ht = Value(lr.y - ul.y);
     glDisable(GL_TEXTURE_2D);
 
     // correct theta* values to range [0, 2pi)
     if (theta1 < 0)
-        theta1 += (int(-theta1 / (2 * PI)) + 1) * 2 * PI;
-    else if (theta1 >= 2 * PI)
-        theta1 -= int(theta1 / (2 * PI)) * 2 * PI;
+        theta1 += (int(-theta1 / twoPI) + 1) * twoPI;
+    else if (theta1 >= twoPI)
+        theta1 -= int(theta1 / twoPI) * twoPI;
     if (theta2 < 0)
-        theta2 += (int(-theta2 / (2 * PI)) + 1) * 2 * PI;
-    else if (theta2 >= 2 * PI)
-        theta2 -= int(theta2 / (2 * PI)) * 2 * PI;
+        theta2 += (int(-theta2 / twoPI) + 1) * twoPI;
+    else if (theta2 >= twoPI)
+        theta2 -= int(theta2 / twoPI) * twoPI;
 
-    const int SLICES = std::min(3 + std::max(Value(wd), Value(ht)), 50);  // this is a good guess at how much to tesselate the circle coordinates (50 segments max)
-    const double HORZ_THETA = (2 * PI) / SLICES;
+    const std::size_t SLICES = std::min(3.0 + std::max(wd, ht), 50.0);  // how much to tesselate the circle coordinates
+    const double HORZ_THETA = twoPI / SLICES;
 
     auto& unit_vertices = unit_circle_coords[SLICES];
     auto& colors = color_arrays[SLICES];
-    if (unit_vertices.size() == 0) {
-        unit_vertices.resize(2 * (SLICES + 1), 0.0);
+    if (unit_vertices.size() == 0) { // no .empty() apparently?
+        unit_vertices.resize(2u * (SLICES + 1), 0.0);
         double theta = 0.0f;
-        for (int j = 0; j <= SLICES; theta += HORZ_THETA, ++j) { // calculate x,y values for each point on a unit circle divided into SLICES arcs
+        for (std::size_t j = 0; j <= SLICES; theta += HORZ_THETA, ++j) { // calculate x,y values for each point on a unit circle divided into SLICES arcs
             unit_vertices[j*2] = cos(-theta);
             unit_vertices[j*2+1] = sin(-theta);
         }
         colors.resize(SLICES + 1, Clr()); // create but don't initialize (this is essentially just scratch space, since the colors are different call-to-call)
     }
-    int first_slice_idx = int(theta1 / HORZ_THETA + 1);
+    const int first_slice_idx = int(theta1 / HORZ_THETA + 1);
     int last_slice_idx = int(theta2 / HORZ_THETA - 1);
     if (theta1 >= theta2)
         last_slice_idx += SLICES;
-    for (int j = first_slice_idx; j <= last_slice_idx; ++j) { // calculate the color value for each needed point
-        int X = (j > SLICES ? (j - SLICES) : j) * 2, Y = X + 1;
-        double color_scale_factor = (SQRT2OVER2 * (unit_vertices[X] + unit_vertices[Y]) + 1) / 2; // this is essentially the dot product of (x,y) with (sqrt2over2,sqrt2over2), the direction of the light source, scaled to the range [0,1]
+    for (std::size_t j = first_slice_idx; cmp_less_equal(j, last_slice_idx); ++j) { // calculate the color value for each needed point
+        std::size_t X = (j > SLICES ? (j - SLICES) : j) * 2, Y = X + 1; // confusing use of operator ,
+        const double color_scale_factor = (SQRT2OVER2 * (unit_vertices[X] + unit_vertices[Y]) + 1) / 2; // this is essentially the dot product of (x,y) with (sqrt2over2,sqrt2over2), the direction of the light source, scaled to the range [0,1]
         colors[j] = BlendClr(border_color1, border_color2, color_scale_factor);
     }
 
     glPushMatrix();
-    glTranslatef(Value(ul.x + wd / 2.0), Value(ul.y + ht / 2.0), 0.0);   // move origin to the center of the rectangle
-    glScalef(Value(wd / 2.0), Value(ht / 2.0), 1.0);                 // map the range [-1,1] to the rectangle in both (x- and y-) directions
+    glTranslatef(Value(ul.x) + wd/2.0f, Value(ul.y) + ht/2.0f, 0.0f);// move origin to the center of the rectangle
+    glScalef(wd/2.0f, ht/2.0f, 1.0f);                                // map the range [-1,1] to the rectangle in both (x- and y-) directions
 
-    double inner_radius = (std::min(Value(wd), Value(ht)) - 2.0 * bevel_thick) / std::min(Value(wd), Value(ht));
+    const double inner_radius = (std::min(wd, ht) - 2.0*bevel_thick) / std::min(wd, ht);
     glColor(color);
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(0, 0);
     // point on circle at angle theta1
-    double theta1_x = cos(-theta1), theta1_y = sin(-theta1);
+    const double theta1_x = cos(-theta1), theta1_y = sin(-theta1);
     glVertex2f(theta1_x * inner_radius, theta1_y * inner_radius);
     // angles in between theta1 and theta2, if any
     for (int i = first_slice_idx; i <= last_slice_idx; ++i) {
-        int X = (i > SLICES ? (i - SLICES) : i) * 2, Y = X + 1;
+        int X = 2 * (cmp_greater(i, SLICES) ? (i - SLICES) : i);
+        int Y = X + 1;
         glVertex2f(unit_vertices[X] * inner_radius, unit_vertices[Y] * inner_radius);
-    }      // theta2
-    double theta2_x = cos(-theta2), theta2_y = sin(-theta2);
+    }
+    const double theta2_x = cos(-theta2), theta2_y = sin(-theta2);
     glVertex2f(theta2_x * inner_radius, theta2_y * inner_radius);
     glEnd();
     glBegin(GL_QUAD_STRIP);
@@ -337,7 +354,8 @@ void CircleArc(Pt ul, Pt lr, Clr color, Clr border_color1, Clr border_color2,
     glVertex2f(theta1_x * inner_radius, theta1_y * inner_radius);
     // angles in between theta1 and theta2, if any
     for (int i = first_slice_idx; i <= last_slice_idx; ++i) {
-        int X = (i > SLICES ? (i - SLICES) : i) * 2, Y = X + 1;
+        const int X = 2 * (cmp_greater(i, SLICES) ? (i - SLICES) : i);
+        const int Y = X + 1;
         glColor(colors[i]);
         glVertex2f(unit_vertices[X], unit_vertices[Y]);
         glVertex2f(unit_vertices[X] * inner_radius, unit_vertices[Y] * inner_radius);
@@ -354,9 +372,9 @@ void CircleArc(Pt ul, Pt lr, Clr color, Clr border_color1, Clr border_color2,
 }
 
 void RoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color1, Clr border_color2,
-                        unsigned int corner_radius, int thick)
+                      unsigned int corner_radius, int thick)
 {
-    int circle_diameter = corner_radius * 2;
+    const int circle_diameter = corner_radius * 2;
     CircleArc(Pt(lr.x - circle_diameter, ul.y),                     Pt(lr.x, ul.y + circle_diameter),
               color, border_color2, border_color1, thick, 0, 0.5 * PI);  // ur corner
     CircleArc(Pt(ul.x, ul.y),                                       Pt(ul.x + circle_diameter, ul.y + circle_diameter),
@@ -373,7 +391,7 @@ void RoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color1, Clr border_col
     GLRGBAColorBuffer colour_buf;   // need to give each vertex in lightness bar its own colour so can't just use a glColor call
     colour_buf.reserve(28);
 
-    int rad = static_cast<int>(corner_radius);
+    const int rad = static_cast<int>(corner_radius);
 
     static constexpr float color_scale_factor1 = (SQRT2OVER2 * (0 + 1) + 1) / 2;
     Clr clr = BlendClr(border_color1, border_color2, color_scale_factor1);
@@ -443,13 +461,13 @@ void RoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color1, Clr border_col
 
 void BubbleRectangle(Pt ul, Pt lr, Clr color1, Clr color2, Clr color3, unsigned int corner_radius)
 {
-    int circle_diameter = corner_radius * 2;
+    const int circle_diameter = corner_radius * 2;
     BubbleArc(Pt(lr.x - circle_diameter, ul.y), Pt(lr.x, ul.y + circle_diameter), color1, color3, color2, 0, 0.5 * PI);  // ur corner
     BubbleArc(Pt(ul.x, ul.y), Pt(ul.x + circle_diameter, ul.y + circle_diameter), color1, color3, color2, 0.5 * PI, PI); // ul corner
     BubbleArc(Pt(ul.x, lr.y - circle_diameter), Pt(ul.x + circle_diameter, lr.y), color1, color3, color2, PI, 1.5 * PI); // ll corner
     BubbleArc(Pt(lr.x - circle_diameter, lr.y - circle_diameter), Pt(lr.x, lr.y), color1, color3, color2, 1.5 * PI, 0);  // lr corner
 
-    int rad = static_cast<int>(corner_radius);
+    const int rad = static_cast<int>(corner_radius);
 
     // top
     static constexpr float color_scale_factor1 = (SQRT2OVER2 * (0 + 1) + 1) / 2;
@@ -602,7 +620,7 @@ void GG::BeginStencilClipping(Pt inner_ul, Pt inner_lr, Pt outer_ul, Pt outer_lr
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
     glDepthMask(GL_FALSE);
 
-    GLuint mask = 1u << g_stencil_bit;
+    const GLuint mask = 1u << g_stencil_bit;
 
     glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
     glEnableClientState(GL_VERTEX_ARRAY);
@@ -611,7 +629,7 @@ void GG::BeginStencilClipping(Pt inner_ul, Pt inner_lr, Pt outer_ul, Pt outer_lr
 
     glStencilFunc(GL_ALWAYS, mask, mask);
     glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
-    GLint outer_vertices[] = {
+    const GLint outer_vertices[] = {
         Value(outer_ul.x), Value(outer_ul.y),
         Value(outer_ul.x), Value(outer_lr.y),
         Value(outer_lr.x), Value(outer_lr.y),
@@ -621,7 +639,7 @@ void GG::BeginStencilClipping(Pt inner_ul, Pt inner_lr, Pt outer_ul, Pt outer_lr
     glDrawArrays(GL_QUADS, 0, 4);
 
     glStencilOp(GL_INVERT, GL_INVERT, GL_INVERT);
-    GLint inner_vertices[] = {
+    const GLint inner_vertices[] = {
         Value(inner_ul.x), Value(inner_ul.y),
         Value(inner_ul.x), Value(inner_lr.y),
         Value(inner_lr.x), Value(inner_lr.y),
@@ -663,8 +681,8 @@ void GG::Line(Pt pt1, Pt pt2, Clr color, float thick)
 
 void GG::Line(X x1, Y y1, X x2, Y y2)
 {
-    GLfloat vertices[4] = {GLfloat(Value(x1)), GLfloat(Value(y1)),
-                            GLfloat(Value(x2)), GLfloat(Value(y2))};
+    const GLfloat vertices[4] = {GLfloat(Value(x1)), GLfloat(Value(y1)),
+                                 GLfloat(Value(x2)), GLfloat(Value(y2))};
 
     glDisable(GL_TEXTURE_2D);
 
@@ -683,8 +701,8 @@ void GG::Line(X x1, Y y1, X x2, Y y2)
 
 void GG::Triangle(Pt pt1, Pt pt2, Pt pt3, Clr color, Clr border_color, float border_thick)
 {
-    GLfloat vertices[6] = {GLfloat(Value(pt1.x)), GLfloat(Value(pt1.y)), GLfloat(Value(pt2.x)),
-                            GLfloat(Value(pt2.y)), GLfloat(Value(pt3.x)), GLfloat(Value(pt3.y))};
+    const GLfloat vertices[6] = {GLfloat(Value(pt1.x)), GLfloat(Value(pt1.y)), GLfloat(Value(pt2.x)),
+                                 GLfloat(Value(pt2.y)), GLfloat(Value(pt3.x)), GLfloat(Value(pt3.y))};
 
     glDisable(GL_TEXTURE_2D);
 
@@ -711,8 +729,8 @@ void GG::Triangle(Pt pt1, Pt pt2, Pt pt3, Clr color, Clr border_color, float bor
 
 void GG::Triangle(X x1, Y y1, X x2, Y y2, X x3, Y y3, bool filled)
 {
-    GLfloat vertices[6] = {GLfloat(Value(x1)), GLfloat(Value(y1)), GLfloat(Value(x2)),
-                            GLfloat(Value(y2)), GLfloat(Value(x3)), GLfloat(Value(y3))};
+    const GLfloat vertices[6] = {GLfloat(Value(x1)), GLfloat(Value(y1)), GLfloat(Value(x2)),
+                                 GLfloat(Value(y2)), GLfloat(Value(x3)), GLfloat(Value(y3))};
 
     glDisable(GL_TEXTURE_2D);
 

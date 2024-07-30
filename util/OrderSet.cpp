@@ -5,7 +5,7 @@
 
 
 namespace {
-    OrderPtr EMPTY_ORDER_PTR;
+    constinit OrderPtr EMPTY_ORDER_PTR;
 }
 
 OrderPtr& OrderSet::operator[](std::size_t i) {
@@ -47,22 +47,27 @@ void OrderSet::ApplyOrders(ScriptingContext& context) {
     DebugLogger() << "OrderSet::ApplyOrders() executing " << m_orders.size() << " orders";
     unsigned int executed_count = 0, failed_count = 0, already_executed_count = 0;
 
-    for (auto& order : m_orders) {
-        if (order.second->Executed()) {
-            DebugLogger() << "Order " << order.first << " already executed";
+    for (auto& [order_id, order] : m_orders) {
+        if (order->Executed()) {
+            DebugLogger() << "Order " << order_id << " already executed";
             ++already_executed_count;
-        } else {
-            try {
-                const auto order_empire_id = order.second->EmpireID();
-                const auto order_empire = context.GetEmpire(order_empire_id);
-                const auto source = order_empire->Source(context.ContextObjects());
-                ScriptingContext empire_context(source.get(), context);
-                order.second->Execute(empire_context);
-                ++executed_count;
-            } catch (const std::exception& e) {
-                ++failed_count;
-                ErrorLogger() << "Caught exception executing order " << order.first << ": " << e.what();
+            continue;
+        }
+
+        try {
+            const auto order_empire_id = order->EmpireID();
+            const auto order_empire = context.GetEmpire(order_empire_id);
+            if (!order_empire) {
+                ErrorLogger() << "ApplyOrders couldn't get empire with id " << order_empire_id;
+                return;
             }
+            const auto source = order_empire->Source(context.ContextObjects()).get();
+            ScriptingContext empire_context(source, context);
+            order->Execute(empire_context);
+            ++executed_count;
+        } catch (const std::exception& e) {
+            ++failed_count;
+            ErrorLogger() << "Caught exception executing order " << order << ": " << e.what();
         }
     }
     DebugLogger() << "OrderSet::ApplyOrders() successfully executed " << executed_count

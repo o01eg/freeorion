@@ -1,4 +1,22 @@
-from common.base_prod import TECH_COST_MULTIPLIER
+from focs._effects import (
+    AllyOf,
+    EffectsGroup,
+    EmpireHasAdoptedPolicy,
+    InSystem,
+    LocalCandidate,
+    OwnedBy,
+    ResupplyableBy,
+    SetStructure,
+    Ship,
+    Source,
+    Stationary,
+    Structure,
+    Target,
+    Turn,
+    Value,
+)
+from focs._tech import *
+from macros.base_prod import TECH_COST_MULTIPLIER
 
 Tech(
     name="SHP_FLEET_REPAIR",

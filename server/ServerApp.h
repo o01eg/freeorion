@@ -84,7 +84,7 @@ public:
     /** Extracts player save game data. */
     [[nodiscard]] std::vector<PlayerSaveGameData> GetPlayerSaveGameData() const;
 
-    [[nodiscard]] bool IsTurnExpired() const;
+    [[nodiscard]] bool IsTurnExpired() const noexcept { return m_turn_expired; }
 
     [[nodiscard]] bool IsHaveWinner() const;
 
@@ -207,10 +207,8 @@ public:
     /** Loads chat history via python script. */
     void LoadChatHistory();
 
-    void PushChatMessage(const std::string& text,
-                         const std::string& player_name,
-                         std::array<uint8_t, 4> text_color,
-                         const boost::posix_time::ptime& timestamp);
+    void PushChatMessage(std::string text, std::string player_name, std::array<uint8_t, 4> text_color,
+                         boost::posix_time::ptime timestamp);
 
     [[nodiscard]] ServerNetworking& Networking() noexcept { return m_networking; };
 
@@ -314,12 +312,14 @@ private:
     boost::asio::signal_set m_signals;
     boost::asio::high_resolution_timer m_timer;
 
-    Universe                m_universe;
-    EmpireManager           m_empires;
-    SpeciesManager          m_species_manager;
-    SupplyManager           m_supply_manager;
-    ServerNetworking        m_networking;
-    ServerFSM*              m_fsm;
+    Universe         m_universe;
+    EmpireManager    m_empires;
+    SpeciesManager   m_species_manager;
+    SupplyManager    m_supply_manager;
+    ServerNetworking m_networking;
+
+    std::unique_ptr<ServerFSM> m_fsm;
+
     PythonServer            m_python_server;
     std::map<int, int>      m_player_empire_ids;                ///< map from player id to empire id that the player controls.
     int                     m_current_turn = INVALID_GAME_TURN; ///< current turn number
@@ -337,6 +337,15 @@ private:
       * to advance turn.
       * */
     std::map<int, std::unique_ptr<PlayerSaveGameData>> m_turn_sequence;
+
+    // storage for cached costs between pre- and post-combat update steps
+    void CacheCostsTimes(const ScriptingContext& context);
+    std::map<int, std::vector<std::pair<std::string_view, double>>> m_cached_empire_policy_adoption_costs;
+    std::map<int, std::vector<std::tuple<std::string_view, double, int>>> m_cached_empire_research_costs_times;
+    std::map<int, std::vector<std::tuple<std::string_view, int, float, int>>> m_cached_empire_production_costs_times;
+    std::map<int, std::vector<std::pair<int, double>>> m_cached_empire_annexation_costs;
+
+    std::map<int, std::vector<int>> m_empire_fleet_combat_initiation_vis_overrides;
 
     // Give FSM and its states direct access.  We are using the FSM code as a
     // control-flow mechanism; it is all notionally part of this class.

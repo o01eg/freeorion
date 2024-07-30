@@ -2,6 +2,7 @@
 
 #include "Directories.h"
 #include "GameRules.h"
+#include "GameRuleRanks.h"
 #include "i18n.h"
 #include "LoggerWithOptionsDB.h"
 #include "OptionsDB.h"
@@ -68,23 +69,55 @@ namespace {
     void AddRules(GameRules& rules) {
         rules.Add<int>(UserStringNop("RULE_THRESHOLD_HUMAN_PLAYER_WIN"),
                        UserStringNop("RULE_THRESHOLD_HUMAN_PLAYER_WIN_DESC"),
-                       UserStringNop("MULTIPLAYER"), 0, true, RangedValidator<int>(0, 999));
+                       GameRuleCategories::GameRuleCategory::MULTIPLAYER,
+                       0, true,
+                       GameRuleRanks::RULE_THRESHOLD_HUMAN_PLAYER_WIN_RANK,
+                       RangedValidator<int>(0, 999));
 
         rules.Add<bool>(UserStringNop("RULE_ONLY_ALLIANCE_WIN"),
                         UserStringNop("RULE_ONLY_ALLIANCE_WIN_DESC"),
-                        UserStringNop("MULTIPLAYER"), true, true);
+                        GameRuleCategories::GameRuleCategory::MULTIPLAYER,
+                        true, true,
+                        GameRuleRanks::RULE_ONLY_ALLIANCE_WIN_RANK);
 
         rules.Add<bool>(UserStringNop("RULE_ALLOW_CONCEDE"),
                         UserStringNop("RULE_ALLOW_CONCEDE_DESC"),
-                        UserStringNop("MULTIPLAYER"), false, true);
+                        GameRuleCategories::GameRuleCategory::MULTIPLAYER,
+                        false, true,
+                        GameRuleRanks::RULE_ALLOW_CONCEDE_RANK);
 
         rules.Add<int>(UserStringNop("RULE_CONCEDE_COLONIES_THRESHOLD"),
                        UserStringNop("RULE_CONCEDE_COLONIES_THRESHOLD_DESC"),
-                       UserStringNop("MULTIPLAYER"), 1, true,  RangedValidator<int>(0, 9999));
+                       GameRuleCategories::GameRuleCategory::MULTIPLAYER,
+                       1, true,
+                       GameRuleRanks::RULE_CONCEDE_COLONIES_THRESHOLD_RANK,
+                       RangedValidator<int>(0, 9999));
+
+        rules.Add<bool>(UserStringNop("RULE_CONCEDE_DESTROY_COLONIES"),
+                        UserStringNop("RULE_CONCEDE_DESTROY_COLONIES_DESC"),
+                        GameRuleCategories::GameRuleCategory::MULTIPLAYER,
+                        false, true,
+                        GameRuleRanks::RULE_CONCEDE_DESTROY_COLONIES_RANK);
+
+        rules.Add<bool>(UserStringNop("RULE_CONCEDE_DESTROY_BUILDINGS"),
+                        UserStringNop("RULE_CONCEDE_DESTROY_BUILDINGS_DESC"),
+                        GameRuleCategories::GameRuleCategory::MULTIPLAYER,
+                        false, true,
+                        GameRuleRanks::RULE_CONCEDE_DESTROY_BUILDINGS_RANK);
+
+        rules.Add<bool>(UserStringNop("RULE_CONCEDE_DESTROY_SHIPS"),
+                        UserStringNop("RULE_CONCEDE_DESTROY_SHIPS_DESC"),
+                        GameRuleCategories::GameRuleCategory::MULTIPLAYER,
+                        false, true,
+                        GameRuleRanks::RULE_CONCEDE_DESTROY_SHIPS_RANK);
     }
     bool temp_bool2 = RegisterGameRules(&AddRules);
 
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+    constexpr std::string EMPTY_STRING;
+#else
     const std::string EMPTY_STRING;
+#endif
 }
 
 /////////////////////////////////////////////////////
@@ -226,8 +259,7 @@ GalaxySetupOptionGeneric GalaxySetupData::GetNativeFreq() const {
     return static_cast<GalaxySetupOptionGeneric>(GetIdx(4, seed + "natives"));       // need range 0-3 for native frequency
 }
 
-void GalaxySetupData::SetSeed(const std::string& seed_) {
-    std::string new_seed = seed_;
+void GalaxySetupData::SetSeed(std::string new_seed) {
     if (new_seed.empty() || new_seed == "RANDOM") {
         ClockSeed();
         new_seed.clear();
@@ -238,8 +270,8 @@ void GalaxySetupData::SetSeed(const std::string& seed_) {
     seed = std::move(new_seed);
 }
 
-void GalaxySetupData::SetGameUID(const std::string& game_uid_)
-{ game_uid = game_uid_; }
+void GalaxySetupData::SetGameUID(std::string game_uid_)
+{ game_uid = std::move(game_uid_); }
 
 /////////////////////////////////////////////////////
 // PlayerSetupData
@@ -254,10 +286,6 @@ bool operator==(const PlayerSetupData& lhs, const PlayerSetupData& rhs) {
             lhs.player_ready == rhs.player_ready &&
             lhs.starting_team == rhs.starting_team;
 }
-
-bool operator!=(const PlayerSetupData& lhs, const PlayerSetupData& rhs)
-{ return !(lhs == rhs); }
-
 
 ////////////////////////////////////////////////////
 // MultiplayerLobbyData

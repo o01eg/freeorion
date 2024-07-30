@@ -28,7 +28,8 @@ enum class SortingMethod : uint8_t {
     SORT_MAX,       ///< Objects with the largest sort key will be selected
     SORT_MIN,       ///< Objects with the smallest sort key will be selected
     SORT_MODE,      ///< Objects with the most common sort key will be selected
-    SORT_RANDOM     ///< Objects will be selected randomly, without consideration of property values
+    SORT_RANDOM,    ///< Objects will be selected randomly, without consideration of property values
+    SORT_UNIQUE     ///< Objects will be sorted by the sort key and one object per unique sort key will be selected
 };
 
 enum class ComparisonType : int8_t {
@@ -55,8 +56,8 @@ enum class ContentType : uint8_t {
 /** Same as ConditionDescription, but returns a string only with conditions that have not been met. */
 [[nodiscard]] FO_COMMON_API std::string ConditionFailedDescription(
     const std::vector<const Condition*>& conditions,
-    const UniverseObject* candidate_object = nullptr,
-    const UniverseObject* source_object = nullptr);
+    const ScriptingContext& source_context,
+    const UniverseObject* candidate_object);
 
 /** Returns a single string which describes a vector of Conditions. If multiple
   * conditions are passed, they are treated as if they were contained by an And
@@ -69,8 +70,8 @@ enum class ContentType : uint8_t {
   * of conditions matches the object. */
 [[nodiscard]] FO_COMMON_API std::string ConditionDescription(
     const std::vector<const Condition*>& conditions,
-    const UniverseObject* candidate_object = nullptr,
-    const UniverseObject* source_object = nullptr);
+    const ScriptingContext& source_context,
+    const UniverseObject* candidate);
 
 /** Matches all objects if the number of objects that match Condition
   * \a condition is is >= \a low and < \a high.  Matched objects may
@@ -147,6 +148,10 @@ struct FO_COMMON_API SortedNumberOf final : public Condition {
                    std::unique_ptr<ValueRef::ValueRef<double>>&& sort_key_ref,
                    SortingMethod sorting_method,
                    std::unique_ptr<Condition>&& condition);
+    SortedNumberOf(std::unique_ptr<ValueRef::ValueRef<int>>&& number,
+                   std::unique_ptr<ValueRef::ValueRef<std::string>>&& sort_key_ref,
+                   SortingMethod sorting_method,
+                   std::unique_ptr<Condition>&& condition);
 
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -163,12 +168,14 @@ struct FO_COMMON_API SortedNumberOf final : public Condition {
 private:
     std::unique_ptr<ValueRef::ValueRef<int>> m_number;
     std::unique_ptr<ValueRef::ValueRef<double>> m_sort_key;
+    std::unique_ptr<ValueRef::ValueRef<std::string>> m_sort_key_string;
     SortingMethod m_sorting_method;
     std::unique_ptr<Condition> m_condition;
 };
 
-/** Matches no objects. Currently only has an experimental use for efficient immediate rejection as the top-line condition.
- *  Essentially the entire point of this Condition is to provide the specialized GetDefaultInitialCandidateObjects() */
+/** Matches no objects. Currently only has an experimental use for efficient
+  * immediate rejection as the top-line condition. Essentially, the entire point
+  * of this Condition is to provide the specialized GetDefaultInitialCandidateObjects() */
 struct FO_COMMON_API None final : public Condition {
     constexpr None() noexcept : Condition(true, true, true) {}
     bool operator==(const Condition& rhs) const override;
@@ -479,7 +486,9 @@ private:
 
 /** Matches all objects that have the tag \a tag. */
 struct FO_COMMON_API HasTag final : public Condition {
-    HasTag();
+    constexpr HasTag() noexcept :
+        Condition(true, true, true)
+    {}
     explicit HasTag(std::string name);
     explicit HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
 
@@ -1221,12 +1230,12 @@ private:
     std::unique_ptr<ValueRef::ValueRef<int>>         m_empire_id;
 };
 
-/** Matches all objects whose owner who has the building type \a name available. */
-struct FO_COMMON_API OwnerHasBuildingTypeAvailable final : public Condition {
-    OwnerHasBuildingTypeAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
-                                  std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
-    explicit OwnerHasBuildingTypeAvailable(const std::string& name);
-    explicit OwnerHasBuildingTypeAvailable(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
+/** Matches objects if the species empire has the building type \a name available. */
+struct FO_COMMON_API EmpireHasBuildingTypeAvailable final : public Condition {
+    EmpireHasBuildingTypeAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
+                                   std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
+    explicit EmpireHasBuildingTypeAvailable(const std::string& name);
+    explicit EmpireHasBuildingTypeAvailable(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
 
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -1248,12 +1257,12 @@ private:
     std::unique_ptr<ValueRef::ValueRef<int>>         m_empire_id;
 };
 
-/** Matches all objects whose owner who has the ship design \a id available. */
-struct FO_COMMON_API OwnerHasShipDesignAvailable final : public Condition {
-    OwnerHasShipDesignAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
-                                std::unique_ptr<ValueRef::ValueRef<int>>&& design_id);
-    explicit OwnerHasShipDesignAvailable(int design_id);
-    explicit OwnerHasShipDesignAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& design_id);
+/** Matches object if the specified empire has the ship design \a id available. */
+struct FO_COMMON_API EmpireHasShipDesignAvailable final : public Condition {
+    EmpireHasShipDesignAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
+                                 std::unique_ptr<ValueRef::ValueRef<int>>&& design_id);
+    explicit EmpireHasShipDesignAvailable(int design_id);
+    explicit EmpireHasShipDesignAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& design_id);
 
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -1275,12 +1284,12 @@ private:
     std::unique_ptr<ValueRef::ValueRef<int>> m_empire_id;
 };
 
-/** Matches all objects whose owner who has the ship part @a name available. */
-struct FO_COMMON_API OwnerHasShipPartAvailable final : public Condition {
-    OwnerHasShipPartAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
-                              std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
-    explicit OwnerHasShipPartAvailable(const std::string& name);
-    explicit OwnerHasShipPartAvailable(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
+/** Matches objects if the specified empire has the ship part @a name available. */
+struct FO_COMMON_API EmpireHasShipPartAvailable final : public Condition {
+    EmpireHasShipPartAvailable(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
+                               std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
+    explicit EmpireHasShipPartAvailable(const std::string& name);
+    explicit EmpireHasShipPartAvailable(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
 
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -1387,14 +1396,9 @@ private:
     std::unique_ptr<Condition> m_condition;
 };
 
-/** Matches objects that are in systems that could have starlanes added between
-  * them and all (not just one) of the systems containing (or that are) one of
-  * the objects matched by \a condition.  "Could have starlanes added" means
-  * that a lane would be geometrically acceptable, meaning it wouldn't cross
-  * any other lanes, pass too close to another system, or be too close in angle
-  * to an existing lane. */
-struct FO_COMMON_API CanAddStarlaneConnection : Condition {
-    explicit CanAddStarlaneConnection(std::unique_ptr<Condition>&& condition);
+/** Matches objects that have a starlane to at least one object that matches \a condition. */
+struct FO_COMMON_API HasStarlaneTo : Condition {
+    explicit HasStarlaneTo(std::unique_ptr<Condition>&& condition);
 
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -1415,8 +1419,100 @@ private:
     std::unique_ptr<Condition> m_condition;
 };
 
-/** Matches systems that have been explored by at least one Empire
-  * in \a empire_ids. */
+/** Matches objects if a starlane from the location of the candidate and the location
+  * of any object that matches \a condition would cross any existing starlane.
+  * If given multiple candidates, does not consider if lines to them from the objects
+  * that match \a condition may or may not cross. */
+struct FO_COMMON_API StarlaneToWouldCrossExistingStarlane : Condition {
+    explicit StarlaneToWouldCrossExistingStarlane(std::unique_ptr<Condition>&& condition);
+
+    bool operator==(const Condition& rhs) const override;
+    void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
+              ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
+    [[nodiscard]] bool EvalOne(const ScriptingContext& parent_context, const UniverseObject* candidate) const override
+    { return Match(ScriptingContext{parent_context, candidate}); }
+
+    [[nodiscard]] std::string Description(bool negated = false) const override;
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
+    void SetTopLevelContent(const std::string& content_name) override;
+    [[nodiscard]] uint32_t GetCheckSum() const override;
+
+    [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
+
+private:
+    [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
+
+    std::unique_ptr<Condition> m_condition;
+};
+
+/** Matches objects if a starlane from the location of the candidate and the location
+  * of any object that matches \a condition would be angularly too close to an existing
+  * starlane on either end. Objects on both ends of the new starlane that are systems
+  * or that are in systems have that system's lanes check. If just one of the candidate
+  * and other object are or are in systems, the only the other end's existing lanes are
+  * checked. If neither object at the ends of the new lane are systems, then no existing
+  * lanes are checked. */
+struct FO_COMMON_API StarlaneToWouldBeAngularlyCloseToExistingStarlane : Condition {
+    // magic limit adjusted to allow no more than 12 starlanes from a system arccos(0.87) = 0.515594 rad = 29.5 degrees
+    static constexpr double DEFAULT_MAX_LANE_DOT_PRODUCT = 0.87;
+
+    explicit StarlaneToWouldBeAngularlyCloseToExistingStarlane(
+        std::unique_ptr<Condition>&& condition, double max_dotprod = DEFAULT_MAX_LANE_DOT_PRODUCT);
+
+    bool operator==(const Condition& rhs) const override;
+    void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
+        ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
+    [[nodiscard]] bool EvalOne(const ScriptingContext& parent_context, const UniverseObject* candidate) const override
+    { return Match(ScriptingContext{parent_context, candidate}); }
+
+    [[nodiscard]] std::string Description(bool negated = false) const override;
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
+    void SetTopLevelContent(const std::string& content_name) override;
+    [[nodiscard]] uint32_t GetCheckSum() const override;
+
+    [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
+
+private:
+    [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
+
+    std::unique_ptr<Condition> m_condition;
+    double m_max_dotprod; // if normalized 
+};
+
+/** Matches objects if a starlane from the location of the candidate and the location
+  * of any object that matches \a lane_end_condition would be too close to any object
+  * that matches \a close_object_condition. */
+struct FO_COMMON_API StarlaneToWouldBeCloseToObject : Condition {
+    static constexpr double DEFAULT_MAX_DISTANCE = 20.0;
+
+    explicit StarlaneToWouldBeCloseToObject(
+        std::unique_ptr<Condition>&& lane_end_condition,
+        std::unique_ptr<Condition>&& close_object_condition =
+            std::make_unique<Type>(UniverseObjectType::OBJ_SYSTEM),
+        double max_distance = DEFAULT_MAX_DISTANCE);
+
+    bool operator==(const Condition& rhs) const override;
+    void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
+        ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
+    [[nodiscard]] bool EvalOne(const ScriptingContext& parent_context, const UniverseObject* candidate) const override
+    { return Match(ScriptingContext{parent_context, candidate}); }
+
+    [[nodiscard]] std::string Description(bool negated = false) const override;
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
+    void SetTopLevelContent(const std::string& content_name) override;
+    [[nodiscard]] uint32_t GetCheckSum() const override;
+
+    [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
+
+private:
+    [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
+
+    std::unique_ptr<Condition> m_lane_end_condition;
+    std::unique_ptr<Condition> m_close_object_condition;
+    double m_max_distance;
+};
+
+/** Matches systems that have been explored by at least one Empire in \a empire_ids. */
 struct FO_COMMON_API ExploredByEmpire final : public Condition {
     explicit ExploredByEmpire(std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id);
 
@@ -1541,7 +1637,9 @@ private:
 
 /** Matches objects whose species has the ability to found new colonies. */
 struct FO_COMMON_API CanColonize final : public Condition {
-    CanColonize();
+    constexpr CanColonize() :
+        Condition(true, true, true)
+    {}
 
     bool operator==(const Condition& rhs) const override;
     [[nodiscard]] bool EvalOne(const ScriptingContext& parent_context, const UniverseObject* candidate) const override
@@ -1601,6 +1699,26 @@ private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
     std::unique_ptr<Condition> m_by_object_condition;
+};
+
+/** Matches the objects that have been ordered annexed by an empire. */
+struct FO_COMMON_API OrderedAnnexed final : public Condition {
+    constexpr OrderedAnnexed() :
+        Condition(true, true, true)
+    {}
+
+    bool operator==(const Condition& rhs) const override;
+    [[nodiscard]] bool EvalOne(const ScriptingContext& parent_context, const UniverseObject* candidate) const override
+    { return Match(ScriptingContext{parent_context, candidate}); }
+
+    [[nodiscard]] std::string Description(bool negated = false) const override;
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
+    [[nodiscard]] uint32_t GetCheckSum() const override;
+
+    [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
+
+private:
+    [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 };
 
 /** Matches all objects if the comparisons between values of ValueRefs meet the
@@ -1732,7 +1850,11 @@ struct FO_COMMON_API And final : public Condition {
     And(std::unique_ptr<Condition>&& operand1,
         std::unique_ptr<Condition>&& operand2,
         std::unique_ptr<Condition>&& operand3 = nullptr,
-        std::unique_ptr<Condition>&& operand4 = nullptr);
+        std::unique_ptr<Condition>&& operand4 = nullptr,
+        std::unique_ptr<Condition>&& operand5 = nullptr,
+        std::unique_ptr<Condition>&& operand6 = nullptr,
+        std::unique_ptr<Condition>&& operand7 = nullptr,
+        std::unique_ptr<Condition>&& operand8 = nullptr);
 
     bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -1803,7 +1925,7 @@ private:
 
 /** Tests conditions in \a operands in order, to find the first condition that
   * matches at least one candidate object. Matches all objects that match that
-  * condaition, ignoring any conditions listed later. If no candidate matches
+  * condition, ignoring any conditions listed later. If no candidate matches
   * any of the conditions, it matches nothing. */
 struct FO_COMMON_API OrderedAlternativesOf final : public Condition {
     explicit OrderedAlternativesOf(std::vector<std::unique_ptr<Condition>>&& operands);

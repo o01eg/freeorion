@@ -24,10 +24,6 @@
 
 
 namespace {
-    constexpr double WORMHOLE_TRAVEL_DISTANCE = 0.1; // the effective distance for ships travelling along a wormhole, for determining how much of their speed is consumed by the jump
-}
-
-namespace {
     /** distance_matrix_storage implements the storage and the mutexes
         for distance in number of hops from system to system.
 
@@ -347,7 +343,7 @@ namespace SystemPathing {
         const auto& edge_weight_map = boost::get(boost::edge_weight, graph);
         try {
             boost::dijkstra_shortest_paths(
-                graph, system1_index, &predecessors[0], &distances[0],
+                graph, system1_index, predecessors.data(), distances.data(),
                 edge_weight_map, index_map, std::less<double>(), std::plus<double>(),
                 std::numeric_limits<int>::max(), 0,
                 boost::make_dijkstra_visitor(PathFindingShortCircuitingVisitor(system2_index)));
@@ -421,8 +417,8 @@ namespace SystemPathing {
             boost::queue<int> buf;
             std::vector<int> colors(boost::num_vertices(graph));
 
-            BFSVisitor bfsVisitor(system1_index, system2_index, &predecessors[0], max_jumps);
-            boost::breadth_first_search(graph, system1_index, buf, bfsVisitor, &colors[0]);
+            BFSVisitor bfsVisitor(system1_index, system2_index, predecessors.data(), max_jumps);
+            boost::breadth_first_search(graph, system1_index, buf, bfsVisitor, colors.data());
         } catch (const typename BFSVisitor::ReachedDepthLimit&) {
             // catching this means the algorithm explored the neighborhood until max_jumps and didn't find anything
             return {{}, -1};
@@ -507,11 +503,9 @@ namespace {
                 decltype(edges)::sequence_type edges_vec;
                 edges_vec.reserve(objects.size<System>() * 10); // guesstimate
                 for (const auto& sys : objects.allRaw<System>()) {
-                    auto sys_id{sys->ID()};
-                    for (auto& [lane_id, is_wormhole] : sys->StarlanesWormholes()) {
-                        (void)is_wormhole; // quiet unused variable_warning
+                    const auto sys_id{sys->ID()};
+                    for (auto lane_id : sys->Starlanes())
                         edges_vec.emplace_back(std::min(sys_id, lane_id), std::max(sys_id, lane_id));
-                    }
                 }
                 // sort and ensure uniqueness of entries before moving into flat_set
                 std::sort(edges_vec.begin(), edges_vec.end());
@@ -547,8 +541,7 @@ namespace {
         void AddSystemPredicate(const Pathfinder::SystemExclusionPredicateType& pred,
                                 const EmpireManager& empires, const ObjectMap& objects)
         {
-            for (auto& [empire_id, empire] : empires) {
-                (void)empire;
+            for (const auto empire_id : empires | range_keys) {
                 SystemPredicateFilter sys_pred_filter(&system_graph, &objects, pred);
                 auto sys_pred_filtered_graph_ptr = std::make_shared<SystemPredicateGraph>(
                     system_graph, sys_pred_filter);
@@ -723,19 +716,18 @@ public:
 // class Pathfinder
 /////////////////////////////////////////////
 Pathfinder::Pathfinder() :
-    pimpl(new PathfinderImpl)
+    pimpl(std::make_unique<PathfinderImpl>())
 {}
 
 Pathfinder::~Pathfinder() = default;
 
 namespace {
     const Fleet* FleetFromObject(const UniverseObject* obj, const ObjectMap& objects) {
-        auto retval = dynamic_cast<const Fleet*>(obj);
-        if (!retval) {
-            if (auto ship = dynamic_cast<const Ship*>(obj))
-                retval = objects.getRaw<Fleet>(ship->FleetID());
-        }
-        return retval;
+        if (obj->ObjectType() == UniverseObjectType::OBJ_FLEET)
+            return static_cast<const Fleet*>(obj);
+        if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP)
+            return objects.getRaw<const Fleet>(static_cast<const Ship*>(obj)->FleetID());
+        return nullptr;
     }
 }
 
@@ -764,18 +756,18 @@ double Pathfinder::LinearDistance(int system1_id, int system2_id, const ObjectMa
 double Pathfinder::PathfinderImpl::LinearDistance(int system1_id, int system2_id,
                                                   const ObjectMap& objects) const
 {
-    const auto system1 = objects.get<System>(system1_id);
+    const auto system1 = objects.getRaw<System>(system1_id);
     if (!system1) {
         ErrorLogger() << "Universe::LinearDistance passed invalid system id: " << system1_id;
         throw std::out_of_range("system1_id invalid");
     }
-    const auto system2 = objects.get<System>(system2_id);
+    const auto system2 = objects.getRaw<System>(system2_id);
     if (!system2) {
         ErrorLogger() << "Universe::LinearDistance passed invalid system id: " << system2_id;
         throw std::out_of_range("system2_id invalid");
     }
-    double x_dist = system2->X() - system1->X();
-    double y_dist = system2->Y() - system1->Y();
+    const double x_dist = system2->X() - system1->X();
+    const double y_dist = system2->Y() - system1->Y();
     return std::sqrt(x_dist*x_dist + y_dist*y_dist);
 }
 
@@ -787,19 +779,18 @@ int16_t Pathfinder::PathfinderImpl::JumpDistanceBetweenSystems(int system1_id, i
         return 0;
 
     try {
-        distance_matrix_cache<distance_matrix_storage<int16_t>> cache(m_system_jumps);
+        const distance_matrix_cache<distance_matrix_storage<int16_t>> cache(m_system_jumps);
 
-        std::size_t system1_index = m_system_id_to_graph_index.at(system1_id);
-        std::size_t system2_index = m_system_id_to_graph_index.at(system2_id);
-        std::size_t smaller_index = std::min(system1_index, system2_index);
-        std::size_t other_index   = std::max(system1_index, system2_index);
+        const std::size_t system1_index = m_system_id_to_graph_index.at(system1_id);
+        const std::size_t system2_index = m_system_id_to_graph_index.at(system2_id);
+        const std::size_t smaller_index = std::min(system1_index, system2_index);
+        const std::size_t other_index   = std::max(system1_index, system2_index);
 
         using row_ref = distance_matrix_storage<short>::row_ref;
 
         // prefer filling the smaller row/column for increased cache locality
-        int16_t jumps = cache.get_T(
-            smaller_index, other_index,
-            [this](size_t ii, row_ref row) { HandleCacheMiss(ii, row); }); // boost::bind(&Pathfinder::PathfinderImpl::HandleCacheMiss, this, ph::_1, ph::_2));
+        const auto jumps = cache.get_T(smaller_index, other_index,
+                                       [this](size_t ii, row_ref row) { HandleCacheMiss(ii, row); });
         if (jumps == SHRT_MAX)  // value returned for no valid path
             return -1;
         return jumps;
@@ -831,7 +822,7 @@ namespace {
         if (!obj)
             return nullptr;
 
-        if (objects.get<System>(obj->SystemID())) {
+        if (objects.getRaw<System>(obj->SystemID())) {
             TraceLogger() << "GeneralizedLocation of " << obj->Name() << " (" << obj->ID()
                           << ") is system id: " << obj->SystemID();
             return obj->SystemID();
@@ -849,7 +840,7 @@ namespace {
             return fleet_sys_pair;
         }
 
-        if (dynamic_cast<const Field*>(obj))
+        if (obj->ObjectType() == UniverseObjectType::OBJ_FIELD)
             return nullptr;
 
         // Don't generate an error message for temporary objects.
@@ -921,7 +912,7 @@ struct JumpDistanceSys2Visitor : public boost::static_visitor<int> {
     the GeneralizedLocation that it is visiting.*/
 struct JumpDistanceSys1Visitor : public boost::static_visitor<int> {
     JumpDistanceSys1Visitor(const Pathfinder::PathfinderImpl& _pf,
-                            const GeneralizedLocationType& _sys2_ids) :
+                            GeneralizedLocationType _sys2_ids) :
         pf(_pf), sys2_ids(_sys2_ids)
     {}
 
@@ -955,7 +946,7 @@ struct JumpDistanceSys1Visitor : public boost::static_visitor<int> {
         return std::min(jumps1, jumps2);
     }
     const Pathfinder::PathfinderImpl& pf;
-    const GeneralizedLocationType& sys2_ids;
+    const GeneralizedLocationType sys2_ids;
 };
 
 int Pathfinder::JumpDistanceBetweenObjects(int object1_id, int object2_id, const ObjectMap& objects) const
@@ -1075,6 +1066,9 @@ double Pathfinder::PathfinderImpl::ShortestPathDistance(int object1_id, int obje
         if (auto next_sys = objects.getRaw<System>(fleet->NextSystemID())) {
             dist = std::sqrt(pow((next_sys->X() - fleet->X()), 2) + pow((next_sys->Y() - fleet->Y()), 2));
             system_one = next_sys;
+        } else {
+            ErrorLogger() << "ShortestPathDistance couldn't get fleet " << fleet->ID() << " next system " << fleet->NextSystemID();
+            return -1.0;
         }
     }
 
@@ -1087,6 +1081,9 @@ double Pathfinder::PathfinderImpl::ShortestPathDistance(int object1_id, int obje
         if (auto next_sys = objects.getRaw<System>(fleet->NextSystemID())) {
             dist += std::sqrt(pow((next_sys->X() - fleet->X()), 2) + pow((next_sys->Y() - fleet->Y()), 2));
             system_two = next_sys;
+        } else {
+            ErrorLogger() << "ShortestPathDistance couldn't get fleet " << fleet->ID() << " next system " << fleet->NextSystemID();
+            return -1.0;
         }
     }
 
@@ -1150,8 +1147,8 @@ bool Pathfinder::SystemHasVisibleStarlanes(int system_id, const ObjectMap& objec
 { return pimpl->SystemHasVisibleStarlanes(system_id, objects); }
 
 bool Pathfinder::PathfinderImpl::SystemHasVisibleStarlanes(int system_id, const ObjectMap& objects) const {
-    if (auto system = objects.get<System>(system_id))
-        if (!system->StarlanesWormholes().empty())
+    if (auto system = objects.getRaw<System>(system_id))
+        if (system->NumStarlanes() > 0)
             return true;
     return false;
 }
@@ -1453,8 +1450,7 @@ void Pathfinder::PathfinderImpl::InitializeSystemGraph(const ObjectMap& objects,
     // add vertices to graph for all systems
     std::vector<int> system_ids;
     system_ids.reserve(objects.allExisting<System>().size());
-    for (auto& sys : objects.allExisting<System>())
-        system_ids.push_back(sys.first);
+    range_copy(objects.allExisting<System>() | range_keys, std::back_inserter(system_ids));
 
     decltype(m_system_id_to_graph_index)::sequence_type system_id_to_graph_idx_vec;
     system_id_to_graph_idx_vec.reserve(system_ids.size());
@@ -1470,9 +1466,6 @@ void Pathfinder::PathfinderImpl::InitializeSystemGraph(const ObjectMap& objects,
     std::sort(system_id_to_graph_idx_vec.begin(), system_id_to_graph_idx_vec.end());
     m_system_id_to_graph_index.adopt_sequence(boost::container::ordered_unique_range,
                                               std::move(system_id_to_graph_idx_vec));
-    m_system_id_to_graph_index.insert(boost::container::ordered_unique_range,
-                                      std::make_move_iterator(system_id_to_graph_idx_vec.begin()),
-                                      std::make_move_iterator(system_id_to_graph_idx_vec.end()));
 
     // add edges for all starlanes
     for (std::size_t system1_index = 0; system1_index < system_ids.size(); ++system1_index) {
@@ -1480,7 +1473,7 @@ void Pathfinder::PathfinderImpl::InitializeSystemGraph(const ObjectMap& objects,
         auto system1 = objects.get<System>(system1_id);
 
         // add edges and edge weights
-        for (auto const& [lane_dest_id, is_wormhole] : system1->StarlanesWormholes()) {
+        for (auto const lane_dest_id : system1->Starlanes()) {
 
             // skip null lanes and only add edges in one direction, to avoid
             // duplicating edges ( since this is an undirected graph, A->B
@@ -1498,12 +1491,8 @@ void Pathfinder::PathfinderImpl::InitializeSystemGraph(const ObjectMap& objects,
                 boost::add_edge(system1_index, lane_dest_graph_index, new_graph_impl->system_graph);
             //DebugLogger() << "Adding graph edge from " << system1_id << " to " << lane_dest_id;
 
-            if (add_success) {   // if this is a non-duplicate starlane or wormhole
-                if (is_wormhole)
-                    edge_weight_map[std::move(edge_descriptor)] = WORMHOLE_TRAVEL_DISTANCE;
-                else
-                    edge_weight_map[std::move(edge_descriptor)] = LinearDistance(system1_id, lane_dest_id, objects);
-            }
+            if (add_success) // if this is a non-duplicate starlane or wormhole
+                edge_weight_map[std::move(edge_descriptor)] = LinearDistance(system1_id, lane_dest_id, objects);
         }
     }
 

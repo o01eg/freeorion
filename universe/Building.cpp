@@ -21,7 +21,8 @@ Building::Building(int empire_id, std::string building_type, int produced_by_emp
 }
 
 std::shared_ptr<UniverseObject> Building::Clone(const Universe& universe, int empire_id) const {
-    const Visibility vis = universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
+    const Visibility vis = empire_id == ALL_EMPIRES ?
+        Visibility::VIS_FULL_VISIBILITY : universe.GetObjectVisibilityByEmpire(this->ID(), empire_id);
 
     if (!(vis >= Visibility::VIS_BASIC_VISIBILITY && vis <= Visibility::VIS_FULL_VISIBILITY))
         return nullptr;
@@ -47,7 +48,8 @@ void Building::Copy(const Building& copied_building, const Universe& universe, i
         return;
 
     const int copied_object_id = copied_building.ID();
-    const Visibility vis = universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
+    const Visibility vis = empire_id == ALL_EMPIRES ?
+        Visibility::VIS_FULL_VISIBILITY : universe.GetObjectVisibilityByEmpire(copied_object_id, empire_id);
     const auto visible_specials = universe.GetObjectVisibleSpecialsByEmpire(copied_object_id, empire_id);
 
     UniverseObject::Copy(copied_building, vis, visible_specials, universe);
@@ -74,13 +76,12 @@ bool Building::HostileToEmpire(int empire_id, const EmpireManager& empires) cons
         empires.GetDiplomaticStatus(Owner(), empire_id) == DiplomaticStatus::DIPLO_WAR;
 }
 
-UniverseObject::TagVecs Building::Tags(const ScriptingContext&) const {
-    if (const BuildingType* type = ::GetBuildingType(m_building_type))
-        return type->Tags();
-    return {};
+UniverseObject::TagVecs Building::Tags() const {
+    const BuildingType* type = ::GetBuildingType(m_building_type);
+    return type ? TagVecs{type->Tags()} : TagVecs{};
 }
 
-bool Building::HasTag(std::string_view name, const ScriptingContext&) const {
+bool Building::HasTag(std::string_view name) const {
     const BuildingType* type = GetBuildingType(m_building_type);
     return type && type->HasTag(name);
 }
@@ -89,6 +90,15 @@ bool Building::ContainedBy(int object_id) const noexcept {
     return object_id != INVALID_OBJECT_ID
         && (    object_id == m_planet_id
             ||  object_id == this->SystemID());
+}
+
+std::size_t Building::SizeInMemory() const {
+    std::size_t retval = UniverseObject::SizeInMemory();
+    retval += sizeof(Building) - sizeof(UniverseObject);
+
+    retval += sizeof(decltype(m_building_type)::value_type)*m_building_type.capacity();
+
+    return retval;
 }
 
 std::string Building::Dump(uint8_t ntabs) const {

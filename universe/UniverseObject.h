@@ -57,6 +57,14 @@ FO_ENUM(
     ((NUM_VISIBILITIES))
 )
 
+#if !defined(CONSTEXPR_VEC)
+#  if defined(__cpp_lib_constexpr_vector)
+#    define CONSTEXPR_VEC constexpr
+#  else
+#    define CONSTEXPR_VEC
+#  endif
+#endif
+
 
 /** The abstract base class for all objects in the universe
   * The UniverseObject class itself has an ID number, a name, a position, an ID
@@ -103,28 +111,27 @@ public:
     [[nodiscard]] float        SpecialCapacity(std::string_view name) const;       ///> returns the capacity of the special with name \a name or 0 if that special is not present
 
     struct [[nodiscard]] TagVecs {
-        TagVecs() = default;
-        TagVecs(const std::vector<std::string_view>& vec) noexcept :
+        constexpr TagVecs() = default;
+        constexpr explicit TagVecs(const std::vector<std::string_view>& vec) noexcept :
             first(vec)
         {}
-        TagVecs(const std::vector<std::string_view>& vec1,
-                const std::vector<std::string_view>& vec2) noexcept:
+        constexpr TagVecs(const std::vector<std::string_view>& vec1,
+                          const std::vector<std::string_view>& vec2) noexcept:
             first(vec1),
             second(vec2)
         {}
-        [[nodiscard]] bool empty() const noexcept { return first.empty() && second.empty(); }
-        [[nodiscard]] auto size() const noexcept { return first.size() + second.size(); }
+        [[nodiscard]] CONSTEXPR_VEC bool empty() const noexcept { return first.empty() && second.empty(); }
+        [[nodiscard]] CONSTEXPR_VEC auto size() const noexcept { return first.size() + second.size(); }
         const std::vector<std::string_view>& first = EMPTY_STRING_VEC;
         const std::vector<std::string_view>& second = EMPTY_STRING_VEC;
-        static const inline std::vector<std::string_view> EMPTY_STRING_VEC{};
+        static inline CONSTEXPR_VEC const std::vector<std::string_view> EMPTY_STRING_VEC{};
     };
     [[nodiscard]] virtual TagVecs             Tags(const ScriptingContext&) const { return {}; }; ///< Returns all tags this object has
     [[nodiscard]] virtual bool                HasTag(std::string_view name, const ScriptingContext&) const { return false; } ///< Returns true iff this object has the tag with the indicated \a name
 
     [[nodiscard]] UniverseObjectType          ObjectType() const noexcept { return m_type; }
 
-    /** Return human readable string description of object offset \p ntabs from
-        margin. */
+    /** Return human readable string description of object offset \p ntabs from margin. */
     [[nodiscard]] virtual std::string         Dump(uint8_t ntabs = 0) const;
 
     /** Returns id of the object that directly contains this object, if any, or
@@ -138,9 +145,8 @@ public:
         within this UniverseObject. */
     [[nodiscard]] virtual bool                Contains(int object_id) const { return false; }
 
-    /* Returns true if there is an object with id \a object_id that contains
-       this UniverseObject. */
-    [[nodiscard]] virtual bool                ContainedBy(int object_id) const { return false; }
+    /* Returns true if there is an object with id \a object_id that contains this UniverseObject. */
+    [[nodiscard]] virtual bool                ContainedBy(int object_id) const noexcept { return false; }
 
     using EmpireObjectVisMap = std::map<int, std::map<int, Visibility>>;
     [[nodiscard]] IDSet                       VisibleContainedObjectIDs(int empire_id, const EmpireObjectVisMap& vis) const; ///< returns the subset of contained object IDs that is visible to empire with id \a empire_id
@@ -159,7 +165,9 @@ public:
     virtual std::shared_ptr<UniverseObject>   Accept(const UniverseObjectVisitor& visitor) const;
 
     [[nodiscard]] int                         CreationTurn() const noexcept { return m_created_on_turn; }; ///< returns game turn on which object was created
-    [[nodiscard]] int                         AgeInTurns(int current_turn) const;   ///< returns elapsed number of turns between turn object was created and current game turn
+    [[nodiscard]] int                         AgeInTurns(int current_turn) const noexcept; ///< returns elapsed number of turns between turn object was created and current game turn
+
+    [[nodiscard]] virtual std::size_t         SizeInMemory() const;
 
     mutable StateChangedSignalType StateChangedSignal; ///< emitted when the UniverseObject is altered in any way
 
@@ -185,9 +193,8 @@ public:
     [[nodiscard]] MeterMap& Meters() noexcept { return m_meters; }  ///< returns this UniverseObject's meters
     [[nodiscard]] Meter*    GetMeter(MeterType type) noexcept;      ///< returns the requested Meter, or 0 if no such Meter of that type is found in this object
 
-    /** Sets all this UniverseObject's meters' initial values equal to their
-        current values. */
-    virtual void BackPropagateMeters();
+    /** Sets all this UniverseObject's meters' initial values equal to their current values. */
+    virtual void BackPropagateMeters() noexcept;
 
     /** Sets the empire that owns this object. */
     virtual void SetOwner(int id);
@@ -197,7 +204,6 @@ public:
     void RemoveSpecial(const std::string& name);                    ///< removes the Special \a name from this object, if it is already present
     void SetSpecialCapacity(std::string name, float capacity, int turn);
 
-public:
     /** Sets current value of max, target and unpaired meters in in this
       * UniverseObject to Meter::DEFAULT_VALUE.  This should be done before any
       * Effects that alter these meter(s) act on the object. */
@@ -245,8 +251,16 @@ protected:
 
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
-    void AddMeter(MeterType meter_type); ///< inserts a meter into object as the \a meter_type meter.  Should be used by derived classes to add their specialized meters to objects
-    void Init();                         ///< adds stealth meter
+    void AddMeter(MeterType meter_type) { m_meters[meter_type]; }
+
+    void AddMeters(const auto& meter_types)
+        requires requires { meter_types.begin(); }
+    {
+        for (MeterType mt : meter_types)
+            AddMeter(mt);
+    }
+
+    void Init();
 
     /** Used by public UniverseObject::Copy and derived classes' ::Copy methods. */
     void Copy(const UniverseObject& copied_object, Visibility vis,
@@ -278,7 +292,7 @@ private:
 /** A function that returns the correct amount of spacing for an indentation of
   * \p ntabs during a dump. */
 [[nodiscard]] inline std::string DumpIndent(uint8_t ntabs = 1)
-{ return std::string(ntabs * 4 /* conversion to std::size_t is safe */, ' '); }
+{ return std::string(static_cast<size_t>(ntabs) * 4u, ' '); }
 
 
 #endif

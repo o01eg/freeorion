@@ -48,39 +48,113 @@ struct FO_COMMON_API Constant final : public ValueRef<T>
         this->m_target_invariant = true;
         this->m_source_invariant = true;
     }
+    constexpr virtual ~Constant() noexcept = default;
 
-    [[nodiscard]] bool operator==(const ValueRef<T>& rhs) const override;
+    [[nodiscard]] constexpr bool operator==(const ValueRef<T>& rhs) const override {
+        if (&rhs == this)
+            return true;
+        if (typeid(rhs) != typeid(*this))
+            return false;
+        const Constant<T>& rhs_ = static_cast<const Constant<T>&>(rhs);
+        return m_value == rhs_.m_value;
+    }
+
+    [[nodiscard]] T Eval(const ScriptingContext& context) const
+        noexcept(noexcept(T{std::declval<const T>()})) override
+    { return m_value; }
+
+    [[nodiscard]] std::string Description() const override;
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override
+    { return DumpIndent(ntabs) + Description(); }
+
+    [[nodiscard]] constexpr T Value() const noexcept(noexcept(T{std::declval<const T>()})) { return m_value; };
+    [[nodiscard]] uint32_t GetCheckSum() const override;
+
+    [[nodiscard]] std::unique_ptr<ValueRef<T>> Clone() const override
+    { return std::make_unique<Constant>(m_value); }
+
+private:
+    const T m_value{};
+};
+
+#if !defined(CONSTEXPR_STRING)
+#  if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+#    define CONSTEXPR_STRING constexpr
+#  else
+#    define CONSTEXPR_STRING
+#  endif
+#endif
+
+template <>
+struct FO_COMMON_API Constant<std::string> final : public ValueRef<std::string>
+{
+    template <typename S> requires (std::is_convertible_v<S, std::string>)
+    CONSTEXPR_STRING explicit Constant(S&& value)
+        noexcept(noexcept(std::string{}) && noexcept(std::string{std::declval<S>()})) :
+        m_value(std::forward<S>(value))
+    {
+        static_assert(std::is_nothrow_move_constructible_v<std::string>);
+        this->m_root_candidate_invariant = true;
+        this->m_local_candidate_invariant = true;
+        this->m_target_invariant = true;
+        this->m_source_invariant = true;
+    }
+    CONSTEXPR_STRING virtual ~Constant() noexcept = default;
+
+    [[nodiscard]] constexpr bool operator==(const ValueRef<std::string>& rhs) const override {
+        if (&rhs == this)
+            return true;
+        if (typeid(rhs) != typeid(*this))
+            return false;
+        auto& rhs_ = static_cast<const Constant<std::string>&>(rhs);
+
+        return m_top_level_content == rhs_.m_top_level_content && m_value == rhs_.m_value;
+    }
 
     static constexpr std::string_view current_content = "CurrentContent";
     static constexpr std::string_view no_current_content = "THERE_IS_NO_TOP_LEVEL_CONTENT";
 
-    [[nodiscard]] T Eval(const ScriptingContext& context) const
-        noexcept(noexcept(T{std::declval<const T>()})) override
-    {
-        if constexpr (std::is_same_v<T, std::string>) {
-            if (m_value == current_content)
-                return m_top_level_content;
+    [[nodiscard]] std::string Eval(const ScriptingContext&) const override
+    { return (m_value == current_content) ? m_top_level_content : m_value; }
+
+    [[nodiscard]] std::string Description() const override
+    { return (m_value == current_content) ? m_top_level_content : m_value; }
+    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override
+    { return "\"" + Description() + "\""; }
+
+    void SetTopLevelContent(const std::string& content_name) override {
+        if (m_value == current_content && content_name == no_current_content) {
+            ErrorLogger() << "Constant<std::string>::SetTopLevelContent()  Scripted Content illegal.  Trying to set "
+                << no_current_content << " for "
+                << current_content << " (maybe you tried to use "
+                << current_content << " in named_values.focs.txt)";
         }
-        return m_value;
+        if (!m_top_level_content.empty() && m_top_level_content != no_current_content)
+            ErrorLogger() << "Constant<std::string>::SetTopLevelContent()  Tried to overwrite top level content from '" << m_top_level_content << "' to '" << content_name << "'";
+        else
+            m_top_level_content = content_name;
     }
 
-    [[nodiscard]] std::string Description() const override;
-    [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
+    [[nodiscard]] auto& Value() const noexcept { return m_value; };
+    [[nodiscard]] uint32_t GetCheckSum() const override {
+        uint32_t retval{0};
 
-    void SetTopLevelContent(const std::string& content_name) override;
+        CheckSums::CheckSumCombine(retval, "ValueRef::Constant<string>");
+        CheckSums::CheckSumCombine(retval, m_value);
+        TraceLogger() << "GetCheckSum(Constant<T>): " << typeid(*this).name()
+                      << " value: " << Description() << " retval: " << retval;
+        return retval;
+    }
 
-    [[nodiscard]] T Value() const noexcept(noexcept(T{})) { return m_value; };
-    [[nodiscard]] uint32_t GetCheckSum() const override;
-
-    [[nodiscard]] std::unique_ptr<ValueRef<T>> Clone() const override {
+    [[nodiscard]] std::unique_ptr<ValueRef<std::string>> Clone() const override {
         auto retval = std::make_unique<Constant>(m_value);
         retval->m_top_level_content = m_top_level_content;
         return retval;
     }
 
 private:
-    const T m_value{};
-    std::string m_top_level_content;    // in the special case that T is std::string and m_value is "CurrentContent", return this instead
+    const std::string m_value;
+    std::string m_top_level_content; // if m_value is "CurrentContent", return this instead
 };
 
 
@@ -396,12 +470,10 @@ enum class OpType : uint8_t {
 template <typename T>
 struct FO_COMMON_API Operation final : public ValueRef<T>
 {
-    /** Binary operation ctor. */
+    /** N-ary operation ctor. */
     Operation(OpType op_type, std::unique_ptr<ValueRef<T>>&& operand1,
-              std::unique_ptr<ValueRef<T>>&& operand2);
-
-    /** Unary operation ctor. */
-    Operation(OpType op_type, std::unique_ptr<ValueRef<T>>&& operand);
+              std::unique_ptr<ValueRef<T>>&& operand2 = nullptr,
+              std::unique_ptr<ValueRef<T>>&& operand3 = nullptr);
 
     /* N-ary operation ctor. */
     Operation(OpType op_type, std::vector<std::unique_ptr<ValueRef<T>>>&& operands);
@@ -475,57 +547,9 @@ private:
 [[nodiscard]] FO_COMMON_API std::string StatisticDescription(
     StatisticType stat_type, std::string_view value_desc, std::string_view condition_desc);
 
-// Template Implementations
-///////////////////////////////////////////////////////////
-// ValueRef                                          //
-///////////////////////////////////////////////////////////
-template <typename T>
-bool ValueRef<T>::operator==(const ValueRef<T>& rhs) const
-{
-    if (&rhs == this)
-        return true;
-    if (typeid(rhs) != typeid(*this))
-        return false;
-
-    return true;
-}
-
 ///////////////////////////////////////////////////////////
 // Constant                                              //
 ///////////////////////////////////////////////////////////
-template <typename T>
-bool Constant<T>::operator==(const ValueRef<T>& rhs) const
-{
-    if (&rhs == this)
-        return true;
-    if (typeid(rhs) != typeid(*this))
-        return false;
-    const Constant<T>& rhs_ = static_cast<const Constant<T>&>(rhs);
-
-    if constexpr (std::is_same_v<T, std::string>) {
-        if (m_top_level_content != rhs_.m_top_level_content)
-            return false;
-    }
-    return m_value == rhs_.m_value;
-}
-
-template <typename T>
-void Constant<T>::SetTopLevelContent(const std::string& content_name)
-{
-    if constexpr (std::is_same_v<T, std::string>) {
-        if (m_value == current_content && content_name == no_current_content) {
-            ErrorLogger() << "Constant<std::string>::SetTopLevelContent()  Scripted Content illegal.  Trying to set "
-                          << no_current_content << " for "
-                          << current_content << " (maybe you tried to use "
-                          << current_content << " in named_values.focs.txt)";
-        }
-        if (!m_top_level_content.empty() && m_top_level_content != no_current_content)
-            ErrorLogger() << "Constant<std::string>::SetTopLevelContent()  Tried to overwrite top level content from '" << m_top_level_content << "' to '" << content_name << "'";
-        else
-            m_top_level_content = content_name;
-    }
-}
-
 template <typename T>
 uint32_t Constant<T>::GetCheckSum() const
 {
@@ -543,9 +567,6 @@ FO_COMMON_API std::string Constant<int>::Description() const;
 
 template <>
 FO_COMMON_API std::string Constant<double>::Description() const;
-
-template <>
-FO_COMMON_API std::string Constant<std::string>::Description() const;
 
 template <>
 FO_COMMON_API std::string Constant<PlanetType>::Description() const;
@@ -588,9 +609,6 @@ FO_COMMON_API std::string Constant<double>::Dump(uint8_t ntabs) const;
 
 template <>
 FO_COMMON_API std::string Constant<int>::Dump(uint8_t ntabs) const;
-
-template <>
-FO_COMMON_API std::string Constant<std::string>::Dump(uint8_t ntabs) const;
 
 ///////////////////////////////////////////////////////////
 // Variable                                              //
@@ -1563,7 +1581,7 @@ std::string StringCast<FromType>::Eval(const ScriptingContext& context) const
         return value;
     } else if constexpr (std::is_enum_v<FromType>) {
         return std::string{to_string(value)};
-    } else if constexpr (std::is_arithmetic_v<FromType>) {
+    } else if constexpr (requires { std::to_string(value); }) {
         return std::to_string(value);
     } else if constexpr (std::is_same_v<FromType, std::vector<std::string>>) {
         std::string retval;
@@ -1596,9 +1614,6 @@ FO_COMMON_API std::string StringCast<double>::Eval(const ScriptingContext& conte
 
 template <>
 FO_COMMON_API std::string StringCast<int>::Eval(const ScriptingContext& context) const;
-
-template <>
-FO_COMMON_API std::string StringCast<std::vector<std::string>>::Eval(const ScriptingContext& context) const;
 
 template <typename FromType>
 std::string StringCast<FromType>::Description() const
@@ -1717,21 +1732,17 @@ uint32_t UserStringLookup<FromType>::GetCheckSum() const
 template <typename T>
 Operation<T>::Operation(OpType op_type,
                         std::unique_ptr<ValueRef<T>>&& operand1,
-                        std::unique_ptr<ValueRef<T>>&& operand2) :
-    Operation(op_type, [&operand1, &operand2]() {
+                        std::unique_ptr<ValueRef<T>>&& operand2,
+                        std::unique_ptr<ValueRef<T>>&& operand3) :
+    Operation(op_type, [&operand1, &operand2, &operand3]() {
                 std::remove_const_t<decltype(m_operands)> retval{};
-                retval.reserve(2);
-                retval.push_back(std::move(operand1));
-                retval.push_back(std::move(operand2));
-                return retval;
-              }())
-{}
-
-template <typename T>
-Operation<T>::Operation(OpType op_type, std::unique_ptr<ValueRef<T>>&& operand) :
-    Operation(op_type, [&operand]() {
-                std::remove_const_t<decltype(m_operands)> retval{};
-                retval.push_back(std::move(operand));
+                retval.reserve((operand1 ? 1u : 0u) + (operand2 ? 1u : 0u) + (operand3 ? 1u : 0u));
+                if (operand1)
+                    retval.push_back(std::move(operand1));
+                if (operand2)
+                    retval.push_back(std::move(operand2));
+                if (operand3)
+                    retval.push_back(std::move(operand3));
                 return retval;
               }())
 {}
@@ -2241,6 +2252,17 @@ std::string Operation<T>::Dump(uint8_t ntabs) const
     if (m_op_type == OpType::SIGN)
         return "sign(" + LHS()->Dump(ntabs) + ")";
 
+    bool parenthesize_whole = [this]() {
+        switch (m_op_type) {
+        case OpType::COMPARE_EQUAL: [[fallthrough]];
+        case OpType::COMPARE_GREATER_THAN: [[fallthrough]];
+        case OpType::COMPARE_GREATER_THAN_OR_EQUAL: [[fallthrough]];
+        case OpType::COMPARE_LESS_THAN: [[fallthrough]];
+        case OpType::COMPARE_LESS_THAN_OR_EQUAL: [[fallthrough]];
+        case OpType::COMPARE_NOT_EQUAL: return true; break;
+        default: return false;
+        }
+    }();
     bool parenthesize_lhs = false;
     bool parenthesize_rhs = false;
     if (auto lhs = dynamic_cast<const Operation<T>*>(LHS())) {
@@ -2270,26 +2292,35 @@ std::string Operation<T>::Dump(uint8_t ntabs) const
             parenthesize_rhs = true;
     }
 
-    std::string retval;
+    std::string retval = parenthesize_whole ? "(" : "";
     if (parenthesize_lhs)
         retval += '(' + LHS()->Dump(ntabs) + ')';
     else
         retval += LHS()->Dump(ntabs);
 
     switch (m_op_type) {
-    case OpType::PLUS:         retval += " + "; break;
-    case OpType::MINUS:        retval += " - "; break;
-    case OpType::TIMES:        retval += " * "; break;
-    case OpType::DIVIDE:       retval += " / "; break;
-    case OpType::REMAINDER:    retval += " % "; break;
-    case OpType::EXPONENTIATE: retval += " ^ "; break;
-    default:                   retval += " ? "; break;
+    case OpType::PLUS:                          retval += " + "; break;
+    case OpType::MINUS:                         retval += " - "; break;
+    case OpType::TIMES:                         retval += " * "; break;
+    case OpType::DIVIDE:                        retval += " / "; break;
+    case OpType::REMAINDER:                     retval += " % "; break;
+    case OpType::EXPONENTIATE:                  retval += " ^ "; break;
+    case OpType::SUBSTITUTION:                  retval += " % "; break;
+    case OpType::COMPARE_EQUAL:                 retval += " == "; break;
+    case OpType::COMPARE_GREATER_THAN:          retval += " > "; break;
+    case OpType::COMPARE_GREATER_THAN_OR_EQUAL: retval += " >= "; break;
+    case OpType::COMPARE_LESS_THAN:             retval += " < "; break;
+    case OpType::COMPARE_LESS_THAN_OR_EQUAL:    retval += " <= "; break;
+    case OpType::COMPARE_NOT_EQUAL:             retval += " != "; break;
+    default: break;
     }
 
     if (parenthesize_rhs)
         retval += '(' + RHS()->Dump(ntabs) + ')';
     else
         retval += RHS()->Dump(ntabs);
+
+    retval += parenthesize_whole ? ")" : "";
 
     return retval;
 }

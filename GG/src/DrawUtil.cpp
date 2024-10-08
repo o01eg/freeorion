@@ -679,6 +679,13 @@ void GG::Line(Pt pt1, Pt pt2, Clr color, float thick)
     Line(pt1.x, pt1.y, pt2.x, pt2.y);
 }
 
+void GG::Line(X x1, Y y1, X x2, Y y2, Clr color, float thick)
+{
+    glLineWidth(thick);
+    glColor(color);
+    Line(x1, y1, x2, y2);
+}
+
 void GG::Line(X x1, Y y1, X x2, Y y2)
 {
     const GLfloat vertices[4] = {GLfloat(Value(x1)), GLfloat(Value(y1)),
@@ -750,17 +757,14 @@ void GG::Triangle(X x1, Y y1, X x2, Y y2, X x3, Y y3, bool filled)
     glEnable(GL_TEXTURE_2D);
 }
 
-void GG::FlatRectangle(Pt ul, Pt lr, Clr color, Clr border_color,
-                       unsigned int border_thick)
+void GG::FlatRectangle(Pt ul, Pt lr, Clr color, Clr border_color, unsigned int border_thick)
 {
     Rectangle(ul, lr, color, border_color, border_color, border_thick,
               true, true, true, true);
 }
 
-void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
-                          unsigned int bevel_thick, bool bevel_left,
-                          bool bevel_top, bool bevel_right,
-                          bool bevel_bottom)
+void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up, unsigned int bevel_thick,
+                          bool bevel_left, bool bevel_top, bool bevel_right, bool bevel_bottom)
 {
     Rectangle(ul, lr, color,
               (up ? LightenClr(border_color) : DarkenClr(border_color)),
@@ -769,16 +773,14 @@ void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
 }
 
 void GG::FlatRoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color,
-                              unsigned int corner_radius,
-                              unsigned int border_thick)
+                              unsigned int corner_radius, unsigned int border_thick)
 {
     RoundedRectangle(ul, lr, color, border_color, border_color,
                      corner_radius, border_thick);
 }
 
 void GG::BeveledRoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
-                                 unsigned int corner_radius,
-                                 unsigned int bevel_thick)
+                                 unsigned int corner_radius, unsigned int bevel_thick)
 {
     RoundedRectangle(ul, lr, color,
                      (up ? LightenClr(border_color) : DarkenClr(border_color)),

@@ -126,28 +126,22 @@ std::string_view TextControl::Text(CPSize from, CPSize to) const
 {
     if (from == INVALID_CP_SIZE || to == INVALID_CP_SIZE)
         return "";
-    CPSize low = std::max(CP0, std::min(from, to));
-    CPSize high = std::min(Length(), std::max(from, to));
 
-    //std::cout << "low: " << low << "  high: " << high << std::endl;
+    std::tie(from, to) = [from, to]() { return std::pair{std::min(from, to), std::max(from, to)}; }();
 
-    auto low_pos = LinePositionOf(low, m_line_data);
-    auto high_pos = LinePositionOf(high, m_line_data);
+    const auto txt_sz = m_text.size();
+    auto [low_string_idx_strsz, high_string_idx_strsz] = CodePointIndicesRangeToStringSizeIndices(from, to, m_line_data);
+    const auto low_string_idx = std::min(Value(low_string_idx_strsz), txt_sz);
+    const auto high_string_idx = std::min(Value(high_string_idx_strsz), txt_sz);
+    const auto out_length = std::max(low_string_idx, high_string_idx) - std::min(low_string_idx, high_string_idx);
 
-    StrSize low_string_idx = StringIndexOf(low_pos.first, low_pos.second, m_line_data);
-    StrSize high_string_idx = StringIndexOf(high_pos.first, high_pos.second, m_line_data);
-
-    auto low_it = m_text.begin() + Value(low_string_idx);
-    auto high_it = m_text.begin() + Value(high_string_idx);
+    const auto low_it = m_text.begin() + low_string_idx;
+    const auto high_it = m_text.begin() + high_string_idx;
 
     try {
-        //std::cout << "dist begin to low: " << std::distance(m_text.begin(), low_it) << std::endl;
-        //std::cout << "dist low to high: " << std::distance(low_it, high_it) << std::endl;
-        //std::cout << "dist high to end: " << std::distance(high_it, m_text.end()) << std::endl;
-
-        return {&*low_it, static_cast<std::size_t>(std::distance(low_it, high_it))};
+        return {&*low_it, out_length};
     } catch (...) {
-        return "";
+        return {};
     }
 }
 
@@ -232,7 +226,7 @@ void TextControl::RecomputeLineData() {
     if (!m_font)
         return;
 
-    m_code_points = CPSize(utf8::distance(m_text.begin(), m_text.end()));
+    m_code_points = CPSize(utf8::distance(m_text.begin(), m_text.end())); // ??? should be based on line data probably?
 
     m_line_data = m_font->DetermineLines(m_text, m_format, ClientSize().x, m_text_elements);
     Pt text_sz = m_font->TextExtent(m_line_data);
@@ -325,9 +319,18 @@ void TextControl::SetResetMinSize(bool b)
 void TextControl::operator+=(const std::string& s)
 { SetText(m_text + s); }
 
+namespace {
+    constexpr bool IsValidUTFChar(char c) noexcept {
+        if constexpr (std::is_signed_v<char>)
+            return c >= 0;
+        else
+            return c <= 0x7f;
+    }
+}
+
 void TextControl::operator+=(char c)
 {
-    if (!detail::ValidUTFChar<char>()(c))
+    if (!IsValidUTFChar(c))
         throw utf8::invalid_utf8(c);
     SetText(m_text + c);
 }
@@ -338,29 +341,29 @@ void TextControl::Clear()
 void TextControl::Insert(CPSize pos, char c)
 {
     std::size_t line;
-    std::tie(line, pos) = LinePositionOf(pos, m_line_data);
+    std::tie(line, pos) = LinePositionOfGlyph(pos, m_line_data);
     Insert(line, pos, c);
 }
 
 void TextControl::Insert(CPSize pos, const std::string& s)
 {
     std::size_t line;
-    std::tie(line, pos) = LinePositionOf(pos, m_line_data);
+    std::tie(line, pos) = LinePositionOfGlyph(pos, m_line_data);
     Insert(line, pos, s);
 }
 
 void TextControl::Erase(CPSize pos, CPSize num)
 {
     std::size_t line;
-    std::tie(line, pos) = LinePositionOf(pos, m_line_data);
+    std::tie(line, pos) = LinePositionOfGlyph(pos, m_line_data);
     Erase(line, pos, num);
 }
 
 void TextControl::Insert(std::size_t line, CPSize pos, char c)
 {
-    if (!detail::ValidUTFChar<char>()(c))
+    if (!IsValidUTFChar(c))
         return;
-    m_text.insert(Value(StringIndexOf(line, pos, m_line_data)), 1, c);
+    m_text.insert(Value(StringIndexOfLineAndGlyph(line, pos, m_line_data)), 1, c);
     SetText(std::move(m_text));
 }
 
@@ -368,14 +371,14 @@ void TextControl::Insert(std::size_t line, CPSize pos, const std::string& s)
 {
     if (!utf8::is_valid(s.begin(), s.end()))
         return;
-    m_text.insert(Value(StringIndexOf(line, pos, m_line_data)), s);
+    m_text.insert(Value(StringIndexOfLineAndGlyph(line, pos, m_line_data)), s);
     SetText(std::move(m_text));
 }
 
 void TextControl::Erase(std::size_t line, CPSize pos, CPSize num)
 {
-    auto it = m_text.begin() + Value(StringIndexOf(line, pos, m_line_data));
-    auto end_it = m_text.begin() + Value(StringIndexOf(line, pos + num, m_line_data));
+    auto it = m_text.begin() + Value(StringIndexOfLineAndGlyph(line, pos, m_line_data));
+    auto end_it = m_text.begin() + Value(StringIndexOfLineAndGlyph(line, pos + num, m_line_data));
     if (it == end_it)
         return;
     m_text.erase(it, end_it);
@@ -386,8 +389,8 @@ void TextControl::Erase(std::size_t line1, CPSize pos1, std::size_t line2, CPSiz
 {
     //std::cout << "TextControl::Erase(" << line1 << ", " << pos1 << "," << line2 << ", " << pos2 << ")" << std::endl;
 
-    std::size_t offset1 = Value(StringIndexOf(line1, pos1, m_line_data));
-    std::size_t offset2 = Value(StringIndexOf(line2, pos2, m_line_data));
+    std::size_t offset1 = Value(StringIndexOfLineAndGlyph(line1, pos1, m_line_data));
+    std::size_t offset2 = Value(StringIndexOfLineAndGlyph(line2, pos2, m_line_data));
     if (offset1 == offset2)
         return;
     //std::cout << "TextControl::Erase offsets: " << offset1 << " // " << offset2 << std::endl;

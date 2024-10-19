@@ -56,16 +56,19 @@ RUN apt-get install --assume-yes \
         dh-apparmor \
 	dh-python \
         python3-psycopg2 \
+	python3-psycopg \
 	python3-aiohttp \
-	python3-aiosmtplib \
 	ssh \
 	libjpeg-dev \
 	libtiff-dev \
 	godot3-server \
 	curl \
 	libssl-dev \
-	gdb \
-    && rm -rf \
+	gdb
+RUN curl -o python3-aiosmtplib_2.0.0-1_all.deb http://launchpadlibrarian.net/641723956/python3-aiosmtplib_2.0.0-1_all.deb \
+    && echo "dbf608a9200922a778fdeeea7217725aacba89f63dfd88681ac919dc982a1cd8 *python3-aiosmtplib_2.0.0-1_all.deb" | sha256sum -c - \
+    && dpkg -i python3-aiosmtplib_2.0.0-1_all.deb  
+RUN rm -rf \
         /var/lib/apt/lists/* \
         /var/cache/apt/archives/*
 

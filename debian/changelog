@@ -1,3 +1,9 @@
+freeorion (0.5.0.1+ppa1~noble) noble; urgency=medium
+
+  * Upgrade to Ubuntu 24.04.1 LTS Noble Numbat.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Sat, 19 Oct 2024 14:07:43 +0400
+
 freeorion (0.5.0.1rc1+ppa1~jammy) jammy; urgency=medium
 
   * 0.5.0.1 RC 1.

@@ -936,6 +936,15 @@ bool ServerApp::NewGameInitVerifyJoiners(const std::vector<PlayerSetupData>& pla
 void ServerApp::SendNewGameStartMessages() {
     std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
 
+    const ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data,
+                                   m_species_manager, m_supply_manager};
+
+    for (auto& empire : m_empires | range_values) {
+        empire->UpdateOwnedObjectCounters(m_universe);
+        empire->PrepQueueAvailabilityInfoForSerialization(context);
+        empire->PrepPolicyInfoForSerialization(context);
+    }
+
     // send new game start messages
     DebugLogger() << "SendGameStartMessages: Sending GameStartMessages to players";
     for (auto player_connection_it = m_networking.established_begin();  // can't easily use range for loop due to non-standard begin and end
@@ -1501,6 +1510,15 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
                         m_cached_empire_production_costs_times);
 
     const auto player_info_map = GetPlayerInfoMap();
+
+
+
+    for (auto& empire : m_empires | range_values) {
+        empire->UpdateOwnedObjectCounters(m_universe);
+        empire->PrepQueueAvailabilityInfoForSerialization(context);
+        empire->PrepPolicyInfoForSerialization(context);
+    }
+
 
     // assemble player state information, and send game start messages
     DebugLogger() << "ServerApp::CommonGameInit: Sending GameStartMessages to players";
@@ -2135,12 +2153,20 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     if (GetOptionsDB().Get<bool>("network.server.drop-empire-ready")) {
         // drop ready status
         empire->SetReady(false);
-        m_networking.SendMessageAll(PlayerStatusMessage(Message::PlayerStatus::PLAYING_TURN,
-                                                        empire_id));
+        m_networking.SendMessageAll(PlayerStatusMessage(Message::PlayerStatus::PLAYING_TURN, empire_id));
     }
 
-    auto player_info_map = GetPlayerInfoMap();
-    bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
+    const auto player_info_map = GetPlayerInfoMap();
+    const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
+
+    const ScriptingContext context{m_universe, m_empires, m_galaxy_setup_data,
+                                   m_species_manager, m_supply_manager};
+
+    for (auto& empire : m_empires | range_values) {
+        empire->UpdateOwnedObjectCounters(m_universe);
+        empire->PrepQueueAvailabilityInfoForSerialization(context);
+        empire->PrepPolicyInfoForSerialization(context);
+    }
 
     player_connection->SendMessage(GameStartMessage(
         m_single_player_game, empire_id,
@@ -2574,6 +2600,7 @@ namespace {
             DebugLogger(combat) << "   Only one combatant present: no combat.";
             return false;
         }
+        DebugLogger(combat) << "   Empires with planets (or populated unowned) present:  " << to_string(empires_here);
         empires_here.insert(empires_here.end(),
                             empires_with_fleets_here.begin(), empires_with_fleets_here.end());
         Uniquify(empires_here);
@@ -2620,13 +2647,14 @@ namespace {
 
             // is any planet owned by an empire at war with aggressive empire?
             for (const auto* planet : aggressive_empire_visible_planets | range_filter(not_null)) {
-                int visible_planet_empire_id = planet->Owner();
+                const int visible_planet_empire_id = planet->Owner();
 
                 if (aggressive_empire_id != visible_planet_empire_id &&
                     at_war_with_empire_ids.contains(visible_planet_empire_id))
                 {
                     DebugLogger(combat) << "   Aggressive fleet empire " << aggressive_empire_id
-                                        << " sees at war target planet " << planet->Name();
+                                        << " sees at war target planet " << planet->Name()
+                                        << " (owner: " << visible_planet_empire_id << ")";
                     return true;  // an aggressive empire can see a planet onwned by an empire it is at war with
                 }
             }
@@ -4388,6 +4416,12 @@ void ServerApp::PreCombatProcessTurns() {
     // indicate that the clients are waiting for their new Universes
     m_networking.SendMessageAll(TurnProgressMessage(Message::TurnProgressPhase::DOWNLOADING));
 
+    for (auto& empire : m_empires | range_values) {
+        empire->UpdateOwnedObjectCounters(m_universe);
+        empire->PrepQueueAvailabilityInfoForSerialization(context);
+        empire->PrepPolicyInfoForSerialization(context);
+    }
+
     // send partial turn updates to all players after orders and movement
     // exclude those without empire and who are not Observer or Moderator
     for (auto player_it = m_networking.established_begin();
@@ -4714,8 +4748,11 @@ void ServerApp::PostCombatProcessTurns() {
 
     // misc. other updates and records
     m_universe.UpdateStatRecords(context);
-    for (auto& empire : m_empires | range_values)
+    for (auto& empire : m_empires | range_values) {
         empire->UpdateOwnedObjectCounters(m_universe);
+        empire->PrepQueueAvailabilityInfoForSerialization(context);
+        empire->PrepPolicyInfoForSerialization(context);
+    }
 
 
     // indicate that the clients are waiting for their new gamestate

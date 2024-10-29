@@ -14,8 +14,6 @@
 #ifndef _GG_PtRect_h_
 #define _GG_PtRect_h_
 
-
-#include <boost/functional/hash.hpp>
 #include <GG/Base.h>
 #include <GG/StrongTypedef.h>
 
@@ -25,80 +23,6 @@ namespace GG {
 POSITION_TYPEDEF(X)
 // Y screen coordinate
 POSITION_TYPEDEF(Y)
-
-
-namespace StaticTests {
-    static_assert(ToX(0.50f) == X1);
-    static_assert(ToX(0.49) == X0);
-    static_assert(ToY(0.0) == Y0);
-    static_assert(ToY(-0.5f) == -Y1);
-    static_assert(ToY(-1.49f) == -Y1);
-    static_assert(ToY(-1.5) == Y{-2});
-
-    static_assert(-X0 == X0);
-    static_assert(-X1 == X{-1});
-    static_assert(X1 + 1.0f == 2.0f);
-    static_assert(std::is_same_v<decltype(X0 + 1.0), decltype(1.0 + X0)>);
-    static_assert(std::is_same_v<decltype(X0 + 1.0f), float>);
-    static_assert(X0/2 == X0);
-    static_assert(std::is_same_v<decltype(42 - X0), int>);
-    static_assert(std::is_same_v<decltype(Y0 - 2.4), decltype(2.4 - Y0)>);
-
-    static_assert(X1 + X0 == X1);
-    static_assert(Value(X{10} + 5) == 15);
-    static_assert(X{10} + 5 == 3 + X{12});
-    static_assert([](){ X x(X0); x += X1; return x; }() == X1);
-    static_assert(Value([](){ X x(X1); x += (-2); return x; }()) == -1);
-    static_assert(X0 + 1.0 == 1.0);
-    static_assert(10.0 + X1 == 11.0 + X0);
-
-    static_assert(X1 - X0 == X1);
-    static_assert(Value(X{10} - 5) == 5);
-    static_assert(10 - X{5} == 5);
-    static_assert([](){ X x(X1); x -= X1; return x; }() == X0);
-    static_assert([](){ X x(X0); x -= (-1); return x; }() == X1);
-    static_assert(X1 - 1.0f == 0.0f);
-    static_assert(10.0f - X1 == 9.0f + X0);
-
-    static_assert(X1 * X0 == X0);
-    static_assert(X{10} * 5 == X{50});
-    static_assert(5 * X{10} == X{50});
-    static_assert(X{10} * 5 == 2 * X{25});
-    static_assert([](){ X x(X1); x *= X1; return x; }() == X1);
-    static_assert(Value([](){ X x(X1); x *= (-1); return x; }()) == -1);
-    static_assert(X1 * 1.0 == 1.0);
-    static_assert(10.0 * X1 == X1 * 10.0);
-
-    static_assert(X1 / X1 == 1);
-    static_assert(X{10} / 5 == X{2});
-    static_assert(X{5} / 10.0 == 25/50.0);
-    static_assert(Value([](){ X x(X1); x /= (-1); return x; }()) == -1);
-    static_assert(Value([](){ X x{21}; x /= 3.0; return x; }()) == 7);
-    static_assert(X1 / 1.0 == 1.0);
-
-    static_assert([](){ X x(X0); return ++x; }() == X1);
-    static_assert([](){ Y y(Y0); y++; return y; }() == Y1);
-    static_assert([](){ Y y(Y1); y++; return y; }() != Y1);
-    static_assert([](){ X x(X1); return --x; }() == X0);
-    static_assert([](){ Y y(Y1); y--; return y; }() == Y0);
-    static_assert([](){ Y y(Y0); y--; return y; }() != Y0);
-
-    inline constexpr Y szy{22};
-    inline constexpr int margin = 3;
-    inline constexpr int tw = Value(szy - 4 * margin);
-    static_assert(tw == 10);
-    inline constexpr int ow = tw + 3 * margin;
-    static_assert(ow == 19);
-    inline constexpr X szx{5};
-    inline constexpr X tl = szx - tw - margin * 5 / 2;
-    static_assert(Value(tl) == -12);
-    inline constexpr auto btnl = szx - ow - margin;
-    static_assert(btnl == GG::X(-17));
-    inline constexpr auto btnr = szx - margin;
-    static_assert(Value(btnr) == 2);
-    static_assert(margin - szx == -Value(btnr));
-}
-
 
 /** \brief A GG screen coordinate class. */
 struct GG_API Pt
@@ -130,6 +54,20 @@ struct GG_API Pt
 
     X x = X0;
     Y y = Y0;
+
+    static constexpr std::size_t hash(std::size_t x) {
+        // from Boost hash_mix_impl
+        const std::size_t m = (std::size_t(0xe9846afu) << 32u) + std::size_t(0x9b1a615du);
+        x ^= x >> 32u;
+        x *= m;
+        x ^= x >> 32u;
+        x *= m;
+        x ^= x >> 28u;
+        return x;
+    }
+
+    static constexpr std::size_t hash(std::size_t x, std::size_t y)
+    { return hash(x + std::size_t{0x9e3779b9u} + y); } // from Boost hash_combine
 };
 
 inline constexpr Pt Pt0{GG::X0, GG::Y0};
@@ -200,21 +138,16 @@ GG_API std::ostream& operator<<(std::ostream& os, Pt pt); ///< Pt stream-output 
 GG_API std::ostream& operator<<(std::ostream& os, Rect rect); ///< Rect stream-output operator for debug output
 
 // Hash functions
-// Replace with C++11 equilvalent when converted to C++11
-[[nodiscard]] GG_API inline std::size_t hash_value(X x) { return boost::hash<int>()(Value(x)); }
-[[nodiscard]] GG_API inline std::size_t hash_value(Y y) { return boost::hash<int>()(Value(y)); }
+[[nodiscard]] GG_API inline std::size_t hash_value(X x) { return std::hash<int32_t>()(Value(x)); }
+[[nodiscard]] GG_API inline std::size_t hash_value(Y y) { return std::hash<int32_t>()(Value(y)); }
 [[nodiscard]] GG_API inline std::size_t hash_value(Pt pt) {
-    std::size_t seed(0);
-    boost::hash_combine(seed, pt.x);
-    boost::hash_combine(seed, pt.y);
-    return seed;
+    static_assert(std::is_same_v<std::decay_t<decltype(Value(pt.x))>, int32_t>);
+    static_assert(static_cast<int64_t>(1) + (static_cast<int64_t>(1) << 32u) == 4294967297);
+    auto temp = static_cast<int64_t>(Value(pt.x)) + (static_cast<int64_t>(Value(pt.y)) << 32u);
+    return std::hash<decltype(temp)>()(temp);
 }
-[[nodiscard]] GG_API inline std::size_t hash_value(Rect r) {
-    std::size_t seed(0);
-    boost::hash_combine(seed, r.ul);
-    boost::hash_combine(seed, r.lr);
-    return seed;
-}
+[[nodiscard]] GG_API inline std::size_t hash_value(Rect r)
+{ return Pt::hash(hash_value(r.ul), hash_value(r.lr)); }
 
 }
 

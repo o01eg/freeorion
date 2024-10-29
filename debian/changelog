@@ -1,3 +1,9 @@
+freeorion (0.5.0.9999.fo0029+git20241029.d2c6017ppa1~noble) noble; urgency=medium
+
+  * FO0029 game.
+
+ -- O01eg Auto-Sign (Key for automatic sign-in PPA) <o01eg@yandex.ru>  Tue, 29 Oct 2024 20:33:31 +0400
+
 freeorion (0.5.0.9999.fo0028+git20240924.4e37383ppa2~jammy) jammy; urgency=medium
 
   * Update weeky test build.

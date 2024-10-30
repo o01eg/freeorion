@@ -1,4 +1,4 @@
-FROM docker.io/ubuntu:jammy
+FROM docker.io/ubuntu:noble
 
 LABEL version="0" \
       maintainer="O01eg <o01eg@yandex.ru>"
@@ -11,7 +11,7 @@ path-exclude=/usr/share/cmake-*/Help/*\n\
 
 RUN echo "# don't install static libraries inside container\n\
 path-exclude=/usr/lib/x86_64-linux-gnu/*.a\n\
-path-exclude=/usr/lib/python3.10/config-3.10-x86_64-linux-gnu/*.a\n\
+path-exclude=/usr/lib/python3.12/config-3.12-x86_64-linux-gnu/*.a\n\
 path-include=/usr/lib/x86_64-linux-gnu/libc_nonshared.a\n\
 path-include=/usr/lib/gcc/x86_64-linux-gnu/11/libgcc.a\n\
 path-include=/usr/lib/x86_64-linux-gnu/libmvec_nonshared.a\n\
@@ -56,16 +56,19 @@ RUN apt-get install --assume-yes \
         dh-apparmor \
 	dh-python \
         python3-psycopg2 \
+	python3-psycopg \
 	python3-aiohttp \
-	python3-aiosmtplib \
 	ssh \
 	libjpeg-dev \
 	libtiff-dev \
 	godot3-server \
 	curl \
 	libssl-dev \
-	gdb \
-    && rm -rf \
+	gdb
+RUN curl -o python3-aiosmtplib_2.0.0-1_all.deb http://launchpadlibrarian.net/641723956/python3-aiosmtplib_2.0.0-1_all.deb \
+    && echo "dbf608a9200922a778fdeeea7217725aacba89f63dfd88681ac919dc982a1cd8 *python3-aiosmtplib_2.0.0-1_all.deb" | sha256sum -c - \
+    && dpkg -i python3-aiosmtplib_2.0.0-1_all.deb
+RUN rm -rf \
         /var/lib/apt/lists/* \
         /var/cache/apt/archives/*
 

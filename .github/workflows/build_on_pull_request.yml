@@ -30,7 +30,7 @@ jobs:
     if: ${{ needs.detect_changed_files.outputs.build_macos == 'true' }}
     strategy:
       matrix:
-        os: [ macos-12, macos-13 ]
+        os: [ macos-14, macos-13 ]
     uses: ./.github/workflows/_build-macos.yml
     with:
       os: ${{ matrix.os }}
@@ -38,6 +38,10 @@ jobs:
     needs: detect_changed_files
     if: ${{ needs.detect_changed_files.outputs.build_ubuntu == 'true' }}
     uses: ./.github/workflows/_build-ubuntu.yml
+  docker:
+    needs: detect_changed_files
+    if: ${{ needs.detect_changed_files.outputs.build_ubuntu == 'true' }}
+    uses: ./.github/workflows/_build-docker.yml
   windows-msvc:
     needs: detect_changed_files
     if: ${{ needs.detect_changed_files.outputs.build_windows_with_msvs == 'true' }}

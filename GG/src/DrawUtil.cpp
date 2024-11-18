@@ -16,8 +16,33 @@
 
 
 #if !defined(__cpp_lib_integer_comparison_functions)
-constexpr bool cmp_less_equal(std::size_t l, int r) noexcept { return l <= r; }
-constexpr bool cmp_greater(std::size_t l, int r) noexcept { return l > r; }
+constexpr bool cmp_less_equal(std::size_t l, int r) noexcept
+{ return (r < 0) ? false : (l <= static_cast<std::size_t>(r)); }
+static_assert(cmp_less_equal(0u, 0));
+static_assert(cmp_less_equal(0u, 1));
+static_assert(cmp_less_equal(1u, 1));
+static_assert(!cmp_less_equal(1u, 0));
+static_assert(cmp_less_equal(1u, 2));
+static_assert(cmp_less_equal(0u, INT_MAX));
+static_assert(cmp_less_equal(static_cast<std::size_t>(INT_MAX), INT_MAX));
+static_assert(!cmp_less_equal(static_cast<std::size_t>(INT_MAX), 0));
+static_assert(!cmp_less_equal(0u, -1));
+static_assert(!cmp_less_equal(0u, INT_MIN));
+static_assert(!cmp_less_equal(static_cast<std::size_t>(INT_MAX), INT_MIN));
+
+constexpr bool cmp_greater(std::size_t l, int r) noexcept
+{ return (r < 0) ? true : (l > static_cast<std::size_t>(r)); }
+static_assert(!cmp_greater(0u, 0));
+static_assert(!cmp_greater(0u, 1));
+static_assert(!cmp_greater(1u, 1));
+static_assert(cmp_greater(1u, 0));
+static_assert(!cmp_greater(1u, 2));
+static_assert(!cmp_greater(0u, INT_MAX));
+static_assert(!cmp_greater(static_cast<std::size_t>(INT_MAX), INT_MAX));
+static_assert(cmp_greater(static_cast<std::size_t>(INT_MAX), 0));
+static_assert(cmp_greater(0u, -1));
+static_assert(cmp_greater(0u, INT_MIN));
+static_assert(cmp_greater(static_cast<std::size_t>(INT_MAX), INT_MIN));
 #else
 using std::cmp_less_equal;
 using std::cmp_greater;
@@ -679,6 +704,13 @@ void GG::Line(Pt pt1, Pt pt2, Clr color, float thick)
     Line(pt1.x, pt1.y, pt2.x, pt2.y);
 }
 
+void GG::Line(X x1, Y y1, X x2, Y y2, Clr color, float thick)
+{
+    glLineWidth(thick);
+    glColor(color);
+    Line(x1, y1, x2, y2);
+}
+
 void GG::Line(X x1, Y y1, X x2, Y y2)
 {
     const GLfloat vertices[4] = {GLfloat(Value(x1)), GLfloat(Value(y1)),
@@ -750,17 +782,14 @@ void GG::Triangle(X x1, Y y1, X x2, Y y2, X x3, Y y3, bool filled)
     glEnable(GL_TEXTURE_2D);
 }
 
-void GG::FlatRectangle(Pt ul, Pt lr, Clr color, Clr border_color,
-                       unsigned int border_thick)
+void GG::FlatRectangle(Pt ul, Pt lr, Clr color, Clr border_color, unsigned int border_thick)
 {
     Rectangle(ul, lr, color, border_color, border_color, border_thick,
               true, true, true, true);
 }
 
-void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
-                          unsigned int bevel_thick, bool bevel_left,
-                          bool bevel_top, bool bevel_right,
-                          bool bevel_bottom)
+void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up, unsigned int bevel_thick,
+                          bool bevel_left, bool bevel_top, bool bevel_right, bool bevel_bottom)
 {
     Rectangle(ul, lr, color,
               (up ? LightenClr(border_color) : DarkenClr(border_color)),
@@ -769,16 +798,14 @@ void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
 }
 
 void GG::FlatRoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color,
-                              unsigned int corner_radius,
-                              unsigned int border_thick)
+                              unsigned int corner_radius, unsigned int border_thick)
 {
     RoundedRectangle(ul, lr, color, border_color, border_color,
                      corner_radius, border_thick);
 }
 
 void GG::BeveledRoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
-                                 unsigned int corner_radius,
-                                 unsigned int bevel_thick)
+                                 unsigned int corner_radius, unsigned int bevel_thick)
 {
     RoundedRectangle(ul, lr, color,
                      (up ? LightenClr(border_color) : DarkenClr(border_color)),

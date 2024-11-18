@@ -193,7 +193,7 @@ namespace {
 
         std::string save_filename = boost::io::str(boost::format("FreeOrion_%04d_%s%s") % current_turn % datetime_str % extension);
         boost::filesystem::path save_path(autosave_dir_path / save_filename);
-        return save_path.string();
+        return PathToString(save_path);
     }
 
     bool IsMultiplayerSaveFile(const boost::filesystem::path& path)
@@ -1867,7 +1867,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
 
             if (!m_lobby_data->new_game) {
                 // Load game ...
-                std::string save_filename = (GetServerSaveDir() / m_lobby_data->save_game).string();
+                std::string save_filename = PathToString((GetServerSaveDir() / m_lobby_data->save_game));
 
                 try {
                     LoadGame(save_filename,             *m_server_save_game_data,
@@ -2037,14 +2037,14 @@ sc::result MPLobby::react(const StartMPGame& msg) {
 }
 
 sc::result MPLobby::react(const HostMPGame& msg) {
-    ErrorLogger(FSM) << "MPLobby::react(const HostMPGame& msg) recived HostMPGame message but is already in the MP Lobby.  Aborting connection";
+    ErrorLogger(FSM) << "MPLobby::react(const HostMPGame& msg) received HostMPGame message but is already in the MP Lobby.  Aborting connection";
     msg.m_player_connection->SendMessage(ErrorMessage(UserStringNop("SERVER_ALREADY_HOSTING_GAME"), true));
     Server().m_networking.Disconnect(msg.m_player_connection);
     return discard_event();
 }
 
 sc::result MPLobby::react(const HostSPGame& msg) {
-    ErrorLogger(FSM) << "MPLobby::react(const HostSPGame& msg) recived HostSPGame message but is already in the MP Lobby.  Aborting connection";
+    ErrorLogger(FSM) << "MPLobby::react(const HostSPGame& msg) received HostSPGame message but is already in the MP Lobby.  Aborting connection";
     msg.m_player_connection->SendMessage(ErrorMessage(UserStringNop("SERVER_ALREADY_HOSTING_GAME"), true));
     Server().m_networking.Disconnect(msg.m_player_connection);
     return discard_event();
@@ -2752,7 +2752,7 @@ sc::result PlayingGame::react(const ModeratorAct& msg) {
     Networking::ClientType client_type = sender->GetClientType();
 
     if (client_type != Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR) {
-        ErrorLogger(FSM) << "PlayingGame::react(ModeratorAct): Non-moderator player sent moderator action, ignorning";
+        ErrorLogger(FSM) << "PlayingGame::react(ModeratorAct): Non-moderator player sent moderator action, ignoring";
         return discard_event();
     }
 
@@ -3462,7 +3462,15 @@ sc::result WaitingForTurnEnd::react(const RevertOrders& msg) {
     server.ClearEmpireTurnOrders(empire_id);
 
     // re-send player initial turn update
-    bool use_binary_serialization = sender->IsBinarySerializationUsed();
+    const ScriptingContext context{server.GetUniverse(), server.Empires(), server.GetGalaxySetupData(),
+                                   server.GetSpeciesManager(), server.GetSupplyManager()};
+    for (auto& empire : server.Empires() | range_values) {
+        empire->UpdateOwnedObjectCounters(server.GetUniverse());
+        empire->PrepQueueAvailabilityInfoForSerialization(context);
+        empire->PrepPolicyInfoForSerialization(context);
+    }
+
+    const bool use_binary_serialization = sender->IsBinarySerializationUsed();
     sender->SendMessage(TurnUpdateMessage(empire_id,                  server.CurrentTurn(),
                                           server.Empires(),           server.GetUniverse(),
                                           server.GetSpeciesManager(), GetCombatLogManager(),

@@ -31,9 +31,9 @@ jobs:
       - name: Ensure installed packages
         run: bash .github/workflows/ppa-install-build.sh
       - name: Export secret keys
-        run: bash .ci/before_script.sh
+        run: bash .github/pre-deploy.sh
         env:
-          SUPER_SECRET_PASSWORD: ${{ secrets.SUPER_SECRET_PASSWORD }}
+          DEPLOY_SSH_PASSWORD: ${{ secrets.DEPLOY_SSH_PASSWORD }}
       - name: Prepare version
         run: python cmake/make_versioncpp.py . CMake
       - name: Build

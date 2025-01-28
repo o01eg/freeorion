@@ -7,11 +7,22 @@ jobs:
     name: Check If Weekly Test Build should be built
     if: ${{ env.ENABLED_WEEKLY != 0 }}
     runs-on: ubuntu-latest
+    outputs:
+      runs-count: ${{ steps.get-info.outputs.runs-count }}
     steps:
       - name: Get previous builds info
+        id: get-info
         shell: bash
         run: |
           echo ${{ github.token }} | gh auth login --with-token
           WORKFLOW_ID=$(gh api -X GET /repos/${{ github.repository }}/actions/runs/${{ github.run_id }} --jq='.workflow_id')
           TOTAL_COUNT=$(gh api -X GET "/repos/${{ github.repository }}/actions/workflows/${WORKFLOW_ID}/runs?status=success&per_page=1&head_sha=${{ github.sha }}" --jq '.total_count')
-          echo "Total count: ${TOTAL_COUNT}"
+          echo "Runs count: ${TOTAL_COUNT}"
+          echo "runs-count=${TOTAL_COUNT}" >> "$GITHUB_OUTPUT"
+  macos:
+    needs: check-run
+    if: ${{ needs.check-run.outputs.runs-count == 0 }}
+    uses: ./.github/workflows/_build_macos.yml
+    with:
+      os: 'macos-13'
+      weekly-deploy: false

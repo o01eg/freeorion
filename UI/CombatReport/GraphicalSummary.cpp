@@ -264,7 +264,7 @@ public:
         m_participant(participant),
         m_sizer(sizer)
     {
-        const ScriptingContext context;
+        const ScriptingContext& context = IApp::GetApp()->GetContext();
         if (auto object = context.ContextObjects().getRaw(participant.object_id)) {
             SetBrowseText(object->PublicName(ClientApp::GetApp()->EmpireID(), context.ContextUniverse()) +
                           " " + DoubleToString(participant.current_health, 3, false) +
@@ -637,7 +637,7 @@ void GraphicalSummaryWnd::MakeSummaries(int log_id) {
         for (int object_id : log->object_ids) {
             if (object_id < 0)
                 continue;   // fighters and invalid objects
-            auto object = Objects().get(object_id);
+            auto object = ClientApp::GetApp()->GetContext().ContextObjects().get(object_id);
             if (!object) {
                 ErrorLogger() << "GraphicalSummaryWnd::MakeSummaries couldn't find object with id: " << object_id;
                 continue;

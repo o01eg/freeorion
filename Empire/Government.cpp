@@ -9,7 +9,6 @@
 #include "../util/Logger.h"
 #include "../util/GameRules.h"
 #include "../util/MultiplayerCommon.h"
-#include "../util/GameRules.h"
 #include "../util/GameRuleRanks.h"
 #include "../util/CheckSums.h"
 #include "../util/ScopedTimer.h"
@@ -147,7 +146,7 @@ float Policy::AdoptionCost(int empire_id, const ScriptingContext& context) const
             return arbitrary_large_number;
 
         // construct new context with source specified
-        const ScriptingContext source_context{source.get(), context};
+        const ScriptingContext source_context{context, ScriptingContext::Source{}, source.get()};
         return static_cast<float>(m_adoption_cost->Eval(source_context));
     }
 }
@@ -243,8 +242,6 @@ uint32_t PolicyManager::GetCheckSum() const {
     for (auto const& policy : m_policies)
         CheckSums::CheckSumCombine(retval, policy);
     CheckSums::CheckSumCombine(retval, m_policies.size());
-
-    DebugLogger() << "PolicyManager checksum: " << retval;
     return retval;
 }
 

@@ -230,7 +230,8 @@ public:
     /** Adopts the specified policy, assuming its conditions are met. Revokes
       * the policy if \a adopt is false; */
     void AdoptPolicy(const std::string& name, const std::string& category,
-                     const ScriptingContext& context, bool adopt = true, int slot = -1);
+                     const ScriptingContext& context, int slot = -1);
+    void DeAdoptPolicy(const std::string& name);
 
     /** Reverts adopted policies to the initial state for the current turn.
       * Does not verify if the initial adopted policies were in a valid
@@ -267,16 +268,17 @@ public:
       * position \a pos.  If \a pos < 0 or queue.size() <= pos, the build is
       * placed at the end of the queue. */
     void PlaceProductionOnQueue(const ProductionQueue::ProductionItem& item,
-                                boost::uuids::uuid uuid, int number,
-                                int blocksize, int location, int pos = -1);
+                                boost::uuids::uuid uuid,
+                                const ScriptingContext& context,
+                                int number, int blocksize, int location, int pos = -1);
 
     /** Adds a copy of the production item at position \a index below it in
       * the queue, with one less quantity. Sets the quantity of the production
       * item at position \a index to 1, retaining its incomplete progress. */
-    void SplitIncompleteProductionItem(int index, boost::uuids::uuid uuid);
+    void SplitIncompleteProductionItem(int index, boost::uuids::uuid uuid, const ScriptingContext& context);
     /** Adds a copy of the production item at position \a index below it in
       * the queue, with no progress. */
-    void DuplicateProductionItem(int index, boost::uuids::uuid uuid);
+    void DuplicateProductionItem(int index, boost::uuids::uuid uuid, const ScriptingContext& context);
 
     void SetProductionQuantity(int index, int quantity);     ///< Changes the remaining number to produce for queue item \a index to \a quantity
     void SetProductionQuantityAndBlocksize(int index, int quantity, int blocksize);   ///< Changes the remaining number and blocksize to produce for queue item \a index to \a quantity and \a blocksize
@@ -511,7 +513,7 @@ private:
         int slot_in_category = INVALID_SLOT_INDEX;
         std::string category;
 
-        bool operator==(const PolicyAdoptionInfo&) const noexcept = default;
+        [[nodiscard]] bool operator==(const PolicyAdoptionInfo&) const noexcept = default;
 
         friend class boost::serialization::access;
         template <typename Archive>

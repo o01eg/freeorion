@@ -92,17 +92,17 @@ void FleetButton::CompleteConstruction() {
 }
 
 void FleetButton::Refresh(SizeType size_type) {
-    const Universe& u = GetUniverse();
-    const ObjectMap& o = u.Objects();
-    const EmpireManager& e = Empires();
-    ScriptingContext context{u, e};
+    const ScriptingContext& context = IApp::GetApp()->GetContext();
+    const Universe& u = context.ContextUniverse();
+    const ObjectMap& o = context.ContextObjects();
+    const EmpireManager& e = context.Empires();
 
     const auto fleets = o.findRaw<const Fleet>(m_fleets);
 
     // determine owner(s) of fleet(s).  Only care whether or not there is more than one owner, as owner
     // is used to determine colouration
     int multiple_owners = false;
-    int owner_id = fleets.empty() ? ALL_EMPIRES : fleets.front()->Owner();
+    int owner_id = fleets.empty() ? ALL_EMPIRES : (fleets.front() ? fleets.front()->Owner() : ALL_EMPIRES);
     if (!fleets.empty()) {
         // use ALL_EMPIRES if there are multiple owners
         for (auto* fleet : fleets) {
@@ -144,7 +144,9 @@ void FleetButton::Refresh(SizeType size_type) {
 
     // determine direction button should be rotated to orient along a starlane
     GLfloat pointing_angle = 0.0f;
-    const auto map_wnd = ClientUI::GetClientUI()->GetMapWnd();
+    const auto map_wnd = ClientUI::GetClientUI()->GetMapWndConst();
+    if (!map_wnd)
+        return;
 
     const Fleet* first_fleet = fleets.empty() ? nullptr : fleets.front();
 
@@ -289,7 +291,7 @@ bool FleetButton::InWindow(GG::Pt pt) const noexcept {
 }
 
 void FleetButton::MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    const auto& map_wnd = ClientUI::GetClientUI()->GetMapWnd();
+    const auto map_wnd = ClientUI::GetClientUI()->GetMapWndConst();
     if (!Disabled() && (!map_wnd || !map_wnd->InProductionViewMode())) {
         if (State() != ButtonState::BN_ROLLOVER)
             PlayFleetButtonRolloverSound();
@@ -305,7 +307,7 @@ void FleetButton::SizeMove(GG::Pt ul, GG::Pt lr) {
 }
 
 void FleetButton::LayoutIcons() {
-    const ScriptingContext context;
+    const ScriptingContext& context = IApp::GetApp()->GetContext();
 
     GG::Pt middle = GG::Pt(Width() / 2, Height() / 2);
     for (auto& graphic : m_icons) {
@@ -438,8 +440,8 @@ std::vector<std::shared_ptr<GG::Texture>> FleetHeadIcons(
     bool hasMonsters = false;
     bool canDamageShips = false;
 
-    const Universe& u = GetUniverse();
-    const ScriptingContext context{u, Empires()};
+    const ScriptingContext& context = IApp::GetApp()->GetContext();
+    const Universe& u = context.ContextUniverse();
 
     for (const auto* fleet : fleets) {
         if (!fleet)

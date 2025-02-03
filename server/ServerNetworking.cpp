@@ -1,5 +1,6 @@
 #include "ServerNetworking.h"
 
+#include "ServerApp.h"
 #include "../util/Logger.h"
 #include "../util/OptionsDB.h"
 #include "../util/Version.h"
@@ -20,6 +21,9 @@ using boost::asio::ip::tcp;
 using boost::asio::ip::udp;
 using namespace Networking;
 
+#if BOOST_VERSION < 107600
+namespace boost::asio::ip { using port_type = uint_least16_t; }
+#endif
 
 namespace {
     DeclareThreadSafeLogger(network);
@@ -30,8 +34,9 @@ namespace {
 ServerNetworking::DiscoveryServer::DiscoveryServer(boost::asio::io_context& io_context) :
     m_socket(io_context)
 {
+    const auto disc_port = static_cast<boost::asio::ip::port_type>(Networking::DiscoveryPort());
     // use a dual stack (ipv6 + ipv4) socket
-    udp::endpoint discovery_endpoint(udp::v6(), Networking::DiscoveryPort());
+    udp::endpoint discovery_endpoint(udp::v6(), disc_port);
 
     if (GetOptionsDB().Get<bool>("singleplayer")) {
         // when hosting a single player game only accept connections from
@@ -47,7 +52,7 @@ ServerNetworking::DiscoveryServer::DiscoveryServer(boost::asio::io_context& io_c
     } catch (const std::exception &e) {
         ErrorLogger(network) << "DiscoveryServer cannot open IPv6 socket: " << e.what()
                                 << ". Fallback to IPv4";
-        discovery_endpoint = udp::endpoint(udp::v4(), Networking::DiscoveryPort());
+        discovery_endpoint = udp::endpoint(udp::v4(), disc_port);
         if (GetOptionsDB().Get<bool>("singleplayer"))
             discovery_endpoint.address(boost::asio::ip::address_v4::loopback());
 
@@ -89,7 +94,7 @@ void ServerNetworking::DiscoveryServer::HandleReceive(boost::system::error_code 
     DebugLogger(network) << "DiscoveryServer evaluating FOCS expression: " << message;
     std::string reply;
     try {
-        ScriptingContext context;
+        const ScriptingContext& context = ServerApp::GetApp()->GetContext();
         if (parse::int_free_variable(message)) {
             auto value_ref = std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
             reply = std::to_string(value_ref->Eval(context));
@@ -214,7 +219,8 @@ void PlayerConnection::SendMessage(const Message& message, int empire_id, int tu
         MessageSentSignal(false, empire_id, turn);
         return;
     }
-    m_service.post(boost::bind(&PlayerConnection::SendMessageImpl, shared_from_this(), message, empire_id, turn));
+    boost::asio::post(m_service, boost::bind(&PlayerConnection::SendMessageImpl, shared_from_this(),
+                                             message, empire_id, turn));
 }
 
 bool PlayerConnection::IsEstablished() const noexcept {
@@ -784,7 +790,8 @@ void ServerNetworking::Init() {
     } catch (const std::exception &e) {
         ErrorLogger(network) << "Server cannot open IPv6 socket: " << e.what()
                              << ". Fallback to IPv4";
-        message_endpoint = tcp::endpoint(tcp::v4(), Networking::MessagePort());
+        const auto msg_port = static_cast<boost::asio::ip::port_type>(Networking::MessagePort());
+        message_endpoint = tcp::endpoint(tcp::v4(), msg_port);
         if (GetOptionsDB().Get<bool>("singleplayer"))
             message_endpoint.address(boost::asio::ip::address_v4::loopback());
 

@@ -10,6 +10,7 @@
 #include "ServerNetworking.h"
 #include "../Empire/EmpireManager.h"
 #include "../Empire/Supply.h"
+#include "../universe/ScriptingContext.h"
 #include "../universe/Species.h"
 #include "../universe/Universe.h"
 #include "../util/AppInterface.h"
@@ -40,6 +41,9 @@ public:
     [[nodiscard]] Empire* GetEmpire(int id) override;
     [[nodiscard]] SupplyManager& GetSupplyManager() noexcept override { return m_supply_manager; }
     [[nodiscard]] SpeciesManager& GetSpeciesManager() noexcept override { return m_species_manager; }
+
+    [[nodiscard]] ScriptingContext& GetContext() noexcept override { return m_context; };
+    [[nodiscard]] const ScriptingContext& GetContext() const noexcept override { return m_context; };
 
     [[nodiscard]] std::string GetVisibleObjectName(const UniverseObject& object) override;
 
@@ -82,7 +86,7 @@ public:
     [[nodiscard]] const boost::circular_buffer<ChatHistoryEntity>& GetChatHistory() const;
 
     /** Extracts player save game data. */
-    [[nodiscard]] std::vector<PlayerSaveGameData> GetPlayerSaveGameData() const;
+    [[nodiscard]] const auto& GetPlayerSaveGameData() const { return m_player_data; }
 
     [[nodiscard]] bool IsTurnExpired() const noexcept { return m_turn_expired; }
 
@@ -98,13 +102,12 @@ public:
     /** creates an AI client child process for each element of \a AIs*/
     void CreateAIClients(const std::vector<PlayerSetupData>& player_setup_data, int max_aggression = 4);
 
-    /** Adds save game data includes turn orders for the given empire for the current turn.
-      * \a save_game_data will be freed when all processing is done for the turn */
-    void SetEmpireSaveGameData(int empire_id, std::unique_ptr<PlayerSaveGameData>&& save_game_data);
+    /** Adds player / empire data including turn orders for the given empire for the current turn. */
+    void AddEmpireData(PlayerSaveGameData psgd);
 
     /** Updated empire orders without changes in readiness status. Removes all \a deleted orders
       * and insert \a added orders. */
-    void UpdatePartialOrders(int empire_id, const OrderSet& added, const std::set<int>& deleted);
+    void UpdatePartialOrders(int empire_id, OrderSet added, const std::set<int>& deleted);
 
     /** Revokes turn order's ready state for the given empire. */
     void RevokeEmpireTurnReadyness(int empire_id);
@@ -298,13 +301,9 @@ private:
       * between two empires. Updates those empires of the change. */
     void HandleDiplomaticMessageChange(int empire1_id, int empire2_id);
 
-    /**  Adds an existing empire to turn processing. The position the empire is
-      * in the vector is it's position in the turn processing.*/
-    void AddEmpireTurn(int empire_id, const PlayerSaveGameData& psgd);
-
     /** Removes an empire from turn processing. This is most likely called when
       * an empire is eliminated from the game */
-    void RemoveEmpireTurn(int empire_id);
+    void RemoveEmpireData(int empire_id);
 
     /** Called when asyncio timer ends. Executes Python asyncio callbacks if any was generated. */
     void AsyncIOTimedoutHandler(const boost::system::error_code& error);
@@ -322,6 +321,8 @@ private:
     SupplyManager    m_supply_manager;
     ServerNetworking m_networking;
 
+    ScriptingContext m_context;
+
     std::unique_ptr<ServerFSM> m_fsm;
 
     PythonServer            m_python_server;
@@ -334,13 +335,8 @@ private:
     boost::circular_buffer<ChatHistoryEntity> m_chat_history;   ///< Stored last chat messages.
 
 
-    /** Turn sequence map is used for turn processing. Each empire is added at
-      * the start of a game or reload and then the map maintains OrderSets for
-      * that turn.
-      * The map contains pointer to orders from empire with ready state which should be true
-      * to advance turn.
-      * */
-    std::map<int, std::unique_ptr<PlayerSaveGameData>> m_turn_sequence;
+    /** Player name, empire id, and orders. */
+    std::vector<PlayerSaveGameData> m_player_data;
 
     // storage for cached costs between pre- and post-combat update steps
     void CacheCostsTimes(const ScriptingContext& context);

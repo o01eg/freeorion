@@ -287,7 +287,7 @@ GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, st
         ErrorLogger() << "OpenGL version is less than 2.1; FreeOrion may crash during initialization";
     }
 
-    SetStyleFactory(std::make_shared<CUIStyle>());
+    SetStyleFactory(std::make_unique<CUIStyle>());
 
     SetMinDragTime(0);
 
@@ -322,7 +322,7 @@ GGHumanClientApp::GGHumanClientApp(int width, int height, bool calculate_fps, st
     GG::Wnd::SetDefaultBrowseInfoWnd(std::move(default_browse_info_wnd));
 
     auto cursor_texture = m_ui->GetTexture(ClientUI::ArtDir() / "cursors" / "default_cursor.png");
-    SetCursor(std::make_shared<GG::TextureCursor>(std::move(cursor_texture),
+    SetCursor(std::make_unique<GG::TextureCursor>(std::move(cursor_texture),
                                                   GG::Pt(GG::X(6), GG::Y(3))));
     RenderCursor(true);
 
@@ -591,14 +591,13 @@ void GGHumanClientApp::NewSinglePlayerGame(bool quickstart) {
     if (human_player_setup_data.starting_species_name == "1")
         human_player_setup_data.starting_species_name = "SP_HUMAN";   // kludge / bug workaround for bug with options storage and retreival.  Empty-string options are stored, but read in as "true" boolean, and converted to string equal to "1"
 
-    const SpeciesManager& sm = this->GetSpeciesManager();
     if (human_player_setup_data.starting_species_name != "RANDOM" &&
-        !sm.GetSpecies(human_player_setup_data.starting_species_name))
+        !m_species_manager.GetSpecies(human_player_setup_data.starting_species_name))
     {
-        if (sm.NumPlayableSpecies() < 1)
+        if (m_species_manager.NumPlayableSpecies() < 1)
             human_player_setup_data.starting_species_name.clear();
         else
-            human_player_setup_data.starting_species_name = sm.playable_begin()->first;
+            human_player_setup_data.starting_species_name = m_species_manager.playable_begin()->first;
     }
 
     human_player_setup_data.save_game_empire_id = ALL_EMPIRES; // not used for new games
@@ -1104,9 +1103,9 @@ void GGHumanClientApp::HandleWindowMove(GG::X w, GG::Y h) {
 
 void GGHumanClientApp::HandleWindowResize(GG::X w, GG::Y h) {
     if (ClientUI* ui = ClientUI::GetClientUI()) {
-        if (auto&& map_wnd = ui->GetMapWnd())
+        if (auto map_wnd = ui->GetMapWnd(false))
             map_wnd->DoLayout();
-        if (auto&& intro_screen = ui->GetIntroScreen())
+        if (auto intro_screen = ui->GetIntroScreen())
             intro_screen->Resize(GG::Pt(w, h));
     }
 
@@ -1188,7 +1187,7 @@ bool GGHumanClientApp::ToggleFullscreen() {
 void GGHumanClientApp::StartGame(bool is_new_game) {
     m_game_started = true;
 
-    if (auto&& map_wnd = ClientUI::GetClientUI()->GetMapWnd())
+    if (auto map_wnd = ClientUI::GetClientUI()->GetMapWnd(false))
         map_wnd->ResetEmpireShown();
 
     ClientUI::GetClientUI()->GetShipDesignManager()->StartGame(EmpireID(), is_new_game);
@@ -1289,10 +1288,10 @@ namespace {
                 return; // don't need to delete anything.
 
             int num_deleted = 0;
-            for (auto& entry : files_by_write_time) {
+            for (auto& delete_file_path : files_by_write_time | range_values) {
                 if (num_deleted >= num_to_delete)
                     break;
-                remove(entry.second);
+                remove(delete_file_path);
                 ++num_deleted;
             }
         } catch (...) {
@@ -1446,7 +1445,8 @@ void GGHumanClientApp::ResetClientData(bool save_connection) {
         m_networking->SetHostPlayerID(Networking::INVALID_PLAYER_ID);
     }
     SetEmpireID(ALL_EMPIRES);
-    m_ui->GetMapWnd()->Sanitize();
+    if (auto map_wnd = m_ui->GetMapWnd(false))
+        map_wnd->Sanitize();
 
     m_universe.Clear();
     m_empires.Clear();
@@ -1489,8 +1489,8 @@ void GGHumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_c
             !m_empires.GetEmpire(m_empire_id)->Ready() &&
             GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER)
         {
-            std::shared_ptr<GG::Font> font = ClientUI::GetFont();
-            auto prompt = GG::GUI::GetGUI()->GetStyleFactory()->NewThreeButtonDlg(
+            auto font = ClientUI::GetFont();
+            auto prompt = GG::GUI::GetGUI()->GetStyleFactory().NewThreeButtonDlg(
                 GG::X(275), GG::Y(75), UserString("GAME_MENU_CONFIRM_NOT_READY"), font,
                 ClientUI::CtrlColor(), ClientUI::CtrlBorderColor(), ClientUI::CtrlColor(), ClientUI::TextColor(),
                 2, UserString("YES"), UserString("CANCEL"));
@@ -1509,7 +1509,7 @@ void GGHumanClientApp::ResetOrExitApp(bool reset, bool skip_savegame, int exit_c
         if (!m_game_saves_in_progress.empty()) {
             DebugLogger() << "save game in progress. Checking with player.";
             // Ask the player if they want to wait for the save game to complete
-            auto dlg = GG::GUI::GetGUI()->GetStyleFactory()->NewThreeButtonDlg(
+            auto dlg = GG::GUI::GetGUI()->GetStyleFactory().NewThreeButtonDlg(
                 GG::X(320), GG::Y(200), UserString("SAVE_GAME_IN_PROGRESS"),
                 ClientUI::GetFont(ClientUI::Pts()+2),
                 ClientUI::WndColor(), ClientUI::WndOuterBorderColor(),
@@ -1564,7 +1564,7 @@ bool GGHumanClientApp::HaveWindowFocus() const
 
 int GGHumanClientApp::SelectedSystemID() const {
     if (m_ui) {
-        if (auto mapwnd = m_ui->GetMapWnd())
+        if (auto mapwnd = m_ui->GetMapWndConst())
             return mapwnd->SelectedSystemID();
     }
     return INVALID_OBJECT_ID;
@@ -1572,7 +1572,7 @@ int GGHumanClientApp::SelectedSystemID() const {
 
 int GGHumanClientApp::SelectedPlanetID() const {
     if (m_ui) {
-        if (auto mapwnd = m_ui->GetMapWnd())
+        if (auto mapwnd = m_ui->GetMapWndConst())
             return mapwnd->SelectedPlanetID();
     }
     return INVALID_OBJECT_ID;
@@ -1580,7 +1580,7 @@ int GGHumanClientApp::SelectedPlanetID() const {
 
 int GGHumanClientApp::SelectedFleetID() const {
     if (m_ui) {
-        if (auto mapwnd = m_ui->GetMapWnd())
+        if (auto mapwnd = m_ui->GetMapWndConst())
             return mapwnd->SelectedFleetID();
     }
     return INVALID_OBJECT_ID;
@@ -1588,7 +1588,7 @@ int GGHumanClientApp::SelectedFleetID() const {
 
 int GGHumanClientApp::SelectedShipID() const {
     if (m_ui) {
-        if (auto mapwnd = m_ui->GetMapWnd())
+        if (auto mapwnd = m_ui->GetMapWndConst())
             return mapwnd->SelectedShipID();
     }
     return INVALID_OBJECT_ID;

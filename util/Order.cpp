@@ -478,7 +478,11 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
     if (!Check(empire_id, fleet_id, dest_system_id, append, context))
         return;
 
-    auto fleet = context.ContextObjects().get<Fleet>(m_fleet);
+    auto fleet = context.ContextObjects().getRaw<Fleet>(m_fleet);
+    //if (!fleet) { // additional check not necessary after calling Check(...)
+    //    ErrorLogger() << "FleetMoveOrder has invalid fleed id:" << m_fleet;
+    //    return;
+    //}
 
     int start_system = fleet->SystemID();
     if (start_system == INVALID_OBJECT_ID)
@@ -486,9 +490,9 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
     if (append && !fleet->TravelRoute().empty())
         start_system = fleet->TravelRoute().back();
 
-    auto short_path = context.ContextUniverse().GetPathfinder()->ShortestPath(
-        start_system, m_dest_system, EmpireID(), context.ContextObjects());
-    if (short_path.first.empty()) {
+    auto short_path = context.ContextUniverse().GetPathfinder().ShortestPath(
+        start_system, m_dest_system, EmpireID(), context.ContextObjects()).first;
+    if (short_path.empty()) {
         ErrorLogger() << "FleetMoveOrder generated empty shortest path between system " << start_system
                       << " and " << m_dest_system << " for empire " << EmpireID()
                       << " with fleet " << m_fleet;
@@ -496,14 +500,14 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
     }
 
     // if in a system now, don't include it in the route
-    if (short_path.first.front() == fleet->SystemID()) {
+    if (short_path.front() == fleet->SystemID()) {
         DebugLogger() << "FleetMoveOrder removing fleet " << m_fleet
                       << " current system location " << fleet->SystemID()
                       << " from shortest path to system " << m_dest_system;
-        short_path.first.erase(short_path.first.begin()); // pop_front();
+        short_path.erase(short_path.begin()); // pop_front();
     }
 
-    m_route = std::move(short_path.first);
+    m_route = std::move(short_path);
 
     // ensure a zero-length (invalid) route is not requested / sent to a fleet
     if (m_route.empty())
@@ -1293,14 +1297,6 @@ void ChangeFocusOrder::ExecuteImpl(ScriptingContext& context) const {
 ////////////////////////////////////////////////
 // PolicyOrder
 ////////////////////////////////////////////////
-PolicyOrder::PolicyOrder(int empire, std::string name, std::string category, bool adopt, int slot) :
-    Order(empire),
-    m_policy_name(std::move(name)),
-    m_category(std::move(category)),
-    m_slot(slot),
-    m_adopt(adopt)
-{}
-
 std::string PolicyOrder::Dump() const {
     const auto& template_str = m_adopt ? UserString("ORDER_POLICY_ADOPT") : UserString("ORDER_POLICY_ABANDON");
     return boost::io::str(FlexibleFormat(template_str)
@@ -1312,11 +1308,10 @@ void PolicyOrder::ExecuteImpl(ScriptingContext& context) const {
     if (m_adopt) {
         DebugLogger() << "PolicyOrder adopt " << m_policy_name << " in category " << m_category
                       << " in slot " << m_slot;
-        empire->AdoptPolicy(m_policy_name, m_category, context, m_adopt, m_slot);
+        empire->AdoptPolicy(m_policy_name, m_category, context, m_slot);
     } else if (!m_revert) {
-        DebugLogger() << "PolicyOrder revoke " << m_policy_name << " from category " << m_category
-                      << " in slot " << m_slot;
-        empire->AdoptPolicy(m_policy_name, m_category, context, m_adopt, m_slot);
+        DebugLogger() << "PolicyOrder de-adopt " << m_policy_name;
+        empire->DeAdoptPolicy(m_policy_name);
     } else {
         empire->RevertPolicies();
     }
@@ -1449,7 +1444,7 @@ void ProductionQueueOrder::ExecuteImpl(ScriptingContext& context) const {
             {
                 DebugLogger() << "ProductionQueueOrder place in queue: " << m_item.Dump()
                               << "  at index: " << m_new_index;
-                empire->PlaceProductionOnQueue(m_item, m_uuid, m_new_quantity, 1, m_location, m_new_index);
+                empire->PlaceProductionOnQueue(m_item, m_uuid, context, m_new_quantity, 1, m_location, m_new_index);
             } else {
                 ErrorLogger() << "ProductionQueueOrder tried to place invalid build type in queue!";
             }
@@ -1481,7 +1476,7 @@ void ProductionQueueOrder::ExecuteImpl(ScriptingContext& context) const {
                 ErrorLogger() << "ProductionQueueOrder asked to split invalid UUID: " << boost::uuids::to_string(m_uuid);
             } else {
                 DebugLogger() << "ProductionQueueOrder splitting incomplete from item";
-                empire->SplitIncompleteProductionItem(idx, m_uuid2);
+                empire->SplitIncompleteProductionItem(idx, m_uuid2, context);
             }
             break;
         }
@@ -1491,7 +1486,7 @@ void ProductionQueueOrder::ExecuteImpl(ScriptingContext& context) const {
                 ErrorLogger() << "ProductionQueueOrder asked to duplicate invalid UUID: " << boost::uuids::to_string(m_uuid);
             } else {
                 DebugLogger() << "ProductionQueueOrder duplicating item";
-                empire->DuplicateProductionItem(idx, m_uuid2);
+                empire->DuplicateProductionItem(idx, m_uuid2, context);
             }
             break;
         }
@@ -1808,10 +1803,7 @@ bool ShipDesignOrder::CheckRename(int empire_id, int existing_design_id, const s
 ScrapOrder::ScrapOrder(int empire, int object_id, const ScriptingContext& context) :
     Order(empire),
     m_object_id(object_id)
-{
-    if (!Check(empire, object_id, context))
-        return;
-}
+{ Check(empire, object_id, context); }
 
 std::string ScrapOrder::Dump() const
 { return UserString("ORDER_SCRAP"); }
@@ -1882,10 +1874,7 @@ AggressiveOrder::AggressiveOrder(int empire, int object_id, FleetAggression aggr
     Order(empire),
     m_object_id(object_id),
     m_aggression(aggression)
-{
-    if (!Check(empire, object_id, m_aggression, context))
-        return;
-}
+{ Check(empire, object_id, m_aggression, context); }
 
 std::string AggressiveOrder::Dump() const
 { return UserString("ORDER_FLEET_AGGRESSION"); }
@@ -1929,10 +1918,7 @@ GiveObjectToEmpireOrder::GiveObjectToEmpireOrder(int empire, int object_id, int 
     Order(empire),
     m_object_id(object_id),
     m_recipient_empire_id(recipient)
-{
-    if (!Check(empire, object_id, recipient, context))
-        return;
-}
+{ Check(empire, object_id, recipient, context); }
 
 std::string GiveObjectToEmpireOrder::Dump() const
 { return UserString("ORDER_GIVE_TO_EMPIRE"); }

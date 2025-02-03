@@ -35,8 +35,6 @@ public:
 
     [[nodiscard]] std::size_t           SizeInMemory() const override;
 
-    std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
-
     void Copy(const UniverseObject& copied_object, const Universe& universe, int empire_id = ALL_EMPIRES) override;
     void Copy(const Field& copied_field, const Universe& universe, int empire_id = ALL_EMPIRES);
 
@@ -44,7 +42,7 @@ public:
     void ClampMeters() override;
 
     Field(std::string field_type, double x, double y, double radius, int creation_turn);
-    Field() : UniverseObject(UniverseObjectType::OBJ_FIELD) {}
+    Field() : UniverseObject(UniverseObjectType::OBJ_FIELD) { AddMeters(std::array{MeterType::METER_SIZE, MeterType::METER_SPEED}); }
 
 private:
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);

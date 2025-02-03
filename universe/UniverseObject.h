@@ -2,6 +2,7 @@
 #define _UniverseObject_h_
 
 
+#include <concepts>
 #include <set>
 #include <string>
 #include <vector>
@@ -11,7 +12,7 @@
 #include <boost/signals2/optional_last_value.hpp>
 #include <boost/signals2/signal.hpp>
 #include "ConstantsFwd.h"
-#include "EnumsFwd.h"
+#include "Enums.h"
 #include "Meter.h"
 #include "../util/blocking_combiner.h"
 #include "../util/Enum.h"
@@ -24,10 +25,9 @@ class EmpireManager;
 class ObjectMap;
 class Universe;
 struct ScriptingContext;
-struct UniverseObjectVisitor;
 
 // The ID number assigned to temporary universe objects
-constexpr int TEMPORARY_OBJECT_ID = -2;
+inline constexpr int TEMPORARY_OBJECT_ID = -2;
 
 
 //! The various major subclasses of UniverseObject
@@ -57,6 +57,88 @@ FO_ENUM(
     ((NUM_VISIBILITIES))
 )
 
+
+/** Types for Meters
+* Only active paired meters should lie between MeterType::METER_POPULATION and MeterType::METER_TROOPS
+* (See: UniverseObject::ResetPairedActiveMeters())
+*/
+FO_ENUM(
+    (MeterType),
+    ((INVALID_METER_TYPE, -1))
+    ((METER_TARGET_POPULATION))
+    ((METER_TARGET_INDUSTRY))
+    ((METER_TARGET_RESEARCH))
+    ((METER_TARGET_INFLUENCE))
+    ((METER_TARGET_CONSTRUCTION))
+    ((METER_TARGET_HAPPINESS))
+
+    ((METER_MAX_CAPACITY))
+    ((METER_MAX_SECONDARY_STAT))
+
+    ((METER_MAX_FUEL))
+    ((METER_MAX_SHIELD))
+    ((METER_MAX_STRUCTURE))
+    ((METER_MAX_DEFENSE))
+    ((METER_MAX_SUPPLY))
+    ((METER_MAX_STOCKPILE))
+    ((METER_MAX_TROOPS))
+
+    ((METER_POPULATION))
+    ((METER_INDUSTRY))
+    ((METER_RESEARCH))
+    ((METER_INFLUENCE))
+    ((METER_CONSTRUCTION))
+    ((METER_HAPPINESS))
+
+    ((METER_CAPACITY))
+    ((METER_SECONDARY_STAT))
+
+    ((METER_FUEL))
+    ((METER_SHIELD))
+    ((METER_STRUCTURE))
+    ((METER_DEFENSE))
+    ((METER_SUPPLY))
+    ((METER_STOCKPILE))
+    ((METER_TROOPS))
+
+    ((METER_REBEL_TROOPS))
+    ((METER_SIZE))
+    ((METER_STEALTH))
+    ((METER_DETECTION))
+    ((METER_SPEED))
+
+    ((NUM_METER_TYPES))
+)
+
+namespace {
+    constexpr inline std::array<std::pair<MeterType, MeterType>, 13> assoc_meters{{
+        {MeterType::METER_POPULATION,   MeterType::METER_TARGET_POPULATION},
+        {MeterType::METER_INDUSTRY,     MeterType::METER_TARGET_INDUSTRY},
+        {MeterType::METER_RESEARCH,     MeterType::METER_TARGET_RESEARCH},
+        {MeterType::METER_INFLUENCE,    MeterType::METER_TARGET_INFLUENCE},
+        {MeterType::METER_CONSTRUCTION, MeterType::METER_TARGET_CONSTRUCTION},
+        {MeterType::METER_HAPPINESS,    MeterType::METER_TARGET_HAPPINESS},
+        {MeterType::METER_FUEL,         MeterType::METER_MAX_FUEL},
+        {MeterType::METER_SHIELD,       MeterType::METER_MAX_SHIELD},
+        {MeterType::METER_STRUCTURE,    MeterType::METER_MAX_STRUCTURE},
+        {MeterType::METER_DEFENSE,      MeterType::METER_MAX_DEFENSE},
+        {MeterType::METER_TROOPS,       MeterType::METER_MAX_TROOPS},
+        {MeterType::METER_SUPPLY,       MeterType::METER_MAX_SUPPLY},
+        {MeterType::METER_STOCKPILE,    MeterType::METER_MAX_STOCKPILE}}};
+}
+
+/** Returns mapping from active to target or max meter types that correspond.
+  * eg. MeterType::METER_RESEARCH -> MeterType::METER_TARGET_RESEARCH */
+inline consteval auto& AssociatedMeterTypes() noexcept { return assoc_meters; }
+
+/** Returns the target or max meter type that is associated with the given active meter type.
+  * If no associated meter type exists, MeterType::INVALID_METER_TYPE is returned. */
+constexpr MeterType AssociatedMeterType(MeterType meter_type) {
+    const auto mt_pair_it = std::find_if(assoc_meters.begin(), assoc_meters.end(),
+                                         [meter_type](const auto& mm) noexcept { return meter_type == mm.first; });
+    return (mt_pair_it != assoc_meters.end()) ? mt_pair_it->second : MeterType::INVALID_METER_TYPE;
+}
+
 #if !defined(CONSTEXPR_VEC)
 #  if defined(__cpp_lib_constexpr_vector)
 #    define CONSTEXPR_VEC constexpr
@@ -81,7 +163,7 @@ FO_ENUM(
   * This means that all mutators on UniverseObject and its subclasses
   * need to emit this signal.  This is how the UI becomes aware that an object
   * that is being displayed has changed.*/
-class FO_COMMON_API UniverseObject : virtual public std::enable_shared_from_this<UniverseObject> {
+class FO_COMMON_API UniverseObject {
 public:
     using MeterMap = boost::container::flat_map<MeterType, Meter>;
     static_assert(std::is_same_v<boost::container::flat_map<MeterType, Meter, std::less<MeterType>>, MeterMap>);
@@ -161,9 +243,6 @@ public:
     /** Returns the name of this objectas it appears to empire \a empire_id .*/
     [[nodiscard]] virtual const std::string&  PublicName(int empire_id, const Universe& universe) const { return m_name; };
 
-    /** Accepts a visitor object \see UniverseObjectVisitor */
-    virtual std::shared_ptr<UniverseObject>   Accept(const UniverseObjectVisitor& visitor) const;
-
     [[nodiscard]] int                         CreationTurn() const noexcept { return m_created_on_turn; }; ///< returns game turn on which object was created
     [[nodiscard]] int                         AgeInTurns(int current_turn) const noexcept; ///< returns elapsed number of turns between turn object was created and current game turn
 
@@ -224,10 +303,11 @@ public:
     virtual void PopGrowthProductionResearchPhase(ScriptingContext&) {}
 
     static constexpr double INVALID_POSITION = -100000.0;           ///< the position in x and y at which default-constructed objects are placed
-    static constexpr int    INVALID_OBJECT_AGE = -(1 << 30) - 1;;   ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
+    static constexpr int    INVALID_OBJECT_AGE = -(1 << 30) - 1;    ///< the age returned by UniverseObject::AgeInTurns() if the current turn is INVALID_GAME_TURN, or if the turn on which an object was created is INVALID_GAME_TURN
     static constexpr int    SINCE_BEFORE_TIME_AGE = (1 << 30) + 1;  ///< the age returned by UniverseObject::AgeInTurns() if an object was created on turn BEFORE_FIRST_TURN
 
     virtual ~UniverseObject() = default;
+    UniverseObject(UniverseObject&&) = default;
 
     /** returns new copy of this UniverseObject, limited to only copy data that
       * is visible to the empire with the specified \a empire_id as determined
@@ -251,16 +331,17 @@ protected:
 
     template <typename T> friend void boost::python::detail::value_destroyer<false>::execute(T const volatile* p);
 
-    void AddMeter(MeterType meter_type) { m_meters[meter_type]; }
-
     void AddMeters(const auto& meter_types)
-        requires requires { meter_types.begin(); }
+#if !defined(FREEORION_ANDROID)
+        requires requires { {*meter_types.begin()} -> std::convertible_to<MeterType>; }
+#else
+        requires requires { static_cast<MeterType>(*meter_types.begin()); }
+#endif
     {
+        m_meters.reserve(m_meters.size() + meter_types.size());
         for (MeterType mt : meter_types)
-            AddMeter(mt);
+            m_meters[mt];
     }
-
-    void Init();
 
     /** Used by public UniverseObject::Copy and derived classes' ::Copy methods. */
     void Copy(const UniverseObject& copied_object, Visibility vis,
@@ -278,7 +359,7 @@ private:
     int        m_created_on_turn = INVALID_GAME_TURN;
     double     m_x = INVALID_POSITION;
     double     m_y = INVALID_POSITION;
-    MeterMap   m_meters;
+    MeterMap   m_meters{{MeterType::METER_STEALTH, Meter()}};
     SpecialMap m_specials; // map from special name to pair of (turn added, capacity)
 
     UniverseObjectType m_type = UniverseObjectType::INVALID_UNIVERSE_OBJECT_TYPE;

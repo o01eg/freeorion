@@ -88,7 +88,7 @@ public:
     void Render() override;
     void SizeMove(Pt ul, Pt lr) override;
     void Disable(bool b = true) override;
-    void SetColor(Clr c) override;
+    void SetColor(Clr c) noexcept override;
     void Incr();  ///< increments the value of the control's text by StepSize(), up to at most MaxValue()
     void Decr();  ///< decrements the value of the control's text by StepSize(), down to at least MinValue()
 
@@ -156,10 +156,10 @@ Spin<T>::Spin(T value, T step, T min, T max, bool edits, const std::shared_ptr<F
 {
     const auto& style = GetStyleFactory();
     Control::SetColor(color);
-    m_edit = style->NewSpinEdit("", font, CLR_ZERO, text_color, CLR_ZERO);
+    m_edit = style.NewSpinEdit("", font, CLR_ZERO, text_color, CLR_ZERO);
     auto small_font = GUI::GetGUI()->GetFont(font, static_cast<int>(font->PointSize() * 0.75));
-    m_up_button = style->NewSpinIncrButton(small_font, color);
-    m_down_button = style->NewSpinDecrButton(small_font, color);
+    m_up_button = style.NewSpinIncrButton(small_font, color);
+    m_down_button = style.NewSpinDecrButton(small_font, color);
 
     if (INSTRUMENT_ALL_SIGNALS)
         ValueChangedSignal.connect(&ValueChangedEcho);
@@ -257,7 +257,7 @@ void Spin<T>::Disable(bool b)
 }
 
 template <typename T>
-void Spin<T>::SetColor(Clr c)
+void Spin<T>::SetColor(Clr c) noexcept
 {
     Control::SetColor(c);
     m_up_button->SetColor(c);

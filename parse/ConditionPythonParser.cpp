@@ -125,7 +125,7 @@ namespace {
     }
 
     condition_wrapper insert_contains_(const condition_wrapper& cond) {
-        return condition_wrapper(std::make_shared<Condition::Contains>(ValueRef::CloneUnique(cond.condition)));
+        return condition_wrapper(std::make_shared<Condition::Contains<>>(ValueRef::CloneUnique(cond.condition)));
     }
 
     condition_wrapper insert_meter_value_(const boost::python::tuple& args, const boost::python::dict& kw, MeterType m) {
@@ -200,16 +200,26 @@ namespace {
     condition_wrapper insert_planet_(const boost::python::tuple& args, const boost::python::dict& kw) {
         if (kw.has_key("type")) {
             std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetType>>> types;
+            std::vector<::PlanetType> type_vals;
+
             boost::python::stl_input_iterator<boost::python::object> it_begin(kw["type"]), it_end;
+            bool have_refs = false;
             for (auto it = it_begin; it != it_end; ++it) {
                 auto type_arg = boost::python::extract<value_ref_wrapper< ::PlanetType>>(*it);
                 if (type_arg.check()) {
                     types.push_back(ValueRef::CloneUnique(type_arg().value_ref));
+                    have_refs = true;
                 } else {
-                    types.push_back(std::make_unique<ValueRef::Constant< ::PlanetType>>(boost::python::extract<enum_wrapper< ::PlanetType>>(*it)().value));
+                    auto val = boost::python::extract<enum_wrapper< ::PlanetType>>(*it)().value;
+                    types.push_back(std::make_unique<ValueRef::Constant< ::PlanetType>>(val));
+                    type_vals.push_back(val);
                 }
             }
-            return condition_wrapper(std::make_shared<Condition::PlanetType>(std::move(types)));
+            if (have_refs) {
+                return condition_wrapper(std::make_shared<Condition::PlanetType<>>(std::move(types)));
+            } else { // have only constants
+                return condition_wrapper(std::make_shared<Condition::PlanetType<::PlanetType>>(std::move(type_vals)));
+            }
         } else if (kw.has_key("size")) {
             std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetSize>>> sizes;
             boost::python::stl_input_iterator<boost::python::object> it_begin(kw["size"]), it_end;
@@ -311,6 +321,12 @@ namespace {
             }
         }
         return condition_wrapper(std::make_shared<Condition::HasTag>(std::move(name)));
+    }
+
+    condition_wrapper insert_has_starlane_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<Condition::Condition> from = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["from_"])().condition);
+
+        return condition_wrapper(std::make_shared<Condition::HasStarlaneTo>(std::move(from)));
     }
 
     condition_wrapper insert_focus_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -862,6 +878,7 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["NoObject"] = condition_wrapper(std::make_shared<Condition::None>());
 
     globals["HasTag"] = boost::python::raw_function(insert_has_tag_);
+    globals["HasStarlane"] = boost::python::raw_function(insert_has_starlane_);
     globals["Planet"] = boost::python::raw_function(insert_planet_);
     globals["Homeworld"] = boost::python::raw_function(insert_homeworld_);
     globals["HasSpecial"] = boost::python::raw_function(insert_has_special_);

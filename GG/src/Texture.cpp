@@ -143,7 +143,7 @@ void Texture::Load(const boost::filesystem::path& path, bool mipmap)
 
     // convert path into UTF-8 format filename string for potential error reporting
     // but do the work only if actually throwing error to log
-    const auto loggable_path = [this](const fs::path& p) {
+    constexpr auto loggable_path = [](const fs::path& p) {
 #if defined (_WIN32)
         boost::filesystem::path::string_type path_native = p.native();
         std::string filename;
@@ -416,8 +416,8 @@ SubTexture::SubTexture(std::shared_ptr<const Texture> texture, X x1, Y y1, X x2,
     m_width(x2 - x1),
     m_height(y2 - y1)
 {
-    if (!m_texture) throw BadTexture("Attempted to contruct subtexture from invalid texture");
-    if (x2 < x1 || y2 < y1) throw InvalidTextureCoordinates("Attempted to contruct subtexture from invalid coordinates");
+    if (!m_texture) throw BadTexture("Attempted to construct subtexture from invalid texture");
+    if (x2 < x1 || y2 < y1) throw InvalidTextureCoordinates("Attempted to construct subtexture from invalid coordinates");
 
     m_tex_coords[0] = static_cast<GLfloat>(x1) / Value(m_texture->Width());
     m_tex_coords[1] = static_cast<GLfloat>(y1) / Value(m_texture->Height());
@@ -430,7 +430,7 @@ SubTexture::SubTexture(std::shared_ptr<const Texture> texture) :
     m_width(GG::X1),
     m_height(GG::Y1)
 {
-    if (!m_texture) throw BadTexture("Attempted to contruct subtexture from invalid texture");
+    if (!m_texture) throw BadTexture("Attempted to construct subtexture from invalid texture");
 
     m_width = m_texture->Width();
     m_height = m_texture->Height();

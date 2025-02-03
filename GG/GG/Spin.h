@@ -82,14 +82,13 @@ public:
     Clr     TextColor() const;          ///< returns the text color
     Clr     InteriorColor() const;      ///< returns the interior color of the control
     Clr     HiliteColor() const;        ///< returns the color used to render hiliting around selected text
-    Clr     SelectedTextColor() const;  ///< returns the color used to render selected text
 
     mutable ValueChangedSignalType ValueChangedSignal; ///< the value changed signal object for this Spin
 
     void Render() override;
     void SizeMove(Pt ul, Pt lr) override;
     void Disable(bool b = true) override;
-    void SetColor(Clr c) override;
+    void SetColor(Clr c) noexcept override;
     void Incr();  ///< increments the value of the control's text by StepSize(), up to at most MaxValue()
     void Decr();  ///< decrements the value of the control's text by StepSize(), down to at least MinValue()
 
@@ -104,7 +103,6 @@ public:
     void SetTextColor(Clr c);           ///< sets the text color
     void SetInteriorColor(Clr c);       ///< sets the interior color of the control
     void SetHiliteColor(Clr c);         ///< sets the color used to render hiliting around selected text
-    void SetSelectedTextColor(Clr c);   ///< sets the color used to render selected text   
 
 protected:
     typedef T ValueType;
@@ -158,10 +156,10 @@ Spin<T>::Spin(T value, T step, T min, T max, bool edits, const std::shared_ptr<F
 {
     const auto& style = GetStyleFactory();
     Control::SetColor(color);
-    m_edit = style->NewSpinEdit("", font, CLR_ZERO, text_color, CLR_ZERO);
+    m_edit = style.NewSpinEdit("", font, CLR_ZERO, text_color, CLR_ZERO);
     auto small_font = GUI::GetGUI()->GetFont(font, static_cast<int>(font->PointSize() * 0.75));
-    m_up_button = style->NewSpinIncrButton(small_font, color);
-    m_down_button = style->NewSpinDecrButton(small_font, color);
+    m_up_button = style.NewSpinIncrButton(small_font, color);
+    m_down_button = style.NewSpinDecrButton(small_font, color);
 
     if (INSTRUMENT_ALL_SIGNALS)
         ValueChangedSignal.connect(&ValueChangedEcho);
@@ -228,10 +226,6 @@ Clr Spin<T>::HiliteColor() const
 { return m_edit->HiliteColor(); }
 
 template <typename T>
-Clr Spin<T>::SelectedTextColor() const
-{ return m_edit->SelectedTextColor(); }
-
-template <typename T>
 void Spin<T>::Render()
 {
     Clr color_to_use = Disabled() ? DisabledColor(Color()) : Color();
@@ -263,7 +257,7 @@ void Spin<T>::Disable(bool b)
 }
 
 template <typename T>
-void Spin<T>::SetColor(Clr c)
+void Spin<T>::SetColor(Clr c) noexcept
 {
     Control::SetColor(c);
     m_up_button->SetColor(c);
@@ -327,10 +321,6 @@ void Spin<T>::SetInteriorColor(Clr c)
 template <typename T>
 void Spin<T>::SetHiliteColor(Clr c)
 { m_edit->SetHiliteColor(c); }
-
-template <typename T>
-void Spin<T>::SetSelectedTextColor(Clr c)
-{ m_edit->SetSelectedTextColor(c); }
 
 template <typename T>
 Button* Spin<T>::UpButton() const

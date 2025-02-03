@@ -376,7 +376,7 @@ bool ShipDesign::ProductionLocation(int empire_id, int location_id, const Script
         return false;
     }
     // evaluate using location as the source, as it should be an object owned by this empire.
-    const ScriptingContext location_as_source_context{location, context};
+    const ScriptingContext location_as_source_context{context, ScriptingContext::Source{}, location};
     if (!hull->Location()->EvalOne(location_as_source_context, location))
         return false;
 
@@ -526,7 +526,7 @@ ShipDesign::MaybeInvalidDesign(std::string hull, std::vector<std::string> parts,
                 if (std::count(parts.begin(), parts.end(), x) > 1) {
                     is_valid = false;
                     if (produce_log)
-                        WarnLogger() << "Invalid ShipDesign part \"" << part_name << "\" excludes itself. Removing first copy.";;
+                        WarnLogger() << "Invalid ShipDesign part \"" << part_name << "\" excludes itself. Removing first copy.";
                     part_name.clear();
                     break; // don't need to check any later exclusions of removed part
                 }
@@ -689,7 +689,7 @@ void ShipDesign::BuildStatCaches() {
     }
 
     // collect unique tags
-    std::sort(tags.begin(), tags.end());
+    std::stable_sort(tags.begin(), tags.end());
     auto last = std::unique(tags.begin(), tags.end());
 
     // compile concatenated tags into contiguous storage
@@ -749,23 +749,6 @@ uint32_t ShipDesign::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_name_desc_in_stringtable);
 
     return retval;
-}
-
-bool operator ==(const ShipDesign& first, const ShipDesign& second) {
-    if (first.Hull() != second.Hull())
-        return false;
-
-    std::map<std::string, int> first_parts;
-    std::map<std::string, int> second_parts;
-
-    // don't care if order is different, as long as the types and numbers of parts is the same
-    for (const std::string& part_name : first.Parts())
-        ++first_parts[part_name];
-
-    for (const std::string& part_name : second.Parts())
-        ++second_parts[part_name];
-
-    return first_parts == second_parts;
 }
 
 
@@ -1024,18 +1007,18 @@ LoadShipDesignsAndManifestOrderFromParseResults(
         std::vector<std::pair<std::string_view, boost::uuids::uuid>> names_and_missing_uuids;
         names_and_missing_uuids.reserve(saved_designs.size());
 
-        const auto not_in_ordering = [&ordering](const auto& uuid_and_x) {
-            const auto uuid = uuid_and_x.first;
+        const auto in_ordering = [&ordering](const auto& uuid) {
             return std::any_of(ordering.begin(), ordering.end(),
                                [uuid](const auto uuid_in_order) noexcept { return uuid == uuid_in_order; });
         };
 
-        for (auto& [uuid, design_and_filename] : saved_designs | range_filter(not_in_ordering)) {
+        for (auto& [uuid, design_and_filename] : saved_designs) {
+            if (!in_ordering(uuid)) // using range_filter above may cause an internal compiler error in MSVC
+                continue;
             ship_manifest_inconsistent = true;
             names_and_missing_uuids.emplace_back(design_and_filename.first->Name(), uuid);
         }
-        std::sort(names_and_missing_uuids.begin(), names_and_missing_uuids.end(),
-                  [](const auto& lhs, const auto& rhs) noexcept { return lhs.first < rhs.first; });
+        std::stable_sort(names_and_missing_uuids.begin(), names_and_missing_uuids.end());
 
         for (auto& [name, uuid] : names_and_missing_uuids) {
             WarnLogger() << "Missing ship design " << uuid << " called " << name << " added to the manifest.";

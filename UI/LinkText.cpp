@@ -262,9 +262,10 @@ namespace {
         GG::Clr color = ClientUI::DefaultLinkColor();
         // get object indicated by object_id, and then get object's owner, if any
         int object_id = CastStringToInt(object_id_str);
-        auto object = Objects().get(object_id);
+        const auto& context = IApp::GetApp()->GetContext();
+        auto object = context.ContextObjects().get(object_id);
         if (object && !object->Unowned())
-            if (auto empire = Empires().GetEmpire(object->Owner()))
+            if (auto empire = context.GetEmpire(object->Owner()))
                 color = empire->Color();
         return GG::RgbaTag(color).append(content).append("</rgba>");
     }
@@ -506,10 +507,10 @@ void TextLinker::LocateLinks() {
             current_link->rects.emplace_back(GG::X0, y_posn, GG::X0, y_posn + font->Height());
 
         for (unsigned int i = 0; i < curr_line.char_data.size(); ++i) {
-            const GG::X x_posn = (i > 0) ? curr_line.char_data[static_cast<std::size_t>(i - 1)].extent : GG::X0;
+            const GG::X x_posn = (i > 0) ? curr_line.char_data.at(static_cast<std::size_t>(i - 1)).extent : GG::X0;
             // The link text_posn is at the beginning of the tag, whereas
             // char_data jumps over tags. That is why we cannot test for precise equality
-            const auto cdsi = Value(curr_line.char_data[i].string_index);
+            const auto cdsi = Value(curr_line.char_data.at(i).string_index);
             const auto [first, lastplusone] = current_link->real_text_posn;
 
             if (!inside_link &&

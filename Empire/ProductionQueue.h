@@ -36,8 +36,6 @@ FO_ENUM(
     ((BT_STOCKPILE))
     ((NUM_BUILD_TYPES))
 )
-static_assert(BuildTypeValues().front() == std::pair{BuildType::INVALID_BUILD_TYPE, std::string_view{"INVALID_BUILD_TYPE"}});
-static_assert(BuildTypeValues()[3].second == "BT_SHIP");
 
 struct FO_COMMON_API ProductionQueue {
     /** The type that specifies a single production item (BuildType and name string). */
@@ -160,7 +158,8 @@ struct FO_COMMON_API ProductionQueue {
     /** The const ProductionQueue iterator type.  Dereference yields a Element. */
     typedef QueueType::const_iterator const_iterator;
 
-    ProductionQueue(int empire_id);
+    ProductionQueue() = default;
+    explicit ProductionQueue(int empire_id);
 
     [[nodiscard]] int     ProjectsInProgress() const noexcept { return m_projects_in_progress; } ///< number of production projects currently (perhaps partially) funded.
     [[nodiscard]] float   TotalPPsSpent() const; ///< number of PPs currently spent on the projects in this queue.

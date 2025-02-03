@@ -40,8 +40,6 @@ System::System(StarType star, std::string name, double x, double y, int current_
         m_star = StarType::INVALID_STAR_TYPE;
 
     m_orbits.assign(SYSTEM_ORBITS, INVALID_OBJECT_ID);
-
-    UniverseObject::Init();
 }
 
 std::shared_ptr<UniverseObject> System::Clone(const Universe& universe, int empire_id) const {
@@ -187,10 +185,10 @@ std::string System::Dump(uint8_t ntabs) const {
 
 std::string System::ApparentName(int empire_id, const Universe& u, bool blank_unexplored_and_none) const {
     // this one line requires a higher __GNUC__ version to compile for several Docker / Fedora test builds. No idea why it's different from the other similar cases.
-#if defined(__cpp_lib_constexpr_string) && (!defined(__GNUC__) || (__GNUC__ > 14)) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
-    constexpr std::string EMPTY_STRING;
+#if defined(__cpp_lib_constexpr_string) && (!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNU_MINOR__ >= 2)) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 10)))
+    static constexpr std::string EMPTY_STRING;
 #else
-    const std::string EMPTY_STRING;
+    static const std::string EMPTY_STRING;
 #endif
 
     const ObjectMap& o = u.Objects();
@@ -252,9 +250,6 @@ bool System::Contains(int object_id) const {
         return false;
     return m_objects.contains(object_id);
 }
-
-std::shared_ptr<UniverseObject> System::Accept(const UniverseObjectVisitor& visitor) const
-{ return visitor.Visit(std::const_pointer_cast<System>(std::static_pointer_cast<const System>(shared_from_this()))); }
 
 std::size_t System::SizeInMemory() const {
     std::size_t retval = UniverseObject::SizeInMemory();

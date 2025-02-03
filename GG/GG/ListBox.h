@@ -174,11 +174,8 @@ public:
     typedef std::list<std::shared_ptr<Row>>::iterator iterator;
     typedef std::list<std::shared_ptr<Row>>::const_iterator const_iterator;
 
-    struct IteratorHash
-    {
-        std::size_t operator()(const iterator it) const
-        { return boost::hash<const std::shared_ptr<Row>>()(*it); }
-    };
+    struct GG_API IteratorHash
+    { std::size_t operator()(const iterator it) const; };
     typedef std::unordered_set<iterator, IteratorHash> SelectionSet;
 
     /** emitted when the list box is cleared */
@@ -302,7 +299,7 @@ public:
     void Show() override;
 
     void Disable(bool b = true) override;
-    void SetColor(Clr c) override;
+    void SetColor(Clr c) noexcept override;
 
     /** Insertion sorts \a row into the ListBox if sorted, or inserts into an
         unsorted ListBox before \a it; returns insertion point.  This Row

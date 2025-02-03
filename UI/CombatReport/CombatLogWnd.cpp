@@ -100,7 +100,7 @@ namespace {
     {
         decltype(SegregateForces(owners, objects, categories, order)) forces;
 
-        for (const auto& object: Objects().find(objects)) {
+        for (const auto& object : ClientApp::GetApp()->GetContext().ContextObjects().find(objects)) {
             if (!object || !owners.contains(object->Owner()))
                 continue;
 
@@ -136,7 +136,7 @@ namespace {
         std::string retval;
         static constexpr std::size_t retval_sz = 24 + 1 + VarText::EMPIRE_ID_TAG.length()*2 + 1 + 8 + 1 + 30 + 3 + 1 + 10 + 20; // semi-guesstimate
         retval.reserve(retval_sz);
-        const ScriptingContext context;
+        const ScriptingContext& context = IApp::GetApp()->GetContext();
         if (const auto empire = context.GetEmpire(empire_id))
             return retval.append(GG::RgbaTag(empire->Color())).append("<").append(VarText::EMPIRE_ID_TAG).append(" ")
                          .append(std::to_string(empire->EmpireID())).append(">").append(empire->Name()).append("</")
@@ -158,7 +158,7 @@ namespace {
         bool operator()(const std::shared_ptr<UniverseObject>& lhs,
                         const std::shared_ptr<UniverseObject>& rhs)
         {
-            const ScriptingContext context;
+            const ScriptingContext& context = IApp::GetApp()->GetContext();
             const auto& lhs_public_name = lhs->PublicName(viewing_empire_id, context.ContextUniverse());
             const auto& rhs_public_name = rhs->PublicName(viewing_empire_id, context.ContextUniverse());
             if (lhs_public_name != rhs_public_name) {
@@ -185,7 +185,7 @@ namespace {
         const std::string_view delimiter = ", ",
         const std::string_view category_delimiter = "\n-\n")
     {
-        const ScriptingContext context;
+        const ScriptingContext& context = IApp::GetApp()->GetContext();
 
         std::stringstream ss;
         bool first_category = true;
@@ -246,7 +246,7 @@ namespace {
         log(log_),
         viewing_empire_id(viewing_empire_id_),
         event(event_),
-        title(log.DecorateLinkText(event->CombatLogDescription(viewing_empire_id, ScriptingContext{})))
+        title(log.DecorateLinkText(event->CombatLogDescription(viewing_empire_id, IApp::GetApp()->GetContext())))
     {}
 
     void CombatLogAccordionPanel::CompleteConstruction() {
@@ -535,7 +535,7 @@ std::vector<std::shared_ptr<GG::Wnd>> CombatLogWnd::Impl::MakeCombatLogPanel(
         return new_logs;
     }
 
-    std::string title = event->CombatLogDescription(viewing_empire_id, ScriptingContext{});
+    std::string title = event->CombatLogDescription(viewing_empire_id, IApp::GetApp()->GetContext());
     if (!(event->FlattenSubEvents() && title.empty()))
         new_logs.push_back(DecorateLinkText(title));
 
@@ -569,7 +569,7 @@ void CombatLogWnd::Impl::SetLog(int log_id) {
                                                      );
     m_wnd.SetLayout(layout);
 
-    const ScriptingContext context;
+    const ScriptingContext& context = IApp::GetApp()->GetContext();
 
     int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
     const Universe& universe = context.ContextUniverse();
@@ -587,26 +587,38 @@ void CombatLogWnd::Impl::SetLog(int log_id) {
                                 % log->turn) + "\n"));
 
 
+    const auto invisible_to_client_empire_planet =
+        [client_empire_id, &universe](const std::shared_ptr<UniverseObject>& object) {
+        return object &&
+            object->ObjectType() == UniverseObjectType::OBJ_PLANET &&
+            universe.GetObjectVisibilityByEmpire(object->ID(), client_empire_id) < Visibility::VIS_PARTIAL_VISIBILITY;
+        };
+
     AddRow(DecorateLinkText(UserString("COMBAT_INITIAL_FORCES")));
-    const auto initial_forces =
-        SegregateForces(log->empire_ids, log->object_ids, {IsShip, HasPopulation},
-                        OrderByNameAndId(client_empire_id));
-    for (const auto& empire_forces : initial_forces)
-        AddRow(GG::Wnd::Create<EmpireForcesAccordionPanel>(
-            GG::X0, *this, client_empire_id, empire_forces.first, empire_forces.second));
+    {
+        auto initial_forces =
+            SegregateForces(log->empire_ids, log->object_ids,
+                            {IsShip, HasPopulation, invisible_to_client_empire_planet},
+                            OrderByNameAndId(client_empire_id));
+        for (auto& [forces_empire_id, empire_forces] : initial_forces)
+            AddRow(GG::Wnd::Create<EmpireForcesAccordionPanel>(
+                GG::X0, *this, client_empire_id, forces_empire_id, std::move(empire_forces)));
+    }
 
     AddRow(DecorateLinkText("\n" + UserString("COMBAT_SUMMARY_DESTROYED")));
-    const auto destroyed_forces =
-        SegregateForces(log->empire_ids, log->destroyed_object_ids, {IsShip, HasPopulation},
-                        OrderByNameAndId(client_empire_id));
-    for (const auto& empire_forces : destroyed_forces)
-        AddRow(GG::Wnd::Create<EmpireForcesAccordionPanel>(
-            GG::X0, *this, client_empire_id, empire_forces.first, empire_forces.second));
+    {
+        auto destroyed_forces =
+            SegregateForces(log->empire_ids, log->destroyed_object_ids, {IsShip, HasPopulation},
+                            OrderByNameAndId(client_empire_id));
+        for (auto& [forces_empire_id, empire_forces] : destroyed_forces)
+            AddRow(GG::Wnd::Create<EmpireForcesAccordionPanel>(
+                GG::X0, *this, client_empire_id, forces_empire_id, std::move(empire_forces)));
+    }
 
     // Write Logs
     for (CombatEventPtr event : log->combat_events) {
         DebugLogger(combat_log) << "event debug info: " << event->DebugString(context);
-        for (auto&& wnd : MakeCombatLogPanel(m_font->SpaceWidth()*10, client_empire_id, event))
+        for (auto& wnd : MakeCombatLogPanel(m_font->SpaceWidth()*10, client_empire_id, event))
             AddRow(std::move(wnd));
     }
 

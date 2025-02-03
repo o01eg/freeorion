@@ -2,7 +2,6 @@
 #define _Universe_h_
 
 
-#include <list>
 #include <map>
 #include <memory>
 #include <set>
@@ -18,6 +17,7 @@
 #include "ConstantsFwd.h"
 #include "EnumsFwd.h"
 #include "ObjectMap.h"
+#include "Pathfinder.h"
 #include "UnlockableItem.h"
 #include "UniverseObject.h"
 #include "../util/Export.h"
@@ -29,7 +29,6 @@ class EmpireManager;
 class XMLElement;
 class ShipDesign;
 class System;
-class Pathfinder;
 class IDAllocator;
 class FleetPlan;
 class MonsterFleetPlan;
@@ -107,8 +106,8 @@ public:
 
 
     /** Returns objects in this Universe. */
-    [[nodiscard]] const ObjectMap& Objects() const noexcept { return *m_objects; }
-    [[nodiscard]] ObjectMap&       Objects() noexcept       { return *m_objects; }
+    [[nodiscard]] const ObjectMap& Objects() const noexcept { return m_objects; }
+    [[nodiscard]] ObjectMap&       Objects() noexcept       { return m_objects; }
 
     /** Returns latest known state of objects for the Empire with
       * id \a empire_id or the true / complete state of all objects in this
@@ -129,8 +128,7 @@ public:
     /** Returns IDs of objects that the Empire with id \a empire_id knows have
       * been destroyed.  Each empire's latest known objects data contains the
       * last known information about each object, whether it has been destroyed
-      * or not.  If \a empire_id = ALL_EMPIRES an empty set of IDs is
-      * returned. */
+      * or not. */
     [[nodiscard]] const std::unordered_set<int>& EmpireKnownDestroyedObjectIDs(int empire_id) const;
 
     /** Returns IDs of objects that the Empire with id \a empire_id has stale
@@ -321,13 +319,13 @@ public:
     /** Fills pathfinding data structure and determines least jumps distances
       * between systems based on the objects in \a objects */
     void InitializeSystemGraph(const EmpireManager& empires, const ObjectMap& objects);
-    void InitializeSystemGraph(const EmpireManager& empires) { InitializeSystemGraph(empires, *m_objects); }
+    void InitializeSystemGraph(const EmpireManager& empires) { InitializeSystemGraph(empires, m_objects); }
 
     /** Regenerates per-empire system view graphs by filtering the complete
       * system graph based on empire visibility.  Does not regenerate the base
       * graph to account for actual system-starlane connectivity changes. */
     void UpdateEmpireVisibilityFilteredSystemGraphsWithOwnObjectMaps(const EmpireManager& empires);
-    void UpdateEmpireVisibilityFilteredSystemGraphsWithMainObjectMap(const EmpireManager& empires);
+    void UpdateCommonFilteredSystemGraphsWithMainObjectMap(const EmpireManager& empires);
 
     /** Adds the object ID \a object_id to the set of object ids for the empire
       * with id \a empire_id that the empire knows have been destroyed. */
@@ -344,29 +342,32 @@ public:
     /** Removes the object with ID number \a object_id from the universe's map
       * of existing objects, and adds the object's id to the set of destroyed
       * object ids.  If \a update_destroyed_object_knowers is true, empires
-      * that currently have visibility of the object have its id added to
-      * their set of objects' ids that are known to have been destroyed.  Older
-      * or limited versions of objects remain in empires latest known objects
-      * ObjectMap, regardless of whether the empire knows the object is
-      * destroyed. */
+      * whose ID is in \a empire_ids and that currently have visibility of the
+      * object have its id added to their set of objects' ids that are known
+      * to have been destroyed.  Older or limited versions of objects remain
+      * in empires latest known objects ObjectMap, regardless of whether the
+      * empire knows the object is destroyed. */
     void Destroy(int object_id, const std::span<const int> empire_ids,
                  bool update_destroyed_object_knowers = true);
 
     /** Destroys object with ID \a object_id, and destroys any associted
       * objects, such as contained buildings of planets, contained anything of
       * systems, or fleets if their last ship has id \a object_id and the fleet
-      * is thus empty. Returns the ids of all destroyed objects. */
+      * is thus empty. Returns the ids of all destroyed objects. Empires
+      * whose ID is in \a empire_ids and that currently have visibility of the
+      * object have its id added to their set of objects' ids that are known
+      * to have been destroyed. */
     std::vector<int> RecursiveDestroy(int object_id, const std::span<const int> empire_ids);
 
     /** Used by the Destroy effect to mark an object for destruction later
       * during turn processing. (objects can't be destroyed immediately as
       * other effects might depend on their existence) */
-    void EffectDestroy(int object_id, int source_object_id = INVALID_OBJECT_ID);
+    void EffectDestroy(int destroyed_object_id, int source_object_id = INVALID_OBJECT_ID);
 
-    /** Permanently deletes object with ID number \a object_id.  no
-      * information about this object is retained in the Universe.  Can be
-      * performed on objects whether or not the have been destroyed.  Returns
-      * true if such an object was found, false otherwise. */
+    /** Permanently deletes object with ID number \a object_id.
+      * No information about this object is retained in the Universe.
+      * Can be performed on objects whether or not the have been destroyed.
+      * Returns true if such an object was found, false otherwise. */
     bool Delete(int object_id);
 
     /** Permanently deletes the ship design with ID number \a design_id. No
@@ -410,7 +411,7 @@ public:
                 continue;
             retval.push_back(ID);
             obj->SetID(ID); // assign and decrement temporary ID
-            m_objects->insert(std::move(obj)); // directly insert into objects, skipping ID validation
+            m_objects.insert(std::move(obj)); // directly insert into objects, skipping ID validation
             ID--;
         }
         return retval;
@@ -459,16 +460,12 @@ public:
     void ObfuscateIDGenerator();
 
 private:
-    /* Pathfinder setup for the viewing empire
-     */
-    std::shared_ptr<Pathfinder> m_pathfinder;
+    Pathfinder m_pathfinder;
 
-    /** Generates an object ID for a future object. Usually used by the server
-      * to service new ID requests. */
+    /** Generates an object ID for a future object. Usually used by the server to service new ID requests. */
     int GenerateObjectID();
 
-    /** Generates design ID for a new (ship) design. Usually used by the
-      * server to service new ID requests. */
+    /** Generates design ID for a new (ship) design. Usually used by the server to service new ID requests. */
     int GenerateDesignID();
 
     /** Verify that an object ID \p id could be generated by \p empire_id. */
@@ -521,7 +518,7 @@ private:
       * vector is passed, it will instead update all existing objects. */
     void UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec, ScriptingContext& context, bool do_accounting);
 
-    std::unique_ptr<ObjectMap>      m_objects;                          ///< map from object id to UniverseObjects in the universe.  for the server: all of them, up to date and true information about object is stored;  for clients, only limited information based on what the client knows about is sent.
+    ObjectMap                       m_objects;                          ///< map from object id to UniverseObjects in the universe.  for the server: all of them, up to date and true information about object is stored;  for clients, only limited information based on what the client knows about is sent.
     EmpireObjectMap                 m_empire_latest_known_objects;      ///< map from empire id to (map from object id to latest known information about each object by that empire)
 
     std::unordered_set<int>         m_destroyed_object_ids;             ///< all ids of objects that have been destroyed (on server) or that a player knows were destroyed (on clients)

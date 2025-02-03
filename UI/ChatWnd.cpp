@@ -49,7 +49,7 @@ namespace {
         auto formatter = FlexibleFormat(key);
 
         std::size_t arg = 1;
-        for (auto submatch : match.nested_results())
+        for (const auto& submatch : match.nested_results())
             formatter.bind_arg(arg++, submatch.str());
 
         return formatter.str();
@@ -111,9 +111,7 @@ MessageWndEdit::MessageWndEdit() :
     CUIEdit("")
 {}
 
-void MessageWndEdit::KeyPress(GG::Key key, uint32_t key_code_point,
-                              GG::Flags<GG::ModKey> mod_keys)
-{
+void MessageWndEdit::KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
     switch (key) {
     case GG::Key::GGK_RETURN:
     case GG::Key::GGK_KP_ENTER:
@@ -132,7 +130,7 @@ void MessageWndEdit::KeyPress(GG::Key key, uint32_t key_code_point,
 }
 
 void MessageWndEdit::FindGameWords() {
-    const ScriptingContext context;
+    const ScriptingContext& context = IApp::GetApp()->GetContext();
 
      // add player and empire names
     for (const auto& empire : Empires() | range_values) {
@@ -366,45 +364,50 @@ void MessageWnd::PreRender() {
 
 void MessageWnd::HandlePlayerChatMessage(const std::string& text,
                                          const std::string& player_name,
-                                         GG::Clr text_color,
+                                         GG::Clr player_name_color,
                                          const boost::posix_time::ptime& timestamp,
                                          int recipient_player_id,
                                          bool pm)
 {
     std::string filtered_message = StringtableTextSubstitute(text);
-    std::string wrapped_text = RgbaTag(text_color);
-    const std::string&& formatted_timestamp = ClientUI::FormatTimestamp(timestamp);
-    if (utf8::is_valid(formatted_timestamp.begin(), formatted_timestamp.end()))
-        wrapped_text.append(formatted_timestamp);
-    if (player_name.empty()) {
-        wrapped_text.append(filtered_message).append("</rgba>");
-    } else {
-        wrapped_text.append(player_name);
-        if (pm)
-            wrapped_text.append(UserString("MESSAGES_WHISPER"));
-        wrapped_text.append(": ").append(filtered_message).append("</rgba>");
+    std::string wrapped_text;
+    {
+        const auto formatted_timestamp = ClientUI::FormatTimestamp(timestamp);
+        if (utf8::is_valid(formatted_timestamp.begin(), formatted_timestamp.end()))
+            wrapped_text.append(formatted_timestamp);
     }
+    const auto filtered_name = GG::Font::StripTags(player_name);
+    wrapped_text.append(RgbaTag(player_name_color))
+                .append(!filtered_name.empty() ? filtered_name : UserString("PLAYER"))
+                .append("</rgba>");
+    static_assert(GG::Font::RGBA_TAG == "rgba");
+    if (pm)
+        wrapped_text.append(UserString("MESSAGES_WHISPER"));
+    wrapped_text.append(": ")
+                .append(filtered_message)
+                .append("</pre>").append("<reset>"); // ensure message doesn't leave text state in preformatted mode or with any other tags applied
+    static_assert(GG::Font::PRE_TAG == "pre");
+    static_assert(GG::Font::RESET_TAG == "reset");
+
     TraceLogger() << "HandlePlayerChatMessage sender: " << player_name
-                  << "  sender colour rgba tag: " << RgbaTag(text_color)
+                  << "  sender colour tag: " << RgbaTag(player_name_color)
                   << "  filtered message: " << filtered_message
                   << "  timestamp text: " << ClientUI::FormatTimestamp(timestamp)
                   << "  wrapped text: " << wrapped_text;
 
-    *m_display += wrapped_text.append("\n");
+    wrapped_text.append("\n");
+
+    *m_display += wrapped_text;
     m_display_show_time = GG::GUI::GetGUI()->Ticks();
 
-    // if client empire is target of message, show message window
-    const ClientApp* app = ClientApp::GetApp();
-    if (!app) {
-        ErrorLogger() << "MessageWnd::HandlePlayerChatMessage couldn't get client app!";
-        return;
-    }
-    // only show and flash message window if other player sent message
-    const auto& players = app->Players();
-    const auto it = players.find(app->PlayerID());
-    if (it == players.end() || it->second.name != player_name) {
-        Flash();
-        Show();
+    if (const ClientApp* app = ClientApp::GetApp()) {
+        // if client empire is target of message, show message window
+        const auto& players = app->Players();
+        const auto it = players.find(app->PlayerID());
+        if (it == players.end() || it->second.name != player_name) {
+            Flash();
+            Show();
+        }
     }
 }
 
@@ -454,7 +457,7 @@ void MessageWnd::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {
         return;
     }
 
-    const ScriptingContext context;
+    const ScriptingContext& context = IApp::GetApp()->GetContext();
 
     int client_empire_id = app->EmpireID();
     DiplomaticStatus status = context.ContextDiploStatus(empire1_id, empire2_id);
@@ -501,8 +504,8 @@ void MessageWnd::OpenForInput() {
     m_display_show_time = GG::GUI::GetGUI()->Ticks();
 }
 
-void MessageWnd::SetChatText(const std::string& chat_text)
-{ m_display->SetText(chat_text); }
+void MessageWnd::SetChatText(std::string chat_text)
+{ m_display->SetText(std::move(chat_text)); }
 
 namespace {
     void SendChatMessage(const std::string& text, std::set<int> recipients, bool pm) {
@@ -524,13 +527,12 @@ namespace {
         std::string::size_type space_pos = text.find_first_of(' ');
         if (space_pos == std::string::npos)
             return Networking::INVALID_PLAYER_ID;
-        std::string player_name = boost::trim_copy(text.substr(0, space_pos));
-        const std::map<int, PlayerInfo>& players = app->Players();
+        const std::string player_name = boost::trim_copy(text.substr(0, space_pos));
+        const auto& players = app->Players();
 
-        for (auto& player : players) {
-            if (boost::iequals(player.second.name, player_name)) {
-                return player.first;
-            }
+        for (auto& [player_id, player_info] : players) {
+            if (boost::iequals(player_info.name, player_name))
+                return player_id;
         }
 
         return Networking::INVALID_PLAYER_ID;

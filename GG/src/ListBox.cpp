@@ -452,6 +452,9 @@ namespace {
     { return lhs.SortKey(column) < rhs.SortKey(column); };
 }
 
+std::size_t ListBox::IteratorHash::operator()(const ListBox::iterator it) const
+{ return boost::hash<const std::shared_ptr<ListBox::Row>>()(*it); }
+
 
 ////////////////////////////////////////////////
 // GG::ListBox
@@ -552,7 +555,7 @@ ListBox::iterator ListBox::LastVisibleRow() const
     Y visible_pixels = ClientSize().y;
     Y acc(Y0);
     iterator it = m_first_row_shown;
-    for (; it != m_rows.end(); ) {
+    for (; it != m_rows.end();) {
         acc += (*it)->Height();
         iterator next_it = it;
         ++next_it;
@@ -889,7 +892,7 @@ void ListBox::Disable(bool b)
         m_hscroll->Disable(b);
 }
 
-void ListBox::SetColor(Clr c)
+void ListBox::SetColor(Clr c) noexcept
 {
     Control::SetColor(c);
     if (m_vscroll)
@@ -2037,7 +2040,7 @@ std::pair<bool, bool> ListBox::AddOrRemoveScrolls(
     // Add necessary vscroll
     if (!m_vscroll && vertical_needed) {
         vscroll_added_or_removed = true;
-        m_vscroll = style->NewListBoxVScroll(m_color, CLR_SHADOW);
+        m_vscroll = style.NewListBoxVScroll(m_color, CLR_SHADOW);
         m_vscroll->NonClientChild(true);
         m_vscroll->MoveTo(Pt(cl_sz.x - SCROLL_WIDTH, Y0));
         m_vscroll->Resize(Pt(X(SCROLL_WIDTH), cl_sz.y - (horizontal_needed ? SCROLL_WIDTH : 0)));
@@ -2087,7 +2090,7 @@ std::pair<bool, bool> ListBox::AddOrRemoveScrolls(
     // Add necessary hscroll
     if (!m_hscroll && horizontal_needed) {
         hscroll_added_or_removed = true;
-        m_hscroll = style->NewListBoxHScroll(m_color, CLR_SHADOW);
+        m_hscroll = style.NewListBoxHScroll(m_color, CLR_SHADOW);
         m_hscroll->NonClientChild(true);
         m_hscroll->MoveTo(Pt(X0, cl_sz.y - SCROLL_WIDTH));
         m_hscroll->Resize(Pt(cl_sz.x - (vertical_needed ? SCROLL_WIDTH : 0), Y(SCROLL_WIDTH)));

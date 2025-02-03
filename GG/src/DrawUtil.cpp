@@ -16,14 +16,101 @@
 
 
 #if !defined(__cpp_lib_integer_comparison_functions)
-constexpr bool cmp_less_equal(std::size_t l, int r) noexcept { return l <= r; }
-constexpr bool cmp_greater(std::size_t l, int r) noexcept { return l > r; }
+namespace {
+constexpr bool cmp_less_equal(std::size_t l, int r) noexcept
+{ return (r < 0) ? false : (l <= static_cast<std::size_t>(r)); }
+static_assert(cmp_less_equal(0u, 0));
+static_assert(cmp_less_equal(0u, 1));
+static_assert(cmp_less_equal(1u, 1));
+static_assert(!cmp_less_equal(1u, 0));
+static_assert(cmp_less_equal(1u, 2));
+static_assert(cmp_less_equal(0u, INT_MAX));
+static_assert(cmp_less_equal(static_cast<std::size_t>(INT_MAX), INT_MAX));
+static_assert(!cmp_less_equal(static_cast<std::size_t>(INT_MAX), 0));
+static_assert(!cmp_less_equal(0u, -1));
+static_assert(!cmp_less_equal(0u, INT_MIN));
+static_assert(!cmp_less_equal(static_cast<std::size_t>(INT_MAX), INT_MIN));
+
+constexpr bool cmp_greater(std::size_t l, int r) noexcept
+{ return (r < 0) ? true : (l > static_cast<std::size_t>(r)); }
+static_assert(!cmp_greater(0u, 0));
+static_assert(!cmp_greater(0u, 1));
+static_assert(!cmp_greater(1u, 1));
+static_assert(cmp_greater(1u, 0));
+static_assert(!cmp_greater(1u, 2));
+static_assert(!cmp_greater(0u, INT_MAX));
+static_assert(!cmp_greater(static_cast<std::size_t>(INT_MAX), INT_MAX));
+static_assert(cmp_greater(static_cast<std::size_t>(INT_MAX), 0));
+static_assert(cmp_greater(0u, -1));
+static_assert(cmp_greater(0u, INT_MIN));
+static_assert(cmp_greater(static_cast<std::size_t>(INT_MAX), INT_MIN));
+}
 #else
 using std::cmp_less_equal;
 using std::cmp_greater;
 #endif
 
 using namespace GG;
+
+namespace {
+    static_assert(uint32_t{Clr{0,0,0,1}} == 1u);
+    static_assert(uint32_t{Clr{0,0,2,3}} == 2*256u + 3u);
+    static_assert(uint32_t{Clr{255,1,0,0}} == 256*256*256*255u + 256*256*1u);
+
+    static_assert(Clr("A0FF01") == Clr{160, 255, 1, 255});
+    static_assert(Clr("12345678") == Clr{16*1+2, 16*3+4, 16*5+6, 16*7+8});
+
+    // workaround for operator==(array, array) not being constexpr in C++17
+    template <std::size_t N>
+    constexpr bool ArrEq(std::array<std::string::value_type, N> l,
+                         const std::string::value_type* r) noexcept
+    {
+        for (std::size_t idx = 0; idx < l.size(); ++idx)
+            if (l[idx] != r[idx])
+                return false;
+        return true;
+    }
+    static_assert(ArrEq(Clr("A0FF01BB").Hex(), "A0FF01BB"));
+
+    static_assert(Clr::ValFromTwoHexChars("01") == 1);
+    static_assert(Clr::ValFromTwoHexChars("FF") == 255);
+    static_assert(Clr::ValFromTwoHexChars("A0") == 160);
+    static_assert(Clr::ValFromTwoHexChars("!.") == 14u);
+
+    static_assert(ArrEq(Clr::ToHexChars(0), "00"));
+    static_assert(ArrEq(Clr::ToHexChars(1), "01"));
+    static_assert(ArrEq(Clr::ToHexChars(9), "09"));
+    static_assert(ArrEq(Clr::ToHexChars(10), "0A"));
+    static_assert(ArrEq(Clr::ToHexChars(15), "0F"));
+    static_assert(ArrEq(Clr::ToHexChars(16), "10"));
+    static_assert(ArrEq(Clr::ToHexChars(255), "FF"));
+
+    static_assert(ArrEq(Clr::ToHexChars(Clr::ValFromTwoHexChars("00")), "00"));
+    static_assert(ArrEq(Clr::ToHexChars(Clr::ValFromTwoHexChars("09")), "09"));
+    static_assert(ArrEq(Clr::ToHexChars(Clr::ValFromTwoHexChars("2C")), "2C"));
+    static_assert(ArrEq(Clr::ToHexChars(Clr::ValFromTwoHexChars("EF")), "EF"));
+
+    using sva4 = std::array<std::string::value_type, 4>;
+    constexpr bool TestUint8ToCharArray(uint8_t num, sva4 expected_result) noexcept
+    { return ArrEq(Clr::UInt8ToCharArray(num), expected_result.data()); }
+
+    static_assert(TestUint8ToCharArray(0, sva4{"0\0\0"}));
+    static_assert(TestUint8ToCharArray(1, sva4{"1\0\0"}));
+    static_assert(TestUint8ToCharArray(20, sva4{"20\0"}));
+    static_assert(TestUint8ToCharArray(21, sva4{"21\0"}));
+    static_assert(TestUint8ToCharArray(200, sva4{"200"}));
+    static_assert(TestUint8ToCharArray(210, sva4{"210"}));
+    static_assert(TestUint8ToCharArray(201, sva4{"201"}));
+    static_assert(TestUint8ToCharArray(255, sva4{"255"}));
+
+
+    static_assert(LightenClr(CLR_DARK_GRAY, 3.0f) == CLR_LIGHT_GRAY);
+    static_assert(LightenClr(CLR_DARK_GRAY, 100.0f) == CLR_WHITE);
+    static_assert(DarkenClr(CLR_DARK_GRAY, 1000.0f) == CLR_BLACK);
+    static_assert(DarkenClr(CLR_DARK_GRAY, 0.00001f) == CLR_WHITE);
+    static_assert(BlendClr(CLR_DARK_GRAY, CLR_LIGHT_GRAY) == InvertClr(CLR_GRAY));
+    static_assert(BlendClr(CLR_WHITE, CLR_ZERO, 0.8f) == Clr(255*4/5, 255*4/5, 255*4/5, 255*4/5));
+}
 
 namespace {
 
@@ -679,6 +766,13 @@ void GG::Line(Pt pt1, Pt pt2, Clr color, float thick)
     Line(pt1.x, pt1.y, pt2.x, pt2.y);
 }
 
+void GG::Line(X x1, Y y1, X x2, Y y2, Clr color, float thick)
+{
+    glLineWidth(thick);
+    glColor(color);
+    Line(x1, y1, x2, y2);
+}
+
 void GG::Line(X x1, Y y1, X x2, Y y2)
 {
     const GLfloat vertices[4] = {GLfloat(Value(x1)), GLfloat(Value(y1)),
@@ -750,17 +844,14 @@ void GG::Triangle(X x1, Y y1, X x2, Y y2, X x3, Y y3, bool filled)
     glEnable(GL_TEXTURE_2D);
 }
 
-void GG::FlatRectangle(Pt ul, Pt lr, Clr color, Clr border_color,
-                       unsigned int border_thick)
+void GG::FlatRectangle(Pt ul, Pt lr, Clr color, Clr border_color, unsigned int border_thick)
 {
     Rectangle(ul, lr, color, border_color, border_color, border_thick,
               true, true, true, true);
 }
 
-void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
-                          unsigned int bevel_thick, bool bevel_left,
-                          bool bevel_top, bool bevel_right,
-                          bool bevel_bottom)
+void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up, unsigned int bevel_thick,
+                          bool bevel_left, bool bevel_top, bool bevel_right, bool bevel_bottom)
 {
     Rectangle(ul, lr, color,
               (up ? LightenClr(border_color) : DarkenClr(border_color)),
@@ -769,16 +860,14 @@ void GG::BeveledRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
 }
 
 void GG::FlatRoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color,
-                              unsigned int corner_radius,
-                              unsigned int border_thick)
+                              unsigned int corner_radius, unsigned int border_thick)
 {
     RoundedRectangle(ul, lr, color, border_color, border_color,
                      corner_radius, border_thick);
 }
 
 void GG::BeveledRoundedRectangle(Pt ul, Pt lr, Clr color, Clr border_color, bool up,
-                                 unsigned int corner_radius,
-                                 unsigned int bevel_thick)
+                                 unsigned int corner_radius, unsigned int bevel_thick)
 {
     RoundedRectangle(ul, lr, color,
                      (up ? LightenClr(border_color) : DarkenClr(border_color)),

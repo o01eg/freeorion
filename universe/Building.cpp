@@ -1,23 +1,19 @@
 #include "Building.h"
 
 #include "BuildingType.h"
-#include "UniverseObjectVisitor.h"
 #include "Universe.h"
 #include "../Empire/EmpireManager.h"
 #include "../util/AppInterface.h"
 #include "../util/i18n.h"
 
 
-Building::Building(int empire_id, std::string building_type, int produced_by_empire_id,
-                   int creation_turn) :
+Building::Building(int empire_id, std::string building_type, int produced_by_empire_id, int creation_turn) :
     UniverseObject{UniverseObjectType::OBJ_BUILDING, "", empire_id, creation_turn},
     m_building_type(std::move(building_type)),
     m_produced_by_empire_id(produced_by_empire_id)
 {
     const BuildingType* type = GetBuildingType(m_building_type);
     Rename(type ? UserString(type->Name()) : UserString("ENC_BUILDING"));
-
-    UniverseObject::Init();
 }
 
 std::shared_ptr<UniverseObject> Building::Clone(const Universe& universe, int empire_id) const {
@@ -108,9 +104,6 @@ std::string Building::Dump(uint8_t ntabs) const {
        << " produced by empire id: " << m_produced_by_empire_id;
     return os.str();
 }
-
-std::shared_ptr<UniverseObject> Building::Accept(const UniverseObjectVisitor& visitor) const
-{ return visitor.Visit(std::const_pointer_cast<Building>(std::static_pointer_cast<const Building>(shared_from_this()))); }
 
 void Building::SetPlanetID(int planet_id) {
     if (planet_id != m_planet_id) {

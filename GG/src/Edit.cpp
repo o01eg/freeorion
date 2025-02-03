@@ -1,7 +1,7 @@
 //! GiGi - A GUI for OpenGL
 //!
 //!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
-//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!  Copyright (C) 2013-2024 The FreeOrion Project
 //!
 //! Released under the GNU Lesser General Public License 2.1 or later.
 //! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
@@ -17,14 +17,6 @@
 using namespace GG;
 
 namespace {
-    struct EditedEcho
-    {
-        EditedEcho(const std::string& name) : m_name(name) {}
-        void operator()(const std::string& str)
-        { std::cerr << "GG SIGNAL : " << m_name << "(str=" << str << ")" << std::endl; }
-        std::string m_name;
-    };
-
     Y HeightFromFont(const std::shared_ptr<Font>& font, unsigned int pixel_margin) noexcept
     { return font->Height() + 2 * static_cast<int>(pixel_margin); }
 }
@@ -43,19 +35,23 @@ Edit::Edit(std::string str, std::shared_ptr<Font> font,
     Edit::SetText(std::move(str));
 
     if (INSTRUMENT_ALL_SIGNALS) {
-        EditedSignal.connect(EditedEcho("Edit::EditedSignal"));
-        FocusUpdateSignal.connect(EditedEcho("Edit::FocusUpdateSignal"));
+        EditedSignal.connect([](const std::string& str) { std::cerr << "GG SIGNAL : Edit::EditedSignal (str=" << str << ")" << std::endl; });
+        FocusUpdateSignal.connect([](const std::string& str) { std::cerr << "GG SIGNAL : Edit::FocusUpdateSignal (str=" << str << ")" << std::endl; });
     }
 }
 
 Pt Edit::MinUsableSize() const noexcept
 { return Pt(X(4 * PIXEL_MARGIN), HeightFromFont(GetFont(), PIXEL_MARGIN)); }
 
+std::string_view Edit::SelectedText() const
+{
+    return Text(m_cursor_pos.first, m_cursor_pos.second);
+}
+
 void Edit::Render()
 {
     Clr color_to_use = Disabled() ? DisabledColor(Color()) : Color();
     Clr int_color_to_use = Disabled() ? DisabledColor(m_int_color) : m_int_color;
-    Clr sel_text_color_to_use = Disabled() ? DisabledColor(m_sel_text_color) : m_sel_text_color;
     Clr hilite_color_to_use = Disabled() ? DisabledColor(m_hilite_color) : m_hilite_color;
     Clr text_color_to_use = Disabled() ? DisabledColor(TextColor()) : TextColor();
 
@@ -66,73 +62,45 @@ void Edit::Render()
 
     BeginScissorClipping(Pt(client_ul.x - 1, client_ul.y), client_lr);
 
-    X first_char_offset = FirstCharOffset();
-    Y text_y_pos = ToY(ul.y + ((lr.y - ul.y) - GetFont()->Height()) / 2.0);
-    CPSize last_visible_char = LastVisibleChar();
-    const StrSize INDEX_0 = StringIndexOf(0, m_first_char_shown, GetLineData());
-    const StrSize INDEX_END = StringIndexOf(0, last_visible_char, GetLineData());
-    Font::RenderState rs{text_color_to_use};
     const auto& font = GetFont();
+    const auto& line_data = GetLineData();
 
+    X first_char_offset = FirstCharOffset();
+    Y text_y_pos = ToY(ul.y + ((lr.y - ul.y) - font->Height()) / 2.0);
+    CPSize last_visible_char = LastVisibleChar();
+    const StrSize INDEX_0 = StringIndexOfLineAndGlyph(0, m_first_char_shown, line_data);
+    const StrSize INDEX_END = StringIndexOfLineAndGlyph(0, last_visible_char, line_data);
+    Font::RenderState rs{text_color_to_use};
 
-    if (!GetLineData().empty() && MultiSelected()) {
-        const auto& char_data = GetLineData()[0].char_data;
+    const auto text_sv = std::string_view(Text()).substr(Value(INDEX_0), Value(INDEX_END - INDEX_0));
 
-        // if one or more chars are selected, hilite, then draw the range in
-        // the selected-text color
-        CPSize low_cursor_pos  = std::min(CPSize(char_data.size()), std::max(CP0, std::min(m_cursor_pos.first, m_cursor_pos.second)));
-        CPSize high_cursor_pos = std::min(CPSize(char_data.size()), std::max(CP0, std::max(m_cursor_pos.first, m_cursor_pos.second)));
+    if (!line_data.empty() && MultiSelected()) {
+        const auto& char_data = line_data.front().char_data;
 
-        // draw hiliting
-        Pt hilite_ul(client_ul.x + (low_cursor_pos < CP1 ? X0 : char_data[Value(low_cursor_pos - CP1)].extent) - first_char_offset, client_ul.y);
-        Pt hilite_lr(client_ul.x + (high_cursor_pos < CP1 ? X0 : char_data[Value(high_cursor_pos - CP1)].extent) - first_char_offset, client_lr.y);
+        // if one or more chars are selected, hilite, then draw the range in the selected-text color
+        CPSize low_cursor_pos  = std::min(CPSize(char_data.size()), std::min(m_cursor_pos.first, m_cursor_pos.second));
+        CPSize high_cursor_pos = std::min(CPSize(char_data.size()), std::max(m_cursor_pos.first, m_cursor_pos.second));
+
+        // draw hilighting background box
+        Pt hilite_ul(client_ul.x + ((low_cursor_pos < CP1) ? X0 : char_data.at(Value(low_cursor_pos - CP1)).extent) - first_char_offset, client_ul.y);
+        Pt hilite_lr(client_ul.x + ((high_cursor_pos < CP1) ? X0 : char_data.at(Value(high_cursor_pos - CP1)).extent) - first_char_offset, client_lr.y);
         FlatRectangle(hilite_ul, hilite_lr, hilite_color_to_use, CLR_ZERO, 0);
 
-        // INDEX_0 to INDEX_1 is unhilited, INDEX_1 to
-        // INDEX_2 is hilited, and INDEX_2 to INDEX_3 is
-        // unhilited; each range may be empty
-        const StrSize INDEX_1 = StringIndexOf(0, std::max(low_cursor_pos, m_first_char_shown), GetLineData());
-        const StrSize INDEX_2 = StringIndexOf(0, std::min(high_cursor_pos, last_visible_char), GetLineData());
-
         // draw text
-        X text_x_pos = client_ul.x;
-        text_x_pos +=
-            font->RenderText(Pt(text_x_pos, text_y_pos),
-                             Text().substr(Value(INDEX_0), Value(INDEX_1 - INDEX_0)), rs);
-
-        rs.PushColor(sel_text_color_to_use);
-        text_x_pos +=
-            font->RenderText(Pt(text_x_pos, text_y_pos),
-                             Text().substr(Value(INDEX_1), Value(INDEX_2 - INDEX_1)), rs);
-        rs.PopColor();
-        text_x_pos +=
-            font->RenderText(Pt(text_x_pos, text_y_pos),
-                             Text().substr(Value(INDEX_2), Value(INDEX_END - INDEX_2)), rs);
+        font->RenderText(Pt(client_ul.x, text_y_pos), text_sv, rs);
 
     } else { // no selected text
-        font->RenderText(Pt(client_ul.x, text_y_pos),
-                         Text().substr(Value(INDEX_0), Value(INDEX_END - INDEX_0)), rs);
+        font->RenderText(Pt(client_ul.x, text_y_pos), text_sv, rs);
+
         if (GUI::GetGUI()->FocusWnd().get() == this) {
             // if we have focus, draw the caret as a simple vertical line
             X caret_x = ScreenPosOfChar(m_cursor_pos.second);
-            Line(caret_x, client_ul.y, caret_x, client_lr.y);
+            Line(caret_x, client_ul.y, caret_x, client_lr.y, text_color_to_use);
         }
     }
 
     EndScissorClipping();
 }
-
-void Edit::SetColor(Clr c)
-{ Control::SetColor(c); }
-
-void Edit::SetInteriorColor(Clr c)
-{ m_int_color = c; }
-
-void Edit::SetHiliteColor(Clr c)
-{ m_hilite_color = c; }
-
-void Edit::SetSelectedTextColor(Clr c)
-{ m_sel_text_color = c; }
 
 void Edit::SelectAll()
 {
@@ -168,7 +136,7 @@ void Edit::SetText(std::string str)
 
     // make sure the change in text did not make the cursor or view position invalid
     if (Text().empty() || GetLineData().empty() ||
-        CPSize{GetLineData()[0].char_data.size()} < m_cursor_pos.first)
+        CPSize{GetLineData().front().char_data.size()} < m_cursor_pos.first)
     {
         m_first_char_shown = CP0;
         m_cursor_pos = {CP0, CP0};
@@ -201,7 +169,7 @@ void Edit::AcceptPastedText(const std::string& text)
 
     if (modified_text) {
         // moves cursor to end of pasted text
-        const CPSize text_span{static_cast<std::size_t>(utf8::distance(text.begin(), text.end()))};
+        const CPSize text_span{static_cast<std::size_t>(utf8::distance(text.begin(), text.end()))}; // TODO: this looks wrong... CPSize should be code points or glyphs, not char (byte) index in string
         m_cursor_pos.second = std::max(CP0, std::min(Length(), m_cursor_pos.second + text_span));
 
         // ensure nothing is selected after pasting
@@ -212,22 +180,11 @@ void Edit::AcceptPastedText(const std::string& text)
     }
 }
 
-CPSize Edit::CharIndexOf(X x) const
-{
-    CPSize retval;
-    const X first_char_offset = FirstCharOffset();
-    for (retval = CP0; retval < Length(); ++retval) {
-        X curr_extent;
-        if (x + first_char_offset <= (curr_extent = GetLineData()[0].char_data[Value(retval)].extent)) { // the point falls within the character at index retval
-            const X prev_extent = retval != CP0 ? GetLineData()[0].char_data[Value(retval - CP1)].extent : X0;
-            const X half_way = (prev_extent + curr_extent) / 2;
-            if (half_way <= x + first_char_offset) // if the point is more than halfway across the character, put the cursor *after* the character
-                ++retval;
-            break;
-        }
-    }
-    return retval;
-}
+CPSize Edit::GlyphIndexAt(X x) const
+{ return GG::GlyphIndexOfXOnLine0(GetLineData(), x, FirstCharOffset()); }
+
+CPSize Edit::CPIndexOfGlyphAt(X x) const
+{ return GG::CodePointIndexOfXOnLine0(GetLineData(), x, FirstCharOffset()); }
 
 X Edit::FirstCharOffset() const
 {
@@ -239,8 +196,9 @@ X Edit::FirstCharOffset() const
     if (char_data.empty())
         return X0;
 
-    auto char_idx = std::min(char_data.size() - 1, Value(m_first_char_shown) - 1);
-    return char_data[char_idx].extent;
+    const auto first_char_shown = (m_first_char_shown > CP0) ? (m_first_char_shown - CP1) : CP0;
+    const auto char_idx = std::min(char_data.size() - 1, Value(first_char_shown));
+    return char_data.at(char_idx).extent;
 }
 
 X Edit::ScreenPosOfChar(CPSize idx) const
@@ -253,13 +211,16 @@ X Edit::ScreenPosOfChar(CPSize idx) const
     if (idx == CP0)
         return line_first_char_x;
 
-    const auto& char_data{line_data.front().char_data};
+    const auto& char_data = line_data.front().char_data;
+    if (char_data.empty())
+        return line_first_char_x;
+
     // get index of previous character to the location of the requested char
     // get the extent to the right of that char to get the left position of the requested char
-    auto char_idx = std::min(char_data.size() - 1, Value(idx) - 1);
-    X line_extent_to_idx_char = char_data[char_idx].extent;
+    auto char_idx = std::min(char_data.size() - 1, Value(idx - CP1));
+    X line_extent_to_right_of_idx_char = char_data.at(char_idx).extent;
 
-    return line_first_char_x + line_extent_to_idx_char;
+    return line_first_char_x + line_extent_to_right_of_idx_char;
 }
 
 CPSize Edit::LastVisibleChar() const
@@ -267,7 +228,7 @@ CPSize Edit::LastVisibleChar() const
     const auto& line_data = GetLineData();
     if (line_data.empty())
         return CP0;
-    const auto& char_data = line_data[0].char_data;
+    const auto& char_data = line_data.front().char_data;
 
     const CPSize line_limit = std::min(Length(), CPSize(char_data.size()));
     const X client_size_x = ClientSize().x;
@@ -279,7 +240,7 @@ CPSize Edit::LastVisibleChar() const
             if (client_size_x <= X0 - first_char_offset)
                 break;
         } else {
-            const std::size_t retval_minus_1 = Value(retval) - 1;
+            const std::size_t retval_minus_1 = Value(retval - CP1);
             const auto retval_minus_1_char_data{char_data.at(retval_minus_1)};
             if (client_size_x <= retval_minus_1_char_data.extent - first_char_offset)
                 break;
@@ -300,7 +261,7 @@ void Edit::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
         return;
     //std::cout << "Edit::LButtonDown start" << std::endl;
     const X click_xpos = ScreenToClient(pt).x; // x coord of click within text space
-    const CPSize idx = CharIndexOf(click_xpos);
+    const CPSize idx = GlyphIndexAt(click_xpos);
     //std::cout << "Edit::LButtonDown got idx: " << idx << std::endl;
 
     const auto word_indices = GetDoubleButtonDownWordIndices(idx);
@@ -316,18 +277,18 @@ void Edit::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
         return;
 
     const X xpos = ScreenToClient(pt).x; // x coord for mouse position within text space
-    const CPSize idx = CharIndexOf(xpos);
-    //std::cout << "CharIndexOf mouse x-pos: " << xpos << std::endl;
+    const CPSize cp_idx = CPIndexOfGlyphAt(xpos);
+    //std::cout << "CPIndexAt mouse x-pos: " << xpos << std::endl;
 
     if (m_in_double_click_mode) {
-        const auto word_indices = GetDoubleButtonDownDragWordIndices(idx);
+        const auto word_indices = GetDoubleButtonDownDragWordCPIndices(cp_idx);
 
         if (word_indices.first == word_indices.second) {
-            if (idx < m_double_click_cursor_pos.first) {
-                m_cursor_pos.second = idx;
+            if (cp_idx < m_double_click_cursor_pos.first) {
+                m_cursor_pos.second = cp_idx;
                 m_cursor_pos.first = m_double_click_cursor_pos.second;
-            } else if (m_double_click_cursor_pos.second < idx) {
-                m_cursor_pos.second = idx;
+            } else if (m_double_click_cursor_pos.second < cp_idx) {
+                m_cursor_pos.second = cp_idx;
                 m_cursor_pos.first = m_double_click_cursor_pos.first;
             } else {
                 m_cursor_pos = m_double_click_cursor_pos;
@@ -342,13 +303,16 @@ void Edit::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
             }
         }
     } else {
-        // when a single-click drag occurs, move m_cursor_pos.second to where the mouse is, which selects a range of characters
-        m_cursor_pos.second = idx;
+        // when a single-click drag occurs, move m_cursor_pos.second to where the mouse is,
+        // which selects a range of characters
+        m_cursor_pos.second = cp_idx;
         if (xpos < X0 || ClientSize().x < xpos) // if we're dragging past the currently visible text
             AdjustView();
     }
 
-    //std::cout << "LDrag selected from: " << m_cursor_pos.first << "  to: " << m_cursor_pos.second << std::endl;
+    //std::cout << "LDrag at glyph: " << Value(GlyphIndexAt(xpos))
+    //          << " selected from cp idx: " << Value(m_cursor_pos.first)
+    //          << " to cp idx: " << Value(m_cursor_pos.second) << std::endl;
 }
 
 void Edit::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
@@ -405,12 +369,29 @@ void Edit::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 
         } else if (CP0 < m_cursor_pos.second) {
             if (!ctrl_down) {
-                --m_cursor_pos.second;
                 const auto& ld{GetLineData()};
-                if (!ld.empty()) {
-                    const auto& ld0cd{ld[0].char_data};
-                    const X extent = ld0cd[Value(m_cursor_pos.second)].extent;
-                    while (CP0 < m_cursor_pos.second && extent == ld0cd[Value(m_cursor_pos.second) - 1].extent)
+                if (ld.empty()) {
+                    m_cursor_pos.second = CP0;
+                } else  {
+                    const auto& ld0cd{ld.front().char_data};
+
+                    m_cursor_pos.second = std::min(m_cursor_pos.second - CP1, CPSize(ld0cd.size()));
+
+                    const X extent = ld0cd.empty() ? X0 : 
+                        (Value(m_cursor_pos.second) < ld0cd.size()) ? ld0cd.at(Value(m_cursor_pos.second)).extent :
+                        ld0cd.back().extent;
+
+                    const auto not_at_start = [sz{ld0cd.size()}](CPSize idx)
+                    { return idx > CP0; };
+                    const auto extent_before_pos = [&ld0cd](CPSize idx)
+                    {
+                        return (idx <= CP1 || ld0cd.empty()) ? X0 :
+                            (Value(idx) >= ld0cd.size()) ? ld0cd.back().extent :
+                            ld0cd.at(Value(idx - CP1)).extent;
+                    };
+
+                    // move end of selection left until it move past any zero-with glyphs or it reaches the start of the line
+                    while (not_at_start(m_cursor_pos.second) && extent == extent_before_pos(m_cursor_pos.second))
                         --m_cursor_pos.second;
                 }
             } else {
@@ -430,9 +411,24 @@ void Edit::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
 
         } else if (m_cursor_pos.second < Length()) {
             if (!ctrl_down) {
-                if (!GetLineData().empty()) {
-                    X extent = GetLineData()[0].char_data[Value(m_cursor_pos.second)].extent;
-                    while (m_cursor_pos.second < Length() && extent == GetLineData()[0].char_data[Value(m_cursor_pos.second)].extent)
+                const auto& ld{GetLineData()};
+                if (!ld.empty()) {
+                    const auto& ld0cd{ld.front().char_data};
+
+                    const X extent = ld0cd.empty() ? X0 :
+                        (Value(m_cursor_pos.second) < ld0cd.size()) ? ld0cd.at(Value(m_cursor_pos.second)).extent :
+                        ld0cd.back().extent;
+
+                    const auto not_at_end = [sz{ld0cd.size()}](CPSize idx)
+                    { return Value(idx) < sz; };
+                    const auto extent_at_pos = [&ld0cd](CPSize idx)
+                    {
+                        return (Value(idx) < ld0cd.size()) ? ld0cd.at(Value(idx)).extent :
+                            ld0cd.empty() ? X0 : ld0cd.back().extent;
+                    };
+
+                    // move end of selection right until it moves past any zero-length glyphs or it reaches the end of the line
+                    while (not_at_end(m_cursor_pos.second) && extent == extent_at_pos(m_cursor_pos.second))
                         ++m_cursor_pos.second;
                 }
             } else {
@@ -510,26 +506,26 @@ void Edit::LosingFocus()
         FocusUpdateSignal(Text());
 }
 
-std::pair<CPSize, CPSize> Edit::GetDoubleButtonDownWordIndices(CPSize char_index)
+std::pair<CPSize, CPSize> Edit::GetDoubleButtonDownWordIndices(CPSize cp_index)
 {
     const auto ticks = GUI::GetGUI()->Ticks();
     if (ticks - m_last_button_down_time <= GUI::GetGUI()->DoubleClickInterval())
         m_in_double_click_mode = true;
     m_last_button_down_time = ticks;
 
-    m_double_click_cursor_pos = std::pair<CPSize, CPSize>(char_index, char_index);
+    m_double_click_cursor_pos = std::pair<CPSize, CPSize>(cp_index, cp_index);
     if (m_in_double_click_mode)
-        m_double_click_cursor_pos = GetDoubleButtonDownDragWordIndices(char_index);
+        m_double_click_cursor_pos = GetDoubleButtonDownDragWordCPIndices(cp_index);
 
     return m_double_click_cursor_pos;
 }
 
-std::pair<CPSize, CPSize> Edit::GetDoubleButtonDownDragWordIndices(CPSize char_index)
+std::pair<CPSize, CPSize> Edit::GetDoubleButtonDownDragWordCPIndices(CPSize cp_index)
 {
-    const auto words = GUI::GetGUI()->FindWords(Text());
-    const auto it = std::find_if(words.begin(), words.end(),
-                                 [char_index](auto word) { return word.first < char_index && char_index < word.second; });
-    return (it != words.end()) ? *it : std::pair<CPSize, CPSize>{char_index, char_index};
+    const auto words_cp_indices = GUI::GetGUI()->FindWords(Text());
+    const auto it = std::find_if(words_cp_indices.begin(), words_cp_indices.end(),
+                                 [cp_index](auto word) { return word.first < cp_index && cp_index < word.second; });
+    return (it != words_cp_indices.end()) ? *it : std::pair<CPSize, CPSize>{cp_index, cp_index};
 }
 
 void Edit::ClearDoubleButtonDownMode()
@@ -545,16 +541,18 @@ void Edit::ClearSelected()
         m_cursor_pos.first = m_cursor_pos.second;
     Erase(0, low, high - low);
 
+    const auto& line_data = GetLineData();
+
     // make sure deletion has not left m_first_char_shown in an out-of-bounds position
-    if (GetLineData().empty() || GetLineData()[0].char_data.empty())
+    if (line_data.empty() || line_data.front().char_data.empty())
         m_first_char_shown = CP0;
-    else if (GetLineData()[0].char_data.size() <= Value(m_first_char_shown))
-        m_first_char_shown = CodePointIndexOf(0, INVALID_CP_SIZE, GetLineData());
+    else if (line_data.front().char_data.size() <= Value(m_first_char_shown))
+        m_first_char_shown = CodePointIndexOfLineAndGlyph(0, INVALID_CP_SIZE, line_data);
 }
 
 void Edit::AdjustView()
 {
-    const X text_space = ClientSize().x;
+    const X text_horizontal_space = ClientSize().x;
     const X first_char_offset = FirstCharOffset();
     static constexpr CPSize CP5{5};
 
@@ -566,34 +564,42 @@ void Edit::AdjustView()
         return;
     }
 
-    const auto length = Length();
-    if (length == CP0)
+    if (Length() == CP0)
         return;
 
     const auto& ld{GetLineData()};
     if (ld.empty())
         return;
 
-    const auto& char_data{ld[0].char_data};
-    const X char_data_extent = -first_char_offset +
-        ((m_cursor_pos.second != CP0) ? char_data[Value(m_cursor_pos.second) - 1].extent : X0);
+    const auto& char_data{ld.front().char_data};
+    const auto cursor_char_rel_extent = (m_cursor_pos.second == CP0 || char_data.empty()) ? X0 :
+        (Value(m_cursor_pos.second) < char_data.size()) ? char_data.at(Value(m_cursor_pos.second - CP1)).extent :
+        char_data.back().extent;
+    const auto char_data_extent = cursor_char_rel_extent - first_char_offset;
 
-    if (text_space <= char_data_extent) { // if the caret is moving to a place right of the current visible area
-        // try to move the text by five characters, or to the end if caret is at a location before the end - 5th character
-        const CPSize last_idx_to_use = std::min(m_cursor_pos.second + CP5, length - CP1);
+    if (text_horizontal_space > char_data_extent)
+        return; // don't need more space
 
-        // number of pixels that the caret position overruns the right side of text area
-        X pixels_to_move = (char_data[Value(last_idx_to_use)].extent - first_char_offset) - text_space;
-        if (last_idx_to_use == length - CP1) // if the caret is at the very end of the string, add the length of some spaces
-            pixels_to_move += static_cast<int>(Value(m_cursor_pos.second + CP5 - length - CP1)) * GetFont()->SpaceWidth();
+    // need to adjust range of shown chars to include carat in visible range of chars
 
-        CPSize move_to = m_first_char_shown;
-        while (move_to < CPSize{char_data.size()} &&
-                char_data[Value(move_to)].extent - first_char_offset < pixels_to_move)
-        { ++move_to; }
-
-        m_first_char_shown = move_to;
+    // try to move the text by five characters, or to the end if caret is at a location before the end - 5th character
+    const auto last_shown_idx = std::min(m_cursor_pos.second + CP5,
+                                         char_data.empty() ? CP0 : CPSize(char_data.size() - 1u));
+    const auto last_shown_extent = (Value(last_shown_idx) >= char_data.size()) ?
+        X0 : char_data.at(Value(last_shown_idx)).extent;
+    auto pixels_to_move = last_shown_extent - first_char_offset - text_horizontal_space;
+    if (Value(last_shown_idx + CP1) >= char_data.size()) {
+        const auto space_width = GetFont()->SpaceWidth();
+        const auto extra_spaces = static_cast<int>(Value(m_cursor_pos.second + CP5 - CP1)) - static_cast<int>(char_data.size());
+        pixels_to_move += space_width * extra_spaces;
     }
+
+    CPSize move_to = m_first_char_shown;
+    while (move_to < CPSize{char_data.size()} &&
+           char_data.at(Value(move_to)).extent - first_char_offset < pixels_to_move)
+    { ++move_to; }
+
+    m_first_char_shown = move_to;
 }
 
 

@@ -276,11 +276,14 @@ set(Boost_PYTHON_SUFFIX "${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}")
 message(STATUS "Boost python version ${Boost_PYTHON_SUFFIX}")
 find_package(Boost ${MINIMUM_BOOST_VERSION}
     COMPONENTS
+        container
         filesystem
+        graph
         iostreams
         locale
         log
         log_setup
+        random
         serialization
         system
         thread
@@ -729,6 +732,7 @@ if(BUILD_CLIENT_GODOT)
                 -D CMAKE_BUILD_TYPE=${GODOT_CPP_BUILD_TYPE}
                 -D CMAKE_CONFIGURATION_TYPES=${GODOT_CPP_BUILD_TYPE}
                 -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                -D CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
                 -D PYTHON_EXECUTABLE=${Python3_EXECUTABLE}
                 -D Python3_EXECUTABLE=${Python3_EXECUTABLE}
                 ${CL_ARGS}
@@ -827,9 +831,13 @@ if(APPLE AND BUILD_CLIENT_GG)
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_CHRONO_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
+           ${CMAKE_COMMAND} -E copy_if_different "${Boost_CONTAINER_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
+        COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_DATE_TIME_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_FILESYSTEM_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
+        COMMAND
+           ${CMAKE_COMMAND} -E copy_if_different "${Boost_GRAPH_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_IOSTREAMS_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
@@ -842,6 +850,8 @@ if(APPLE AND BUILD_CLIENT_GG)
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_REGEX_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_PYTHON${Boost_PYTHON_SUFFIX}_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
+        COMMAND
+           ${CMAKE_COMMAND} -E copy_if_different "${Boost_RANDOM_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_SERIALIZATION_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND

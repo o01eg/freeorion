@@ -183,13 +183,13 @@ void CombatInfo::InitializeObjectVisibility() {
 }
 
 
-ScriptingContext::ScriptingContext(CombatInfo& info, UniverseObject* attacker_as_source) noexcept :
+ScriptingContext::ScriptingContext(CombatInfo& info, Attacker, UniverseObject* attacker_as_source) noexcept :
     source(                 attacker_as_source),
+    current_turn(           info.turn),
     combat_bout(            info.bout),
     galaxy_setup_data(      info.galaxy_setup_data),
     species(                info.species),
     supply(                 info.supply),
-    universe(               nullptr),
     const_universe(         info.universe),
     objects(                &info.objects), // not taken from Universe!
     const_objects(          info.objects),
@@ -797,7 +797,7 @@ namespace {
         const auto target_planet = target->ObjectType() == UniverseObjectType::OBJ_PLANET ?
             static_cast<Planet*>(target) : nullptr;
         const auto target_fighter = target->ObjectType() == UniverseObjectType::OBJ_FIGHTER ?
-            static_cast<Fighter*>(target) : nullptr;;
+            static_cast<Fighter*>(target) : nullptr;
 
         if (attack_ship && target_ship) {
             AttackShipShip(         attack_ship,    weapon, target_ship,    combat_info, bout, round, platform_event);
@@ -1394,7 +1394,7 @@ namespace {
         //             const SpeciesManager& species_,
         //             const SupplyManager& supply_) 
 
-        ScriptingContext context{combat_state.combat_info, attacker};
+        ScriptingContext context{combat_state.combat_info, ScriptingContext::Attacker{}, attacker};
 
         TraceLogger(combat) << "Set up context in ShootAllWeapons: objects: " << context.ContextObjects().size()
                             << "  const objects: " << context.ContextObjects().size()
@@ -1498,7 +1498,7 @@ namespace {
 
         const ShipDesign* design = universe.GetShipDesign(ship->DesignID());
         if (!design) {
-            ErrorLogger(combat) << "ReduceStoredFighterCount couldn't get ship design with id " << ship->DesignID();;
+            ErrorLogger(combat) << "ReduceStoredFighterCount couldn't get ship design with id " << ship->DesignID();
             return;
         }
 
@@ -1605,7 +1605,7 @@ namespace {
 
         const ShipDesign* design = universe.GetShipDesign(ship.DesignID());
         if (!design) {
-            ErrorLogger(combat) << "IncreaseStoredFighterCount couldn't get ship design with id " << ship.DesignID();;
+            ErrorLogger(combat) << "IncreaseStoredFighterCount couldn't get ship design with id " << ship.DesignID();
             return;
         }
 
@@ -1668,12 +1668,12 @@ namespace {
             ships_fighters_to_add_back[launched_from_id]++;
         }
         DebugLogger() << "Fighters left at end of combat:";
-        for (const auto [ship_id, fighter_count] : ships_fighters_to_add_back)
+        for (const auto& [ship_id, fighter_count] : ships_fighters_to_add_back)
             DebugLogger() << " ... from ship id " << ship_id << " : " << fighter_count;
 
 
         DebugLogger() << "Returning fighters to ships:";
-        for (const auto [ship_id, fighter_count] : ships_fighters_to_add_back) {
+        for (const auto& [ship_id, fighter_count] : ships_fighters_to_add_back) {
             auto ship = combat_info.objects.getRaw<Ship>(ship_id);
             if (!ship) {
                 ErrorLogger(combat) << "Couldn't get ship with id " << ship_id << " for fighter to return to...";
@@ -1923,7 +1923,7 @@ void AutoResolveCombat(CombatInfo& combat_info) {
     DebugLogger(combat) << "AutoResolveCombat objects after resolution: " << combat_info.objects.Dump();
 
     DebugLogger(combat) << "combat event log start:";
-    ScriptingContext context{combat_info};
+    const ScriptingContext context{combat_info};
     for (const auto& event : combat_info.combat_events)
         DebugLogger(combat) << event->DebugString(context);
     DebugLogger(combat) << "combat event log end:";

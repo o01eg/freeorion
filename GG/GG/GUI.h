@@ -104,7 +104,7 @@ class GG_API GUI
 private:
     struct OrCombiner
     {
-        typedef bool result_type; 
+        typedef bool result_type;
         template <typename InIt> bool operator()(InIt first, InIt last) const;
     };
 
@@ -133,11 +133,11 @@ public:
 
     /** The type of iterator returned by non-const accel_begin() and
         accel_end(). */
-    typedef std::set<std::pair<Key, Flags<ModKey>>>::iterator accel_iterator;
+    using accel_iterator = std::vector<std::pair<Key, Flags<ModKey>>>::iterator;
 
     /** The type of iterator returned by const accel_begin() and
         accel_end(). */
-    typedef std::set<std::pair<Key, Flags<ModKey>>>::const_iterator const_accel_iterator;
+    using const_accel_iterator = std::vector<std::pair<Key, Flags<ModKey>>>::const_iterator ;
 
     virtual ~GUI();
 
@@ -166,37 +166,37 @@ public:
     bool                        DragDropWnd(const Wnd* wnd) const;  ///< returns true if \a wnd is currently begin dragged as part of a drag-and-drop operation
     bool                        AcceptedDragDropWnd(const Wnd* wnd) const;  ///< returns true if \a wnd is currently begin dragged as part of a drag-and-drop operation, and it is over a drop target that will accept it
     bool                        MouseButtonDown(unsigned int bn) const;     ///< returns the up/down states of the mouse buttons
-    Pt                          MousePosition() const;              ///< returns the absolute position of mouse, based on the last mouse motion event
-    Pt                          MouseMovement() const;              ///< returns the relative position of mouse, based on the last mouse motion event
-    Flags<ModKey>               ModKeys() const;                    ///< returns the set of modifier keys that are currently depressed, based on the last event
-    bool                        MouseLRSwapped() const;             ///< returns true if the left and right mouse button press events are set to be swapped before event handling. This is to facilitate left-handed mouse users semi-automatically.
+    Pt                          MousePosition() const noexcept;     ///< returns the absolute position of mouse, based on the last mouse motion event
+    Pt                          MouseMovement() const noexcept;     ///< returns the relative position of mouse, based on the last mouse motion event
+    Flags<ModKey>               ModKeys() const noexcept;           ///< returns the set of modifier keys that are currently depressed, based on the last event
+    bool                        MouseLRSwapped() const noexcept;    ///< returns true if the left and right mouse button press events are set to be swapped before event handling. This is to facilitate left-handed mouse users semi-automatically.
     virtual std::string         ClipboardText() const;              ///< returns text stored in a clipboard
 
-    /** Returns the (begin, end) indices of the code points or char indices
-      * of the word-tokens in the given string. */
+    /** Returns the (begin, end) code point indices of the of the word-tokens in the given string. */
     std::vector<std::pair<CPSize, CPSize>>   FindWords(std::string_view str) const;
+    /** Returns the (begin, end) string indices of the of the word-tokens in the given string. */
     std::vector<std::pair<StrSize, StrSize>> FindWordsStringIndices(std::string_view str) const;
     std::vector<std::string_view>            FindWordsStringViews(std::string_view str) const;
 
     /** Returns the currently-installed style factory. */
-    const std::shared_ptr<StyleFactory>&    GetStyleFactory() const;
+    const StyleFactory&                     GetStyleFactory() const noexcept;
 
     bool                                    RenderCursor() const; ///< returns true iff the GUI is responsible for rendering the cursor
 
     /* Returns the currently-installed cursor. */
-    const std::shared_ptr<Cursor>&          GetCursor() const;
+    const Cursor&                           GetCursor() const noexcept;
 
     /** Returns an iterator to one past the first defined keyboard accelerator. */
-    const_accel_iterator                    accel_begin() const;
+    const_accel_iterator                    accel_begin() const noexcept;
 
     /** Returns an iterator to one past the last defined keyboard accelerator. */
-    const_accel_iterator                    accel_end() const;
+    const_accel_iterator                    accel_end() const noexcept;
 
     /** Returns the signal that is emitted when the requested keyboard accelerator is invoked. */
     AcceleratorSignalType&                  AcceleratorSignal(Key key, Flags<ModKey> mod_keys = MOD_KEY_NONE) const;
 
     /** Returns true iff keyboard accelerator signals fire while modal windows are open. */
-    bool                                    ModalAcceleratorSignalsEnabled() const;
+    bool                                    ModalAcceleratorSignalsEnabled() const noexcept;
 
     /** Returns true iff any modal Wnds are open. */
     bool                                    ModalWndsOpen() const;
@@ -330,17 +330,17 @@ public:
       * generated if \a mipmap is true. */
     std::shared_ptr<Texture> GetTexture(const boost::filesystem::path& path, bool mipmap = false);
 
-    /** Removes the desired texture from the managed pool; since shared_ptr's
+    /** Removes the desired texture from the managed pool; since shared_ptr
       * are used, the texture may be deleted much later. */
     void FreeTexture(const boost::filesystem::path& path);
 
     /** Sets the currently-installed style factory. */
-    void SetStyleFactory(const std::shared_ptr<StyleFactory>& factory);
+    void SetStyleFactory(std::unique_ptr<StyleFactory>&& factory) noexcept;
 
-    void RenderCursor(bool render); ///< set this to true iff the GUI should render the cursor
+    void RenderCursor(bool render) noexcept; ///< set this to true iff the GUI should render the cursor
 
     /** Sets the currently-installed cursor. */
-    void SetCursor(const std::shared_ptr<Cursor>& cursor);
+    void SetCursor(std::unique_ptr<Cursor>&& cursor) noexcept;
 
     virtual bool SetClipboardText(std::string text);        ///< sets text stored in clipboard
     bool CopyFocusWndText();                                ///< copies current focus Wnd as text to clipboard
@@ -445,12 +445,14 @@ GG_API Flags<ModKey> MassagedAccelModKeys(Flags<ModKey> mod_keys);
 
 
 template <typename InIt>
-bool GUI::OrCombiner::operator()(InIt first, InIt last) const
+bool GUI::OrCombiner::operator()(InIt first, const InIt last) const
 {
-    bool retval = false;
-    while (first != last)
-        retval |= static_cast<bool>(*first++);
-    return retval;
+    static constexpr bool scb_nx = noexcept(static_cast<bool>(*first));
+    return std::any_of(first, last, [](const auto& x) noexcept(scb_nx) { return static_cast<bool>(x); });
+    //bool retval = false;
+    //while (first != last)
+    //    retval |= static_cast<bool>(*first++);
+    //return retval;
 }
 
 template <typename CharSetIter>

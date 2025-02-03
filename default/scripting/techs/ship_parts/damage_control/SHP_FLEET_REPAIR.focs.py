@@ -3,9 +3,10 @@ from focs._effects import (
     EffectsGroup,
     EmpireHasAdoptedPolicy,
     InSystem,
+    IsSource,
     LocalCandidate,
     OwnedBy,
-    ResupplyableBy,
+    ResourceSupplyConnected,
     SetStructure,
     Ship,
     Source,
@@ -44,7 +45,7 @@ Tech(
             )
             & Turn(low=LocalCandidate.System.LastTurnBattleHere + 1)
             & Structure(high=LocalCandidate.MaxStructure - 0.001)
-            & ResupplyableBy(empire=Source.Owner),
+            & ResourceSupplyConnected(empire=Source.Owner, condition=IsSource),
             stackinggroup="FLEET_REPAIR",
             effects=SetStructure(value=Value + (Target.MaxStructure / 10)),
         )

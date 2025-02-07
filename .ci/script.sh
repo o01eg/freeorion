@@ -2,14 +2,13 @@
 
 source .ci/base-script.sh
 
-echo "REV=${BUILD_REV} DATE=${BUILD_DATE} PPA=${BUILD_PPA}"
-sed -i "s/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}\]/${BUILD_REV}\]/" util/Version.cpp || end_with_error "Cann't set version"
+echo "PPA=${BUILD_PPA}"
 
 head -n 1 debian/changelog
 
 echo "Building package ${DISTNAME}..."
 sed -i "1,+1{s/bionic\|disco\|eoan\|focal\|groovy\|hirsute\|impish\|jammy\|kinetic/${DIST}/g}" debian/changelog  || end_with_error "Cann't set distribution"
-sed -i "1,+1{s/1SNAPSHOT[0-9]\{8\}ppa[0-9]\+~/1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~/g}" debian/changelog || end_with_error "Cann't set date"
+sed -i "1,+1{s/ppa[0-9]\+~/ppa${BUILD_PPA}~/g}" debian/changelog || end_with_error "Cann't set date"
 
 head -n 1 debian/changelog
 

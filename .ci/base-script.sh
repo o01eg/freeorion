@@ -15,10 +15,8 @@ progress()
     done
 }
 
-BUILD_REV=$(echo "$2" | sed -s 's/^ppa-\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}\).*/\1/')
-BUILD_DATE=$(echo "$2" | sed -s 's/^ppa-\([0-9]\{4\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)\.[0-9a-f]\{7\}.*/\1\2\3/')
 BUILD_PPA=$(echo "$2" | sed -s 's/^ppa-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}_\([0-9]\+\).*/\1/')
 
 DIST=$1
-DISTNAME=../freeorion_0.5.999+1SNAPSHOT${BUILD_DATE}ppa${BUILD_PPA}~${DIST}
+DISTNAME=../freeorion_0.5.1ppa${BUILD_PPA}~${DIST}
 

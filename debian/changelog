@@ -1,3 +1,9 @@
+freeorion (0.5.1ppa1~focal) focal; urgency=medium
+
+  * Release v0.5.1.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Fri, 07 Feb 2025 22:57:59 +0400
+
 freeorion (0.5.999+1SNAPSHOT20220327ppa2~focal) focal; urgency=medium
 
   * Fix godot installation.

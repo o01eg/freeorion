@@ -16,7 +16,7 @@ jobs:
           - debian-oldstable
           - debian-stable
           - debian-sid
-          - fedora-rawhide
+#          - fedora-rawhide
         godot3: [true]
         include:
           - image: manjaro

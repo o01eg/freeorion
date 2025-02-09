@@ -7,12 +7,12 @@ jobs:
     name: Generate Godot API
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/bend-n/godot:3.5.2
+      image: ghcr.io/bend-n/godot:3.6
     steps:
       - name: Setup
         uses: bend-n/godot-actions/.github/actions/setup-godot@main
         env:
-          GODOT_VERSION: 3.5.2
+          GODOT_VERSION: "3.6"
       - name: Generate API file
         run: |
           timeout 1m godot --no-window --disable-render-loop --video-driver Dummy --gdnative-generate-json-api godot-api.json
@@ -85,14 +85,14 @@ jobs:
     runs-on: ubuntu-22.04
     needs: merge-binaries
     container:
-      image: ghcr.io/bend-n/godot:3.5.2
+      image: ghcr.io/bend-n/godot:3.6
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
       - name: Setup
         uses: bend-n/godot-actions/.github/actions/setup-godot@main
         env:
-          GODOT_VERSION: 3.5.2
+          GODOT_VERSION: "3.6"
       - name: Download python library
         id: download-python-lib
         uses: suisei-cn/actions-download-file@v1.3.0
@@ -117,6 +117,6 @@ jobs:
       - name: Build
         uses: bend-n/godot-actions/.github/actions/export-android@main
         env:
-          GODOT_VERSION: 3.5.2
+          GODOT_VERSION: "3.6"
           NAME: freeorion
           PROJECT_PATH: godot

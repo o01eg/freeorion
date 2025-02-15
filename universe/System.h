@@ -11,12 +11,6 @@
 class Fleet;
 class ObjectMap;
 
-namespace {
-    constexpr int SYSTEM_ORBITS = 7;
-}
-struct UniverseObjectVisitor;
-
-
 //! Types of stars
 FO_ENUM(
     (StarType),
@@ -55,8 +49,6 @@ public:
 
     [[nodiscard]] bool ContainedBy(int object_id) const noexcept override { return false; }
 
-    std::shared_ptr<UniverseObject> Accept(const UniverseObjectVisitor& visitor) const override;
-
     /** returns the name to display for players for this system.  While all
       * systems may have a proper name assigned, if they contain no planets or
       * star, then "Deep Space" (or its translation)  Or, a system that is not
@@ -90,12 +82,12 @@ public:
     [[nodiscard]] auto&         Starlanes() const noexcept { return m_starlanes; }
     [[nodiscard]] IDSet         VisibleStarlanes(int empire_id, const Universe& universe) const;
 
-    [[nodiscard]] int                     LastTurnBattleHere() const noexcept { return m_last_turn_battle_here; }
+    [[nodiscard]] int           LastTurnBattleHere() const noexcept { return m_last_turn_battle_here; }
 
-    [[nodiscard]] const std::string&      OverlayTexture() const noexcept     { return m_overlay_texture; }
-    [[nodiscard]] double                  OverlaySize() const noexcept        { return m_overlay_size; }  ///< size in universe units
+    [[nodiscard]] const auto&   OverlayTexture() const noexcept     { return m_overlay_texture; }
+    [[nodiscard]] double        OverlaySize() const noexcept        { return m_overlay_size; }  ///< size in universe units
 
-    [[nodiscard]] std::size_t             SizeInMemory() const override;
+    [[nodiscard]] std::size_t   SizeInMemory() const override;
 
 
     /** fleets are inserted into system */
@@ -139,6 +131,8 @@ private:
 
     /** Returns new copy of this System. */
     [[nodiscard]] std::shared_ptr<UniverseObject> Clone(const Universe& universe, int empire_id = ALL_EMPIRES) const override;
+
+    static constexpr int SYSTEM_ORBITS = 7;
 
     StarType            m_star = StarType::INVALID_STAR_TYPE;
     std::vector<int>    m_orbits = std::vector<int>(SYSTEM_ORBITS, INVALID_OBJECT_ID);  ///< indexed by orbit number, indicates the id of the planet in that orbit

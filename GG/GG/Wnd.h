@@ -324,7 +324,8 @@ public:
         // will not prevent more that a smart pointer control block worth of
         // memory from being released.
         std::shared_ptr<T> wnd(new T(std::forward<Args>(args)...));
-        wnd->CompleteConstruction();
+        if (wnd)
+            wnd->CompleteConstruction();
         return wnd;
     }
 
@@ -429,10 +430,10 @@ public:
     [[nodiscard]] virtual Pt ClientLowerRight() const { return LowerRight(); }
 
     /** Returns the size of the client area \see Size(). */
-    [[nodiscard]] Pt ClientSize() const noexcept { return ClientLowerRight() - ClientUpperLeft(); }
+    [[nodiscard]] Pt ClientSize() const { return ClientLowerRight() - ClientUpperLeft(); }
 
-    [[nodiscard]] X ClientWidth() const noexcept { return ClientLowerRight().x - ClientUpperLeft().x; }
-    [[nodiscard]] Y ClientHeight() const noexcept { return ClientLowerRight().y - ClientUpperLeft().y; }
+    [[nodiscard]] X ClientWidth() const { return ClientLowerRight().x - ClientUpperLeft().x; }
+    [[nodiscard]] Y ClientHeight() const { return ClientLowerRight().y - ClientUpperLeft().y; }
 
     /** Returns \a pt translated from screen- to window-coordinates. */
     [[nodiscard]] Pt ScreenToWindow(Pt pt) const noexcept { return pt - UpperLeft(); }
@@ -448,10 +449,10 @@ public:
     { return r.LowerRight() >= UpperLeft() && r.UpperLeft() <= LowerRight(); }
 
     /** Returns true if screen-coordinate point \a pt falls within the window's client area. */
-    [[nodiscard]] virtual bool InClient(Pt pt) const noexcept { return pt >= ClientUpperLeft() && pt < ClientLowerRight(); }
+    [[nodiscard]] virtual bool InClient(Pt pt) const { return pt >= ClientUpperLeft() && pt < ClientLowerRight(); }
 
     /** Returns true if screen-coordinates Rect \a r all or partly falls within the window's client area. */
-    [[nodiscard]] virtual bool InClient(Rect r) const noexcept
+    [[nodiscard]] virtual bool InClient(Rect r) const
     { return r.LowerRight() >= ClientUpperLeft() && r.UpperLeft() <= ClientLowerRight(); }
 
     /** Returns child list; the list is const, but the children may be manipulated. */
@@ -488,7 +489,7 @@ public:
 
     /** Returns the currently-installed style factory if none exists, or the
         GUI-wide one otherwise. */
-    [[nodiscard]] const std::shared_ptr<StyleFactory>& GetStyleFactory() const;
+    [[nodiscard]] const StyleFactory& GetStyleFactory() const noexcept;
 
     /** Returns the region under point \a pt. */
     [[nodiscard]] virtual WndRegion WindowRegion(Pt pt) const;

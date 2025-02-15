@@ -185,7 +185,7 @@ public:
 
     /** Just like Control::SetColor(), except that this one also adjusts the
         text color. */
-    void SetColor(Clr c) override;
+    void SetColor(Clr c) noexcept override;
 
     /** Sets the text displayed in this control to \a str.  May resize the
         window.  If the control was constructed with FORMAT_NOWRAP, calls
@@ -295,7 +295,7 @@ public:
 
 protected:
     /** Returns the line data for the text in this TextControl. */
-    virtual const std::vector<Font::LineData>& GetLineData() const noexcept { return m_line_data; }
+    virtual const Font::LineVec& GetLineData() const noexcept { return m_line_data; }
 
     Font::RenderCache m_render_cache;///< Cache much of text rendering.
 
@@ -316,7 +316,7 @@ private:
     bool                           m_clip_text = false;
     bool                           m_set_min_size = false;
     std::vector<Font::TextElement> m_text_elements;
-    std::vector<Font::LineData>    m_line_data;
+    Font::LineVec                  m_line_data;
     CPSize                         m_code_points{0};
     std::shared_ptr<Font>          m_font;
     Pt                             m_text_ul;     ///< stored relative to the control's UpperLeft()

@@ -124,11 +124,12 @@ namespace {
     bool AvailabilityManager::PolicyDisplayed(const Policy& policy, int empire_id) const {
         const auto [show_adopted, show_adoptable, show_unaffordable, show_restricted, show_locked] = m_availabilities;
 
-        const ScriptingContext context;
+        const ScriptingContext& context = GGHumanClientApp::GetApp()->GetContext();
         const auto* empire = context.GetEmpire(empire_id).get();
         if (!empire)
             return true;
-        const ScriptingContext source_context{empire->Source(context.ContextObjects()).get()};
+        const ScriptingContext source_context{context, ScriptingContext::Source{},
+                                              empire->Source(context.ContextObjects()).get()};
 
         const bool policy_adopted = empire->PolicyAdopted(policy.Name());
         const bool policy_affordable = empire->PolicyAffordable(policy.Name(), source_context);
@@ -161,15 +162,15 @@ namespace {
         if (!policy)
             return nullptr;
 
-        const ScriptingContext context;
-        int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        auto empire = context.GetEmpire(empire_id);
+        const auto* app = GGHumanClientApp::GetApp();
+        const ScriptingContext& context = app->GetContext();
+        const int empire_id = app->EmpireID();
 
         std::string main_text;
         main_text += UserString(policy->Category()) + " - ";
         main_text += UserString(policy->ShortDescription()) + "\n\n";
 
-        if (empire) {
+        if (const auto empire = context.GetEmpire(empire_id)) {
             bool adopted = empire->PolicyAdopted(policy_name);
             bool available = empire->PolicyAvailable(policy_name);
             bool restricted = !empire->PolicyPrereqsAndExclusionsOK(policy_name, context.current_turn);
@@ -265,7 +266,7 @@ void PolicyControl::CompleteConstruction() {
     if (!m_policy)
         return;
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    const ScriptingContext context;
+    const ScriptingContext& context = ClientApp::GetApp()->GetContext();
     const auto& name = UserString(m_policy->Name());
     const auto cost = static_cast<int>(m_policy->AdoptionCost(empire_id, context));
 
@@ -997,7 +998,7 @@ void PolicySlotControl::DropsAcceptable(DropsAcceptableIter first, DropsAcceptab
     if (std::distance(first, last) != 1)
         return;
 
-    const ScriptingContext context;
+    const ScriptingContext& context = ClientApp::GetApp()->GetContext();
 
     int empire_id = GGHumanClientApp::GetApp()->EmpireID();
     auto empire = context.GetEmpire(empire_id);
@@ -1300,10 +1301,11 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
         return;
     }
 
-    ScriptingContext context;
+    auto* app = GGHumanClientApp::GetApp();
+    ScriptingContext& context = app->GetContext();
+    const int empire_id = app->EmpireID();
 
-    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto empire = context.GetEmpire(empire_id);  // may be nullptr
+    auto empire = std::as_const(context).GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy has no empire to set policies for";
         return;
@@ -1340,7 +1342,7 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
 
     // check if adopting or revoking a policy. If adopting, then pass along the name of
     // the policy to adopt. If de-adeopting, then pass the name of the policy to de-adopt.
-    const bool adopt = policy;
+    const bool adopt = !!policy;
 
     if (!adopt && initial_policy_name.empty()) {
         DebugLogger() << "GovernmentWnd::MainPanel::SetPolicy requested to de-adopt policy in slot " << slot
@@ -1356,19 +1358,21 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
     }
 
     // issue order to adopt or revoke
-    auto order = std::make_shared<PolicyOrder>(empire_id, std::move(order_policy_name),
-                                               std::string{adopt_in_category},
-                                               adopt, adopt_in_category_slot);
-    GGHumanClientApp::GetApp()->Orders().IssueOrder(std::move(order), context);
+    if (adopt)
+        app->Orders().IssueOrder<PolicyOrder>(context, empire_id, std::move(order_policy_name),
+                                              std::string{adopt_in_category}, adopt_in_category_slot);
+    else
+        app->Orders().IssueOrder<PolicyOrder>(context, empire_id, std::move(order_policy_name));
 
     if (update_empire_and_refresh)
         PostChangeBigUpdate();
 }
 
 void GovernmentWnd::MainPanel::PostChangeBigUpdate() {
-    ScriptingContext context;
+    auto* app = GGHumanClientApp::GetApp();
+    auto& context = app->GetContext();
 
-    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int empire_id = app->EmpireID();
     auto empire = context.GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy has no empire to set policies for";
@@ -1383,7 +1387,7 @@ void GovernmentWnd::MainPanel::PostChangeBigUpdate() {
         gov_wnd->DoLayout();
     context.ContextUniverse().UpdateMeterEstimates(context);
     SidePanel::Refresh();
-    FleetUIManager::GetFleetUIManager().RefreshAll();
+    FleetUIManager::GetFleetUIManager().RefreshAll(empire_id, context);
 }
 
 void GovernmentWnd::MainPanel::SetPolicies(const std::vector<std::string>& policies) {
@@ -1413,9 +1417,8 @@ int GovernmentWnd::MainPanel::FindEmptySlotForPolicy(const Policy* policy) const
     if (!policy)
         return -1;
 
-    const ScriptingContext context;
-    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto empire = context.GetEmpire(empire_id);
+    const auto* app = GGHumanClientApp::GetApp();
+    const auto empire = app->GetContext().GetEmpire(app->EmpireID());
 
     // reject unavailable and already-adopted policies
     if (!empire || !empire->PolicyAvailable(policy->Name())
@@ -1435,9 +1438,10 @@ int GovernmentWnd::MainPanel::FindEmptySlotForPolicy(const Policy* policy) const
 }
 
 void GovernmentWnd::MainPanel::RevertPolicies() {
-    ScriptingContext context;
+    auto* app = GGHumanClientApp::GetApp();
+    ScriptingContext& context = app->GetContext();
 
-    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int empire_id = app->EmpireID();
     auto empire = context.GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
         ErrorLogger() << "GovernmentWnd::MainPanel::RevertPolicies has no empire to revert policies for";
@@ -1447,9 +1451,8 @@ void GovernmentWnd::MainPanel::RevertPolicies() {
     if (!empire->PoliciesModified())
         return;
 
-    // issue order to adopt or revoke
-    auto order = std::make_shared<PolicyOrder>(empire_id);
-    GGHumanClientApp::GetApp()->Orders().IssueOrder(std::move(order), context);
+    // issue order to revoke changes
+    app->Orders().IssueOrder<PolicyOrder>(context, empire_id);
 
     PostChangeBigUpdate();
 }
@@ -1477,11 +1480,11 @@ void GovernmentWnd::MainPanel::Populate() {
         DetachChild(slot);
     m_slots.clear();
 
-    ScriptingContext context;
+    const auto* app = GGHumanClientApp::GetApp();
+    const ScriptingContext& context = app->GetContext();
 
     // loop over policy slots the empire's government has, add slot controls
-    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto empire = context.GetEmpire(empire_id);
+    const auto empire = context.GetEmpire(app->EmpireID());
     if (!empire)
         return;
 

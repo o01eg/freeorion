@@ -207,8 +207,8 @@ public:
     void ResetTimeoutClock(int timeout);         //!< start count down \a timeout seconds
 
     void SetFleetExploring(const int fleet_id);
-    void StopFleetExploring(const int fleet_id);
-    bool IsFleetExploring(const int fleet_id);
+    void StopFleetExploring(const int fleet_id, ObjectMap& objects);
+    bool IsFleetExploring(const int fleet_id) const;
     void DispatchFleetsExploring();              //!< called at each turn begin and when a fleet start/stop exploring to redispatch everyone.
 
 
@@ -216,22 +216,21 @@ private:
     void RefreshTurnButtonTooltip();
 
     void RefreshInfluenceResourceIndicator();
-    void RefreshFleetResourceIndicator();
+    void RefreshFleetResourceIndicator(const ScriptingContext& context, int empire_id);
     void RefreshResearchResourceIndicator();
     void RefreshIndustryResourceIndicator();
     void RefreshPopulationIndicator();
     void RefreshDetectionIndicator();
 
-    /** recalculates production and predicted changes of player's empire's
-      * resource and population pools */
-    void UpdateEmpireResourcePools();
+    /** recalculates production and predicted changes the specied empire's resource and population pools */
+    void UpdateEmpireResourcePools(ScriptingContext& context, int empire_id);
 
     /** contains information necessary to render a single fleet movement line
       * on the main map. also contains cached infromation */
     struct MovementLineData {
         // apparent universe positions of move line points, derived from actual universe positions contained in MovePathNodes
         struct Vertex {
-            constexpr Vertex(double x_, double y_, int eta_, bool show_eta_,
+            constexpr Vertex(double x_, double y_, uint8_t eta_, bool show_eta_,
                              bool flag_blockade_ = false, bool flag_supply_block_ = false) noexcept :
                 x(x_), y(y_), eta(eta_), show_eta(show_eta_),
                 flag_blockade(flag_blockade_), flag_supply_block(flag_supply_block_)
@@ -285,20 +284,25 @@ private:
     void CreateFleetButtonsOfType(
         FleetButtonMap& type_fleet_buttons,
         const FleetsMap& fleets_map,
-        const FleetButton::SizeType& fleet_button_size);
+        const FleetButton::SizeType& fleet_button_size,
+        const ObjectMap& objects);
 
     /** Delete all fleet buttons.*/
     void DeleteFleetButtons();
 
-    void RefreshFleetButtonSelectionIndicators();    //!< marks (only) selected fleets' buttons as selected
+    void RefreshFleetButtonSelectionIndicators();        //!< marks (only) selected fleets' buttons as selected
 
-    void DoFleetButtonsLayout();                     //!< does layout of fleet buttons
+    void DoFleetButtonsLayout(const ObjectMap& objects); //!< does layout of fleet buttons
 
     /** Return fleets ids of all fleet buttons containing or overlapping the
         fleet button for \p fleet_id. */
-    std::vector<int> FleetIDsOfFleetButtonsOverlapping(int fleet_id) const;
+    std::vector<int> FleetIDsOfFleetButtonsOverlapping(int fleet_id,
+                                                       const ScriptingContext& context,
+                                                       int empire_id) const;
     /** Return fleets ids of all fleet buttons containing or overlapping \p fleet_btn. */
-    std::vector<int> FleetIDsOfFleetButtonsOverlapping(const FleetButton& fleet_btn) const;
+    std::vector<int> FleetIDsOfFleetButtonsOverlapping(const FleetButton& fleet_btn,
+                                                       const ScriptingContext& context,
+                                                       int empire_id) const;
 
     /** Returns position on map where a moving fleet should be displayed.  This
         is different from the fleet's actual universe position due to the
@@ -307,8 +311,8 @@ private:
         fleet has no valid screen position. */
     boost::optional<std::pair<double, double>> MovingFleetMapPositionOnLane(std::shared_ptr<const Fleet> fleet) const;
 
-    void DoSystemIconsLayout();          //!< does layout of system icons
-    void DoFieldIconsLayout();           //!< does layout of field icons
+    void DoSystemIconsLayout(const ObjectMap& objects); //!< does layout of system icons
+    void DoFieldIconsLayout(const ObjectMap& objects);  //!< does layout of field icons
 
     void RefreshSliders();               //!< shows or hides sliders on map
 
@@ -321,7 +325,7 @@ private:
     void ClearFieldRenderingBuffers();
     void InitVisibilityRadiiRenderingBuffers();
     void ClearVisibilityRadiiRenderingBuffers();
-    void InitScaleCircleRenderingBuffer();
+    void InitScaleCircleRenderingBuffer(const ObjectMap& objects);
     void ClearScaleCircleRenderingBuffer();
     void ClearStarfieldRenderingBuffers();
 

@@ -4,33 +4,22 @@
 #include "Order.h"
 
 
-namespace {
-    constinit OrderPtr EMPTY_ORDER_PTR;
-}
-
-OrderPtr& OrderSet::operator[](std::size_t i) {
-    auto it = m_orders.find(i);
-    if (it == m_orders.end())
-        return EMPTY_ORDER_PTR;
-    return it->second;
-}
-
 std::string OrderSet::Dump() const {
     std::string retval;
-    for (const auto& order : m_orders)
-        retval += std::to_string(order.first) + ": " + order.second->Dump() + "\n";
+    for (const auto& [order_id, order] : m_orders)
+        retval += std::to_string(order_id) + ": " + order->Dump() + "\n";
     return retval;
 }
 
-int OrderSet::IssueOrder(OrderPtr order, ScriptingContext& context) {
-    const int retval = (!m_orders.empty() ? m_orders.rbegin()->first + 1 : 0);
+void OrderSet::IssueOrder(OrderPtr order, ScriptingContext& context) {
+    const int order_id = (!m_orders.empty() ? m_orders.rbegin()->first + 1 : 0);
 
     // Insert the order into the m_orders map.  forward the rvalue to use the move constructor.
-    auto [it, insert_ran] = m_orders.emplace(retval, std::move(order));
+    auto [it, insert_ran] = m_orders.emplace(order_id, std::move(order));
     if (!insert_ran)
         ErrorLogger() << "OrderSet::IssueOrder unexpected didn't succeed inserting order";
 
-    m_last_added_orders.insert(retval);
+    m_last_added_orders.insert(order_id);
 
     try {
         it->second->Execute(context);
@@ -39,8 +28,6 @@ int OrderSet::IssueOrder(OrderPtr order, ScriptingContext& context) {
     }
 
     TraceLogger() << "OrderSetIssueOrder m_orders size: " << m_orders.size();
-
-    return retval;
 }
 
 void OrderSet::ApplyOrders(ScriptingContext& context) {
@@ -62,7 +49,7 @@ void OrderSet::ApplyOrders(ScriptingContext& context) {
                 return;
             }
             const auto source = order_empire->Source(context.ContextObjects()).get();
-            ScriptingContext empire_context(source, context);
+            ScriptingContext empire_context(context, ScriptingContext::Source{}, source);
             order->Execute(empire_context);
             ++executed_count;
         } catch (const std::exception& e) {

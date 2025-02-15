@@ -36,7 +36,7 @@ namespace {
 
     auto obstructedStarlanes(const Empire& empire) -> std::vector<std::pair<int, int>>
     {
-        const auto& laneset = GetSupplyManager().SupplyObstructedStarlaneTraversals(empire.EmpireID());
+        const auto& laneset = IApp::GetApp()->GetSupplyManager().SupplyObstructedStarlaneTraversals(empire.EmpireID());
         static_assert(!std::is_same_v<std::decay_t<decltype(laneset)>, std::vector<std::pair<int, int>>>); // if are the same, don't need to explicitly construct the return value...
         try {
             return {laneset.begin(), laneset.end()};
@@ -47,14 +47,13 @@ namespace {
 
     auto jumpsToSuppliedSystem(const Empire& empire) -> std::map<int, int>
     {
-        const ScriptingContext context;
-        const SupplyManager& supply = context.supply;
+        const ScriptingContext& context = IApp::GetApp()->GetContext();
 
         std::map<int, int> retval;
         const auto empire_starlanes = empire.KnownStarlanes(context.ContextUniverse());
         std::deque<int> propagating_list;
 
-        for (int system_id : supply.FleetSupplyableSystemIDs(empire.EmpireID(), true, context)) {
+        for (int system_id : context.supply.FleetSupplyableSystemIDs(empire.EmpireID(), true, context)) {
             retval[system_id] = 0;
             propagating_list.push_back(system_id);
         }
@@ -99,11 +98,12 @@ namespace {
     auto PlanetsWithAvailablePP(const Empire& empire) -> std::map<std::set<int>, float>
     {
         std::map<std::set<int>, float> planets_with_available_pp;
+        const auto& objects = IApp::GetApp()->GetContext().ContextObjects();
 
         // filter industry pool output to get just planet IDs
         for (auto& [object_ids, PP] : empire.GetIndustryPool().Output()) {
             std::set<int> planet_ids;
-            for (const auto* planet : Objects().findRaw<Planet>(object_ids)) {
+            for (const auto* planet : objects.findRaw<Planet>(object_ids)) {
                 if (planet)
                     planet_ids.insert(planet->ID());
             }
@@ -115,14 +115,14 @@ namespace {
 
     auto PlanetsWithAllocatedPP(const Empire& empire) -> std::map<std::set<int>, float>
     {
+        const auto& objects = IApp::GetApp()->GetContext().ContextObjects();
         const auto& prod_queue = empire.GetProductionQueue();
         std::map<std::set<int>, float> planets_with_allocated_pp;
         for (const auto& objects_pp : prod_queue.AllocatedPP()) {
             std::set<int> planets;
-            for (const auto& planet : Objects().find<Planet>(objects_pp.first)) {
-                if (!planet)
-                    continue;
-                planets.insert(planet->ID());
+            for (const auto* planet : objects.findRaw<Planet>(objects_pp.first)) {
+                if (planet)
+                    planets.insert(planet->ID());
             }
             if (!planets.empty())
                 planets_with_allocated_pp[planets] = objects_pp.second;
@@ -132,11 +132,12 @@ namespace {
 
     auto PlanetsWithWastedPP(const Empire& empire) -> std::set<std::set<int>>
     {
+        const auto& objects = IApp::GetApp()->GetContext().ContextObjects();
         const ProductionQueue& prod_queue = empire.GetProductionQueue();
         std::set<std::set<int>> planets_with_wasted_pp;
         for (const auto& object_ids : prod_queue.ObjectsWithWastedPP(empire.GetIndustryPool())) {
             std::set<int> planet_ids;
-            for (const auto* planet : Objects().findRaw<Planet>(object_ids)) {
+            for (const auto* planet : objects.findRaw<Planet>(object_ids)) {
                 if (planet)
                     planet_ids.insert(planet->ID());
             }
@@ -273,16 +274,16 @@ namespace FreeOrionPython {
             .add_property("availableBuildingTypes", +[](const Empire& empire) { return ToVec(empire.AvailableBuildingTypes()); })
 
             .add_property("totalShipsOwned",        make_function(&Empire::TotalShipsOwned,         py::return_value_policy<py::return_by_value>()))
-            .def("shipDesignAvailable",             +[](const Empire& empire, int id) -> bool { return empire.ShipDesignAvailable(id, GetUniverse()); })
+            .def("shipDesignAvailable",             +[](const Empire& empire, int id) -> bool { return empire.ShipDesignAvailable(id, IApp::GetApp()->GetContext().ContextUniverse()); })
             .add_property("allShipDesigns",         make_function(&Empire::ShipDesigns,             py::return_value_policy<py::return_by_value>()))
-            .add_property("availableShipDesigns",   +[](const Empire& empire) -> std::set<int> { auto temp{empire.AvailableShipDesigns(GetUniverse())}; return {temp.begin(), temp.end()}; })
+            .add_property("availableShipDesigns",   +[](const Empire& empire) -> std::set<int> { auto temp{empire.AvailableShipDesigns(IApp::GetApp()->GetContext().ContextUniverse())}; return {temp.begin(), temp.end()}; })
 
 
             .add_property("availableShipParts",     +[](const Empire& empire) { return ToVec(empire.AvailableShipParts()); })
             .add_property("availableShipHulls",     +[](const Empire& empire) { return ToVec(empire.AvailableShipHulls()); })
 
             .add_property("productionQueue",        make_function(&Empire::GetProductionQueue,      py::return_internal_reference<>()))
-            .def("productionCostAndTime",           +[](const Empire& empire, const ProductionQueue::Element& element) -> std::pair<float, int> { return element.ProductionCostAndTime(ScriptingContext{}); },
+            .def("productionCostAndTime",           +[](const Empire& empire, const ProductionQueue::Element& element) -> std::pair<float, int> { return element.ProductionCostAndTime(IApp::GetApp()->GetContext()); },
                                                     py::return_value_policy<py::return_by_value>())
             .add_property("planetsWithAvailablePP", make_function(
                                                         PlanetsWithAvailablePP,
@@ -303,7 +304,7 @@ namespace FreeOrionPython {
                                                         py::return_value_policy<py::return_by_value>()
                                                     ))
             .def("getTechStatus",                   &Empire::GetTechStatus)
-            .def("researchProgress",                +[](const Empire& e, const std::string& tech) { return e.ResearchProgress(tech, ScriptingContext{}); })
+            .def("researchProgress",                +[](const Empire& e, const std::string& tech) { return e.ResearchProgress(tech, IApp::GetApp()->GetContext()); })
             .add_property("researchQueue",          make_function(&Empire::GetResearchQueue,        py::return_internal_reference<>()))
 
             .def("policyAdopted",                   +[](const Empire& e, const std::string& policy) { return e.PolicyAdopted(policy); })
@@ -341,7 +342,7 @@ namespace FreeOrionPython {
 
             .def("policyAvailable",                 +[](const Empire& e, const std::string& policy) { return e.PolicyAvailable(policy); })
 
-            .def("policyPrereqsAndExclusionsOK",    +[](const Empire& e, const std::string& policy) { return e.PolicyPrereqsAndExclusionsOK(policy, CurrentTurn()); })
+            .def("policyPrereqsAndExclusionsOK",    +[](const Empire& e, const std::string& policy) { return e.PolicyPrereqsAndExclusionsOK(policy, IApp::GetApp()->CurrentTurn()); })
 
             .add_property("totalPolicySlots",       make_function(
                                                         +[](const Empire& e) -> std::map<std::string, int>
@@ -354,8 +355,8 @@ namespace FreeOrionPython {
                                                         py::return_value_policy<py::return_by_value>()
                                                     ))
 
-            .def("canBuild",                        +[](const Empire& empire, BuildType build_type, const std::string& name, int location) -> bool { return empire.ProducibleItem(build_type, name, location, ScriptingContext{}); })
-            .def("canBuild",                        +[](const Empire& empire, BuildType build_type, int design, int location) -> bool { return empire.ProducibleItem(build_type, design, location, ScriptingContext{}); })
+            .def("canBuild",                        +[](const Empire& empire, BuildType build_type, const std::string& name, int location) -> bool { return empire.ProducibleItem(build_type, name, location, IApp::GetApp()->GetContext()); })
+            .def("canBuild",                        +[](const Empire& empire, BuildType build_type, int design, int location) -> bool { return empire.ProducibleItem(build_type, design, location, IApp::GetApp()->GetContext()); })
 
             .def("hasExploredSystem",               &Empire::HasExploredSystem)
             .add_property("exploredSystemIDs",      +[](const Empire& empire) { return ToVec(empire.ExploredSystems()); })
@@ -372,13 +373,13 @@ namespace FreeOrionPython {
 
             .def("preservedLaneTravel",             &Empire::PreservedLaneTravel)
             .add_property("fleetSupplyableSystemIDs",   make_function(
-                                                            +[](const Empire& empire) -> const std::set<int>& { return GetSupplyManager().FleetSupplyableSystemIDs(empire.EmpireID()); },
+                                                            +[](const Empire& empire) -> const std::set<int>& { return IApp::GetApp()->GetSupplyManager().FleetSupplyableSystemIDs(empire.EmpireID()); },
                                                             py::return_value_policy<py::copy_const_reference>()
                                                         ))
             .add_property("supplyUnobstructedSystems",  make_function(&Empire::SupplyUnobstructedSystems,   py::return_internal_reference<>()))
             .add_property("systemSupplyRanges",         make_function(&Empire::SystemSupplyRanges,          py::return_internal_reference<>()))
             .add_property("resourceSupplyGroups",       make_function(
-                                                             +[](const Empire& empire) -> const std::set<std::set<int>>& { return GetSupplyManager().ResourceSupplyGroups(empire.EmpireID()); },
+                                                             +[](const Empire& empire) -> const std::set<std::set<int>>& { return IApp::GetApp()->GetSupplyManager().ResourceSupplyGroups(empire.EmpireID()); },
                                                              py::return_value_policy<py::copy_const_reference>()
                                                         ))
 
@@ -463,13 +464,13 @@ namespace FreeOrionPython {
             .add_property("description",            make_function(&Tech::Description,       py::return_value_policy<py::copy_const_reference>()))
             .add_property("shortDescription",       make_function(&Tech::ShortDescription,  py::return_value_policy<py::copy_const_reference>()))
             .add_property("category",               make_function(&Tech::Category,          py::return_value_policy<py::copy_const_reference>()))
-            .def("researchCost",                    +[](const Tech& t, int empire_id) { return t.ResearchCost(empire_id, ScriptingContext{}); })
-            .def("perTurnCost",                     +[](const Tech& t, int empire_id) { return t.PerTurnCost(empire_id, ScriptingContext{}); })
-            .def("researchTime",                    +[](const Tech& t, int empire_id) { return t.ResearchTime(empire_id, ScriptingContext{}); })
+            .def("researchCost",                    +[](const Tech& t, int empire_id) { return t.ResearchCost(empire_id, IApp::GetApp()->GetContext()); })
+            .def("perTurnCost",                     +[](const Tech& t, int empire_id) { return t.PerTurnCost(empire_id, IApp::GetApp()->GetContext()); })
+            .def("researchTime",                    +[](const Tech& t, int empire_id) { return t.ResearchTime(empire_id, IApp::GetApp()->GetContext()); })
             .add_property("prerequisites",          make_function(&Tech::Prerequisites,     py::return_internal_reference<>()))
             .add_property("unlockedTechs",          make_function(&Tech::UnlockedTechs,     py::return_internal_reference<>()))
             .add_property("unlockedItems",          make_function(&Tech::UnlockedItems,     py::return_internal_reference<>()))
-            .def("recursivePrerequisites",          +[](const Tech& tech, int empire_id) -> std::vector<std::string> { return GetTechManager().RecursivePrereqs(tech.Name(), empire_id, ScriptingContext{}); },
+            .def("recursivePrerequisites",          +[](const Tech& tech, int empire_id) -> std::vector<std::string> { return GetTechManager().RecursivePrereqs(tech.Name(), empire_id, IApp::GetApp()->GetContext()); },
                                                     py::return_value_policy<py::return_by_value>())
         ;
 
@@ -505,9 +506,9 @@ namespace FreeOrionPython {
             .add_property("description",            make_function(&Policy::Description,         py::return_value_policy<py::copy_const_reference>()))
             .add_property("shortDescription",       make_function(&Policy::ShortDescription,    py::return_value_policy<py::copy_const_reference>()))
             .add_property("category",               make_function(&Policy::Category,            py::return_value_policy<py::copy_const_reference>()))
-            .def("adoptionCost",                    +[](const Policy& p)                       { return p.AdoptionCost(AppEmpireID(), ScriptingContext{}); })
-            .def("adoptionCost",                    +[](const Policy& p, const Empire& empire) { return p.AdoptionCost(empire.EmpireID(), ScriptingContext{}); })
-            .def("adoptionCost",                    +[](const Policy& p, int empire_id)        { return p.AdoptionCost(empire_id, ScriptingContext{}); })
+            .def("adoptionCost",                    +[](const Policy& p)                       { return p.AdoptionCost(IApp::GetApp()->EmpireID(), IApp::GetApp()->GetContext()); })
+            .def("adoptionCost",                    +[](const Policy& p, const Empire& empire) { return p.AdoptionCost(empire.EmpireID(), IApp::GetApp()->GetContext()); })
+            .def("adoptionCost",                    +[](const Policy& p, int empire_id)        { return p.AdoptionCost(empire_id, IApp::GetApp()->GetContext()); })
         ;
 
         def("getPolicy",
@@ -546,9 +547,9 @@ namespace FreeOrionPython {
         ////////////////////////////
         py::class_<DiplomaticStatusUpdateInfo>("diplomaticStatusUpdate")
             .def(py::init<int, int, DiplomaticStatus>())
-            .add_property("status",             &DiplomaticStatusUpdateInfo::diplo_status)
-            .add_property("empire1",            &DiplomaticStatusUpdateInfo::empire1_id)
-            .add_property("empire2",            &DiplomaticStatusUpdateInfo::empire2_id)
+            .add_property("status",  &DiplomaticStatusUpdateInfo::diplo_status)
+            .add_property("empire1", &DiplomaticStatusUpdateInfo::empire1_id)
+            .add_property("empire2", &DiplomaticStatusUpdateInfo::empire2_id)
         ;
     }
 }

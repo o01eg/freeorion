@@ -7,7 +7,6 @@
 #include "Ship.h"
 #include "Species.h"
 #include "System.h"
-#include "UniverseObjectVisitor.h"
 #include "Universe.h"
 #include "ValueRef.h"
 #include "../Empire/EmpireManager.h"
@@ -60,8 +59,7 @@ Planet::Planet(PlanetType type, PlanetSize size, int creation_turn) :
     m_axial_tilt(RandZeroToOne() * HIGH_TILT_THERESHOLD)
 {
     //DebugLogger() << "Planet::Planet(" << type << ", " << size <<")";
-    UniverseObject::Init();
-    Planet::Init();
+    AddMeters(planet_meter_types);
 
     static constexpr double SPIN_STD_DEV = 0.1;
     static constexpr double REVERSE_SPIN_CHANCE = 0.06;
@@ -235,35 +233,6 @@ int Planet::HabitableSize() const {
     case PlanetSize::SZ_TINY:      return gr.Get<int>("RULE_HABITABLE_SIZE_TINY");      break;
     default:                       return 0;                                            break;
     }
-}
-
-void Planet::Init() {
-    AddMeter(MeterType::METER_POPULATION);
-    AddMeter(MeterType::METER_TARGET_POPULATION);
-    AddMeter(MeterType::METER_HAPPINESS);
-    AddMeter(MeterType::METER_TARGET_HAPPINESS);
-
-    AddMeter(MeterType::METER_INDUSTRY);
-    AddMeter(MeterType::METER_RESEARCH);
-    AddMeter(MeterType::METER_INFLUENCE);
-    AddMeter(MeterType::METER_CONSTRUCTION);
-    AddMeter(MeterType::METER_TARGET_INDUSTRY);
-    AddMeter(MeterType::METER_TARGET_RESEARCH);
-    AddMeter(MeterType::METER_TARGET_INFLUENCE);
-    AddMeter(MeterType::METER_TARGET_CONSTRUCTION);
-
-    AddMeter(MeterType::METER_SUPPLY);
-    AddMeter(MeterType::METER_MAX_SUPPLY);
-    AddMeter(MeterType::METER_STOCKPILE);
-    AddMeter(MeterType::METER_MAX_STOCKPILE);
-    AddMeter(MeterType::METER_SHIELD);
-    AddMeter(MeterType::METER_MAX_SHIELD);
-    AddMeter(MeterType::METER_DEFENSE);
-    AddMeter(MeterType::METER_MAX_DEFENSE);
-    AddMeter(MeterType::METER_TROOPS);
-    AddMeter(MeterType::METER_MAX_TROOPS);
-    AddMeter(MeterType::METER_DETECTION);
-    AddMeter(MeterType::METER_REBEL_TROOPS);
 }
 
 int Planet::TurnsSinceFocusChange(int current_turn) const noexcept {
@@ -510,9 +479,6 @@ PlanetSize Planet::NextSmallerPlanetSize() const noexcept
 float Planet::OrbitalPositionOnTurn(int turn) const noexcept
 { return m_initial_orbital_position + OrbitalPeriod() * 2.0 * 3.1415926 / 4 * turn; }
 
-std::shared_ptr<UniverseObject> Planet::Accept(const UniverseObjectVisitor& visitor) const
-{ return visitor.Visit(std::const_pointer_cast<Planet>(std::static_pointer_cast<const Planet>(UniverseObject::shared_from_this()))); }
-
 std::string Planet::CardinalSuffix(const ObjectMap& objects) const {
     std::string retval;
     // Early return for invalid ID
@@ -600,14 +566,14 @@ bool Planet::FocusAvailable(std::string_view focus, const ScriptingContext& cont
         return false;
     const auto& foci = species->Foci();
     const auto it = std::find_if(foci.begin(), foci.end(),
-                                 [focus](const FocusType& focus_type) { return focus_type.Name() == focus; });
+                                 [focus](const FocusType& focus_type) noexcept { return focus_type.Name() == focus; });
     if (it == foci.end())
         return false;
     const auto* location = it->Location();
     if (!location)
         return false;
 
-    const ScriptingContext planet_context(this, context);
+    const ScriptingContext planet_context(context, ScriptingContext::Source{}, this);
     return location->EvalOne(planet_context, this);
 }
 
@@ -617,7 +583,7 @@ std::vector<std::string_view> Planet::AvailableFoci(const ScriptingContext& cont
     if (!species)
         return retval;
 
-    const ScriptingContext planet_context(this, context);
+    const ScriptingContext planet_context(context, ScriptingContext::Source{}, this);
 
     const auto& foci = species->Foci();
     retval.reserve(species->Foci().size());
@@ -680,7 +646,7 @@ double Planet::AnnexationCost(int empire_id, const ScriptingContext& context) co
         return ac->Eval();
 
     const auto* source_for_empire = context.Empires().GetSource(empire_id, context.ContextObjects()).get();
-    ScriptingContext source_planet_context{source_for_empire, context};
+    ScriptingContext source_planet_context{context, ScriptingContext::Source{}, source_for_empire};
     source_planet_context.condition_local_candidate = this;
     if (!source_planet_context.condition_root_candidate)
         source_planet_context.condition_root_candidate = this;

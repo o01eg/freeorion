@@ -11,14 +11,14 @@ jobs:
       fail-fast: false
       matrix:
         image:
-          - ubuntu-23.04
+          - ubuntu-24.10
           - fedora-33
           - debian-oldstable
           - debian-stable
-          - debian-sid
+          # - debian-sid # g++-15 ICE https://gcc.gnu.org/bugzilla/show_bug.cgi?id=118464
           - debian-sid-i386
           - manjaro
-          - fedora-rawhide
+          # - fedora-rawhide # wait for update godot3-server at https://packages.fedoraproject.org/pkgs/godot3/godot3-server/fedora-rawhide.html since 2025-01-30
           - void-musl
     env:
       CACHE_NAME: linux
@@ -74,15 +74,15 @@ jobs:
         run: |
           docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/xvfb-run /freeorion/build/godot --no-window --disable-render-loop --video-driver GLES2 --gdnative-generate-json-api /freeorion/build/godot-api.json
       - name: Configure freeorion
-        if: ${{ matrix.image == 'ubuntu-23.04' }}
+        if: ${{ matrix.image == 'ubuntu-24.10' }}
         run: |
-          docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/cmake -DBUILD_CLIENT_GODOT=ON -DGODOT_CUSTOM_API_FILE=/freeorion/build/godot-api.json -DBUILD_TESTING=ON -DCMAKE_C_COMPILER=gcc-12 -DCMAKE_CXX_COMPILER=g++-12 ..
+          docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/cmake -DBUILD_CLIENT_GODOT=ON -DGODOT_CUSTOM_API_FILE=/freeorion/build/godot-api.json -DBUILD_TESTING=ON -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14 ..
       - name: Configure freeorion
         if: ${{ matrix.image == 'manjaro' || matrix.image == 'void-musl' }}
         run: |
           docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/cmake -DBUILD_CLIENT_GODOT=Off -DBUILD_TESTING=ON ..
       - name: Configure freeorion
-        if: ${{ matrix.image != 'ubuntu-23.04' && matrix.image != 'manjaro' && matrix.image != 'void-musl' }}
+        if: ${{ matrix.image != 'ubuntu-24.10' && matrix.image != 'manjaro' && matrix.image != 'void-musl' }}
         run: |
           docker run -v "$(pwd):/freeorion" -v "${{ runner.temp }}/ccache:/ccache_dir" -e CCACHE_DIR='/ccache_dir' -w /freeorion/build ${{ steps.prep.outputs.tagged_image }} /usr/bin/cmake -DBUILD_CLIENT_GODOT=ON -DGODOT_CUSTOM_API_FILE=/freeorion/build/godot-api.json -DBUILD_TESTING=ON ..
       - name: Build freeorion

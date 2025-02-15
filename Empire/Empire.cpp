@@ -165,21 +165,21 @@ void Empire::SetCapitalID(int id, const ObjectMap& objects) {
         m_source_id = id;
 }
 
-void Empire::AdoptPolicy(const std::string& name, const std::string& category,
-                         const ScriptingContext& context, bool adopt, int slot)
-{
-    if (adopt && name.empty()) {
-        ErrorLogger() << "Empire::AdoptPolicy asked to adopt empty policy name in category " << category << " slot " << slot;
-        return;
-    } else if (name.empty()) {
+void Empire::DeAdoptPolicy(const std::string& name) {
+    if (name.empty()) {
         ErrorLogger() << "Empire::AdoptPolicy asked to de-adopt empty policy name";
         return;
     }
 
-    if (!adopt) {
-        // revoke policy
-        if (m_adopted_policies.erase(name))
-            PoliciesChangedSignal();
+    if (m_adopted_policies.erase(name))
+        PoliciesChangedSignal();
+}
+
+void Empire::AdoptPolicy(const std::string& name, const std::string& category,
+                         const ScriptingContext& context, int slot)
+{
+    if (name.empty()) {
+        ErrorLogger() << "Empire::AdoptPolicy asked to adopt empty policy name in category " << category << " slot " << slot;
         return;
     }
 
@@ -1662,15 +1662,13 @@ void Empire::SetTechResearchProgress(const std::string& name, float progress,
 constexpr unsigned int MAX_PROD_QUEUE_SIZE = 500;
 
 void Empire::PlaceProductionOnQueue(const ProductionQueue::ProductionItem& item,
-                                    boost::uuids::uuid uuid, int number,
-                                    int blocksize, int location, int pos)
+                                    boost::uuids::uuid uuid, const ScriptingContext& context,
+                                    int number, int blocksize, int location, int pos)
 {
     if (m_production_queue.size() >= MAX_PROD_QUEUE_SIZE) {
         ErrorLogger() << "Empire::PlaceProductionOnQueue() : Maximum queue size reached. Aborting enqueue";
         return;
     }
-
-    const ScriptingContext context;
 
     if (item.build_type == BuildType::BT_BUILDING) {
         // only buildings have a distinction between enqueuable and producible...
@@ -1734,7 +1732,7 @@ void Empire::SetProductionQuantityAndBlocksize(int index, int quantity, int bloc
     }
 }
 
-void Empire::SplitIncompleteProductionItem(int index, boost::uuids::uuid uuid) {
+void Empire::SplitIncompleteProductionItem(int index, boost::uuids::uuid uuid, const ScriptingContext& context) {
     DebugLogger() << "Empire::SplitIncompleteProductionItem() called for index " << index;
     if (index < 0 || cmp_less_equal(m_production_queue.size(), index))
         throw std::runtime_error("Empire::SplitIncompleteProductionItem() : Attempted to adjust the quantity of items to be built in a nonexistent production queue item.");
@@ -1750,16 +1748,16 @@ void Empire::SplitIncompleteProductionItem(int index, boost::uuids::uuid uuid) {
     // add duplicate
     int new_item_quantity = elem.remaining - 1;
     elem.remaining = 1; // reduce remaining on specified to 1
-    PlaceProductionOnQueue(elem.item, uuid, new_item_quantity, elem.blocksize, elem.location, index + 1);
+    PlaceProductionOnQueue(elem.item, uuid, context, new_item_quantity, elem.blocksize, elem.location, index + 1);
 }
 
-void Empire::DuplicateProductionItem(int index, boost::uuids::uuid uuid) {
+void Empire::DuplicateProductionItem(int index, boost::uuids::uuid uuid, const ScriptingContext& context) {
     DebugLogger() << "Empire::DuplicateProductionItem() called for index " << index << " with new UUID: " << boost::uuids::to_string(uuid);
     if (index < 0 || cmp_less_equal(m_production_queue.size(), index))
         throw std::runtime_error("Empire::DuplicateProductionItem() : Attempted to adjust the quantity of items to be built in a nonexistent production queue item.");
 
     auto& elem = m_production_queue[index];
-    PlaceProductionOnQueue(elem.item, uuid, elem.remaining, elem.blocksize, elem.location, index + 1);
+    PlaceProductionOnQueue(elem.item, uuid, context, elem.remaining, elem.blocksize, elem.location, index + 1);
 }
 
 void Empire::SetProductionRallyPoint(int index, int rally_point_id) {
@@ -1877,7 +1875,7 @@ void Empire::ConquerProductionQueueItemsAtLocation(int location_id, int empire_i
 
         ProductionQueue& queue = from_empire->m_production_queue;
 
-        for (auto queue_it = queue.begin(); queue_it != queue.end(); ) {
+        for (auto queue_it = queue.begin(); queue_it != queue.end();) {
             const auto& elem = *queue_it;
             if (elem.location != location_id) {
                 ++queue_it;

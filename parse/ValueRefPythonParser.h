@@ -21,13 +21,10 @@ struct value_ref_wrapper {
     {}
 
     value_ref_wrapper<T> call(const value_ref_wrapper<T>& var_) const {
-        auto var = std::dynamic_pointer_cast<const ValueRef::Variable<T>>(var_.value_ref);
-        if (var) {
+        if (auto var = std::dynamic_pointer_cast<const ValueRef::Variable<T>>(var_.value_ref)) {
             return value_ref_wrapper<T>(std::make_shared<ValueRef::Variable<T>>(
-                                            var->GetReferenceType(),
-                                            var->PropertyName(),
-                                            true
-                                        ));
+                var->GetReferenceType(), var->PropertyName(), var->GetContainerType(),
+                ValueRef::ValueToReturn::Immediate));
         } else if(var_.value_ref) {
             throw std::runtime_error(std::string("Unknown type of Value.__call__ ") + typeid(*var_.value_ref).name());
         } else {
@@ -111,6 +108,7 @@ value_ref_wrapper<double> operator<(const value_ref_wrapper<double>&, const valu
 value_ref_wrapper<double> operator<(double, const value_ref_wrapper<double>&);
 value_ref_wrapper<double> operator<(const value_ref_wrapper<double>&, double);
 value_ref_wrapper<double> operator!=(const value_ref_wrapper<double>&, int);
+value_ref_wrapper<double> operator-(const value_ref_wrapper<double>&);
 
 value_ref_wrapper<int> operator*(int, const value_ref_wrapper<int>&);
 value_ref_wrapper<int> operator-(const value_ref_wrapper<int>&, int);

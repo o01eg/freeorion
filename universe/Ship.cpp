@@ -9,7 +9,6 @@
 #include "ShipHull.h"
 #include "ShipPart.h"
 #include "Species.h"
-#include "UniverseObjectVisitor.h"
 #include "Universe.h"
 #include "ValueRef.h"
 #include "../combat/CombatDamage.h"
@@ -43,48 +42,49 @@ Ship::Ship(int empire_id, int design_id, std::string species_name,
     if (!m_species_name.empty() && !ship_species)
         DebugLogger() << "Ship created with invalid species name: " << m_species_name;
 
-
-    static constexpr auto ship_meter_types = []() {
-        std::array<MeterType, 15> retval{{
-            MeterType::METER_FUEL, MeterType::METER_MAX_FUEL, MeterType::METER_SHIELD, MeterType::METER_MAX_SHIELD,
-            MeterType::METER_DETECTION, MeterType::METER_STRUCTURE, MeterType::METER_MAX_STRUCTURE,
-            MeterType::METER_SPEED, MeterType::METER_TARGET_INDUSTRY, MeterType::METER_INDUSTRY,
-            MeterType::METER_TARGET_RESEARCH, MeterType::METER_RESEARCH, MeterType::METER_TARGET_INFLUENCE,
-            MeterType::METER_INFLUENCE, MeterType::METER_STEALTH  // stealth here means Universe::Init not needed
-        }};
-#if defined(__cpp_lib_constexpr_algorithms)
-        std::sort(retval.begin(), retval.end());
-#endif
-        return retval;
-    }();
     AddMeters(ship_meter_types);
 
     if (!design)
         return;
 
+    m_part_meters.reserve(design->Parts().size() * 2); // guesstimate
     for (const std::string& part_name : design->Parts()) {
         if (!part_name.empty()) {
             const ShipPart* part = GetShipPart(part_name);
-            if (!part) {
+            if (!part) [[unlikely]] {
                 ErrorLogger() << "Ship::Ship couldn't get part with name " << part_name;
                 continue;
             }
 
+#if defined(__cpp_using_enum)
+            using enum MeterType;
+            using enum ShipPartClass;
+#else
+            static constexpr auto METER_CAPACITY = MeterType::METER_CAPACITY;
+            static constexpr auto METER_MAX_CAPACITY = MeterType::METER_MAX_CAPACITY;
+            static constexpr auto METER_SECONDARY_STAT = MeterType::METER_SECONDARY_STAT;
+            static constexpr auto METER_MAX_SECONDARY_STAT = MeterType::METER_MAX_SECONDARY_STAT;
+            static constexpr auto PC_COLONY = ShipPartClass::PC_COLONY;
+            static constexpr auto PC_TROOPS = ShipPartClass::PC_TROOPS;
+            static constexpr auto PC_DIRECT_WEAPON = ShipPartClass::PC_DIRECT_WEAPON;
+            static constexpr auto PC_FIGHTER_HANGAR = ShipPartClass::PC_FIGHTER_HANGAR;
+            static constexpr auto PC_FIGHTER_BAY = ShipPartClass::PC_FIGHTER_BAY;
+#endif
             switch (part->Class()) {
-            case ShipPartClass::PC_COLONY:
-            case ShipPartClass::PC_TROOPS: {
-                m_part_meters[{part_name, MeterType::METER_CAPACITY}];
+            case PC_COLONY:
+            case PC_TROOPS: {
+                m_part_meters[{part_name, METER_CAPACITY}];
                 break;
             }
-            case ShipPartClass::PC_DIRECT_WEAPON:      // capacity is damage, secondary stat is shots per attack
-            case ShipPartClass::PC_FIGHTER_HANGAR: {   // capacity is how many fighters contained, secondary stat is damage per fighter attack
-                m_part_meters[{part_name, MeterType::METER_SECONDARY_STAT}];
-                m_part_meters[{part_name, MeterType::METER_MAX_SECONDARY_STAT}];
+            case PC_DIRECT_WEAPON:      // capacity is damage, secondary stat is shots per attack
+            case PC_FIGHTER_HANGAR: {   // capacity is how many fighters contained, secondary stat is damage per fighter attack
+                m_part_meters[{part_name, METER_SECONDARY_STAT}];
+                m_part_meters[{part_name, METER_MAX_SECONDARY_STAT}];
             }
             [[fallthrough]];
-            case ShipPartClass::PC_FIGHTER_BAY: {      // capacity is how many fighters launched per combat round
-                m_part_meters[{part_name, MeterType::METER_CAPACITY}];
-                m_part_meters[{part_name, MeterType::METER_MAX_CAPACITY}];
+            case PC_FIGHTER_BAY: {      // capacity is how many fighters launched per combat round
+                m_part_meters[{part_name, METER_CAPACITY}];
+                m_part_meters[{part_name, METER_MAX_CAPACITY}];
                 break;
             }
             default:
@@ -376,9 +376,6 @@ const std::string& Ship::PublicName(int empire_id) const {
         return UserString("OBJ_SHIP");
 }
 
-std::shared_ptr<UniverseObject> Ship::Accept(const UniverseObjectVisitor& visitor) const
-{ return visitor.Visit(std::const_pointer_cast<Ship>(std::static_pointer_cast<const Ship>(shared_from_this()))); }
-
 const Meter* Ship::GetPartMeter(MeterType type, const std::string& part_name) const {
     const Meter* retval = nullptr;
     const auto it = std::find_if(m_part_meters.begin(), m_part_meters.end(),
@@ -525,19 +522,13 @@ float Ship::TotalWeaponsShipDamage(const ScriptingContext& context, float shield
 std::vector<float> Ship::AllWeaponsFighterDamage(const ScriptingContext& context,
                                                  bool launch_fighters) const
 {
-    return Combat::WeaponDamageImpl(
-        context, std::static_pointer_cast<const Ship>(shared_from_this()),
-        /*target_shield_DR*/0, /*max meters*/false,
-        launch_fighters, /*target_ships*/false);
+    return Combat::WeaponDamageImpl(context, *this, /*target_shield_DR*/0, /*max meters*/false,
+                                    launch_fighters, /*target_ships*/false);
 }
 
 std::vector<float> Ship::AllWeaponsShipDamage(const ScriptingContext& context, float shield_DR,
                                               bool launch_fighters) const
-{
-    return Combat::WeaponDamageImpl(
-        context, std::static_pointer_cast<const Ship>(shared_from_this()),
-        shield_DR, false, launch_fighters, true);
-}
+{ return Combat::WeaponDamageImpl(context, *this, shield_DR, false, launch_fighters, true); }
 
 std::vector<float> Ship::AllWeaponsMaxShipDamage(const ScriptingContext& context, float shield_DR,
                                                  bool launch_fighters) const
@@ -548,8 +539,7 @@ std::vector<float> Ship::AllWeaponsMaxShipDamage(const ScriptingContext& context
     if (!design)
         return retval;
 
-    return Combat::WeaponDamageImpl(context, std::static_pointer_cast<const Ship>(shared_from_this()),
-                                    shield_DR, true, launch_fighters);
+    return Combat::WeaponDamageImpl(context, *this, shield_DR, true, launch_fighters);
 }
 
 std::size_t Ship::SizeInMemory() const {
@@ -605,8 +595,7 @@ void Ship::Resupply(int turn) {
 
     Meter* fuel_meter = UniverseObject::GetMeter(MeterType::METER_FUEL);
     const Meter* max_fuel_meter = UniverseObject::GetMeter(MeterType::METER_MAX_FUEL);
-    if (!fuel_meter || !max_fuel_meter) {
-        [[unlikely]]
+    if (!fuel_meter || !max_fuel_meter) [[unlikely]] {
         ErrorLogger() << "Ship::Resupply couldn't get fuel meters!";
     } else {
         fuel_meter->SetCurrent(max_fuel_meter->Current());
@@ -632,7 +621,7 @@ void Ship::Resupply(int turn) {
 }
 
 void Ship::SetSpecies(std::string species_name, const SpeciesManager& sm) {
-    if (!sm.GetSpecies(species_name))
+    if (!sm.GetSpecies(species_name)) [[unlikely]] 
         ErrorLogger() << "Ship::SetSpecies couldn't get species with name " << species_name;
     m_species_name = std::move(species_name);
 }

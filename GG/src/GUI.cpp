@@ -143,7 +143,7 @@ struct GG::GUIImpl
 
     void GouvernFPS();
 
-    std::string  m_app_name;            // the user-defined name of the apllication
+    std::string  m_app_name;            // the user-defined name of the application
 
     ZList               m_zlist;        // object that keeps the GUI windows in the correct depth ordering
     std::weak_ptr<Wnd>  m_focus_wnd;    // GUI window that currently has the input focus (this is the base level focus window, used when no modal windows are active)
@@ -201,10 +201,11 @@ struct GG::GUIImpl
     /** Tracks whether Wnd is acceptable for dropping on the current target Wnd.*/
     std::map<const Wnd*, bool> m_drag_drop_wnds_acceptable;
 
-    std::set<std::pair<Key, Flags<ModKey>>> m_accelerators; // the keyboard accelerators
+    std::vector<std::pair<Key, Flags<ModKey>>> m_accelerators; // the keyboard accelerators
 
     /** The signals emitted by the keyboard accelerators. */
-    std::map<std::pair<Key, Flags<ModKey>>, std::shared_ptr<GUI::AcceleratorSignalType>> m_accelerator_sigs;
+    std::vector<std::pair<std::pair<Key, Flags<ModKey>>,
+                          std::unique_ptr<GUI::AcceleratorSignalType>>> m_accelerator_sigs;
 
     bool m_mouse_lr_swap = false; // treat left and right mouse events as each other
 
@@ -225,9 +226,9 @@ struct GG::GUIImpl
     int          m_double_click_start_time = -1;//! the time from which we started measuring double_click_time, in ms
     int          m_double_click_time = -1;      //! time elapsed since last click, in ms
 
-    std::shared_ptr<StyleFactory>   m_style_factory;
-    bool                            m_render_cursor = false;
-    std::shared_ptr<Cursor>         m_cursor;
+    std::unique_ptr<const StyleFactory> m_style_factory;
+    std::unique_ptr<const Cursor>       m_cursor;
+    bool                                m_render_cursor = false;
 
     std::set<Timer*> m_timers;
 
@@ -240,8 +241,7 @@ struct GG::GUIImpl
 GUIImpl::GUIImpl(std::string app_name) :
     m_app_name(std::move(app_name)),
     m_last_FPS_time(std::chrono::high_resolution_clock::now()),
-    m_last_frame_time(std::chrono::high_resolution_clock::now()),
-    m_style_factory(std::make_shared<StyleFactory>())
+    m_last_frame_time(std::chrono::high_resolution_clock::now())
 {}
 
 void GUIImpl::HandleMouseButtonPress(unsigned int mouse_button, Pt pos, int curr_ticks)
@@ -358,10 +358,10 @@ void GUIImpl::HandleMouseDrag(unsigned int mouse_button, Pt pos, int curr_ticks)
             m_curr_wnd_under_cursor = curr_wnd_under_cursor;
             std::map<std::shared_ptr<Wnd>, Pt> drag_drop_wnds;
             drag_drop_wnds[dragged_wnd] = m_wnd_drag_offset;
-            const auto&& prev_wnd_under_cursor = LockAndResetIfExpired(m_prev_wnd_under_cursor);
+            const auto prev_wnd_under_cursor = LockAndResetIfExpired(m_prev_wnd_under_cursor);
             if (curr_wnd_under_cursor && prev_wnd_under_cursor == curr_wnd_under_cursor) {
                 // Wnd under cursor has remained the same for the last two updates
-                const auto&& curr_drag_drop_here_wnd = LockAndResetIfExpired(m_curr_drag_drop_here_wnd);
+                const auto curr_drag_drop_here_wnd = LockAndResetIfExpired(m_curr_drag_drop_here_wnd);
                 if (curr_drag_drop_here_wnd == curr_wnd_under_cursor) {
                     // Wnd being dragged over is still being dragged over...
                     WndEvent event(WndEvent::EventType::DragDropHere, pos, m_drag_drop_wnds, m_mod_keys);
@@ -386,7 +386,7 @@ void GUIImpl::HandleMouseDrag(unsigned int mouse_button, Pt pos, int curr_ticks)
         // send appropriate resize message to window, depending on the position
         // of the cursor within / at the edge of the Wnd being dragged over
         Pt offset_pos = pos + m_wnd_resize_offset;
-        if (auto&& parent = dragged_wnd->Parent())
+        if (auto parent = dragged_wnd->Parent())
             offset_pos -= parent->ClientUpperLeft();
         const GG::Pt rel_lr = dragged_wnd->RelativeLowerRight();
         const GG::Pt rel_ul = dragged_wnd->RelativeUpperLeft();
@@ -645,17 +645,13 @@ void GUIImpl::HandleKeyPress(Key key, uint32_t key_code_point,
         // the focus_wnd may care about the state of the numlock and
         // capslock, or which side of the keyboard's CTRL, SHIFT, etc.
         // was pressed, but the accelerators don't
-        Flags<ModKey> massaged_mods = MassagedAccelModKeys(mod_keys);
-        if (m_accelerators.find({key, massaged_mods})
-            != m_accelerators.end())
-        {
-            processed = GUI::s_gui->AcceleratorSignal(key, massaged_mods)();
-        }
+        const std::pair key_mods{key, MassagedAccelModKeys(mod_keys)};
+        if (std::find(m_accelerators.begin(), m_accelerators.end(), key_mods) != m_accelerators.end())
+            processed = GUI::s_gui->AcceleratorSignal(key, key_mods.second)();
     }
-    auto&& focus_wnd = FocusWnd();
-    if (!processed && focus_wnd)
-        focus_wnd->HandleEvent(WndEvent(
-            WndEvent::EventType::KeyPress, key, key_code_point, mod_keys));
+    if (!processed)
+        if (auto focus_wnd = FocusWnd())
+            focus_wnd->HandleEvent(WndEvent(WndEvent::EventType::KeyPress, key, key_code_point, mod_keys));
 }
 
 void GUIImpl::HandleKeyRelease(Key key, uint32_t key_code_point,
@@ -1018,16 +1014,16 @@ bool GUI::AcceptedDragDropWnd(const Wnd* wnd) const
 bool GUI::MouseButtonDown(unsigned int bn) const
 { return (bn <= 2) ? m_impl->m_mouse_button_state[bn] : false; }
 
-Pt GUI::MousePosition() const
+Pt GUI::MousePosition() const noexcept
 { return m_impl->m_mouse_pos; }
 
-Pt GUI::MouseMovement() const
+Pt GUI::MouseMovement() const noexcept
 { return m_impl->m_mouse_rel; }
 
-Flags<ModKey> GUI::ModKeys() const
+Flags<ModKey> GUI::ModKeys() const noexcept
 { return m_impl->m_mod_keys; }
 
-bool GUI::MouseLRSwapped() const
+bool GUI::MouseLRSwapped() const noexcept
 { return m_impl->m_mouse_lr_swap; }
 
 std::vector<std::pair<CPSize, CPSize>> GUI::FindWords(std::string_view str) const
@@ -1103,32 +1099,50 @@ std::vector<std::string_view> GUI::FindWordsStringViews(std::string_view str) co
     return retval;
 }
 
-const std::shared_ptr<StyleFactory>& GUI::GetStyleFactory() const
-{ return m_impl->m_style_factory; }
+namespace {
+#if defined(__cpp_constexpr) && (__cpp_constexpr >= 201907L)
+    constexpr StyleFactory default_stylefactory;
+    constexpr Cursor default_cursor;
+#else
+    const StyleFactory default_stylefactory;
+    const Cursor default_cursor;
+#endif
+}
+
+const StyleFactory& GUI::GetStyleFactory() const noexcept
+{ return m_impl->m_style_factory ? *m_impl->m_style_factory : default_stylefactory; }
 
 bool GUI::RenderCursor() const
 { return m_impl->m_render_cursor; }
 
-const std::shared_ptr<Cursor>& GUI::GetCursor() const
-{ return m_impl->m_cursor; }
+const Cursor& GUI::GetCursor() const noexcept
+{ return m_impl->m_cursor ? *m_impl->m_cursor : default_cursor; }
 
-GUI::const_accel_iterator GUI::accel_begin() const
+GUI::const_accel_iterator GUI::accel_begin() const noexcept
 { return m_impl->m_accelerators.begin(); }
 
-GUI::const_accel_iterator GUI::accel_end() const
+GUI::const_accel_iterator GUI::accel_end() const noexcept
 { return m_impl->m_accelerators.end(); }
 
 GUI::AcceleratorSignalType& GUI::AcceleratorSignal(Key key, Flags<ModKey> mod_keys) const
 {
-    auto& sig_ptr = m_impl->m_accelerator_sigs[{key, mod_keys}];
-    if (!sig_ptr)
-        sig_ptr = std::make_shared<AcceleratorSignalType>();
+    auto& sigs = m_impl->m_accelerator_sigs;
+    std::pair key_mod{key, mod_keys};
+    const auto is_key_mod = [key_mod](const auto& entry) { return entry.first == key_mod; };
+
+    auto it = std::find_if(sigs.begin(), sigs.end(), is_key_mod);
+
+    using sig_t = std::decay_t<decltype(*it->second)>;
+
+    sig_t& sig = (it != sigs.end()) ? *it->second :
+        *sigs.emplace_back(key_mod, std::make_unique<sig_t>()).second;
+
     if (INSTRUMENT_ALL_SIGNALS)
-        sig_ptr->connect(AcceleratorEcho(key, mod_keys));
-    return *sig_ptr;
+        sig.connect(AcceleratorEcho(key, mod_keys));
+    return sig;
 }
 
-bool GUI::ModalAcceleratorSignalsEnabled() const
+bool GUI::ModalAcceleratorSignalsEnabled() const noexcept
 { return m_impl->m_allow_modal_accelerator_signals; }
 
 bool GUI::ModalWndsOpen() const
@@ -1408,15 +1422,14 @@ GUI::accel_iterator GUI::accel_end()
 { return m_impl->m_accelerators.end(); }
 
 void GUI::SetAccelerator(Key key, Flags<ModKey> mod_keys)
-{
-    mod_keys = MassagedAccelModKeys(mod_keys);
-    m_impl->m_accelerators.emplace(key, mod_keys);
-}
+{ m_impl->m_accelerators.emplace_back(key, MassagedAccelModKeys(mod_keys)); }
 
 void GUI::RemoveAccelerator(Key key, Flags<ModKey> mod_keys)
 {
-    mod_keys = MassagedAccelModKeys(mod_keys);
-    m_impl->m_accelerators.erase({key, mod_keys});
+    auto& acs = m_impl->m_accelerators;
+    auto it = std::find(acs.begin(), acs.end(), std::pair{key, MassagedAccelModKeys(mod_keys)});
+    if (it != acs.end())
+        acs.erase(it);
 }
 
 void GUI::RemoveAccelerator(accel_iterator it)
@@ -1439,7 +1452,7 @@ std::shared_ptr<Font> GUI::GetFont(const std::shared_ptr<Font>& font, unsigned i
 {
     std::shared_ptr<Font> retval;
     if (font->FontName() == StyleFactory::DefaultFontName()) {
-        retval = GetStyleFactory()->DefaultFont(pts);
+        retval = GetStyleFactory().DefaultFont(pts);
     } else {
         retval = GetFont(font->FontName(), font->PointSize(),
                          font->UnicodeCharsets().begin(),
@@ -1463,18 +1476,14 @@ std::shared_ptr<Texture> GUI::GetTexture(const boost::filesystem::path& path, bo
 void GUI::FreeTexture(const boost::filesystem::path& path)
 { GetTextureManager().FreeTexture(path); }
 
-void GUI::SetStyleFactory(const std::shared_ptr<StyleFactory>& factory)
-{
-    m_impl->m_style_factory = factory;
-    if (!m_impl->m_style_factory)
-        m_impl->m_style_factory = std::make_shared<StyleFactory>();
-}
+void GUI::SetStyleFactory(std::unique_ptr<StyleFactory>&& factory) noexcept
+{ m_impl->m_style_factory = std::move(factory); }
 
-void GUI::RenderCursor(bool render)
+void GUI::RenderCursor(bool render) noexcept
 { m_impl->m_render_cursor = render; }
 
-void GUI::SetCursor(const std::shared_ptr<Cursor>& cursor)
-{ m_impl->m_cursor = cursor; }
+void GUI::SetCursor(std::unique_ptr<Cursor>&& cursor) noexcept
+{ m_impl->m_cursor = std::move(cursor); }
 
 std::string GUI::ClipboardText() const
 { return m_impl->m_clipboard_text; }
@@ -1826,7 +1835,7 @@ void GUI::Render()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (m_impl->m_render_cursor && m_impl->m_cursor && AppHasMouseFocus())
+    if (m_impl && m_impl->m_render_cursor && m_impl->m_cursor && AppHasMouseFocus())
         m_impl->m_cursor->Render(m_impl->m_mouse_pos);
     Exit2DMode();
 }
@@ -1834,28 +1843,28 @@ void GUI::Render()
 bool GUI::ProcessBrowseInfoImpl(Wnd* wnd)
 {
     bool retval = false;
-    const std::vector<Wnd::BrowseInfoMode>& browse_modes = wnd->BrowseModes();
-    if (!browse_modes.empty()) {
-        unsigned int delta_t = Ticks() - m_impl->m_prev_wnd_under_cursor_time;
-        std::size_t i = 0;
-        for (auto it = browse_modes.rbegin();
-             it != browse_modes.rend();
-             ++it, ++i)
-        {
-            if (it->time < delta_t) {
-                if (it->wnd && it->wnd->WndHasBrowseInfo(wnd, i)) {
-                    if (m_impl->m_browse_target != wnd || m_impl->m_browse_info_wnd != it->wnd || m_impl->m_browse_info_mode != static_cast<int>(i)) {
-                        m_impl->m_browse_target = wnd;
-                        m_impl->m_browse_info_wnd = it->wnd;
-                        m_impl->m_browse_info_mode = static_cast<decltype(m_impl->m_browse_info_mode)>(i);
-                        m_impl->m_browse_info_wnd->SetCursorPosition(m_impl->m_mouse_pos);
-                    }
-                    retval = true;
+    const auto& browse_modes = wnd->BrowseModes();
+    if (browse_modes.empty())
+        return retval;
+
+    const auto delta_t = Ticks() - m_impl->m_prev_wnd_under_cursor_time;
+    std::size_t i = 0;
+    for (auto it = browse_modes.rbegin(); it != browse_modes.rend(); ++it, ++i)
+    {
+        if (it->time < delta_t) {
+            if (it->wnd && it->wnd->WndHasBrowseInfo(wnd, i)) {
+                if (m_impl->m_browse_target != wnd || m_impl->m_browse_info_wnd != it->wnd || m_impl->m_browse_info_mode != static_cast<int>(i)) {
+                    m_impl->m_browse_target = wnd;
+                    m_impl->m_browse_info_wnd = it->wnd;
+                    m_impl->m_browse_info_mode = static_cast<decltype(m_impl->m_browse_info_mode)>(i);
+                    m_impl->m_browse_info_wnd->SetCursorPosition(m_impl->m_mouse_pos);
                 }
-                break;
+                retval = true;
             }
+            break;
         }
     }
+
     return retval;
 }
 

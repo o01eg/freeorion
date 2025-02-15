@@ -125,7 +125,7 @@ namespace {
     }
 
     condition_wrapper insert_contains_(const condition_wrapper& cond) {
-        return condition_wrapper(std::make_shared<Condition::Contains>(ValueRef::CloneUnique(cond.condition)));
+        return condition_wrapper(std::make_shared<Condition::Contains<>>(ValueRef::CloneUnique(cond.condition)));
     }
 
     condition_wrapper insert_meter_value_(const boost::python::tuple& args, const boost::python::dict& kw, MeterType m) {
@@ -200,16 +200,26 @@ namespace {
     condition_wrapper insert_planet_(const boost::python::tuple& args, const boost::python::dict& kw) {
         if (kw.has_key("type")) {
             std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetType>>> types;
+            std::vector<::PlanetType> type_vals;
+
             boost::python::stl_input_iterator<boost::python::object> it_begin(kw["type"]), it_end;
+            bool have_refs = false;
             for (auto it = it_begin; it != it_end; ++it) {
                 auto type_arg = boost::python::extract<value_ref_wrapper< ::PlanetType>>(*it);
                 if (type_arg.check()) {
                     types.push_back(ValueRef::CloneUnique(type_arg().value_ref));
+                    have_refs = true;
                 } else {
-                    types.push_back(std::make_unique<ValueRef::Constant< ::PlanetType>>(boost::python::extract<enum_wrapper< ::PlanetType>>(*it)().value));
+                    auto val = boost::python::extract<enum_wrapper< ::PlanetType>>(*it)().value;
+                    types.push_back(std::make_unique<ValueRef::Constant< ::PlanetType>>(val));
+                    type_vals.push_back(val);
                 }
             }
-            return condition_wrapper(std::make_shared<Condition::PlanetType>(std::move(types)));
+            if (have_refs) {
+                return condition_wrapper(std::make_shared<Condition::PlanetType<>>(std::move(types)));
+            } else { // have only constants
+                return condition_wrapper(std::make_shared<Condition::PlanetType<::PlanetType>>(std::move(type_vals)));
+            }
         } else if (kw.has_key("size")) {
             std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetSize>>> sizes;
             boost::python::stl_input_iterator<boost::python::object> it_begin(kw["size"]), it_end;
@@ -317,6 +327,29 @@ namespace {
         std::unique_ptr<Condition::Condition> from = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["from_"])().condition);
 
         return condition_wrapper(std::make_shared<Condition::HasStarlaneTo>(std::move(from)));
+    }
+
+    condition_wrapper insert_starlane_to_would_cross_existing_starlane_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<Condition::Condition> from = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["from_"])().condition);
+
+        return condition_wrapper(std::make_shared<Condition::StarlaneToWouldCrossExistingStarlane>(std::move(from)));
+    }
+
+    condition_wrapper insert_starlane_to_would_be_angularly_close_to_existing_starlane_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<Condition::Condition> from = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["from_"])().condition);
+        double maxdotprod = boost::python::extract<double>(kw["maxdotprod"])();
+
+        return condition_wrapper(std::make_shared<Condition::StarlaneToWouldBeAngularlyCloseToExistingStarlane>(std::move(from), maxdotprod));
+    }
+
+    condition_wrapper insert_starlane_to_would_be_close_to_object_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        std::unique_ptr<Condition::Condition> from = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["from_"])().condition);
+        std::unique_ptr<Condition::Condition> closeto = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["closeto"])().condition);
+        double distance = boost::python::extract<double>(kw["distance"])();
+
+        return condition_wrapper(std::make_shared<Condition::StarlaneToWouldBeCloseToObject>(std::move(from),
+                                std::move(closeto),
+                                distance));
     }
 
     condition_wrapper insert_focus_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -743,6 +776,39 @@ namespace {
         return condition_wrapper(std::make_shared<Condition::ObjectID>(std::move(id)));
     }
 
+    condition_wrapper insert_described_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        auto description = boost::python::extract<std::string>(kw["description"])();
+        auto condition = boost::python::extract<condition_wrapper>(kw["condition"])();
+
+        return condition_wrapper(std::make_shared<Condition::Described>(
+                                    ValueRef::CloneUnique(condition.condition),
+                                    std::move(description)));
+    }
+
+    condition_wrapper insert_design_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        if (kw.has_key("name") && !kw.has_key("design")) {
+            std::unique_ptr<ValueRef::ValueRef<std::string>> name;
+            auto name_args = boost::python::extract<value_ref_wrapper<std::string>>(kw["name"]);
+            if (name_args.check()) {
+                name = ValueRef::CloneUnique(name_args().value_ref);
+            } else {
+                name = std::make_unique<ValueRef::Constant<std::string>>(boost::python::extract<std::string>(kw["name"])());
+            }
+            return condition_wrapper(std::make_shared<Condition::PredefinedShipDesign>(std::move(name)));           
+        } else if (kw.has_key("design") && !kw.has_key("name")) {
+            std::unique_ptr<ValueRef::ValueRef<int>> design;
+            auto design_args = boost::python::extract<value_ref_wrapper<int>>(kw["design"]);
+            if (design_args.check()) {
+                design = ValueRef::CloneUnique(design_args().value_ref);
+            } else {
+                design = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["design"])());
+            }
+            return condition_wrapper(std::make_shared<Condition::NumberedShipDesign>(std::move(design)));
+        }
+
+        throw std::runtime_error("Design requires only name or design keyword");
+    }
+
     condition_wrapper insert_species_opinion_(const boost::python::tuple& args, const boost::python::dict& kw, Condition::ComparisonType cmp) {
         std::unique_ptr<ValueRef::ValueRef<std::string>> species;
         if (kw.has_key("species")) {
@@ -869,6 +935,9 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
 
     globals["HasTag"] = boost::python::raw_function(insert_has_tag_);
     globals["HasStarlane"] = boost::python::raw_function(insert_has_starlane_);
+    globals["StarlaneToWouldCrossExistingStarlane"] = boost::python::raw_function(insert_starlane_to_would_cross_existing_starlane_);
+    globals["StarlaneToWouldBeAngularlyCloseToExistingStarlane"] = boost::python::raw_function(insert_starlane_to_would_be_angularly_close_to_existing_starlane_);
+    globals["StarlaneToWouldBeCloseToObject"] = boost::python::raw_function(insert_starlane_to_would_be_close_to_object_);
     globals["Planet"] = boost::python::raw_function(insert_planet_);
     globals["Homeworld"] = boost::python::raw_function(insert_homeworld_);
     globals["HasSpecial"] = boost::python::raw_function(insert_has_special_);
@@ -884,6 +953,8 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["WithinStarlaneJumps"] = boost::python::raw_function(insert_within_starlane_jumps_);
     globals["WithinDistance"] = boost::python::raw_function(insert_within_distance_);
     globals["Object"] = boost::python::raw_function(insert_object_id_);
+    globals["Described"] = boost::python::raw_function(insert_described_);
+    globals["Design"] = boost::python::raw_function(insert_design_);
     const auto f_insert_species_likes = [](const auto& args, const auto& kw) { return insert_species_opinion_(args, kw, Condition::ComparisonType::GREATER_THAN); };
     globals["SpeciesLikes"] = boost::python::raw_function(f_insert_species_likes);
     const auto f_insert_species_dislikes = [](const auto& args, const auto& kw) { return insert_species_opinion_(args, kw, Condition::ComparisonType::LESS_THAN); };

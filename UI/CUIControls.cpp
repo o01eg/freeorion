@@ -405,7 +405,7 @@ void CUIRadioRepresenter::Render(const GG::StateButton& button) const {
                    inside_color, outside_color, 1);
     } else {
         GG::Clr inside_color = AdjustBrightness(border_color_to_use, -75);
-        GG::Clr outside_color = AdjustBrightness(inside_color, 40);;
+        GG::Clr outside_color = AdjustBrightness(inside_color, 40);
         FlatCircle(GG::Pt(bn_ul.x + MARGIN, bn_ul.y + MARGIN),
                    GG::Pt(bn_lr.x - MARGIN, bn_lr.y - MARGIN),
                    inside_color, outside_color, 1);
@@ -1566,7 +1566,7 @@ SpeciesSelector::SpeciesSelector(const std::string& preselect_species, GG::X w, 
         [this](GG::DropDownList::iterator it) {
             SpeciesChangedSignal((it == this->end() || !(*it)) ? EMPTY_STRING : (*it)->Name()); });
 
-    const SpeciesManager& sm = GetSpeciesManager();
+    const SpeciesManager& sm = GGHumanClientApp::GetApp()->GetSpeciesManager();
     for (auto it = sm.playable_begin(); it != sm.playable_end(); ++it) {
         auto row_it = Insert(GG::Wnd::Create<SpeciesRow>(it->second, w, h - 4));
         if (it->first == preselect_species)
@@ -1681,10 +1681,10 @@ ColorSelector::ColorSelector(GG::Clr color, GG::Clr default_color) :
 void ColorSelector::InitBuffer() {
     const auto sz = Size();
     m_border_buffer.clear();
-    m_border_buffer.store(0.0f,        0.0f);
-    m_border_buffer.store(Value(sz.x), 0.0f);
-    m_border_buffer.store(Value(sz.x), Value(sz.y));
-    m_border_buffer.store(0.0f,        Value(sz.y));
+    m_border_buffer.store(0.0f,                             0.0f);
+    m_border_buffer.store(static_cast<float>(Value(sz.x)),  0.0f);
+    m_border_buffer.store(static_cast<float>(Value(sz.x)),  static_cast<float>(Value(sz.y)));
+    m_border_buffer.store(0.0f,                             static_cast<float>(Value(sz.y)));
     m_border_buffer.createServerBuffer();
 }
 
@@ -1914,7 +1914,7 @@ void ResourceInfoPanel::SetEmpireID(int empire_id) {
     int old_empire_id = m_empire_id;
     m_empire_id = empire_id;
     if (old_empire_id != m_empire_id) {
-        const ScriptingContext context;
+        const ScriptingContext& context = IApp::GetApp()->GetContext();
         auto empire = context.GetEmpire(m_empire_id);
         const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
         // let a subsequent SetLocalPointsCost call re-set the title to include location info if necessary
@@ -1930,7 +1930,7 @@ void ResourceInfoPanel::ClearLocalInfo() {
     DetachChild(m_local_stockpile_use);
     DetachChild(m_local_stockpile_use_P_label);
 
-    const ScriptingContext context;
+    const ScriptingContext& context = IApp::GetApp()->GetContext();
     auto empire = context.GetEmpire(m_empire_id);
     const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
@@ -2374,19 +2374,19 @@ void RotatingGraphic::Render() {
     glBindTexture(GL_TEXTURE_2D, texture->OpenGLId());
 
 
-    int ticks = GG::GUI::GetGUI()->Ticks();     // in ms
-    float minutes = ticks / 1000.0f / 60.0f;
+    const int ticks = GG::GUI::GetGUI()->Ticks();     // in ms
+    const float minutes = ticks / 1000.0f / 60.0f;
 
     // rotate around centre of rendered area
-    GG::Rect rendered_area = RenderedArea();
-    float angle = 360 * minutes * m_rpm + m_phase_offset;   // in degrees
+    const GG::Rect rendered_area = RenderedArea();
+    const float angle = 360 * minutes * m_rpm + m_phase_offset;   // in degrees
 
 
     glPushMatrix();
 
-    glTranslatef(Value(rendered_area.MidX()), Value(rendered_area.MidY()), 0.0f);   // tx back into position
-    glRotatef(angle, 0.0f, 0.0f, 1.0f);                                             // rotate about centre
-    glTranslatef(-Value(rendered_area.MidX()), -Value(rendered_area.MidY()), 0.0f); // tx to be centred on 0, 0
+    glTranslatef(static_cast<float>(Value(rendered_area.MidX())), static_cast<float>(Value(rendered_area.MidY())), 0.0f);   // tx back into position
+    glRotatef(angle, 0.0f, 0.0f, 1.0f); // rotate about centre
+    glTranslatef(static_cast<float>(-Value(rendered_area.MidX())), static_cast<float>(-Value(rendered_area.MidY())), 0.0f); // tx to be centred on 0, 0
 
     if (rendered_area != last_rendered_area) {
         last_rendered_area = rendered_area;

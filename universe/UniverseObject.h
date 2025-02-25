@@ -4,6 +4,7 @@
 
 #include <concepts>
 #include <set>
+#include <span>
 #include <string>
 #include <vector>
 #include <boost/container/flat_map.hpp>
@@ -56,6 +57,28 @@ FO_ENUM(
     ((VIS_FULL_VISIBILITY))
     ((NUM_VISIBILITIES))
 )
+
+[[nodiscard]] constexpr std::string_view DumpEnum(UniverseObjectType value) noexcept {
+    switch (value) {
+    case UniverseObjectType::OBJ_BUILDING:    return "Building";
+    case UniverseObjectType::OBJ_SHIP:        return "Ship";
+    case UniverseObjectType::OBJ_FLEET:       return "Fleet";
+    case UniverseObjectType::OBJ_PLANET:      return "Planet";
+    case UniverseObjectType::OBJ_SYSTEM:      return "System";
+    case UniverseObjectType::OBJ_FIELD:       return "Field";
+    default:                                  return "?";
+    }
+}
+
+[[nodiscard]] constexpr std::string_view DumpEnum(Visibility value) noexcept {
+    switch (value) {
+    case Visibility::VIS_NO_VISIBILITY:      return "Invisible";
+    case Visibility::VIS_BASIC_VISIBILITY:   return "Basic";
+    case Visibility::VIS_PARTIAL_VISIBILITY: return "Partial";
+    case Visibility::VIS_FULL_VISIBILITY:    return "Full";
+    default:                                 return "Unknown";
+    }
+}
 
 
 /** Types for Meters
@@ -194,19 +217,18 @@ public:
 
     struct [[nodiscard]] TagVecs {
         constexpr TagVecs() = default;
-        constexpr explicit TagVecs(const std::vector<std::string_view>& vec) noexcept :
+        constexpr explicit TagVecs(std::span<const std::string_view> vec) noexcept :
             first(vec)
         {}
-        constexpr TagVecs(const std::vector<std::string_view>& vec1,
-                          const std::vector<std::string_view>& vec2) noexcept:
+        constexpr TagVecs(std::span<const std::string_view> vec1, std::span<const std::string_view> vec2) noexcept:
             first(vec1),
             second(vec2)
         {}
-        [[nodiscard]] CONSTEXPR_VEC bool empty() const noexcept { return first.empty() && second.empty(); }
-        [[nodiscard]] CONSTEXPR_VEC auto size() const noexcept { return first.size() + second.size(); }
-        const std::vector<std::string_view>& first = EMPTY_STRING_VEC;
-        const std::vector<std::string_view>& second = EMPTY_STRING_VEC;
-        static inline CONSTEXPR_VEC const std::vector<std::string_view> EMPTY_STRING_VEC{};
+        TagVecs(std::vector<std::string_view>&&) = delete;
+        [[nodiscard]] constexpr bool empty() const noexcept { return first.empty() && second.empty(); }
+        [[nodiscard]] constexpr auto size() const noexcept { return first.size() + second.size(); }
+        const std::span<const std::string_view> first;
+        const std::span<const std::string_view> second;
     };
     [[nodiscard]] virtual TagVecs             Tags(const ScriptingContext&) const { return {}; }; ///< Returns all tags this object has
     [[nodiscard]] virtual bool                HasTag(std::string_view name, const ScriptingContext&) const { return false; } ///< Returns true iff this object has the tag with the indicated \a name

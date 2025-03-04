@@ -202,6 +202,16 @@ value_ref_wrapper<double> operator+(const value_ref_wrapper<double>& lhs, const 
     );
 }
 
+value_ref_wrapper<double> operator+(const value_ref_wrapper<int>& lhs, const value_ref_wrapper<double>& rhs) {
+    return value_ref_wrapper<double>(
+        std::make_shared<ValueRef::Operation<double>>(
+            ValueRef::OpType::PLUS,
+            std::make_unique<ValueRef::StaticCast<int, double>>(ValueRef::CloneUnique(lhs.value_ref)),
+            ValueRef::CloneUnique(rhs.value_ref)
+        )
+    );
+}
+
 value_ref_wrapper<double> operator+(double lhs, const value_ref_wrapper<int>& rhs) {
     return value_ref_wrapper<double>(
         std::make_shared<ValueRef::Operation<double>>(
@@ -379,6 +389,17 @@ value_ref_wrapper<int> operator*(int lhs, const value_ref_wrapper<int>& rhs) {
         )
     );
 }
+
+value_ref_wrapper<int> operator/(const value_ref_wrapper<int>& lhs, int rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(
+            ValueRef::OpType::DIVIDE,
+            ValueRef::CloneUnique(lhs.value_ref),
+            std::make_unique<ValueRef::Constant<int>>(rhs)
+        )
+    );
+}
+
 
 value_ref_wrapper<int> operator-(const value_ref_wrapper<int>& lhs, int rhs) {
     return value_ref_wrapper<int>(
@@ -563,8 +584,13 @@ namespace {
                 auto arg = boost::python::extract<value_ref_wrapper<double>>(args[i]);
                 if (arg.check())
                     operands.push_back(ValueRef::CloneUnique(arg().value_ref));
-                else
-                    operands.push_back(std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(args[i])()));
+                else {
+                    auto arg_int = boost::python::extract<value_ref_wrapper<int>>(args[i]);
+                    if (arg_int.check())
+                        operands.push_back(std::make_unique<ValueRef::StaticCast<int, double>>(ValueRef::CloneUnique(arg_int().value_ref)));
+                    else
+                        operands.push_back(std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(args[i])()));
+                }
             }
             return boost::python::object(value_ref_wrapper<double>(std::make_shared<ValueRef::Operation<double>>(op, std::move(operands))));
         } else if (args[0] == parser.type_str) {

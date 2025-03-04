@@ -73,6 +73,11 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         throw std::runtime_error("Python sub-interpreter isn't initialized");
     }
 
+    if (!m_python.InitErrorHandler()) {
+        ErrorLogger() << "Python error handler isn't initialized!";
+        throw std::runtime_error("Python error handler isn't initialized!");
+    }
+
     try {
         type_int = py::import("builtins").attr("int");
         type_float = py::import("builtins").attr("float");
@@ -100,6 +105,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         py::class_<value_ref_wrapper<int>>("ValueRefInt", py::no_init)
             .def(int() * py::self_ns::self)
             .def(double() * py::self_ns::self)
+            .def(py::self_ns::self / int())
             .def(py::self_ns::self - int())
             .def(int() - py::self_ns::self)
             .def(py::self_ns::self + py::self_ns::self)
@@ -132,6 +138,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(py::self_ns::self + double())
             .def(py::self_ns::self + py::self_ns::self)
             .def(py::self_ns::self + py::other<value_ref_wrapper<int>>())
+            .def(py::other<value_ref_wrapper<int>>() + py::self_ns::self)
             .def(py::self_ns::self - double())
             .def(py::self_ns::self - py::self_ns::self)
             .def(py::self_ns::self - py::other<value_ref_wrapper<int>>())
@@ -308,10 +315,11 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         py::implicitly_convertible<value_ref_wrapper<int>, condition_wrapper>();
 
         m_meta_path = py::extract<py::list>(py::import("sys").attr("meta_path"))();
+#if PY_VERSION_HEX < 0x030c0000
         const auto meta_path_len = py::len(*m_meta_path);
         for (std::decay_t<decltype(meta_path_len)> i = 0; i < meta_path_len; ++i)
             m_meta_path->pop();
-
+#endif
         m_meta_path->append(boost::cref(*this));
         m_meta_path_len = static_cast<int>(py::len(*m_meta_path));
 

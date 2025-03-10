@@ -46,7 +46,7 @@ std::vector<std::wstring> ToWStringArray(InputIt first, InputIt last) {
 }
 #endif
 
-class Process::Impl {
+class Process::Impl : public std::enable_shared_from_this<Process::Impl> {
 public:
     Impl(boost::asio::io_context& io_context, const std::string& cmd, const std::vector<std::string>& argv);
     ~Impl();
@@ -70,7 +70,7 @@ Process::Process() :
 {}
 
 Process::Process(boost::asio::io_context& io_context, const std::string& cmd, const std::vector<std::string>& argv) :
-    m_impl(std::make_unique<Impl>(io_context, cmd, argv)),
+    m_impl(std::make_shared<Impl>(io_context, cmd, argv)),
     m_empty(false)
 {}
 

@@ -78,7 +78,7 @@ public:
 private:
     class Impl;
 
-    std::unique_ptr<Impl>   m_impl;
+    std::shared_ptr<Impl>   m_impl;
     bool                    m_empty = false;        ///< true iff this is a default-constructed Process (no associated process exists)
     bool                    m_low_priority = false; ///< true if this process is set to low priority
 };

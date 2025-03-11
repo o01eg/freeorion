@@ -4,7 +4,11 @@
 
 #include <boost/algorithm/string/trim.hpp>
 #if BOOST_VERSION >= 108000
+#  include <boost/asio/readable_pipe.hpp>
+#  include <boost/asio/read.hpp>
+#  include <boost/asio/placeholders.hpp>
 #  include <boost/process/v2/process.hpp>
+#  include <boost/process/v2/stdio.hpp>
 #  define PROCESS_ERROR_CODE boost::system::error_code
 #else
 #  include <boost/process.hpp>
@@ -59,6 +63,15 @@ public:
 private:
     bool                  m_free = false;
 #if BOOST_VERSION >= 108000
+    void ReadStdout(boost::system::error_code error,
+                    std::size_t bytes_transferred);
+    void ReadStderr(boost::system::error_code error,
+                    std::size_t bytes_transferred);
+
+    boost::asio::readable_pipe m_stdout;
+    std::vector<char> m_stdout_buffer;
+    boost::asio::readable_pipe m_stderr;
+    std::vector<char> m_stderr_buffer;
     boost::process::v2::process m_child;
 #else
     boost::process::child m_child;
@@ -141,10 +154,14 @@ void Process::Free() {
 
 Process::Impl::Impl(boost::asio::io_context& io_context, const std::string& cmd, const std::vector<std::string>& argv) :
 #if BOOST_VERSION >= 108000
+    m_stdout(io_context),
+    m_stdout_buffer(4096),
+    m_stderr(io_context),
+    m_stderr_buffer(4096),
 #  if defined(FREEORION_LINUX) || defined(FREEORION_MACOSX)
-    m_child(io_context, cmd, std::vector(argv.cbegin() + 1, argv.cend()))
+    m_child(io_context, cmd, std::vector(argv.cbegin() + 1, argv.cend()), boost::process::v2::process_stdio{{}, m_stdout, m_stderr})
 #  elif defined(FREEORION_WIN32)
-    m_child(io_context, ToWString(cmd), ToWStringArray(argv.cbegin() + 1, argv.cend()))
+    m_child(io_context, ToWString(cmd), ToWStringArray(argv.cbegin() + 1, argv.cend()), boost::process::v2::process_stdio{{}, m_stdout, m_stderr}})
 #  endif
 #else
 #  if defined(FREEORION_LINUX) || defined(FREEORION_MACOSX)
@@ -161,7 +178,58 @@ Process::Impl::Impl(boost::asio::io_context& io_context, const std::string& cmd,
         ErrorLogger() << error_message;
         throw std::runtime_error(error_message);
     }
+
+#if BOOST_VERSION >= 108000
+    m_stdout.async_read_some(boost::asio::buffer(m_stdout_buffer),
+                                 boost::bind(&Process::Impl::ReadStdout,
+                                        this,
+                                        boost::asio::placeholders::error,
+                                        boost::asio::placeholders::bytes_transferred));
+    m_stderr.async_read_some(boost::asio::buffer(m_stderr_buffer),
+                                 boost::bind(&Process::Impl::ReadStderr,
+                                        this,
+                                        boost::asio::placeholders::error,
+                                        boost::asio::placeholders::bytes_transferred));
+#endif
 }
+
+#if BOOST_VERSION >= 108000
+void Process::Impl::ReadStdout(boost::system::error_code error,
+                    std::size_t bytes_transferred)
+{
+    if (error) {
+        ErrorLogger() << "Can't read child stdout:"
+                      << "  error #: " << error.value()
+                      << "  category: " << error.category().name()
+                      << "  message: " << error.message();
+        return;
+    }
+    InfoLogger() << "Read " << bytes_transferred << " bytes from stdout";
+    m_stdout.async_read_some(boost::asio::buffer(m_stdout_buffer),
+                                 boost::bind(&Process::Impl::ReadStdout,
+                                        this,
+                                        boost::asio::placeholders::error,
+                                        boost::asio::placeholders::bytes_transferred));
+}
+
+void Process::Impl::ReadStderr(boost::system::error_code error,
+                    std::size_t bytes_transferred)
+{
+    if (error) {
+        ErrorLogger() << "Can't read child stderr:"
+                      << "  error #: " << error.value()
+                      << "  category: " << error.category().name()
+                      << "  message: " << error.message();
+        return;
+    }
+    InfoLogger() << "Read " << bytes_transferred << " bytes from stderr";
+    m_stderr.async_read_some(boost::asio::buffer(m_stderr_buffer),
+                                 boost::bind(&Process::Impl::ReadStderr,
+                                        this,
+                                        boost::asio::placeholders::error,
+                                        boost::asio::placeholders::bytes_transferred));
+}
+#endif
 
 Process::Impl::~Impl()
 { if (!m_free) Kill(); }

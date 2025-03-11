@@ -3,6 +3,7 @@
 #include "Logger.h"
 
 #include <boost/algorithm/string/trim.hpp>
+#include <boost/process.hpp>
 
 #include <stdexcept>
 
@@ -18,11 +19,30 @@
 #  define NOMINMAX
 #endif
 #include <windows.h>
+
+std::wstring ToWString(const std::string& utf8_string) {
+    // convert UTF-8 string to UTF-16
+    int utf16_sz = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                       utf8_string.data(), utf8_string.length(), NULL, 0);
+    std::wstring utf16_string(utf16_sz, 0);
+    if (utf16_sz > 0)
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                            utf8_string.data(), utf8_string.size(),
+                            utf16_string.data(), utf16_sz);
+    return utf16_string;
+}
+
+template<typename InputIt>
+std::vector<std::wstring> ToWStringArray(InputIt first, InputIt last) {
+    std::vector<std::wstring> result;
+    std::transform(first, last, std::back_inserter(result), ToWString);
+    return result;
+}
 #endif
 
 class Process::Impl {
 public:
-    Impl(const std::string& cmd, const std::vector<std::string>& argv);
+    Impl(boost::asio::io_context& io_context, const std::string& cmd, const std::vector<std::string>& argv);
     ~Impl();
 
     bool SetLowPriority(bool low);
@@ -32,11 +52,10 @@ public:
 
 private:
     bool                m_free = false;
-#if defined(FREEORION_WIN32)
-    STARTUPINFOW        m_startup_info;
-    PROCESS_INFORMATION m_process_info;
-#elif defined(FREEORION_LINUX) || defined(FREEORION_MACOSX)
+#if defined(FREEORION_MACOSX)
     pid_t               m_process_id;
+#elif defined(FREEORION_WIN32) || defined(FREEORION_LINUX)
+    boost::process::child m_child;
 #endif
 };
 
@@ -45,7 +64,7 @@ Process::Process() :
 {}
 
 Process::Process(boost::asio::io_context& io_context, const std::string& cmd, const std::vector<std::string>& argv) :
-    m_impl(std::make_unique<Impl>(cmd, argv)),
+    m_impl(std::make_unique<Impl>(io_context, cmd, argv)),
     m_empty(false)
 {}
 
@@ -114,110 +133,9 @@ void Process::Free() {
 }
 
 
-#if defined(FREEORION_WIN32)
 
-std::wstring ToWString(const std::string& utf8_string) {
-    // convert UTF-8 string to UTF-16
-    int utf16_sz = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                                       utf8_string.data(), utf8_string.length(), NULL, 0);
-    std::wstring utf16_string(utf16_sz, 0);
-    if (utf16_sz > 0)
-        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                            utf8_string.data(), utf8_string.size(),
-                            utf16_string.data(), utf16_sz);
-    return utf16_string;
-}
 
-Process::Impl::Impl(const std::string& cmd, const std::vector<std::string>& argv) {
-    // convert UTF8 command and arguments to UTF16
-    std::wstring wargs;
-    for (std::size_t i = 0u; i < argv.size(); ++i) {
-        wargs += ToWString(argv[i]);
-        if (i + 1 < argv.size())
-            wargs += ' ';
-    }
-
-    ZeroMemory(&m_startup_info, sizeof(STARTUPINFOW));
-    m_startup_info.cb = sizeof(STARTUPINFOW);
-    ZeroMemory(&m_process_info, sizeof(PROCESS_INFORMATION));
-
-    const std::wstring wcmd = ToWString(cmd);
-
-    if (!CreateProcessW(wcmd.c_str(), const_cast<LPWSTR>(wargs.c_str()), 0, 0,
-                        false, CREATE_NO_WINDOW, 0, 0, &m_startup_info, &m_process_info))
-    {
-        std::string err_str;
-        DWORD err = GetLastError();
-        static constexpr DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM;
-        LPSTR buf = {};
-        if (FormatMessageA(flags, 0, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&buf, 0, 0)) {
-            err_str += buf;
-            LocalFree(buf);
-        }
-        throw std::runtime_error("Process::Process : Failed to create child process.  Windows error was: \"" + err_str + "\"");
-    }
-    WaitForInputIdle(m_process_info.hProcess, 1000); // wait for process to finish setting up, or for 1 sec, which ever comes first
-}
-
-Process::Impl::~Impl()
-{ if (!m_free) Kill(); }
-
-bool Process::Impl::SetLowPriority(bool low) {
-    const DWORD priority = low ? BELOW_NORMAL_PRIORITY_CLASS : NORMAL_PRIORITY_CLASS;
-    return SetPriorityClass(m_process_info.hProcess, priority);
-}
-
-bool Process::Impl::Terminate() {
-    // ToDo: Use actual WinAPI termination.
-    Kill();
-    return true;
-}
-
-void Process::Impl::Kill() {
-    if (m_process_info.hProcess && !TerminateProcess(m_process_info.hProcess, 0)) {
-        std::string err_str;
-        DWORD err = GetLastError();
-        static constexpr DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM;
-        LPSTR buf = {};
-        if (FormatMessageA(flags, 0, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&buf, 0, 0)) {
-            err_str += buf;
-            LocalFree(buf);
-        }
-        boost::algorithm::trim(err_str);
-        ErrorLogger() << "Process::Impl::Kill : Error terminating process: " << err_str;
-    }
-
-    if (m_process_info.hProcess && !CloseHandle(m_process_info.hProcess)) {
-        std::string err_str;
-        DWORD err = GetLastError();
-        DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM;
-        LPSTR buf;
-        if (FormatMessageA(flags, 0, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&buf, 0, 0)) {
-            err_str += buf;
-            LocalFree(buf);
-        }
-        boost::algorithm::trim(err_str);
-        ErrorLogger() << "Process::Impl::Kill : Error closing process handle: " << err_str;
-    }
-
-    if (m_process_info.hThread && !CloseHandle(m_process_info.hThread)) {
-        std::string err_str;
-        DWORD err = GetLastError();
-        static constexpr DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM;
-        LPSTR buf = {};
-        if (FormatMessageA(flags, 0, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&buf, 0, 0)) {
-            err_str += buf;
-            LocalFree(buf);
-        }
-        boost::algorithm::trim(err_str);
-        ErrorLogger() << "Process::Impl::Kill : Error closing thread handle: " << err_str;
-    }
-
-    m_process_info.hProcess = 0;
-    m_process_info.hThread = 0;
-}
-
-#elif defined(FREEORION_LINUX) || defined(FREEORION_MACOSX)
+#if defined(FREEORION_MACOSX)
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -228,7 +146,7 @@ void Process::Impl::Kill() {
 #include <sys/wait.h>
 
 
-Process::Impl::Impl(const std::string& cmd, const std::vector<std::string>& argv) {
+Process::Impl::Impl(boost::asio::io_context& io_context, const std::string& cmd, const std::vector<std::string>& argv) {
     std::vector<char*> args;
     for (unsigned int i = 0; i < argv.size(); ++i)
         args.push_back(const_cast<char*>(&(const_cast<std::string&>(argv[i])[0])));
@@ -289,6 +207,77 @@ void Process::Impl::Kill() {
     kill(m_process_id, SIGKILL);
     DebugLogger() << "Process::Impl::Kill calling waitpid(m_process_id, &status, 0)";
     waitpid(m_process_id, &status, 0);
+    DebugLogger() << "Process::Impl::Kill done";
+}
+
+#elif defined(FREEORION_WIN32) || defined(FREEORION_LINUX)
+
+Process::Impl::Impl(boost::asio::io_context& io_context, const std::string& cmd, const std::vector<std::string>& argv) :
+#if defined(FREEORION_LINUX)
+    m_child(cmd, boost::process::args = std::vector(argv.cbegin() + 1, argv.cend()), io_context)
+#elif defined(FREEORION_WIN32)
+    m_child(ToWString(cmd), boost::process::args = ToWStringArray(argv.cbegin() + 1, argv.cend()), io_context)
+#endif
+{
+    std::error_code ec;
+    if (!m_child.running(ec)) {
+        std::string error_message = "Process::Process : Failed to run a new process: ";
+        error_message += ec.message();
+        ErrorLogger() << error_message;
+        throw std::runtime_error(error_message);
+    }
+}
+
+Process::Impl::~Impl()
+{ if (!m_free) Kill(); }
+
+#if defined(FREEORION_LINUX)
+#include <sys/resource.h>
+
+bool Process::Impl::SetLowPriority(bool low) {
+    if (low)
+        return (setpriority(PRIO_PROCESS, m_child.id(), 10) == 0);
+    else
+        return (setpriority(PRIO_PROCESS, m_child.id(), 0) == 0);
+}
+#elif defined(FREEORION_WIN32)
+bool Process::Impl::SetLowPriority(bool low) {
+    const DWORD priority = low ? BELOW_NORMAL_PRIORITY_CLASS : NORMAL_PRIORITY_CLASS;
+    return SetPriorityClass(m_child.native_handle(), priority);
+}
+#endif
+
+bool Process::Impl::Terminate() {
+    if (m_free) {
+        DebugLogger() << "Process::Impl::Terminate called but m_free is true so returning with no action";
+        return true;
+    }
+    DebugLogger() << "Process::Impl::Terminate calling kill(m_process_id, SIGINT)";
+    std::error_code term_ec;
+    m_child.terminate(term_ec);
+    DebugLogger() << "Process::Impl::Terminate calling waitpid(m_process_id, &status, 0)";
+    std::error_code wait_ec;
+    m_child.wait(wait_ec);
+    int status = m_child.exit_code();
+    DebugLogger() << "Process::Impl::Terminate done";
+    if (status != 0) {
+        WarnLogger() << "Process::Impl::Terminate got failure status " << status << ", termination error code " << term_ec.message() << ", waiting error code " << wait_ec.message();
+        return false;
+    }
+    return true;
+}
+
+void Process::Impl::Kill() {
+    if (m_free) {
+        DebugLogger() << "Process::Impl::Kill called but m_free is true so returning with no action";
+        return;
+    }
+    DebugLogger() << "Process::Impl::Kill calling kill(m_process_id, SIGKILL)";
+    std::error_code term_ec;
+    m_child.terminate(term_ec);
+    DebugLogger() << "Process::Impl::Kill calling waitpid(m_process_id, &status, 0)";
+    std::error_code wait_ec;
+    m_child.wait(wait_ec);
     DebugLogger() << "Process::Impl::Kill done";
 }
 

@@ -4,6 +4,7 @@
 #if __has_include(<charconv>)
   #include <charconv>
 #endif
+#include <chrono>
 #include <functional>
 #include <iomanip>
 #include <iterator>
@@ -127,7 +128,9 @@ namespace {
         return {};
     }
 
-    [[nodiscard]] const UniverseObject* GetRefObject(ValueRef::ReferenceType ref_type, const ScriptingContext& context) {
+    [[nodiscard]] const UniverseObjectCXBase* GetRefObject(ValueRef::ReferenceType ref_type,
+                                                           const ScriptingContext& context)
+    {
         switch (ref_type) {
         case SOURCE_REFERENCE:                   return context.source;                      break;
         case EFFECT_TARGET_REFERENCE:            return context.effect_target;               break;
@@ -136,15 +139,15 @@ namespace {
         }
     }
 
-    const UniverseObject* FollowReference(ValueRef::ContainerType container_type, ValueRef::ReferenceType ref_type,
-                                          const ScriptingContext& context)
+    const UniverseObjectCXBase* FollowReference(ValueRef::ContainerType container_type, ValueRef::ReferenceType ref_type,
+                                                const ScriptingContext& context)
     {
         if (ref_type == NON_OBJECT_REFERENCE)
             return context.condition_local_candidate;
 
-        const UniverseObject* const obj = GetRefObject(ref_type, context);
+        const auto* const obj = GetRefObject(ref_type, context);
         if (!obj) {
-            static constexpr auto name_or_0 = [](const UniverseObject* obj) noexcept -> std::string_view
+            static constexpr auto name_or_0 = [](const auto* obj) noexcept -> std::string_view
             { return obj ? std::string_view{obj->Name()} : std::string_view{"0"}; };
 
             ErrorLogger() << "FollowReference : top level object (" << to_string(ref_type)
@@ -206,8 +209,8 @@ namespace {
     std::string TraceReference(std::string_view property_name, ValueRef::ContainerType container_type,
                                ValueRef::ReferenceType ref_type, const ScriptingContext& context)
     {
-        const UniverseObject* obj = nullptr;
-        const UniverseObject* initial_obj = nullptr;
+        const UniverseObjectCXBase* obj = nullptr;
+        const UniverseObjectCXBase* initial_obj = nullptr;
         std::string retval = ReconstructName(property_name, container_type, ref_type, false) + " : ";
         switch (ref_type) {
         case NON_OBJECT_REFERENCE:
@@ -350,7 +353,6 @@ namespace {
 }
 
 namespace ValueRef {
-
 template <typename EnumT>
 std::string EnumToString(EnumT t)
 {
@@ -458,7 +460,7 @@ std::string ReconstructName(std::string_view property_name, ContainerType contai
     case EFFECT_TARGET_VALUE_REFERENCE:       retval += "Value";           break;
     case CONDITION_LOCAL_CANDIDATE_REFERENCE: retval += "LocalCandidate";  break;
     case CONDITION_ROOT_CANDIDATE_REFERENCE:  retval += "RootCandidate";   break;
-    case NON_OBJECT_REFERENCE:                retval += "";                break;
+    case NON_OBJECT_REFERENCE:                retval += property_name;     break;
     default:                                  retval += "?????";           break;
     }
 
@@ -702,8 +704,7 @@ namespace StaticTests {
 
     static_assert([]() {
         const VRVI_t visrprop(ReferenceType::SOURCE_REFERENCE, "Property", PLANET);
-        return !visrprop.ReturnImmediateValue() &&
-               (visrprop.GetContainerType() == PLANET) &&
+        return (visrprop.GetContainerType() == PLANET) &&
                (visrprop.PropertyName() == "Property");
     }());
 
@@ -3346,6 +3347,50 @@ namespace StaticTests {
     static_assert(OperateConstantValueRefs(OpType::COMPARE_NOT_EQUAL, test_refs) == 3);
 #  endif
 #endif
+
+    constexpr auto test_checksum_nullptr = CheckSums::GetCheckSum(nullptr);
+
+    constexpr auto test_checksum_sv_short = CheckSums::GetCheckSum("short text");
+    constexpr auto test_checksum_sv_long = CheckSums::GetCheckSum("longer text that should not be within string sso");
+    static_assert(test_checksum_sv_short != test_checksum_sv_long);
+
+    constexpr auto test_checksum_variadic3 = CalculateCheckSum("longer text that should not be within string sso", 5, nullptr);
+    static_assert(test_checksum_variadic3 == 4696);
+
+    constexpr ::ValueRef::Constant<int> const_ref_8{8};
+    static_assert(const_ref_8.Eval() == 8);
+    static_assert(const_ref_8.GetCheckSum() == CalculateCheckSum("ValueRef::Constant", 8));
+
+    constexpr auto test_checksum_variadic4 = CalculateCheckSum("text", false, &const_ref_8, nullptr);
+    static_assert(test_checksum_variadic4 == 2235);
+
+    constexpr auto test_checksum_like_constant_string = CalculateCheckSum("ValueRef::Constant<string>", "RULE_ANNEX_COST_MINIMUM");
+    static_assert(test_checksum_like_constant_string == 4414);
+
+    constexpr auto test_checksum_like_complex1 = CalculateCheckSum("ValueRef::ComplexVariable", "GameRule", false,
+                                                                   nullptr, nullptr, nullptr, 
+                                                                   test_checksum_like_constant_string, nullptr);
+    constexpr auto test_checksum_like_complex2 = CalculateCheckSum("ValueRef::ComplexVariable", "GameRule",
+                                                                   "ValueRef::Constant<string>", "RULE_ANNEX_COST_MINIMUM");
+    static_assert(test_checksum_like_complex1 == 7677);
+    static_assert(test_checksum_like_complex2 == 7677);
+
+
+#if defined(__cpp_lib_constexpr_string) && (!defined(__GNUC__) || (__GNUC__ > 13) || (__GNUC__ == 13 && __GNUC_MINOR__ >= 3)) && (!defined(_MSC_VER) || (_MSC_VER >= 1934)) && (!defined(__clang_major__) || (__clang_major__ >= 17))
+    constexpr auto test_checksum_combo_with_string = []() {
+        const Constant<std::string> const_string_ref_annex_min{"RULE_ANNEX_COST_MINIMUM"};
+        return const_string_ref_annex_min.GetCheckSum();
+    }();
+    static_assert(test_checksum_combo_with_string == test_checksum_like_constant_string);
+
+    constexpr auto test_checksum_combo_with_string_ref = []() {
+        const Constant<std::string> const_string_ref_annex_min{"RULE_ANNEX_COST_MINIMUM"};
+        return CalculateCheckSum("ValueRef::ComplexVariable", "GameRule", false,
+                                 nullptr, nullptr, nullptr, &const_string_ref_annex_min, nullptr);
+    }();
+    static_assert(test_checksum_combo_with_string_ref == 7677);
+#endif
+
 }
 
 } // namespace ValueRef

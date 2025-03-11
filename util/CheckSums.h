@@ -61,6 +61,8 @@ namespace CheckSums {
 
     inline constexpr uint32_t CHECKSUM_MODULUS = 10000000U;    // reasonably big number that should be well below UINT_MAX, which is ~4.29x10^9 for 32 bit unsigned int
     static_assert(CHECKSUM_MODULUS < UINT_MAX/4);
+    inline constexpr uint32_t UINT24_MAX = 0xffffff;
+    static_assert(CHECKSUM_MODULUS < UINT24_MAX);
 
 #if !defined(__cpp_lib_constexpr_cmath)
     constexpr double log_base_e_of_10 = 2.30258509299404568401799145;
@@ -291,6 +293,10 @@ namespace CheckSums {
     constexpr void CheckSumCombine(uint32_t& sum, EnumT t) noexcept
     { CheckSumCombine(sum, static_cast<int>(t) + 10); }
 
+    // nullptr
+    constexpr void CheckSumCombine(uint32_t& sum, std::nullptr_t) noexcept {}
+
+    // misc
     constexpr void CheckSumCombine(uint32_t& sum, const auto& v)
         requires(!std::is_integral_v<std::decay_t<decltype(v)>> &&
                  !std::is_floating_point_v<std::decay_t<decltype(v)>> &&

@@ -216,7 +216,6 @@ namespace parse {
         }
         try {
             std::set<boost::filesystem::path> files_included;
-            process_include_substitutions(text, file_search_path, files_included);
         } catch (const std::exception& e) {
             ErrorLogger() << "Exception caught regex parsing script file " << filename
                           << ": " << e.what();

@@ -60,76 +60,10 @@ void IApp::StartBackgroundParsing(const PythonParser& python, std::promise<void>
 
     DebugLogger() << "Start background parsing...";
 
-    // named value ref parsing can be done in parallel as the referencing happens after parsing
-    if (IsExistingDir(rdir / "scripting/macros"))
-        GetNamedValueRefManager().SetNamedValueRefParse(Pending::ParseSynchronously(parse::named_value_refs, rdir / "scripting/macros"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/macros").string();
-
-    if (IsExistingDir(rdir / "scripting/buildings"))
-        GetBuildingTypeManager().SetBuildingTypes(Pending::ParseSynchronously(parse::buildings, python, rdir / "scripting/buildings"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/buildings").string();
-
-    if (IsExistingDir(rdir / "scripting/policies"))
-        GetPolicyManager().SetPolicies(Pending::StartAsyncParsing(parse::policies<std::vector<Policy>>, rdir / "scripting/policies"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/policies").string();
-
-    if (IsExistingDir(rdir / "scripting/encyclopedia"))
-        GetEncyclopedia().SetArticles(Pending::StartAsyncParsing(parse::encyclopedia_articles, rdir / "scripting/encyclopedia"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/encyclopedia").string();
-
-    if (IsExistingDir(rdir / "scripting/fields"))
-        GetFieldTypeManager().SetFieldTypes(Pending::StartAsyncParsing(parse::fields, rdir / "scripting/fields"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/fields").string();
-
-    if (IsExistingDir(rdir / "scripting/specials"))
-        GetSpecialsManager().SetSpecialsTypes(Pending::StartAsyncParsing(parse::specials, rdir / "scripting/specials"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/specials").string();
-
-    if (IsExistingDir(rdir / "scripting/species"))
-        GetSpeciesManager().SetSpeciesTypes(Pending::ParseSynchronously(parse::species, python, rdir / "scripting/species"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/species").string();
-
-    if (IsExistingDir(rdir / "scripting/ship_parts"))
-        GetShipPartManager().SetShipParts(Pending::StartAsyncParsing(parse::ship_parts, rdir / "scripting/ship_parts"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/ship_parts").string();
-
-    if (IsExistingDir(rdir / "scripting/ship_hulls"))
-        GetShipHullManager().SetShipHulls(Pending::StartAsyncParsing(parse::ship_hulls, rdir / "scripting/ship_hulls"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/ship_hulls").string();
-
-    if (IsExistingDir(rdir / "scripting/ship_designs"))
-        GetPredefinedShipDesignManager().SetShipDesignTypes(Pending::StartAsyncParsing(parse::ship_designs, rdir / "scripting/ship_designs"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/ship_designs").string();
-
-    if (IsExistingDir(rdir / "scripting/monster_designs"))
-        GetPredefinedShipDesignManager().SetMonsterDesignTypes(Pending::StartAsyncParsing(parse::ship_designs, rdir / "scripting/monster_designs"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/monster_designs").string();
-
-    if (IsExistingFile(rdir / "scripting/game_rules.focs.py"))
-        GetGameRules().Add(Pending::ParseSynchronously(parse::game_rules, python, rdir / "scripting/game_rules.focs.py"));
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/game_rules.focs.py").string();
-
     if (IsExistingDir(rdir / "scripting/techs"))
         GetTechManager().SetTechs(Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, python, rdir / "scripting/techs", std::move(barrier)));
     else {
         ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/techs").string();
         barrier.set_value();
     }
-
-    if (IsExistingFile(rdir / "scripting/empire_colors.xml"))
-        InitEmpireColors(rdir / "scripting/empire_colors.xml");
-    else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/empire_colors.xml").string();
 }

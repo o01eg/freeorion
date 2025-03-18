@@ -49,7 +49,6 @@ endforeach()
 project(FreeOrion)
 
 include(GNUInstallDirs)
-include(UseCodeCoverage)
 include(TargetDependencies)
 include(CPackComponent)
 
@@ -70,7 +69,6 @@ set(GODOT_CPP_ROOT "" CACHE PATH "Path to Godot CPP libraries (empty to build in
 if(BUILD_TESTING)
     message( STATUS "Building Tests")
     enable_testing()
-    enable_coverage()
 
     if(NOT TARGET unittest)
         add_custom_target(unittest

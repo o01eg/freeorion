@@ -30,9 +30,6 @@ ENDIF(NOT CMAKE_BUILD_TYPE)
 
 message(STATUS "Build type CMAKE_BUILD_TYPE set to ${CMAKE_BUILD_TYPE}")
 
-include(UseCompilerCache)
-find_compiler_cache(PROGRAM ccache)
-
 list(APPEND GODOT_CPP_CMAKE_VARS "CMAKE_BUILD_TYPE;CMAKE_CONFIGURATION_TYPES;CMAKE_TOOLCHAIN_FILE;PYTHON_EXECUTABLE;Python3_EXECUTABLE")
 get_cmake_property(vars CACHE_VARIABLES)
 foreach(var ${vars})
@@ -50,8 +47,6 @@ endforeach()
 ##
 
 project(FreeOrion)
-
-use_compiler_cache_with_xcode()
 
 include(GNUInstallDirs)
 include(UseCodeCoverage)

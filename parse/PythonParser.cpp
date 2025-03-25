@@ -40,6 +40,8 @@ namespace {
     void translate(import_error const& e) {
         PyErr_SetString(PyExc_ImportError, e.what());
     }
+
+    constexpr bool STATIC_FALSE = false;
 }
 
 struct module_spec {
@@ -97,8 +99,8 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def_readonly("_uninitialized_submodules", &module_spec::uninitialized_submodules)
             .add_static_property("loader", py::make_getter(*this, py::return_value_policy<py::reference_existing_object>()))
             .def_readonly("submodule_search_locations", &module_spec::path)
-            .def_readonly("has_location", false)
-            .def_readonly("cached", false)
+            .def_readonly("has_location", STATIC_FALSE)
+            .def_readonly("cached", STATIC_FALSE)
             .def_readonly("parent", &module_spec::parent);
 
         // Use wrappers to not collide with types in server and AI
@@ -136,6 +138,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(py::self_ns::self / double())
             .def(py::self_ns::self + int())
             .def(py::self_ns::self + double())
+            .def(double() + py::self_ns::self)
             .def(py::self_ns::self + py::self_ns::self)
             .def(py::self_ns::self + py::other<value_ref_wrapper<int>>())
             .def(py::other<value_ref_wrapper<int>>() + py::self_ns::self)

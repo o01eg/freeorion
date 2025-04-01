@@ -202,12 +202,23 @@ namespace CheckSums {
     static_assert(noexcept(99253 + static_cast<unsigned int>(43.0)));
     static_assert(noexcept(73423 % CHECKSUM_MODULUS));
 
-    template <typename T>
-    constexpr bool can_combine = requires(uint32_t& i, const T& t) { CheckSumCombine(i, t); };
-
     struct DummyPair { int first, second; };
-    static_assert(can_combine<DummyPair>);
+    static_assert(Combinable<DummyPair>);
 
     struct DummyEmpty {};
-    static_assert(!can_combine<DummyEmpty>);
+    static_assert(!Combinable<DummyEmpty>);
+
+    static_assert(Combinable<decltype("some text")>);
+    static_assert(Combinable<bool>);
+
+    static_assert(GetCheckSum(DummyPair{}, "some text", false) != 0u);
+
+    static_assert(noexcept(CheckSumCombine(std::declval<uint32_t&>(), 82343)));
+
+    struct DummyCombinable { constexpr uint32_t GetCheckSum() const noexcept { return 42; }};
+    static_assert(Combinable<DummyCombinable>); // already combinable, but not noexcept
+    constexpr void CheckSumCombine(uint32_t& i, const DummyCombinable& dc) noexcept { CheckSumCombine(i, dc.GetCheckSum()); } // no combinable noexcept
+    static_assert(noexcept(std::array<uint8_t, 4u>{}));
+    static_assert(noexcept(CheckSumCombine(std::declval<uint32_t&>(), DummyCombinable{})));
+    static_assert(all_noexcept_combinable<int, DummyCombinable>);
 }

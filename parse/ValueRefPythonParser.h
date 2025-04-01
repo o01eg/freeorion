@@ -124,10 +124,12 @@ value_ref_wrapper<double> operator!=(const value_ref_wrapper<double>&, int);
 value_ref_wrapper<double> operator-(const value_ref_wrapper<double>&);
 
 value_ref_wrapper<int> operator*(int, const value_ref_wrapper<int>&);
+value_ref_wrapper<int> operator*(const value_ref_wrapper<int>&, const value_ref_wrapper<int>&);
 value_ref_wrapper<int> operator/(const value_ref_wrapper<int>&, int);
 value_ref_wrapper<int> operator-(const value_ref_wrapper<int>&, int);
 value_ref_wrapper<int> operator-(int, const value_ref_wrapper<int>&);
 value_ref_wrapper<int> operator+(const value_ref_wrapper<int>&, int);
+value_ref_wrapper<int> operator+(int, const value_ref_wrapper<int>&);
 value_ref_wrapper<int> operator+(const value_ref_wrapper<int>&, const value_ref_wrapper<int>&);
 value_ref_wrapper<int> operator<(const value_ref_wrapper<int>&, const value_ref_wrapper<int>&);
 value_ref_wrapper<int> operator<(const value_ref_wrapper<int>&, int);
@@ -141,6 +143,8 @@ value_ref_wrapper<int> operator!=(const value_ref_wrapper<int>&, int);
 
 value_ref_wrapper<std::string> operator+(const value_ref_wrapper<std::string>&, const std::string&);
 value_ref_wrapper<std::string> operator+(const std::string&, const value_ref_wrapper<std::string>&);
+
+condition_wrapper operator!=(const value_ref_wrapper<PlanetType>&, const value_ref_wrapper<PlanetType>&);
 
 void RegisterGlobalsValueRefs(boost::python::dict& globals, const PythonParser& parser);
 

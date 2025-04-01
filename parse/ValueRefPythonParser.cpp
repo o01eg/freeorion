@@ -400,6 +400,16 @@ value_ref_wrapper<int> operator*(int lhs, const value_ref_wrapper<int>& rhs) {
     );
 }
 
+value_ref_wrapper<int> operator*(const value_ref_wrapper<int>& lhs, const value_ref_wrapper<int>& rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(
+            ValueRef::OpType::TIMES,
+            ValueRef::CloneUnique(lhs.value_ref),
+            ValueRef::CloneUnique(rhs.value_ref)
+        )
+    );
+}
+
 value_ref_wrapper<int> operator/(const value_ref_wrapper<int>& lhs, int rhs) {
     return value_ref_wrapper<int>(
         std::make_shared<ValueRef::Operation<int>>(
@@ -437,6 +447,16 @@ value_ref_wrapper<int> operator+(const value_ref_wrapper<int>& lhs, int rhs) {
             ValueRef::OpType::PLUS,
             ValueRef::CloneUnique(lhs.value_ref),
             std::make_unique<ValueRef::Constant<int>>(rhs)
+        )
+    );
+}
+
+value_ref_wrapper<int> operator+(int lhs, const value_ref_wrapper<int>& rhs) {
+    return value_ref_wrapper<int>(
+        std::make_shared<ValueRef::Operation<int>>(
+            ValueRef::OpType::PLUS,
+            std::make_unique<ValueRef::Constant<int>>(lhs),
+            ValueRef::CloneUnique(rhs.value_ref)
         )
     );
 }
@@ -548,6 +568,13 @@ value_ref_wrapper<std::string> operator+(const std::string& lhs, const value_ref
             std::make_unique<ValueRef::Constant<std::string>>(lhs),
             ValueRef::CloneUnique(rhs.value_ref))
     );
+}
+
+condition_wrapper operator!=(const value_ref_wrapper<PlanetType>& lhs, const value_ref_wrapper<PlanetType>& rhs) {
+    return condition_wrapper(std::make_shared<Condition::ValueTest>(
+        std::make_unique<ValueRef::StaticCast<PlanetType, int>>(ValueRef::CloneUnique(lhs.value_ref)),
+        Condition::ComparisonType::NOT_EQUAL,
+        std::make_unique<ValueRef::StaticCast<PlanetType, int>>(ValueRef::CloneUnique(rhs.value_ref))));
 }
 
 namespace {
@@ -675,11 +702,37 @@ namespace {
         return boost::python::object();
     }
 
+    template<typename T>
+    boost::python::object insert_statictic_value_return_typed(const PythonParser& parser,
+                                                              const boost::python::object& return_type,
+                                                              std::unique_ptr<ValueRef::ValueRef<T>>&& value,
+                                                              ValueRef::StatisticType type,
+                                                              std::unique_ptr<Condition::Condition>&& condition) 
+    {
+        if (return_type == parser.type_int) {
+            return boost::python::object(value_ref_wrapper<int>(std::make_shared<ValueRef::Statistic<int, T>>(std::move(value), type, std::move(condition))));
+        } else if (return_type == parser.type_float) {
+            return boost::python::object(value_ref_wrapper<double>(std::make_shared<ValueRef::Statistic<double, T>>(std::move(value), type, std::move(condition))));
+        } else if constexpr (std::is_same<T, std::string>::value) {
+            if (return_type == parser.type_str) {
+                return boost::python::object(value_ref_wrapper<std::string>(std::make_shared<ValueRef::Statistic<std::string, T>>(std::move(value), type, std::move(condition))));
+            }
+        }
+
+        ErrorLogger() << "Unsupported type for statistic : " << boost::python::extract<std::string>(boost::python::str(return_type))();
+        throw std::runtime_error(std::string("Not implemented ") + __func__);
+
+    }
+
     boost::python::object insert_statistic_value_(const PythonParser& parser, const boost::python::tuple& args, const boost::python::dict& kw) {
-        const auto type = boost::python::extract<enum_wrapper<ValueRef::StatisticType>>(args[1])().value;
         const auto condition = boost::python::extract<condition_wrapper>(kw["condition"])().condition;
 
-        if (args[0] == parser.type_int) {
+        const auto return_type = args[0];
+        const auto args1 = boost::python::extract<enum_wrapper<ValueRef::StatisticType>>(args[1]);
+        const auto value_type = args1.check() ? return_type : args[1];
+        const auto type = args1.check() ? args1().value : boost::python::extract<enum_wrapper<ValueRef::StatisticType>>(args[2])().value;
+
+        if (value_type == parser.type_int) {
             const auto value_arg = boost::python::extract<value_ref_wrapper<int>>(kw["value"]);
             std::unique_ptr<ValueRef::ValueRef<int>> value;
             if (value_arg.check()) {
@@ -687,8 +740,8 @@ namespace {
             } else {
                 value = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["value"])());
             }
-            return boost::python::object(value_ref_wrapper<int>(std::make_shared<ValueRef::Statistic<int, int>>(std::move(value), type, ValueRef::CloneUnique(condition))));
-        } else if (args[0] == parser.type_float) {
+            return insert_statictic_value_return_typed(parser, return_type, std::move(value), type, ValueRef::CloneUnique(condition));
+        } else if (value_type == parser.type_float) {
             const auto value_arg = boost::python::extract<value_ref_wrapper<double>>(kw["value"]);
             std::unique_ptr<ValueRef::ValueRef<double>> value;
             if (value_arg.check()) {
@@ -701,8 +754,8 @@ namespace {
                     value = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["value"])());
                }
             }
-            return boost::python::object(value_ref_wrapper<double>(std::make_shared<ValueRef::Statistic<double, double>>(std::move(value), type, ValueRef::CloneUnique(condition))));
-        } else if (args[0] == parser.type_str) {
+            return insert_statictic_value_return_typed(parser, return_type, std::move(value), type, ValueRef::CloneUnique(condition));
+        } else if (value_type == parser.type_str) {
             const auto value_arg = boost::python::extract<value_ref_wrapper<std::string>>(kw["value"]);
             std::unique_ptr<ValueRef::ValueRef<std::string>> value;
             if (value_arg.check()) {
@@ -710,14 +763,11 @@ namespace {
             } else {
                 value = std::make_unique<ValueRef::Constant<std::string>>(boost::python::extract<std::string>(kw["value"])());
             }
-            return boost::python::object(value_ref_wrapper<std::string>(std::make_shared<ValueRef::Statistic<std::string, std::string>>(std::move(value), type, ValueRef::CloneUnique(condition))));
-        } else {
-            ErrorLogger() << "Unsupported type for statistic : " << boost::python::extract<std::string>(boost::python::str(args[0]))();
-
-            throw std::runtime_error(std::string("Not implemented ") + __func__);
+            return insert_statictic_value_return_typed(parser, return_type, std::move(value), type, ValueRef::CloneUnique(condition));
         }
-
-        return boost::python::object();
+        
+        ErrorLogger() << "Unsupported type for statistic : " << boost::python::extract<std::string>(boost::python::str(return_type))() << ", " << boost::python::extract<std::string>(boost::python::str(value_type))();
+        throw std::runtime_error(std::string("Not implemented ") + __func__);
     }
 
     boost::python::object insert_game_rule_(const PythonParser& parser, const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -1025,8 +1075,21 @@ namespace {
     }
 
     value_ref_wrapper<int> insert_planet_type_difference_(const boost::python::tuple& args, const boost::python::dict& kw) {
-        auto from = ValueRef::CloneUnique(boost::python::extract<value_ref_wrapper<PlanetType>>(kw["from_"])().value_ref);
-        auto to = ValueRef::CloneUnique(boost::python::extract<value_ref_wrapper<PlanetType>>(kw["to"])().value_ref);
+        std::unique_ptr<ValueRef::ValueRef<PlanetType>> from;
+        auto from_args = boost::python::extract<value_ref_wrapper<PlanetType>>(kw["from_"]);
+        if (from_args.check()) {
+            from = ValueRef::CloneUnique(from_args().value_ref);
+        } else {
+            from = std::make_unique<ValueRef::Constant<PlanetType>>(boost::python::extract<enum_wrapper<PlanetType>>(kw["from_"])().value);
+        }
+
+        std::unique_ptr<ValueRef::ValueRef<PlanetType>> to;
+        auto to_args = boost::python::extract<value_ref_wrapper<PlanetType>>(kw["to"]);
+        if (to_args.check()) {
+            to = ValueRef::CloneUnique(to_args().value_ref);
+        } else {
+            to = std::make_unique<ValueRef::Constant<PlanetType>>(boost::python::extract<enum_wrapper<PlanetType>>(kw["to"])().value);
+        }
 
         return value_ref_wrapper<int>(std::make_shared<ValueRef::ComplexVariable<int>>(
             "PlanetTypeDifference",

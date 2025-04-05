@@ -138,7 +138,7 @@ version_file_name = version
 
 try:
     branch = check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
-    if (branch == "master") or (branch == "weekly-test-builds") or (branch[:7] == "release"):
+    if (branch == "ci-weekly-exp-macos") or (branch == "master") or (branch == "weekly-test-builds") or (branch[:7] == "release"):
         branch = ""
     else:
         branch += " "
@@ -152,7 +152,7 @@ try:
     if branch[:7] == "release":
         version_file_name = "v" + version
     else:
-        version_file_name = build_no + "_Test"
+        version_file_name = build_no + "_TestExp"
 except (OSError, CalledProcessError):
     print("WARNING: git not installed or not setup correctly")
 

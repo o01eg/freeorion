@@ -185,8 +185,8 @@ void CombatInfo::InitializeObjectVisibility() {
 
 ScriptingContext::ScriptingContext(CombatInfo& info, Attacker, UniverseObjectCXBase* attacker_as_source) noexcept :
     source(                 attacker_as_source),
-    current_turn(           info.turn),
     combat_bout(            info.bout),
+    current_turn(           info.turn),
     galaxy_setup_data(      info.galaxy_setup_data),
     species(                info.species),
     supply(                 info.supply),
@@ -1272,7 +1272,7 @@ namespace {
         }
 
     private:
-        typedef std::set<int>::const_iterator const_id_iterator;
+        using const_id_iterator = std::set<int>::const_iterator;
 
         // Populate lists of things that can attack. List attackers also by empire.
         void PopulateAttackers() {

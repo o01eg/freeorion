@@ -296,6 +296,11 @@ namespace Impl {
     constexpr auto bit_and = [](auto lhs, auto rhs) noexcept { return lhs & rhs; };
     constexpr auto bit_or = [](auto lhs, auto rhs) noexcept { return lhs | rhs; };
 
+    template <typename ptr>
+        requires requires(const ptr& p, const ptr& q) { !p; bool(p); *p == *q; }
+    constexpr bool ptr_eq(const ptr& lhs, const ptr& rhs)
+        noexcept(noexcept((!lhs && !rhs) || (lhs && rhs && *lhs == *rhs)))
+    { return (!lhs && !rhs) || (lhs && rhs && *lhs == *rhs); };
 
     // type derived from Condition or a pointer to Condition
     template <class ConditionT>
@@ -410,10 +415,29 @@ namespace Impl {
 struct FO_COMMON_API Number final : public Condition {
     Number(std::unique_ptr<ValueRef::ValueRef<int>>&& low,
            std::unique_ptr<ValueRef::ValueRef<int>>&& high,
-           std::unique_ptr<Condition>&& condition);
+           std::unique_ptr<Condition>&& condition) :
+        Condition(CondsRTSI(low, high, condition)),
+        m_low(std::move(low)),
+        m_high(std::move(high)),
+        m_condition(std::move(condition)),
+        m_high_low_local_invariant((!m_low || m_low->LocalCandidateInvariant()) &&
+                                   (!m_high || m_high->LocalCandidateInvariant())),
+        m_high_low_root_invariant((!m_low || m_low->RootCandidateInvariant()) &&
+                                  (!m_high || m_high->RootCandidateInvariant()))
+    {}
 
-    [[nodiscard]] bool operator==(const Condition& rhs) const override;
-    [[nodiscard]] bool operator==(const Number& rhs) const;
+    [[nodiscard]] bool operator==(const Condition& rhs) const override {
+        if (this == &rhs)
+            return true;
+        const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
+        return rhs_p && *this == *rhs_p;
+    }
+    [[nodiscard]] bool operator==(const Number& rhs) const {
+        if (this == &rhs)
+            return true;
+        return Impl::ptr_eq(m_low, rhs.m_low) && Impl::ptr_eq(m_high, rhs.m_high) &&
+               Impl::ptr_eq(m_condition, rhs.m_condition);
+    }
 
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
@@ -440,10 +464,24 @@ private:
 /** Matches all objects if the current game turn is >= \a low and < \a high. */
 struct FO_COMMON_API Turn final : public Condition {
     explicit Turn(std::unique_ptr<ValueRef::ValueRef<int>>&& low,
-                  std::unique_ptr<ValueRef::ValueRef<int>>&& high = nullptr);
+                  std::unique_ptr<ValueRef::ValueRef<int>>&& high = nullptr) :
+        Condition(CondsRTSI(low, high), CheckSums::GetCheckSum("Condition::Turn", low, high)),
+        m_low(std::move(low)),
+        m_high(std::move(high))
+    {}
 
-    [[nodiscard]] bool operator==(const Condition& rhs) const override;
-    [[nodiscard]] bool operator==(const Turn& rhs) const;
+    [[nodiscard]] bool operator==(const Condition& rhs) const {
+        if (this == &rhs)
+            return true;
+        const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
+        return rhs_p && *this == *rhs_p;
+    }
+
+    [[nodiscard]] bool operator==(const Turn& rhs) const {
+        if (this == &rhs)
+            return true;
+        return Impl::ptr_eq(m_low, rhs.m_low) && Impl::ptr_eq(m_high, rhs.m_high);
+    }
 
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
@@ -453,7 +491,6 @@ struct FO_COMMON_API Turn final : public Condition {
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
-    [[nodiscard]] uint32_t GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
 
@@ -826,12 +863,31 @@ private:
 
 /** Matches all objects that are of UniverseObjectType \a type. */
 struct FO_COMMON_API Type final : public Condition {
-    explicit Type(std::unique_ptr<ValueRef::ValueRef<UniverseObjectType>>&& type);
-    explicit Type(UniverseObjectType type);
+    explicit Type(std::unique_ptr<ValueRef::ValueRef<UniverseObjectType>>&& type) :
+        Condition(CondsRTSI(type),
+                  CalcInitAllMatch(type),
+                  CheckSums::GetCheckSum("Condition::Type", type)),
+        m_type(std::move(type)),
+        m_type_const(m_type && m_type->ConstantExpr()),
+        m_type_local_invariant(m_type && m_type->LocalCandidateInvariant())
+    {}
+    explicit Type(UniverseObjectType type) :
+        Type(std::make_unique<ValueRef::Constant<UniverseObjectType>>(type))
+    {}
+
     Type(Type&&) noexcept = default;
 
-    [[nodiscard]] bool operator==(const Condition& rhs) const override;
-    [[nodiscard]] bool operator==(const Type& rhs) const;
+    [[nodiscard]] bool operator==(const Condition& rhs) const override {
+        if (this == &rhs)
+            return true;
+        const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
+        return rhs_p && *this == *rhs_p;
+    }
+    [[nodiscard]] bool operator==(const Type& rhs) const {
+        if (this == &rhs)
+            return true;
+        return Impl::ptr_eq(m_type, rhs.m_type);
+    }
 
     [[nodiscard]] UniverseObjectType FixedObjectType() const noexcept {
         if (!m_type || !m_type->ConstantExpr())
@@ -867,11 +923,15 @@ struct FO_COMMON_API Type final : public Condition {
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
-    [[nodiscard]] uint32_t GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
 
 private:
+    static bool CalcInitAllMatch(const std::unique_ptr<ValueRef::ValueRef<UniverseObjectType>>& type) {
+        return type &&
+            (type->ConstantExpr() || (type->LocalCandidateInvariant() && type->RootCandidateInvariant()));
+    }
+
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
     std::unique_ptr<ValueRef::ValueRef<UniverseObjectType>> m_type;
@@ -901,7 +961,6 @@ struct FO_COMMON_API Building final : public Condition {
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
-    [[nodiscard]] uint32_t GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
 
@@ -980,13 +1039,29 @@ private:
 
 /** Matches all objects that have the tag \a tag. */
 struct FO_COMMON_API HasTag final : public Condition {
-    constexpr HasTag() noexcept : Condition(true, true, true) {}
-    explicit HasTag(std::string name);
-    explicit HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
+    constexpr HasTag() noexcept :
+        Condition(std::array<bool, 3>{{true, true, true}}, CheckSums::GetCheckSum("Condition::HasTag"))
+    {}
+    explicit HasTag(std::string name) :
+        HasTag(std::make_unique<ValueRef::Constant<std::string>>(std::move(name)))
+    {}
+    explicit HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
+        Condition(CondsRTSI(name), CheckSums::GetCheckSum("Condition::HasTag", name)),
+        m_name(std::move(name))
+    {}
     // no constexpr destructor GCC workaround as ~unique_ptr is not constexpr before C++23 anyway...
 
-    [[nodiscard]] bool operator==(const Condition& rhs) const override;
-    [[nodiscard]] bool operator==(const HasTag& rhs) const;
+    [[nodiscard]] bool operator==(const Condition& rhs) const override {
+        if (this == &rhs)
+            return true;
+        const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
+        return rhs_p && *this == *rhs_p;
+    }
+    [[nodiscard]] bool operator==(const HasTag& rhs) const {
+        if (this == &rhs)
+            return true;
+        return Impl::ptr_eq(m_name, rhs.m_name);
+    }
 
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
@@ -996,7 +1071,6 @@ struct FO_COMMON_API HasTag final : public Condition {
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
     void SetTopLevelContent(const std::string& content_name) override;
-    [[nodiscard]] uint32_t GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
 
@@ -1258,7 +1332,7 @@ struct FO_COMMON_API Contains final : public Impl::NestedCondition<ConditionT> {
     using NC::SubCondition;
     using NC::SetTopLevelContent;
 
-    [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(NC::checksumimpl_noexcept)
+    [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(NC::checksumimpl_noexcept) override
     { return NC::GetCheckSumImpl("Condition::Contains"); }
 
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override
@@ -1531,14 +1605,14 @@ struct FO_COMMON_API ContainedBy final : public Impl::NestedCondition<ConditionT
     using NC::SubCondition;
     using NC::SetTopLevelContent;
 
-    [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(NC::checksumimpl_noexcept)
+    [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(NC::checksumimpl_noexcept) override
     { return NC::GetCheckSumImpl("Condition::ContainedBy"); }
 
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override
     { return NC::CloneImpl(*this); }
 
 private:
-    [[nodiscard]] constexpr bool Match(const ScriptingContext& local_context) const {
+    [[nodiscard]] constexpr bool Match(const ScriptingContext& local_context) const override {
         const auto* candidate = local_context.condition_local_candidate;
         if (!candidate) [[unlikely]]
             return false;
@@ -1891,7 +1965,7 @@ public:
         }
     }
 
-    std::unique_ptr<Condition> Clone() const {
+    std::unique_ptr<Condition> Clone() const override {
         if constexpr (have_pt_values)
             return std::make_unique<std::decay_t<decltype(*this)>>(m_types);
             //return std::make_unique<PlanetType<PT_t, N>>(m_types);
@@ -1927,7 +2001,7 @@ private:
             return Match(planet_type, m_types, context);
     }
 
-    bool Match(const ScriptingContext& local_context) const {
+    bool Match(const ScriptingContext& local_context) const override {
         const auto* planet = PlanetFromObject(local_context.condition_local_candidate, local_context.ContextObjects());
         return planet && Match(planet->Type(), local_context);
     }

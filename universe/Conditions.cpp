@@ -291,38 +291,6 @@ ObjectSet Condition::GetDefaultInitialCandidateObjects(const ScriptingContext& p
 ///////////////////////////////////////////////////////////
 // Number                                                //
 ///////////////////////////////////////////////////////////
-Number::Number(std::unique_ptr<ValueRef::ValueRef<int>>&& low,
-               std::unique_ptr<ValueRef::ValueRef<int>>&& high,
-               std::unique_ptr<Condition>&& condition) :
-    Condition(CondsRTSI(low, high, condition)),
-    m_low(std::move(low)),
-    m_high(std::move(high)),
-    m_condition(std::move(condition)),
-    m_high_low_local_invariant((!m_low || m_low->LocalCandidateInvariant()) &&
-                               (!m_high || m_high->LocalCandidateInvariant())),
-    m_high_low_root_invariant((!m_low || m_low->RootCandidateInvariant()) &&
-                              (!m_high || m_high->RootCandidateInvariant()))
-{}
-
-bool Number::operator==(const Condition& rhs) const {
-    if (this == &rhs)
-        return true;
-    const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
-
-    return rhs_p && *this == *rhs_p;
-}
-
-bool Number::operator==(const Number& rhs_) const {
-    if (this == &rhs_)
-        return true;
-
-    CHECK_COND_VREF_MEMBER(m_low)
-    CHECK_COND_VREF_MEMBER(m_high)
-    CHECK_COND_VREF_MEMBER(m_condition)
-
-    return true;
-}
-
 std::string Number::Description(bool negated) const {
     std::string low_str = (m_low ? (m_low->ConstantExpr() ?
                                     std::to_string(m_low->Eval()) :
@@ -437,30 +405,6 @@ std::unique_ptr<Condition> Number::Clone() const {
 ///////////////////////////////////////////////////////////
 // Turn                                                  //
 ///////////////////////////////////////////////////////////
-Turn::Turn(std::unique_ptr<ValueRef::ValueRef<int>>&& low,
-           std::unique_ptr<ValueRef::ValueRef<int>>&& high) :
-    Condition(CondsRTSI(low, high)),
-    m_low(std::move(low)),
-    m_high(std::move(high))
-{}
-
-bool Turn::operator==(const Condition& rhs) const {
-    if (this == &rhs)
-        return true;
-    const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
-    return rhs_p && *this == *rhs_p;
-}
-
-bool Turn::operator==(const Turn& rhs_) const {
-    if (this == &rhs_)
-        return true;
-
-    CHECK_COND_VREF_MEMBER(m_low)
-    CHECK_COND_VREF_MEMBER(m_high)
-
-    return true;
-}
-
 void Turn::Eval(const ScriptingContext& parent_context,
                 ObjectSet& matches, ObjectSet& non_matches,
                 SearchDomain search_domain) const
@@ -564,17 +508,6 @@ void Turn::SetTopLevelContent(const std::string& content_name) {
         m_low->SetTopLevelContent(content_name);
     if (m_high)
         m_high->SetTopLevelContent(content_name);
-}
-
-uint32_t Turn::GetCheckSum() const {
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "Condition::Turn");
-    CheckSums::CheckSumCombine(retval, m_low);
-    CheckSums::CheckSumCombine(retval, m_high);
-
-    TraceLogger(conditions) << "GetCheckSum(Turn): retval: " << retval;
-    return retval;
 }
 
 std::unique_ptr<Condition> Turn::Clone() const {
@@ -2084,35 +2017,6 @@ std::unique_ptr<Condition> Armed::Clone() const
 ///////////////////////////////////////////////////////////
 // Type                                                  //
 ///////////////////////////////////////////////////////////
-Type::Type(std::unique_ptr<ValueRef::ValueRef<UniverseObjectType>>&& type) :
-    Condition(CondsRTSI(type),
-              type && (
-                  type->ConstantExpr() || (
-                      type->LocalCandidateInvariant() &&
-                      type->RootCandidateInvariant()))),
-    m_type(std::move(type)),
-    m_type_const(m_type && m_type->ConstantExpr()),
-    m_type_local_invariant(m_type && m_type->LocalCandidateInvariant())
-{}
-
-Type::Type(UniverseObjectType type) :
-    Type(std::make_unique<ValueRef::Constant<UniverseObjectType>>(type))
-{}
-
-bool Type::operator==(const Condition& rhs) const {
-    if (this == &rhs)
-        return true;
-    const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
-    return rhs_p && *this == *rhs_p;
-}
-
-bool Type::operator==(const Type& rhs_) const {
-    if (this == &rhs_)
-        return true;
-    CHECK_COND_VREF_MEMBER(m_type)
-    return true;
-}
-
 namespace {
     struct TypeSimpleMatch {
         constexpr explicit TypeSimpleMatch(UniverseObjectType type) noexcept :
@@ -2233,16 +2137,6 @@ void Type::SetTopLevelContent(const std::string& content_name) {
         m_type->SetTopLevelContent(content_name);
 }
 
-uint32_t Type::GetCheckSum() const {
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "Condition::Type");
-    CheckSums::CheckSumCombine(retval, m_type);
-
-    TraceLogger(conditions) << "GetCheckSum(Type): retval: " << retval;
-    return retval;
-}
-
 std::unique_ptr<Condition> Type::Clone() const
 { return std::make_unique<Type>(ValueRef::CloneUnique(m_type)); }
 
@@ -2250,7 +2144,7 @@ std::unique_ptr<Condition> Type::Clone() const
 // Building                                              //
 ///////////////////////////////////////////////////////////
 Building::Building(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names) :
-    Condition(CondsRTSI(names)),
+    Condition(CondsRTSI(names), CheckSums::GetCheckSum("Condition::Building", names)),
     m_names(std::move(names)),
     m_names_local_invariant(std::all_of(m_names.begin(), m_names.end(),
                                         [](const auto& e) { return e->LocalCandidateInvariant(); }))
@@ -2424,16 +2318,6 @@ void Building::SetTopLevelContent(const std::string& content_name) {
         if (name)
             name->SetTopLevelContent(content_name);
     }
-}
-
-uint32_t Building::GetCheckSum() const {
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "Condition::Building");
-    CheckSums::CheckSumCombine(retval, m_names);
-
-    TraceLogger(conditions) << "GetCheckSum(Building): retval: " << retval;
-    return retval;
 }
 
 std::unique_ptr<Condition> Building::Clone() const
@@ -2846,29 +2730,6 @@ std::unique_ptr<Condition> HasSpecial::Clone() const
 ///////////////////////////////////////////////////////////
 // HasTag                                                //
 ///////////////////////////////////////////////////////////
-HasTag::HasTag(std::string name) :
-    HasTag(std::make_unique<ValueRef::Constant<std::string>>(std::move(name)))
-{}
-
-HasTag::HasTag(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
-    Condition(CondsRTSI(name)),
-    m_name(std::move(name))
-{}
-
-bool HasTag::operator==(const Condition& rhs) const {
-    if (this == &rhs)
-        return true;
-    const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
-    return rhs_p && *this == *rhs_p;
-}
-
-bool HasTag::operator==(const HasTag& rhs) const {
-    if (this == &rhs)
-        return true;
-    return (this == &rhs) || (m_name == rhs.m_name) ||
-        (m_name && rhs.m_name && *m_name == *(rhs.m_name));
-}
-
 namespace {
     struct HasTagSimpleMatch {
         HasTagSimpleMatch(const ScriptingContext& context) noexcept:
@@ -2955,16 +2816,6 @@ bool HasTag::Match(const ScriptingContext& local_context) const {
 void HasTag::SetTopLevelContent(const std::string& content_name) {
     if (m_name)
         m_name->SetTopLevelContent(content_name);
-}
-
-uint32_t HasTag::GetCheckSum() const {
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "Condition::HasTag");
-    CheckSums::CheckSumCombine(retval, m_name);
-
-    TraceLogger(conditions) << "GetCheckSum(HasTag): retval: " << retval;
-    return retval;
 }
 
 std::unique_ptr<Condition> HasTag::Clone() const
@@ -10986,6 +10837,9 @@ namespace StaticTests {
     constexpr auto contains_aggressive_cx1 = Contains<Aggressive>{};
     constexpr auto contains_aggressive_cx2 = Contains{Aggressive{true}};
     constexpr auto contains_aggressive_cx3 = Contains<Aggressive>{true};
+    static_assert(static_cast<const Condition&>(contains_target_cx) != contains_capital_cx);
+    static_assert(static_cast<const Condition&>(contains_capital_cx) != contains_aggressive_cx1);
+    static_assert(contains_aggressive_cx1 == contains_aggressive_cx2);
     static_assert(contains_aggressive_cx2 == contains_aggressive_cx3);
 
     constexpr auto pt_cx = PlanetType{::PlanetType::PT_INFERNO};

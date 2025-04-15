@@ -661,8 +661,8 @@ public:
     mutable boost::signals2::signal<void (int)> OrderButtonChangedSignal;
 
 private:
-    void DoLayout();
-    void RefreshPlanetGraphic();
+    void DoLayout(PlanetType type, PlanetSize size);
+    void RefreshPlanetGraphic(PlanetType type, PlanetSize size);
     void SetFocus(std::string focus) const; ///< set the focus of the planet to \a focus
     void ClickAnnex();                      ///< called if annex button is pressed
     void ClickColonize();                   ///< called if colonize button is pressed
@@ -705,9 +705,11 @@ public:
 
     void MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) override;
 
-    int                     SelectedPlanetID() const    {return m_selected_planet_id;}
-    const std::set<int>&    SelectionCandidates() const {return m_candidate_ids;}
-    int                     ScrollPosition() const;
+    int         SelectedPlanetID() const noexcept { return m_selected_planet_id; }
+    const auto& SelectionCandidates() const noexcept { return m_candidate_ids; }
+    int         ScrollPosition() const;
+
+    auto        NumPanels() const noexcept { return m_planet_panels.size(); }
 
     void LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) override;
     void SizeMove(GG::Pt ul, GG::Pt lr) override;
@@ -730,8 +732,8 @@ public:
                                 int excluded_planet_id = INVALID_OBJECT_ID,
                                 bool require_prerender = false);
 
-    virtual void    ShowScrollbar();
-    virtual void    HideScrollbar();
+    virtual void ShowScrollbar();
+    virtual void HideScrollbar();
 
     /** Enables, or disables if \a enable is false, issuing orders via the
       * PlanetPanels in this PlanetPanelContainer. */
@@ -772,10 +774,11 @@ public:
     RotatingPlanetControl(GG::X x, GG::Y y, int planet_id, StarType star_type) :
         GG::Control(x, y, GG::X1, GG::Y1, GG::NO_WND_FLAGS),
         m_planet_id(planet_id),
-        m_initial_rotation(fmod(planet_id / 7.352535, 1.0)),    // arbitrary scale number applied to id to give consistent by varied angles
+        m_initial_rotation(fmod(planet_id / 7.352535, 1.0)), // arbitrary scale number applied to id to give consistent by varied angles
         m_star_type(star_type)
     {
-        Refresh();
+        if (const auto* app = ClientApp::GetApp())
+            Refresh(app->GetContext(), app->EmpireID());
     }
 
     void Render() override {
@@ -804,9 +807,10 @@ public:
         }
     }
 
-    void Refresh() {
+    void Refresh(const ScriptingContext& context, int client_empire_id) {
         ScopedTimer timer("RotatingPlanetControl::Refresh", true);
-        auto planet = Objects().get<Planet>(m_planet_id);
+
+        auto planet = context.ContextObjects().get<Planet>(m_planet_id);
         if (!planet) return;
 
         // these values ensure that wierd GLUT-sphere artifacts do not show themselves
@@ -814,11 +818,9 @@ public:
         m_rpm = (std::abs(period) < 0.1) ? 10.0 : (1.0 / period); // prevent divide by zero or extremely fast rotations
         m_diameter = PlanetDiameter(planet->Size());
         m_axial_tilt = std::max(-30.0, std::min(static_cast<double>(planet->AxialTilt()), 60.0));
-        const auto client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
-        m_visibility = (client_empire_id == ALL_EMPIRES) ?
-            Visibility::VIS_FULL_VISIBILITY : GetUniverse().GetObjectVisibilityByEmpire(m_planet_id, client_empire_id);
+        m_visibility = (client_empire_id == ALL_EMPIRES) ? 
+            Visibility::VIS_FULL_VISIBILITY : context.ContextVis(m_planet_id, client_empire_id);
 
-        const std::string texture_filename;
         const auto& planet_data = GetRotatingPlanetData();
 
         const auto planet_data_it = planet_data.find(planet->Type());
@@ -1120,14 +1122,14 @@ void SidePanel::PlanetPanel::CompleteConstruction() {
     RequirePreRender();
 }
 
-void SidePanel::PlanetPanel::DoLayout() {
+void SidePanel::PlanetPanel::DoLayout(PlanetType type, PlanetSize size) {
     GG::X left = GG::X0 + MaxPlanetDiameter() + EDGE_PAD;
     GG::X right = left + Width() - MaxPlanetDiameter() - 2*EDGE_PAD;
     GG::Y y = GG::Y0;
 
     if (m_planet_name) {
         m_planet_name->MoveTo(GG::Pt(left, y));
-        y += m_planet_name->Height();                           // no interpanel space needed here, I declare arbitrarily
+        y += m_planet_name->Height(); // no interpanel space needed here, I declare arbitrarily
     }
 
     if (m_specials_panel) {
@@ -1187,11 +1189,12 @@ void SidePanel::PlanetPanel::DoLayout() {
         y += m_buildings_panel->Height() + EDGE_PAD;
     }
 
-    GG::Y min_height{MaxPlanetDiameter()};
 
-    RefreshPlanetGraphic();
-    if (m_planet_graphic)
-        min_height = m_planet_graphic->Height();
+    RefreshPlanetGraphic(type, size);
+
+    GG::Y min_height = m_planet_graphic ? 
+        m_planet_graphic->Height() : GG::Y{MaxPlanetDiameter()};
+
     // TODO: get following to resize panel properly...
     //else if (m_rotating_planet_graphic)
     //    min_height = m_rotating_planet_graphic->Height();
@@ -1206,20 +1209,19 @@ void SidePanel::PlanetPanel::DoLayout() {
     ResizedSignal();
 }
 
-void SidePanel::PlanetPanel::RefreshPlanetGraphic() {
-    auto planet = Objects().get<Planet>(m_planet_id);
-    if (!planet || !GetOptionsDB().Get<bool>("ui.map.sidepanel.planet.shown"))
+void SidePanel::PlanetPanel::RefreshPlanetGraphic(PlanetType type, PlanetSize size) {
+    if (!GetOptionsDB().Get<bool>("ui.map.sidepanel.planet.shown"))
         return;
 
     DetachChildAndReset(m_planet_graphic);
     DetachChildAndReset(m_rotating_planet_graphic);
 
-    if (planet->Type() == PlanetType::PT_ASTEROIDS) {
+    if (type == PlanetType::PT_ASTEROIDS) {
         const auto& textures = GetAsteroidTextures();
         if (textures.empty())
             return;
-        GG::X texture_width = textures[0]->DefaultWidth();
-        GG::Y texture_height = textures[0]->DefaultHeight();
+        GG::X texture_width = textures.front()->DefaultWidth();
+        GG::Y texture_height = textures.front()->DefaultHeight();
         GG::Pt planet_image_pos(GG::X(MaxPlanetDiameter() / 2 - texture_width / 2 + 3), GG::Y0);
 
         m_planet_graphic = GG::Wnd::Create<GG::DynamicGraphic>(
@@ -1227,15 +1229,16 @@ void SidePanel::PlanetPanel::RefreshPlanetGraphic() {
             true, texture_width, texture_height, 0, textures,
             GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         m_planet_graphic->SetFPS(GetAsteroidsFPS());
-        m_planet_graphic->SetFrameIndex(RandInt(0, textures.size() - 1));
+        m_planet_graphic->SetFrameIndex(static_cast<std::size_t>(RandInt(0, textures.size() - 1)));
         AttachChild(m_planet_graphic);
         m_planet_graphic->Play();
-    } else if (planet->Type() < PlanetType::NUM_PLANET_TYPES) {
-        int planet_image_sz = PlanetDiameter(planet->Size());
+
+    } else if (type < PlanetType::NUM_PLANET_TYPES) {
+        const int planet_image_sz = PlanetDiameter(size);
         GG::Pt planet_image_pos(GG::X(MaxPlanetDiameter() / 2 - planet_image_sz / 2 + 3),
                                 GG::Y(MaxPlanetDiameter() / 2 - planet_image_sz / 2));
-        m_rotating_planet_graphic = GG::Wnd::Create<RotatingPlanetControl>(planet_image_pos.x, planet_image_pos.y,
-                                                                           m_planet_id, m_star_type);
+        m_rotating_planet_graphic =
+            GG::Wnd::Create<RotatingPlanetControl>(planet_image_pos.x, planet_image_pos.y, m_planet_id, m_star_type);
         AttachChild(m_rotating_planet_graphic);
     }
 }
@@ -2414,7 +2417,10 @@ void SidePanel::PlanetPanel::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKe
 
 void SidePanel::PlanetPanel::PreRender() {
     GG::Control::PreRender();
-    DoLayout();
+    if (const auto* app = IApp::GetApp()) {
+        if (const auto* planet = app->GetContext().ContextObjects().getRaw<Planet>(m_planet_id))
+            DoLayout(planet->Type(), planet->Size());
+    }
 }
 
 void SidePanel::PlanetPanel::Render() {
@@ -2491,28 +2497,21 @@ void SidePanel::PlanetPanel::Render() {
     glEnable(GL_TEXTURE_2D);
 }
 
-void SidePanel::PlanetPanel::Select(bool selected) {
-    if (m_selected != selected) {
-        m_selected = selected;
-        // TODO: consider setting text box colours?
-    }
-}
+void SidePanel::PlanetPanel::Select(bool selected)
+{ m_selected = selected; } // TODO: consider setting text box colours?
 
 namespace {
-    void CancelColonizeInvadeBombardScrapShipOrders(const Ship* ship, ScriptingContext& context) { // TODO: pass in app?
-        if (!ship)
-            return;
-        auto* app = GGHumanClientApp::GetApp();
-        if (!app)
-            return;
-        const OrderSet orders{app->Orders()}; // copy to preserve iterators while rescinding
+    void CancelColonizeInvadeBombardScrapShipOrders(const Ship& ship, ScriptingContext& context,
+                                                    OrderSet& mutable_orders)
+    {
+        const auto orders_const{mutable_orders}; // copy to preserve iterators while rescinding
 
         // is selected ship already ordered to colonize?  If so, recind that order.
-        if (ship->OrderedColonizePlanet() != INVALID_OBJECT_ID) {
-            for (const auto& [order_id, order] : orders) {
+        if (ship.OrderedColonizePlanet() != INVALID_OBJECT_ID) {
+            for (const auto& [order_id, order] : orders_const) {
                 if (auto colonize_order = std::dynamic_pointer_cast<ColonizeOrder>(order)) {
-                    if (colonize_order->ShipID() == ship->ID()) {
-                        app->Orders().RescindOrder(order_id, context);
+                    if (colonize_order->ShipID() == ship.ID()) {
+                        mutable_orders.RescindOrder(order_id, context);
                         // could break here, but won't to ensure there are no problems with doubled orders
                     }
                 }
@@ -2520,11 +2519,11 @@ namespace {
         }
 
         // is selected ship ordered to invade?  If so, recind that order
-        if (ship->OrderedInvadePlanet() != INVALID_OBJECT_ID) {
-            for (const auto& [order_id, order] : orders) {
+        if (ship.OrderedInvadePlanet() != INVALID_OBJECT_ID) {
+            for (const auto& [order_id, order] : orders_const) {
                if (auto invade_order = std::dynamic_pointer_cast<InvadeOrder>(order)) {
-                    if (invade_order->ShipID() == ship->ID()) {
-                        app->Orders().RescindOrder(order_id, context);
+                    if (invade_order->ShipID() == ship.ID()) {
+                        mutable_orders.RescindOrder(order_id, context);
                         // could break here, but won't to ensure there are no problems with doubled orders
                     }
                 }
@@ -2532,11 +2531,11 @@ namespace {
         }
 
         // is selected ship ordered scrapped?  If so, recind that order
-        if (ship->OrderedScrapped()) {
-            for (const auto& [order_id, order] : orders) {
+        if (ship.OrderedScrapped()) {
+            for (const auto& [order_id, order] : orders_const) {
                 if (auto scrap_order = std::dynamic_pointer_cast<ScrapOrder>(order)) {
-                    if (scrap_order->ObjectID() == ship->ID()) {
-                        app->Orders().RescindOrder(order_id, context);
+                    if (scrap_order->ObjectID() == ship.ID()) {
+                        mutable_orders.RescindOrder(order_id, context);
                         // could break here, but won't to ensure there are no problems with doubled orders
                     }
                 }
@@ -2544,11 +2543,11 @@ namespace {
         }
 
         // is selected ship order to bombard?  If so, recind that order
-        if (ship->OrderedBombardPlanet() != INVALID_OBJECT_ID) {
-            for (const auto& [order_id, order] : orders) {
+        if (ship.OrderedBombardPlanet() != INVALID_OBJECT_ID) {
+            for (const auto& [order_id, order] : orders_const) {
                if (auto bombard_order = std::dynamic_pointer_cast<BombardOrder>(order)) {
-                    if (bombard_order->ShipID() == ship->ID()) {
-                        app->Orders().RescindOrder(order_id, context);
+                    if (bombard_order->ShipID() == ship.ID()) {
+                        mutable_orders.RescindOrder(order_id, context);
                         // could break here, but won't to ensure there are no problems with doubled orders
                     }
                 }
@@ -2562,8 +2561,11 @@ void SidePanel::PlanetPanel::ClickAnnex() {
     // been ordered
 
     auto* app = GGHumanClientApp::GetApp();
+    if (!app)
+        return;
     ScriptingContext& context = app->GetContext();
     const ObjectMap& objects{context.ContextObjects()};
+    auto& orders = app->Orders();
 
     const auto planet = objects.get<const Planet>(m_planet_id);
     if (!planet || !m_order_issuing_enabled)
@@ -2579,7 +2581,7 @@ void SidePanel::PlanetPanel::ClickAnnex() {
                                  { return m_planet_id == order_id_planet_id.first; });
     if (it != pending_annex_orders.end()) {
         // cancel previous annex order for planet
-        app->Orders().RescindOrder(it->second, context);
+        orders.RescindOrder(it->second, context);
 
     } else {
         const auto empire = context.GetEmpire(empire_id);
@@ -2593,7 +2595,7 @@ void SidePanel::PlanetPanel::ClickAnnex() {
             return;
         }
         ScriptingContext empire_context{context, ScriptingContext::Source{}, source};
-        app->Orders().IssueOrder<AnnexOrder>(empire_context, empire_id, m_planet_id);
+        orders.IssueOrder<AnnexOrder>(empire_context, empire_id, m_planet_id);
     }
     OrderButtonChangedSignal(m_planet_id);
 }
@@ -2603,14 +2605,17 @@ void SidePanel::PlanetPanel::ClickColonize() {
     // been ordered
 
     auto* app = GGHumanClientApp::GetApp();
+    if (!app)
+        return;
     ScriptingContext& context = app->GetContext();
     const ObjectMap& objects{context.ContextObjects()};
+    auto& orders = app->Orders();
 
-    auto planet = objects.getRaw<const Planet>(m_planet_id);
+    const auto planet = objects.getRaw<const Planet>(m_planet_id);
     if (!planet || planet->GetMeter(MeterType::METER_POPULATION)->Initial() != 0.0 || !m_order_issuing_enabled)
         return;
 
-    int empire_id = app->EmpireID();
+    const int empire_id = app->EmpireID();
     if (empire_id == ALL_EMPIRES)
         return;
 
@@ -2619,7 +2624,7 @@ void SidePanel::PlanetPanel::ClickColonize() {
 
     if (it != pending_colonization_orders.end()) {
         // cancel previous colonization order for planet
-        app->Orders().RescindOrder(it->second, context);
+        orders.RescindOrder(it->second, context);
 
     } else {
         // find colony ship and order it to colonize
@@ -2636,18 +2641,19 @@ void SidePanel::PlanetPanel::ClickColonize() {
             return;
         }
 
-        CancelColonizeInvadeBombardScrapShipOrders(ship, context);
+        CancelColonizeInvadeBombardScrapShipOrders(*ship, context, orders);
 
-        app->Orders().IssueOrder<ColonizeOrder>(context, empire_id, ship->ID(), m_planet_id);
+        orders.IssueOrder<ColonizeOrder>(context, empire_id, ship->ID(), m_planet_id);
     }
     OrderButtonChangedSignal(m_planet_id);
 }
 
 void SidePanel::PlanetPanel::ClickInvade() {
-    // order or cancel invasion, depending on whether it has previously
-    // been ordered
+    // order or cancel invasion, depending on whether it has previously been ordered
 
-    auto* app = GGHumanClientApp::GetApp();
+    auto* app = ClientApp::GetApp();
+    if (!app)
+        return;
     ScriptingContext& context = app->GetContext();
     const ObjectMap& objects{context.ContextObjects()};
     auto planet = objects.getRaw<Planet>(m_planet_id);
@@ -2660,6 +2666,8 @@ void SidePanel::PlanetPanel::ClickInvade() {
     if (empire_id == ALL_EMPIRES)
         return;
 
+    auto& orders = app->Orders();
+
     const auto pending_invade_orders = PendingInvadeOrders();
     auto it = pending_invade_orders.find(m_planet_id);
 
@@ -2667,7 +2675,7 @@ void SidePanel::PlanetPanel::ClickInvade() {
         const auto& planet_invade_orders = it->second;
         // cancel previous invasion orders for this planet
         for (int order_id : planet_invade_orders)
-            app->Orders().RescindOrder(order_id, context);
+            orders.RescindOrder(order_id, context);
 
     } else {
         // order selected invasion ships to invade planet
@@ -2675,13 +2683,9 @@ void SidePanel::PlanetPanel::ClickInvade() {
         if (invasion_ships.empty())
             invasion_ships = AutomaticallyChosenInvasionShips(m_planet_id, context);
 
-        for (const auto* ship : invasion_ships) {
-            if (!ship)
-                continue;
-
-            CancelColonizeInvadeBombardScrapShipOrders(ship, context);
-
-            app->Orders().IssueOrder<InvadeOrder>(context, empire_id, ship->ID(), m_planet_id);
+        for (const auto* ship : invasion_ships | range_filter([](auto s) { return !!s; })) {
+            CancelColonizeInvadeBombardScrapShipOrders(*ship, context, orders);
+            orders.IssueOrder<InvadeOrder>(context, empire_id, ship->ID(), m_planet_id);
         }
     }
     OrderButtonChangedSignal(m_planet_id);
@@ -2691,7 +2695,9 @@ void SidePanel::PlanetPanel::ClickBombard() {
     // order or cancel bombard, depending on whether it has previously
     // been ordered
 
-    auto* app = GGHumanClientApp::GetApp();
+    auto* app = ClientApp::GetApp();
+    if (!app)
+        return;
     ScriptingContext& context = app->GetContext();
     const ObjectMap& objects{context.ContextObjects()};
     auto planet = objects.getRaw<Planet>(m_planet_id);
@@ -2704,14 +2710,16 @@ void SidePanel::PlanetPanel::ClickBombard() {
     if (empire_id == ALL_EMPIRES)
         return;
 
+    auto& orders = app->Orders();
+
     const auto pending_bombard_orders = PendingBombardOrders();
     const auto it = pending_bombard_orders.find(m_planet_id);
 
     if (it != pending_bombard_orders.end()) {
-        const auto planet_bombard_orders = it->second; // copy to preserve iterators while rescinding
+        const auto planet_bombard_orders{it->second}; // copy to preserve iterators while rescinding
         // cancel previous bombard orders for this planet
         for (int order_id : planet_bombard_orders)
-            app->Orders().RescindOrder(order_id, context);
+            orders.RescindOrder(order_id, context);
 
     } else {
         // order selected bombard ships to bombard planet
@@ -2719,13 +2727,9 @@ void SidePanel::PlanetPanel::ClickBombard() {
         if (bombard_ships.empty())
             bombard_ships = AutomaticallyChosenBombardShips(m_planet_id, context);
 
-        for (const auto* ship : bombard_ships) {
-            if (!ship)
-                continue;
-
-            CancelColonizeInvadeBombardScrapShipOrders(ship, context);
-
-            app->Orders().IssueOrder<BombardOrder>(context, empire_id, ship->ID(), m_planet_id);
+        for (const auto* ship : bombard_ships | range_filter([](auto s) { return !!s; })) {
+            CancelColonizeInvadeBombardScrapShipOrders(*ship, context, orders);
+            orders.IssueOrder<BombardOrder>(context, empire_id, ship->ID(), m_planet_id);
         }
     }
     OrderButtonChangedSignal(m_planet_id);
@@ -2773,8 +2777,19 @@ void SidePanel::PlanetPanel::EnableOrderIssuing(bool enable) {
 
     m_buildings_panel->EnableOrderIssuing(enable);
 
-    auto obj = Objects().get(m_planet_id);
-    if (!enable || !obj || !obj->OwnedBy(GGHumanClientApp::GetApp()->EmpireID()))
+    if (!enable) {
+        m_focus_drop->Disable();
+        return;
+    }
+
+    const auto* app = IApp::GetApp();
+    if (!app) {
+        m_focus_drop->Disable();
+        return;
+    }
+
+    const auto obj = app->GetContext().ContextObjects().get(m_planet_id);
+    if (!obj || !obj->OwnedBy(app->EmpireID()))
         m_focus_drop->Disable();
     else
         m_focus_drop->Disable(false);
@@ -3158,7 +3173,10 @@ namespace {
             }
             m_labels_and_amounts.clear();
 
-            auto system = Objects().get<System>(m_system_id);
+            const auto* app = IApp::GetApp();
+            if (!app) return;
+            const auto& objects = app->GetContext().ContextObjects();
+            const auto system = objects.get<System>(m_system_id);
             if (!system)
                 return;
 
@@ -3173,10 +3191,10 @@ namespace {
 
             GG::Y top = row_height;
             // add label-value pair for each resource-producing object in system to indicate amount of resource produced
-            auto objects = Objects().find<const Planet>(system->ContainedObjectIDs());
-            for (const auto& planet : objects) {
+            const auto contained_objects = objects.findRaw<const Planet>(system->ContainedObjectIDs());
+            for (const auto* planet : contained_objects) {
                 // Ignore empty planets
-                if (planet->Unowned() && planet->SpeciesName().empty())
+                if (!planet || (planet->Unowned() && planet->SpeciesName().empty()))
                     continue;
 
                 auto label = GG::Wnd::Create<CUILabel>(planet->Name(), GG::FORMAT_RIGHT);
@@ -3209,6 +3227,7 @@ namespace {
 
             Resize(GG::Pt(LabelWidth() + ValueWidth(), top));
         }
+
     private:
         MeterType m_meter_type;
         int m_system_id;
@@ -3278,28 +3297,27 @@ void SidePanel::CompleteConstruction() {
 
     using boost::placeholders::_1;
 
-    m_connections.reserve(9);
-    m_connections.emplace_back(m_system_name->DropDownOpenedSignal.connect(
-        [this](auto b) { SystemNameDropListOpenedSlot(b); }));
-    m_connections.emplace_back(m_system_name->SelChangedSignal.connect(
-        [this](auto it) { SystemSelectionChangedSlot(it); }));
-    m_connections.emplace_back(m_system_name->SelChangedWhileDroppedSignal.connect(
-        [this](auto it) { SystemSelectionChangedSlot(it); }));
-    m_connections.emplace_back(m_button_prev->LeftClickedSignal.connect(
-        [this]() { PrevButtonClicked(); }));
-    m_connections.emplace_back(m_button_next->LeftClickedSignal.connect(
-        [this]() { NextButtonClicked(); }));
-    m_connections.emplace_back(m_planet_panel_container->PlanetClickedSignal.connect(
+    m_connections[0] = m_system_name->DropDownOpenedSignal.connect(
+        [this](auto b) { SystemNameDropListOpenedSlot(b); });
+    m_connections[1] = m_system_name->SelChangedSignal.connect(
+        [this](auto it) { SystemSelectionChangedSlot(it); });
+    m_connections[2] = m_system_name->SelChangedWhileDroppedSignal.connect(
+        [this](auto it) { SystemSelectionChangedSlot(it); });
+    m_connections[3] = m_button_prev->LeftClickedSignal.connect(
+        [this]() { PrevButtonClicked(); });
+    m_connections[4] = m_button_next->LeftClickedSignal.connect(
+        [this]() { NextButtonClicked(); });
+    m_connections[5] = m_planet_panel_container->PlanetClickedSignal.connect(
         [this](auto id) {
             const ScriptingContext& context = IApp::GetApp()->GetContext();
             PlanetClickedSlot(id, context.ContextObjects());
-        }));
-    m_connections.emplace_back(m_planet_panel_container->PlanetLeftDoubleClickedSignal.connect(
-        PlanetDoubleClickedSignal));
-    m_connections.emplace_back(m_planet_panel_container->PlanetRightClickedSignal.connect(
-        PlanetRightClickedSignal));
-    m_connections.emplace_back(m_planet_panel_container->BuildingRightClickedSignal.connect(
-        BuildingRightClickedSignal));
+        });
+    m_connections[6] = m_planet_panel_container->PlanetLeftDoubleClickedSignal.connect(
+        PlanetDoubleClickedSignal);
+    m_connections[7] = m_planet_panel_container->PlanetRightClickedSignal.connect(
+        PlanetRightClickedSignal);
+    m_connections[8] = m_planet_panel_container->BuildingRightClickedSignal.connect(
+        BuildingRightClickedSignal);
 
     SetMinSize(GG::Pt(GG::X(MaxPlanetDiameter() + BORDER_LEFT + BORDER_RIGHT + 120),
                       PLANET_PANEL_TOP + GG::Y(MaxPlanetDiameter())));
@@ -3507,11 +3525,42 @@ void SidePanel::RefreshInPreRender(ScriptingContext& context) {
     s_system_connections.insert(system->FleetsRemovedSignal.connect(&SidePanel::FleetsRemoved));
 }
 
-void SidePanel::RefreshSystemNames() {
-    //auto system = Objects().get<System>(s_system_id);
-    //if (!system)
-    //    return;
+namespace {
+    constexpr auto sys_name_cmp = [](const auto& lhs_sv_int, const auto& rhs_sv_int) {
+        const std::string_view& lhs = lhs_sv_int.first;
+        const std::string_view& rhs = rhs_sv_int.first;
 
+#if defined(FREEORION_MACOSX)
+        // Collate on OSX seemingly ignores greek characters, resulting in sort order: X α I, X β I, X α II
+        return lhs < rhs;
+#else
+        using collate_t = std::collate<std::string_view::value_type>;
+        const auto& collate = std::use_facet<collate_t>(GetLocale());
+        return collate.compare(lhs.data(), lhs.data() + lhs.size(), rhs.data(), rhs.data() + rhs.size()) < 0;
+#endif
+    };
+
+    auto GetSortedRows(GG::Y system_name_height, const ObjectMap& objects, const auto& is_sys) {
+        std::vector<std::pair<std::string_view, int>> sorted_systems;
+        sorted_systems.reserve(objects.size<System>());
+
+        for (auto* system : objects.allRaw<const System>() | range_filter(is_sys))
+            sorted_systems.emplace_back(system->Name(), system->ID());
+
+        if (!sorted_systems.empty()) // sort by name
+            std::stable_sort(sorted_systems.begin(), sorted_systems.end(), sys_name_cmp);
+
+        std::vector<std::shared_ptr<GG::DropDownList::Row>> rows;
+        rows.reserve(sorted_systems.size());
+
+        for (auto sys_id : sorted_systems | range_values)
+            rows.push_back(GG::Wnd::Create<SystemRow>(sys_id, system_name_height));
+
+        return rows;
+    };
+}
+
+void SidePanel::RefreshSystemNames(const ObjectMap& objects) {
     // Repopulate the system with all of the names of known systems, if it is closed.
     // If it is open do not change the system names because it runs in a seperate modal
     // from the main UI.
@@ -3524,46 +3573,11 @@ void SidePanel::RefreshSystemNames() {
         const auto system_name_font(ClientUI::GetBoldFont(SystemNameFontSize()));
         const GG::Y system_name_height(system_name_font->Lineskip() + 4);
 
+        static constexpr auto has_name_or_is_s_system = [](const System* sys)
+        { return sys && (!sys->Name().empty() || sys->ID() == s_system_id); };
+
         // Make a vector of sorted rows and insert them in a single operation.
-        auto sorted_system_rows = [system_name_height]() {
-            std::vector<std::pair<std::string_view, int>> sorted_systems;
-            sorted_systems.reserve(Objects().size<System>());
-
-            static constexpr auto has_name_or_is_s_system = [](const System* sys)
-            { return sys && (!sys->Name().empty() || sys->ID() == s_system_id); };
-
-            for (auto* system : Objects().allRaw<const System>() | range_filter(has_name_or_is_s_system))
-                sorted_systems.emplace_back(system->Name(), system->ID());
-
-            if (!sorted_systems.empty()) {
-                static constexpr auto sys_name_cmp = [](const auto& lhs_sv_int, const auto& rhs_sv_int) {
-                    const std::string_view& lhs = lhs_sv_int.first;
-                    const std::string_view& rhs = rhs_sv_int.first;
-
-#if defined(FREEORION_MACOSX)
-                    // Collate on OSX seemingly ignores greek characters, resulting in sort order: X α I, X β I, X α II
-                    return lhs < rhs;
-#else
-                    using collate_t = std::collate<std::string_view::value_type>;
-                    const auto& collate = std::use_facet<collate_t>(GetLocale());
-                    return collate.compare(lhs.data(), lhs.data() + lhs.size(), rhs.data(), rhs.data() + rhs.size()) < 0;
-#endif
-                };
-
-                // sort by name
-                std::stable_sort(sorted_systems.begin(), sorted_systems.end(), sys_name_cmp);
-            }
-
-            std::vector<std::shared_ptr<GG::DropDownList::Row>> rows;
-            rows.reserve(sorted_systems.size());
-
-            for (auto sys_id : sorted_systems | range_values)
-                rows.push_back(GG::Wnd::Create<SystemRow>(sys_id, system_name_height));
-
-            return rows;
-        }();
-
-        m_system_name->Insert(std::move(sorted_system_rows));
+        m_system_name->Insert(GetSortedRows(system_name_height, objects, has_name_or_is_s_system));
     }
 
     // Select in the ListBox the currently-selected system.
@@ -3588,7 +3602,7 @@ void SidePanel::RefreshImpl(ScriptingContext& context) {
     DetachChildAndReset(m_system_resource_summary);
 
 
-    RefreshSystemNames();
+    RefreshSystemNames(context.ContextObjects());
 
     auto system = context.ContextObjects().get<System>(s_system_id);
     // if no system object, there is nothing to populate with.  early abort.
@@ -3763,13 +3777,10 @@ void SidePanel::DoLayout() {
     GG::GUI::PreRenderWindow(m_planet_panel_container);
 
     // hide scrollbar if there is no planets in the system
-    auto system = Objects().get<System>(s_system_id);
-    if (system) {
-        if (system->PlanetIDs().empty())
-            m_planet_panel_container->HideScrollbar();
-        else
-            m_planet_panel_container->ShowScrollbar();
-    }
+    if (m_planet_panel_container->NumPanels() > 0)
+        m_planet_panel_container->HideScrollbar();
+    else
+        m_planet_panel_container->ShowScrollbar();
 
     // resize system resource summary
     if (m_system_resource_summary) {
@@ -3792,7 +3803,8 @@ void SidePanel::SystemNameDropListOpenedSlot(bool is_open) {
     // Refresh the system names when the drop list closes.
     if (is_open)
         return;
-    RefreshSystemNames();
+    if (const auto* app = IApp::GetApp())
+        RefreshSystemNames(app->GetContext().ContextObjects());
 }
 
 void SidePanel::SystemSelectionChangedSlot(GG::DropDownList::iterator it) {

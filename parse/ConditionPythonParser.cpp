@@ -271,7 +271,11 @@ namespace {
                     environments.push_back(make_constant< ::PlanetEnvironment>(*it));
                 }
             }
-            return make_wrapped<Condition::PlanetEnvironment>(std::move(environments));
+            std::unique_ptr<ValueRef::ValueRef<std::string>> species = nullptr;
+            if (kw.has_key("species")) {
+                species = pyobject_to_vref<std::string>(kw["species"]);
+            }
+            return make_wrapped<Condition::PlanetEnvironment>(std::move(environments), std::move(species));
         }
         return make_wrapped<Condition::Type>(UniverseObjectType::OBJ_PLANET);
     }
@@ -960,6 +964,7 @@ void RegisterGlobalsConditions(boost::python::dict& globals) {
     globals["HasSpecies"] = boost::python::raw_function(insert_has_species_);
     globals["IsField"] = boost::python::raw_function(insert_is_field_);
     globals["CanColonize"] = make_wrapped<Condition::CanColonize>();
+    globals["CanProduceShips"] = make_wrapped<Condition::CanProduceShips>();
     globals["Armed"] = make_wrapped<Condition::Armed>();
 
     globals["IsSource"] = make_wrapped<Condition::Source>();

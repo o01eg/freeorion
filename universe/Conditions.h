@@ -231,7 +231,7 @@ namespace Impl {
             return static_cast<const Condition&>(cond).GetDefaultInitialCandidateObjectTypes();
     }
 
-    constexpr auto to_mt = [](const auto& op) { return GetDefaultInitialCandidateObjectTypes(op); };
+    inline constexpr auto to_mt = [](const auto& op) { return GetDefaultInitialCandidateObjectTypes(op); };
 
     constexpr void PushBackIfNotAlreadyIn(auto& out, const auto* o) {
         if (o && std::none_of(out.begin(), out.end(), [o](const auto* r) noexcept { return o == r; }))
@@ -287,14 +287,14 @@ namespace Impl {
         return retval;
     }
 
-    constexpr auto matches_only_source = [](auto mt) noexcept -> bool { return mt == MatchesType::SOURCE; };
-    constexpr auto matches_only_target = [](auto mt) noexcept -> bool { return mt == MatchesType::TARGET; };
-    constexpr auto matches_only_rootcand = [](auto mt) noexcept -> bool { return mt == MatchesType::ROOTCANDIDATE; };
-    constexpr auto matches_any_context_object = [](auto mt) noexcept -> bool { return mt & MatchesType::SINGLEOBJECT; }; // could match multiple context objects, eg. source and target
-    constexpr auto matches_any_object_type = [](auto mt) noexcept -> bool { return mt & MatchesType::ANYOBJECTTYPE; };
-    constexpr auto matches_nothing = [](auto mt) noexcept -> bool { return mt == MatchesType::NOTHING; };
-    constexpr auto bit_and = [](auto lhs, auto rhs) noexcept { return lhs & rhs; };
-    constexpr auto bit_or = [](auto lhs, auto rhs) noexcept { return lhs | rhs; };
+    inline constexpr auto matches_only_source = [](uint16_t mt) noexcept -> bool { return mt == MatchesType::SOURCE; };
+    inline constexpr auto matches_only_target = [](uint16_t mt) noexcept -> bool { return mt == MatchesType::TARGET; };
+    inline constexpr auto matches_only_rootcand = [](uint16_t mt) noexcept -> bool { return mt == MatchesType::ROOTCANDIDATE; };
+    inline constexpr auto matches_any_context_object = [](uint16_t mt) noexcept -> bool { return mt & MatchesType::SINGLEOBJECT; }; // could match multiple context objects, eg. source and target
+    inline constexpr auto matches_any_object_type = [](uint16_t mt) noexcept -> bool { return mt & MatchesType::ANYOBJECTTYPE; };
+    inline constexpr auto matches_nothing = [](uint16_t mt) noexcept -> bool { return mt == MatchesType::NOTHING; };
+    inline constexpr auto bit_and = [](uint16_t lhs, uint16_t rhs) noexcept -> uint16_t { return lhs & rhs; };
+    inline constexpr auto bit_or = [](uint16_t lhs, uint16_t rhs) noexcept -> uint16_t  { return lhs | rhs; };
 
     template <typename ptr>
         requires requires(const ptr& p, const ptr& q) { !p; bool(p); *p == *q; }
@@ -344,6 +344,7 @@ namespace Impl {
             else
                 return false;
         }
+        using Condition::operator==;
 
         [[nodiscard]] constexpr const auto* SubCondition() const noexcept {
             if constexpr (cond_is_ptr)
@@ -470,7 +471,7 @@ struct FO_COMMON_API Turn final : public Condition {
         m_high(std::move(high))
     {}
 
-    [[nodiscard]] bool operator==(const Condition& rhs) const {
+    [[nodiscard]] bool operator==(const Condition& rhs) const override {
         if (this == &rhs)
             return true;
         const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);

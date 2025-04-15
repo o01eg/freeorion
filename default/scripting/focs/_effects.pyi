@@ -106,6 +106,7 @@ class _Planet:
     TargetIndustry: float
     Population: float
     Owner: _Empire
+    Happiness: float
 
 class Source:
     """
@@ -345,6 +346,7 @@ IsRootCandidate = _Condition()
 IsTarget = _Condition()
 CanColonize = _Condition()
 IsAnyObject = _Condition()
+CanProduceShips = _Condition()
 
 def InSystem(*, id: _SystemID = _SystemID()) -> _Condition: ...
 
@@ -353,6 +355,7 @@ GalaxyMonsterFrequency = 0
 
 def Described(*, description: str, condition: _Condition) -> _Condition: ...
 def MinimumNumberOf(number: int, sortkey: _FloatParam, condition: _Condition) -> _Condition: ...
+def MaximumNumberOf(number: int, sortkey: _FloatParam, condition: _Condition) -> _Condition: ...
 def NumberOf(number: int, condition: _Condition) -> _Condition: ...
 def UniqueNumberOf(*, number: int, condition: _Condition, sortkey) -> _Condition: ...
 def TargetIndustry(*, low: int) -> _Condition: ...

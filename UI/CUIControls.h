@@ -18,6 +18,7 @@
 #include <GG/GLClientAndServerBuffer.h>
 
 #include "LinkText.h"
+#include "../universe/ConstantsFwd.h"
 
 /** \file
  *
@@ -55,11 +56,11 @@ public:
 /** a FreeOrion Button control */
 class CUIButton : public GG::Button {
 public:
-    CUIButton(std::string str);
-
+    CUIButton(std::string str, std::shared_ptr<GG::Font> font, GG::Clr ctrl_clr, GG::Clr text_clr);
+    explicit CUIButton(std::string str);
     CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed, GG::SubTexture rollover);
 
-    GG::Pt MinUsableSize() const override;
+    GG::Pt MinUsableSize() const noexcept override;
 
     bool InWindow(GG::Pt pt) const override;
 
@@ -189,8 +190,7 @@ public:
 /** Tab bar with buttons for selecting tabbed windows. */
 class CUITabBar final : public GG::TabBar {
 public:
-    CUITabBar(const std::shared_ptr<GG::Font>& font, GG::Clr color,
-              GG::Clr text_color);
+    CUITabBar(std::shared_ptr<GG::Font> font, GG::Clr color, GG::Clr text_color);
 
 private:
     void DistinguishCurrentTab(const std::vector<GG::StateButton*>& tab_buttons) override;
@@ -385,7 +385,7 @@ public:
     void CompleteConstruction() override;
 
     double GetValue(std::size_t index = 0) const;
-    GG::Pt MinUsableSize() const override;
+    GG::Pt MinUsableSize() const noexcept override;
 
     void PreRender() override;
     void Render() override {}
@@ -510,7 +510,7 @@ private:
 
     std::string m_units_str;
     std::string m_title_str;
-    int         m_empire_id;
+    int         m_empire_id = ALL_EMPIRES;
 
     std::shared_ptr<GG::Label>  m_empire_column_label;
     std::shared_ptr<GG::Label>  m_local_column_label;

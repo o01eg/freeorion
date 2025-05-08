@@ -95,17 +95,19 @@ namespace {
     constexpr int CUIBUTTON_ANGLE_OFFSET = 5;
 }
 
-CUIButton::CUIButton(std::string str) :
-    Button(std::move(str), ClientUI::GetFont(), ClientUI::CtrlColor(),
-           ClientUI::TextColor(), GG::INTERACTIVE)
+CUIButton::CUIButton(std::string str, std::shared_ptr<GG::Font> font, GG::Clr ctrl_clr, GG::Clr text_clr) :
+    Button(std::move(str), std::move(font), ctrl_clr, text_clr, GG::INTERACTIVE)
 {
     SetName("CUIButton " + this->m_label->Text());
     LeftClickedSignal.connect(-1, &PlayButtonClickSound);
 }
 
-CUIButton::CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed,
-                     GG::SubTexture rollover) :
-    Button("", ClientUI::GetFont(), GG::CLR_WHITE, GG::CLR_ZERO, GG::INTERACTIVE)
+CUIButton::CUIButton(std::string str) :
+    CUIButton(std::move(str), ClientUI::GetFont(), ClientUI::CtrlColor(), ClientUI::TextColor())
+{}
+
+CUIButton::CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed, GG::SubTexture rollover) :
+    Button("", nullptr, GG::CLR_WHITE, GG::CLR_ZERO, GG::INTERACTIVE)
 {
     SetName("CUIButton SubTextures");
     SetColor(GG::CLR_WHITE);
@@ -124,7 +126,7 @@ void CUIButton::MouseEnter(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
          PlayButtonRolloverSound();
 }
 
-GG::Pt CUIButton::MinUsableSize() const {
+GG::Pt CUIButton::MinUsableSize() const noexcept {
     GG::Pt result = GG::Button::MinUsableSize();
     static constexpr int CUIBUTTON_HPADDING = 10;
     static constexpr int CUIBUTTON_VPADDING = 3;
@@ -607,8 +609,8 @@ void CUISpin<double>::SetEditTextFromValue()
 ///////////////////////////////////////
 // class CUITabBar
 ///////////////////////////////////////
-CUITabBar::CUITabBar(const std::shared_ptr<GG::Font>& font, GG::Clr color, GG::Clr text_color) :
-    GG::TabBar(font, color, text_color)
+CUITabBar::CUITabBar(std::shared_ptr<GG::Font> font, GG::Clr color, GG::Clr text_color) :
+    GG::TabBar(std::move(font), color, text_color)
 { SetName("CUITabBar"); }
 
 void CUITabBar::DistinguishCurrentTab(const std::vector<GG::StateButton*>& tab_buttons) {
@@ -1452,7 +1454,7 @@ void StatisticIcon::DoLayout() {
     m_text->SizeMove(text_ul, {Width(), Height()});
 }
 
-GG::Pt StatisticIcon::MinUsableSize() const {
+GG::Pt StatisticIcon::MinUsableSize() const noexcept {
     if (!m_icon)
         return GG::Pt(GG::X1, GG::Y1);
 
@@ -1773,7 +1775,6 @@ ResourceInfoPanel::ResourceInfoPanel(std::string title, std::string point_units_
            config_name, false),
     m_units_str(std::move(point_units_str)),
     m_title_str(std::move(title)),
-    m_empire_id(ALL_EMPIRES),
     m_empire_column_label(GG::Wnd::Create<CUILabel>(UserString("EMPIRE"), GG::FORMAT_LEFT)),
     m_local_column_label(GG::Wnd::Create<CUILabel>("", GG::FORMAT_LEFT)),
     m_total_points_label(GG::Wnd::Create<CUILabel>(UserString("PRODUCTION_INFO_TOTAL_PS_LABEL"), GG::FORMAT_RIGHT)),

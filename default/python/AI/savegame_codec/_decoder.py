@@ -14,7 +14,6 @@ to provide a __setstate__ method to verify and possibly sanitize the content of 
 
 import binascii
 import json
-from typing import Union
 
 import EnumsAI
 from AIstate import AIstate
@@ -30,7 +29,7 @@ from ._definitions import (
     TRUE,
     TUPLE_PREFIX,
     InvalidSaveGameException,
-    trusted_classes,
+    TrustedClasses,
 )
 
 
@@ -52,13 +51,14 @@ def _extract_collection(prefix: str, value: str):
     return value[len(prefix) + 1 : -1]
 
 
-def load_savegame_string(string: Union[str, bytes]) -> AIstate:
+def load_savegame_string(string: str | bytes) -> AIstate:
     """
     :raises: SaveDecompressException, InvalidSaveGameException
     """
     import base64
     import zlib
 
+    trusted_classes = TrustedClasses()
     try:
         new_string = base64.b64decode(string)
     except (binascii.Error, ValueError, TypeError) as e:
@@ -67,17 +67,18 @@ def load_savegame_string(string: Union[str, bytes]) -> AIstate:
         new_string = zlib.decompress(new_string)
     except zlib.error as e:
         raise SaveDecompressException("Fail to decompress savestate %s" % e) from e
-    return decode(new_string.decode("utf-8"))
+    return decode(new_string.decode("utf-8"), trusted_classes)
 
 
-def decode(obj):
-    return _FreeOrionAISaveGameDecoder().decode(obj)
+def decode(obj, trusted_classes: TrustedClasses):
+    return _FreeOrionAISaveGameDecoder(trusted_classes).decode(obj)
 
 
 class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
-    def __init__(self, **kwargs):
+    def __init__(self, trusted_classes: TrustedClasses):
         # do not allow control characters
-        super().__init__(strict=True, **kwargs)
+        self._trusted_classes = trusted_classes
+        super().__init__(strict=True)
 
     def decode(self, s, _w=None):
         # use the default JSONDecoder to parse the string into a dict
@@ -95,7 +96,7 @@ class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
         class_name = obj.pop("__class__")
         module_name = obj.pop("__module__")
         full_name = f"{module_name}.{class_name}"
-        cls = trusted_classes.get(full_name)
+        cls = self._trusted_classes.get(full_name)
         if cls is None:
             raise InvalidSaveGameException("DANGER DANGER - %s not trusted" % full_name)
 
@@ -121,7 +122,7 @@ class _FreeOrionAISaveGameDecoder(json.JSONDecoder):
     def __interpret(self, x):  # noqa: C901
         """Interpret an object that was just decoded."""
         # primitive types do not have to be interpreted
-        if isinstance(x, (int, float)):
+        if isinstance(x, int | float):
             return x
 
         # special handling for dicts as they could encode our classes

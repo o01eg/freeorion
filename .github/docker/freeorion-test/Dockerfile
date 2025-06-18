@@ -76,11 +76,11 @@ RUN rm -rf \
 ENV RUSTUP_HOME=/usr/local/rustup \
 	CARGO_HOME=/usr/local/cargo \
 	PATH=/usr/local/cargo/bin:$PATH \
-	RUST_VERSION=1.82.0 \
-	RUSTUP_VERSION=1.27.1
+	RUST_VERSION=1.87.0 \
+	RUSTUP_VERSION=1.28.2
 
 RUN curl -o rustup-init https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init \
-    && echo "6aeece6993e902708983b209d04c0d1dbb14ebb405ddb87def578d41f920f56d *rustup-init" | sha256sum -c - \
+    && echo "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c *rustup-init" | sha256sum -c - \
     && chmod +x rustup-init
 
 RUN ./rustup-init --help

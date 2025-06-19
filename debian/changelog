@@ -1,3 +1,9 @@
+freeorion (0.5.1.1rc1ppa1~focal) focal; urgency=medium
+
+  * Release Candidate v0.5.1.1 RC1.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Thu, 19 Jun 2025 07:02:31 +0400
+
 freeorion (0.5.1ppa1~focal) focal; urgency=medium
 
   * Release v0.5.1.

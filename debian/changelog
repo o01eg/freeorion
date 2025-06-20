@@ -1,3 +1,9 @@
+freeorion (0.5.1.1-rc1.fo0029+git20250615.783080appa1~noble) noble; urgency=medium
+
+  * Update 0.5.1.1 RC1.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Fri, 20 Jun 2025 07:26:45 +0400
+
 freeorion (0.5.1-rc4.fo0029+git20250202.d309ca5ppa1~noble) noble; urgency=medium
 
   * Update 0.5.1 RC4.

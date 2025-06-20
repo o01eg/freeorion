@@ -2016,6 +2016,9 @@ Sets the color of the scan-line shading over planet graphics on the sidepanel.
 OPTIONS_DB_UI_PLANET_STATUS_ICON_SIZE
 Sets the size of the planet status icon.
 
+OPTIONS_DB_UI_SHOW_SIDEPANEL_STALE_BUILDING
+Enables display of stale visibility buildings on sidepanel. Stale visibility means previously detected and should be currently visible based on last known state and location and a player's current detection levels, but nevertheless not currently detected anywhere.
+
 OPTIONS_DB_UI_PLANET_STATUS_ICON_TITLE
 Planet status notification
 
@@ -3114,6 +3117,9 @@ Automatically reposition windows
 
 OPTIONS_DISPLAY_TIMESTAMP
 Show chat timestamp
+
+OPTIONS_SHOW_SIDEPANEL_STALE_BUILDING
+Show stale visibility buildings on sidepanel
 
 OPTIONS_MISC_UI
 Miscellaneous UI Settings
@@ -14449,7 +14455,7 @@ SHP_FIGHTERS_1_DESC
 
 A [[encyclopedia PC_FIGHTER_BAY]] can launch a number of fighters in each combat round. These fighters will then be both valid targets and able to attack ships and other fighters in subsequent combat rounds, but a single hit from any source will destroy a fighter. Unlike [[encyclopedia DAMAGE_TITLE]] inflicted by regular weapons, fighter damage ignores [[metertype METER_SHIELD]] on warships (they fire from within the shields).
 
-Piloting traits affect [[FT_HANGAR_2]], [[FT_HANGAR_3]], and [[FT_HANGAR_4]] fighters in the same way: bad piloting reduces damage by 6 per fighter; good piloting increases damage by 6, great piloting by 12, and ultimate piloting by 18 per fighter shot.
+Piloting traits affect [[FT_HANGAR_2]], [[FT_HANGAR_3]], and [[FT_HANGAR_4]] fighters in the same way: bad piloting reduces damage by [[value BAD_PILOT_FIGHTER_DAMAGE_BONUS]] per fighter; good piloting increases damage by [[value GOOD_PILOT_FIGHTER_DAMAGE_BONUS]], great piloting by [[value GREAT_PILOT_FIGHTER_DAMAGE_BONUS]], and ultimate piloting by [[value ULTIMATE_PILOT_FIGHTER_DAMAGE_BONUS]] per fighter shot.
 Piloting traits do not affect [[FT_HANGAR_1]] fighters.
 
 At the end of combat, carriers will collect any fighters that have survived. If a carrier is in [[metertype METER_SUPPLY]] immediately after movement is resolved, it will refill hangars to maximum.'''
@@ -14458,19 +14464,19 @@ SHP_FIGHTERS_2
 Fighters and Launch Bays 2
 
 SHP_FIGHTERS_2_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by [[value SHP_FIGHTERS_2_FT_HANGAR_2_DAMAGE_BONUS]], [[shippart FT_HANGAR_3]] by [[value SHP_FIGHTERS_2_FT_HANGAR_3_DAMAGE_BONUS]], and [[shippart FT_HANGAR_4]] by [[value SHP_FIGHTERS_2_FT_HANGAR_4_DAMAGE_BONUS]]. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_3
 Fighters and Launch Bays 3
 
 SHP_FIGHTERS_3_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have plasma weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by [[value SHP_FIGHTERS_3_FT_HANGAR_2_DAMAGE_BONUS]], [[shippart FT_HANGAR_3]] by [[value SHP_FIGHTERS_3_FT_HANGAR_3_DAMAGE_BONUS]], and [[shippart FT_HANGAR_4]] by [[value SHP_FIGHTERS_3_FT_HANGAR_4_DAMAGE_BONUS]]. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_4
 Fighters and Launch Bays 4
 
 SHP_FIGHTERS_4_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have death ray weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by [[value SHP_FIGHTERS_4_FT_HANGAR_2_DAMAGE_BONUS]], [[shippart FT_HANGAR_3]] by [[value SHP_FIGHTERS_4_FT_HANGAR_3_DAMAGE_BONUS]], and [[shippart FT_HANGAR_4]] by [[value SHP_FIGHTERS_4_FT_HANGAR_4_DAMAGE_BONUS]]. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_WEAPON_1_2
 Mass Driver 2
@@ -15311,7 +15317,7 @@ The research bonus requires a stability of [[value BLD_INTERSPECIES_ACADEMY_MIN_
 
 Learning to design devices for use by different species is crucial for developing universally usable tools.
 
-Each empire may contain an academy on up to six planets with different species. To build an academy, a planet must have a stability of [[value BLD_INTERSPECIES_ACADEMY_MIN_STABILITY_BUILD]], and must be more than three starlane jumps away from the nearest existing academy.'''
+Each empire may contain an academy on up to seven planets with different species. To build an academy, a planet must have a stability of [[value BLD_INTERSPECIES_ACADEMY_MIN_STABILITY_BUILD]], and must be more than three starlane jumps away from the nearest existing academy.'''
 
 BLD_STOCKPILING_CENTER
 Imperial Entanglement Center

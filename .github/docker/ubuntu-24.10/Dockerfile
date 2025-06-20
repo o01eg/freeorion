@@ -43,12 +43,10 @@ RUN apt-get install --assume-yes \
         libsdl2-dev \
         mesa-common-dev \
         libpng-dev \
-	    libboost-all-dev \
-	    godot3-server \
-	    libboost-all-dev \
-	    libjpeg-dev \
-	    libtiff-dev \
-        python3-psycopg2 \
+	libboost-all-dev \
+	godot3-server \
+	libjpeg-dev \
+	libtiff-dev \
     && rm -rf \
         /var/lib/apt/lists/*
 

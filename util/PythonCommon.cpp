@@ -14,8 +14,9 @@
 
 namespace py = boost::python;
 
-
-inline wchar_t* GetFilePath(const boost::filesystem::path& path)
+namespace {
+#if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32) || defined(FREEORION_ANDROID)
+wchar_t* GetFilePath(const boost::filesystem::path& path)
 {
 #if defined(FREEORION_WIN32)
     const std::wstring_view native_path = path.native();
@@ -27,21 +28,25 @@ inline wchar_t* GetFilePath(const boost::filesystem::path& path)
     return Py_DecodeLocale(path.string().c_str(), nullptr);
 #endif
 }
+#endif
 
-inline auto GetLoggableString(const wchar_t* const original)
+auto GetLoggableString(const wchar_t* const original)
 {
 #if defined(FREEORION_WIN32)
     const std::wstring_view view(original);
     const size_t original_size = view.size(); // passing -1 would compute size for null terminated string, but would include the null
     int utf8_size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, original, original_size, nullptr, 0, nullptr, nullptr);
     std::string utf8_string(utf8_size, '\0');
-    if (utf8_size > 0) {
+    if (utf8_size > 0)
         WideCharToMultiByte(CP_UTF8, 0, original, original_size, utf8_string.data(), utf8_size, nullptr, nullptr);
-    }
     return utf8_string;
 #else
     return original;
 #endif
+}
+
+auto GetPythonExecutable() // should be the containing C++ binary / .exe file
+{ return py::extract<std::string>(py::import("sys").attr("executable"))(); }
 }
 
 PythonCommon::~PythonCommon()
@@ -80,7 +85,7 @@ bool PythonCommon::Initialize() {
         // initializes Python interpreter, allowing Python functions to be called from C++
         Py_Initialize();
         DebugLogger() << "Python initialized";
-        DebugLogger() << "Python program: " << GetLoggableString(Py_GetProgramFullPath());
+        DebugLogger() << "Python program: " << GetPythonExecutable();
         DebugLogger() << "Python version: " << Py_GetVersion();
         DebugLogger() << "Python prefix: " << GetLoggableString(Py_GetPrefix());
         DebugLogger() << "Python module search path: " << GetLoggableString(Py_GetPath());
@@ -127,8 +132,8 @@ void PythonCommon::HandleErrorAlreadySet() {
     }
 
     PyObject *extype, *value, *traceback;
-    PyErr_Fetch(&extype, &value, &traceback);
-    PyErr_NormalizeException(&extype, &value, &traceback);
+    PyErr_Fetch(std::addressof(extype), std::addressof(value), std::addressof(traceback));
+    PyErr_NormalizeException(std::addressof(extype), std::addressof(value), std::addressof(traceback));
     if (!extype) {
         ErrorLogger() << "Missing python exception type";
         return;
@@ -136,7 +141,8 @@ void PythonCommon::HandleErrorAlreadySet() {
 
     py::object o_extype(py::handle<>(py::borrowed(extype)));
     py::object o_value(py::handle<>(py::borrowed(value)));
-    py::object o_traceback = traceback != nullptr ? py::object(py::handle<>(py::borrowed(traceback))) : py::object();
+    py::object o_traceback = (traceback != nullptr) ?
+        py::object(py::handle<>(py::borrowed(traceback))) : py::object();
 
     py::object lines = m_traceback_format_exception(o_extype, o_value, o_traceback);
     for (int i = 0; i < len(lines); ++i) {

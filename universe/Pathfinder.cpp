@@ -51,15 +51,13 @@ namespace {
         void resize(std::size_t a_size) {
             m_data.clear();
             m_data.resize(a_size);
-            m_row_mutexes.resize(a_size);
-            for (auto &row_mutex : m_row_mutexes)
-                row_mutex = std::make_shared<std::shared_mutex>();
+            m_row_mutexes = std::vector<std::shared_mutex>(a_size);
         }
 
         /**N x N table of hop distances in row column form.*/
         std::vector<std::vector<T>> m_data;
         /**Per row mutexes.*/
-        std::vector<std::shared_ptr<std::shared_mutex>> m_row_mutexes;
+        std::vector<std::shared_mutex> m_row_mutexes;
         /**Table mutex*/
         std::shared_mutex m_mutex;
     };
@@ -102,7 +100,7 @@ namespace {
         using cache_miss_handler = std::function<void (std::size_t&, Row)>;
 
         /// A function to examine an entire row cache hit
-        using cache_hit_handler = std::function<void (std::size_t &/*ii*/, const Row /*row*/)>;
+        using cache_hit_handler = std::function<void (std::size_t&/*ii*/, const Row /*row*/)>;
 
         /** Retrieve a single element at (\p ii, \p jj).
           * On cache miss call the \p fill_row which must fill the row
@@ -120,22 +118,22 @@ namespace {
                 throw std::out_of_range("row and/or column index is invalid.");
             }
             {
-                std::shared_lock<std::shared_mutex> row_guard(*m_storage.m_row_mutexes[ii]);
-                const Row &row_data = m_storage.m_data[ii];
+                std::shared_lock<std::shared_mutex> row_guard(m_storage.m_row_mutexes[ii]);
+                const Row& row_data = m_storage.m_data[ii];
 
                 if (NN == row_data.size())
                     return row_data[jj];
             }
             {
-                std::shared_lock<std::shared_mutex> column_guard(*m_storage.m_row_mutexes[jj]);
-                const Row &column_data = m_storage.m_data[jj];
+                std::shared_lock<std::shared_mutex> column_guard(m_storage.m_row_mutexes[jj]);
+                const Row& column_data = m_storage.m_data[jj];
 
                 if (NN == column_data.size())
                     return column_data[ii];
             }
             {
-                std::unique_lock<std::shared_mutex> row_guard(*m_storage.m_row_mutexes[ii]);
-                Row &row_data = m_storage.m_data[ii];
+                std::unique_lock<std::shared_mutex> row_guard(m_storage.m_row_mutexes[ii]);
+                Row& row_data = m_storage.m_data[ii];
 
                 if (NN == row_data.size()) {
                     return row_data[jj];
@@ -173,7 +171,7 @@ namespace {
 
             {
                 // check for existing cache data for requested row
-                std::shared_lock<std::shared_mutex> row_guard(*m_storage.m_row_mutexes[ii]);
+                std::shared_lock<std::shared_mutex> row_guard(m_storage.m_row_mutexes[ii]);
                 const Row& row_data = m_storage.m_data[ii];
 
                 if (NN == row_data.size()) {
@@ -183,7 +181,7 @@ namespace {
             }
 
             {
-                std::unique_lock<std::shared_mutex> row_guard(*m_storage.m_row_mutexes[ii]);
+                std::unique_lock<std::shared_mutex> row_guard(m_storage.m_row_mutexes[ii]);
                 Row& row_data = m_storage.m_data[ii];
 
                 if (NN != row_data.size()) { // re-check for data after getting unique lock
@@ -1017,7 +1015,7 @@ std::pair<std::vector<int>, double> Pathfinder::PathfinderImpl::ShortestPath(
     }
     const GraphImpl::SystemPredicateGraph sys_pred_graph(
         *m_graph_impl.system_graph,
-        GraphImpl::SystemPredicateFilter{m_graph_impl.system_graph.get(), &objects, sys_pred});
+        GraphImpl::SystemPredicateFilter{m_graph_impl.system_graph.get(), std::addressof(objects), sys_pred});
     
     try {
         return ShortestPathImpl(sys_pred_graph, system1_id, system2_id, m_system_id_to_graph_index);

@@ -40,31 +40,17 @@ namespace {
     constexpr EmpireColor CLR_ZERO{{0, 0, 0, 0}};
 
     void SendMessageToAllPlayers(const Message& message) {
-        ServerApp* server = ServerApp::GetApp();
-        if (!server) {
-            ErrorLogger(FSM) << "SendMessageToAllPlayers couldn't get server.";
-            return;
-        }
-
-        for (const auto& player : server->Networking().EstablishedPlayerConnections())
+        for (const auto& player : GetApp().Networking().EstablishedPlayerConnections())
             player->SendMessage(message);
     }
 
     void SendMessageToHost(const Message& message) {
-        ServerApp* server = ServerApp::GetApp();
-        if (!server) {
-            ErrorLogger(FSM) << "SendMessageToHost couldn't get server.";
-            return;
-        }
-        ServerNetworking& networking = server->Networking();
+        ServerNetworking& networking = GetApp().Networking();
 
-        const auto host = networking.GetPlayer(networking.HostPlayerID());
-        if (!host) {
+        if (const auto host = networking.GetPlayer(networking.HostPlayerID()))
+            host->SendMessage(message);
+        else
             ErrorLogger(FSM) << "SendMessageToHost couldn't get host player.";
-            return;
-        }
-
-        host->SendMessage(message);
     }
 
     std::string GetHostNameFromSinglePlayerSetupData(const SinglePlayerSetupData& single_player_setup_data) {
@@ -239,7 +225,7 @@ ServerFSM::ServerFSM(ServerApp &server) :
 
 void ServerFSM::unconsumed_event(const sc::event_base &event) {
     std::string most_derived_message_type_str = "[ERROR: Unknown Event]";
-    const sc::event_base* event_ptr = &event;
+    const sc::event_base* const event_ptr = std::addressof(event);
     if (dynamic_cast<const Disconnection*>(event_ptr))
         most_derived_message_type_str = "Disconnection";
 #define MESSAGE_EVENT_CASE(r, data, name)                               \
@@ -403,9 +389,9 @@ void ServerFSM::HandleNonLobbyDisconnection(const Disconnection& d) {
                 // inform players that save is complete
                 SendMessageToAllPlayers(ServerSaveGameCompleteMessage(save_filename, bytes_written));
             }
-            m_server.m_fsm->process_event(Hostless());
+            m_server.m_fsm.process_event(Hostless());
         } else {
-            m_server.m_fsm->process_event(ShutdownServer());
+            m_server.m_fsm.process_event(ShutdownServer());
         }
     } else {
         // can continue.  Select new host if necessary.
@@ -1290,17 +1276,17 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
     // save files, save game empire data from the save file, player data)
     // during this copying and is updated below from the save file(s)
 
-    if (sender->HasAuthRole(Networking::RoleType::ROLE_HOST)) {
-        if (m_lobby_data->any_can_edit != incoming_lobby_data.any_can_edit) {
-            has_important_changes = true;
-            m_lobby_data->any_can_edit = incoming_lobby_data.any_can_edit;
+    if (sender->HasAuthRole(Networking::RoleType::ROLE_HOST) && 
+        (m_lobby_data->any_can_edit != incoming_lobby_data.any_can_edit))
+    {
+        has_important_changes = true;
+        m_lobby_data->any_can_edit = incoming_lobby_data.any_can_edit;
 
-            // change role ROLE_GALAXY_SETUP for all non-host players
-            for (const auto& player_connection : server.Networking().AllPlayerConnections()) {
-                if (!player_connection->HasAuthRole(Networking::RoleType::ROLE_HOST)) {
-                    player_connection->SetAuthRole(Networking::RoleType::ROLE_GALAXY_SETUP,
-                                                   m_lobby_data->any_can_edit);
-                }
+        // change role ROLE_GALAXY_SETUP for all non-host players
+        for (const auto& player_connection : server.Networking().AllPlayerConnections()) {
+            if (!player_connection->HasAuthRole(Networking::RoleType::ROLE_HOST)) {
+                player_connection->SetAuthRole(Networking::RoleType::ROLE_GALAXY_SETUP,
+                                               m_lobby_data->any_can_edit);
             }
         }
     }
@@ -1333,7 +1319,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 if (psd.empire_name.empty())
                     psd.empire_name = GenerateEmpireName(psd.player_name, incoming_lobby_data.players);
                 if (psd.starting_species_name.empty()) {
-                    if (m_lobby_data->seed != "")
+                    if (!m_lobby_data->seed.empty())
                         psd.starting_species_name = server.m_species_manager.RandomPlayableSpeciesName();
                     else
                         psd.starting_species_name = server.m_species_manager.SequentialPlayableSpeciesName(m_ai_next_index);
@@ -1349,8 +1335,10 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             }
         }
 
+
         bool has_collision = false;
-        // check for color, names, and IDs
+
+        // check for colliding color, names, and IDs
         std::set<EmpireColor> psd_colors;
         std::set<std::string> psd_names;
         std::set<int> psd_ids;
@@ -1600,6 +1588,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
             }
 
         }
+
     } else {
         // can change only himself
         for (auto& i_player : m_lobby_data->players) {
@@ -1630,12 +1619,9 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
                 if (psd_colors.contains(j_player.second.empire_color) ||
                     psd_names.contains(j_player.second.empire_name) ||
                     psd_names.contains(j_player.second.player_name) ||
-                    (j_player.second.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER &&
-                        !sender->HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER)) ||
-                    (j_player.second.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR &&
-                        !sender->HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_MODERATOR)) ||
-                    (j_player.second.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER &&
-                        !sender->HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_OBSERVER)))
+                    (Networking::is_human(j_player.second) && !sender->HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER)) ||
+                    (Networking::is_mod(j_player.second) && !sender->HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_MODERATOR)) ||
+                    (Networking::is_obs(j_player.second) && !sender->HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_OBSERVER)))
                 {
                     i_player.second.player_ready = false;
                     player_setup_data_changed = true;
@@ -1680,9 +1666,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
     }
 
     ValidateClientLimits();
-    if (m_lobby_data->start_locked) {
+    if (m_lobby_data->start_locked)
         has_important_changes = true;
-    }
 
     // to determine if a new save file was selected, check if the selected file
     // index is different, and the new file index is in the valid range
@@ -1755,6 +1740,7 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
     if (has_important_changes) {
         for (auto& player : m_lobby_data->players | range_values)
             player.player_ready = false;
+
     } else {
         // check if all established human players ready to play
         static constexpr auto has_valid_id = [](const auto& id_lb_data) { return id_lb_data.first >= 0; };
@@ -1817,8 +1803,8 @@ sc::result MPLobby::react(const LobbyUpdate& msg) {
         // to players who didn't send the message that this function is
         // responding to.  TODO: check for add/drop
         if (new_save_file_selected || player_setup_data_changed ||
-            player_id != sender->PlayerID() || has_important_changes )
-            player_connection->SendMessage(ServerLobbyUpdateMessage(*m_lobby_data));
+            player_id != sender->PlayerID() || has_important_changes)
+        { player_connection->SendMessage(ServerLobbyUpdateMessage(*m_lobby_data)); }
     }
 
     return discard_event();
@@ -2999,7 +2985,7 @@ sc::result PlayingGame::react(const LobbyUpdate& msg) {
         if (player.first == sender->PlayerID() && player.second.save_game_empire_id != ALL_EMPIRES) {
             int empire_id = server.AddPlayerIntoGame(sender, player.second.save_game_empire_id);
             if (empire_id != ALL_EMPIRES) {
-                server.m_fsm->UpdateIngameLobby();
+                server.m_fsm.UpdateIngameLobby();
                 return discard_event();
             }
         }
@@ -3033,7 +3019,7 @@ void PlayingGame::TurnTimedoutHandler(boost::system::error_code error) {
     }
     Server().ExpireTurn();
     // check if AI players made their orders and advance turn
-    Server().m_fsm->process_event(CheckTurnEndConditions());
+    Server().m_fsm.process_event(CheckTurnEndConditions());
 }
 
 ////////////////////////////////////////////////////////////
@@ -3462,7 +3448,7 @@ void WaitingForTurnEnd::SaveTimedoutHandler(const boost::system::error_code& err
 
     DebugLogger() << "Save timed out.";
     PlayerConnectionPtr dummy_connection = nullptr;
-    Server().m_fsm->process_event(SaveGameRequest(HostSaveGameInitiateMessage(
+    Server().m_fsm.process_event(SaveGameRequest(HostSaveGameInitiateMessage(
         GetAutoSaveFileName(Server().CurrentTurn(), Server().GetGalaxySetupData())),
         dummy_connection));
     if (GetOptionsDB().Get<int>("save.auto.interval") > 0) {

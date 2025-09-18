@@ -24,7 +24,8 @@ namespace {
     void PlayCloseSound() { PlayOptionSound("ui.window.close.sound.path"); }
 
     void AddOptions(OptionsDB& db) {
-        db.AddFlag('w', "window-reset", UserStringNop("OPTIONS_DB_WINDOW_RESET"), false);
+        db.AddFlag('w', "window-reset", UserStringNop("OPTIONS_DB_WINDOW_RESET"),
+                   OptionsDB::Storable::UNSTORABLE);
     }
     bool temp_bool = RegisterOptions(&AddOptions);
 
@@ -76,8 +77,8 @@ void CUI_MinRestoreButton::Toggle() {
 // CUI_PinButton
 ////////////////////////////////////////////////
 namespace {
-    auto GetButtonSubTexture(std::string name)
-    { return GG::SubTexture(ClientUI::GetTexture( ClientUI::ArtDir() / "icons" / "buttons" / name)); }
+    GG::SubTexture GetButtonSubTexture(std::string name)
+    { return GG::SubTexture(GetApp().GetUI().GetTexture( ClientUI::ArtDir() / "icons" / "buttons" / name)); }
 }
 
 CUI_PinButton::CUI_PinButton() :
@@ -165,14 +166,14 @@ void CUIWnd::Init() {
     InitButtons();
     SetChildClippingMode(ChildClippingMode::ClipToClientAndWindowSeparately);
 
-    auto* app = GGHumanClientApp::GetApp();
+    auto& app = GetApp();
 
     if (!m_config_name.empty()) {
         LoadOptions();
-        app->FullscreenSwitchSignal.connect(boost::bind(&CUIWnd::LoadOptions, this));
+        app.FullscreenSwitchSignal.connect(boost::bind(&CUIWnd::LoadOptions, this));
     }
 
-    m_title = GG::Wnd::Create<CUILabel>(Name(), GG::FORMAT_LEFT, GG::NO_WND_FLAGS,
+    m_title = GG::Wnd::Create<CUILabel>(Name(), app.GetUI(), GG::FORMAT_LEFT, GG::NO_WND_FLAGS,
                                         BORDER_LEFT, TITLE_OFFSET, Width(), TopBorder());
 
     // User-dragable windows recalculate their position only when told to (e.g.
@@ -180,9 +181,9 @@ void CUIWnd::Init() {
     // Non-user-dragable windows are given the chance to position themselves on
     // every resize event.
     if (Dragable() || m_resizable)
-        app->RepositionWindowsSignal.connect(boost::bind(&CUIWnd::ResetDefaultPosition, this));
+        app.RepositionWindowsSignal.connect(boost::bind(&CUIWnd::ResetDefaultPosition, this));
     else
-        app->WindowResizedSignal.connect(boost::bind(&CUIWnd::ResetDefaultPosition, this));
+        app.WindowResizedSignal.connect(boost::bind(&CUIWnd::ResetDefaultPosition, this));
 }
 
 void CUIWnd::InitSizeMove(GG::Pt ul, GG::Pt lr) {
@@ -245,13 +246,9 @@ void CUIWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
         if (const auto parent = Parent()) {
             // Keep this CUIWnd entirely inside its parent.
             available_size = parent->ClientSize();
-        } else if (const auto* app = GGHumanClientApp::GetApp()) {
-            // Keep this CUIWnd entirely inside the application window.
-            available_size = app->AppSize();
         } else {
-            available_size = GG::Pt(GG::X(GGHumanClientApp::MaximumPossibleWidth()),
-                                    GG::Y(GGHumanClientApp::MaximumPossibleHeight()));
-            ErrorLogger() << "CUIWnd::SizeMove() could not get app instance!";
+            // Keep this CUIWnd entirely inside the application window.
+            available_size = GetApp().AppSize();
         }
 
         // Limit window size to be no larger than the containing window.
@@ -305,8 +302,8 @@ void CUIWnd::Render() {
         glDrawArrays(GL_LINE_LOOP,      m_buffer_indices[0].first, m_buffer_indices[0].second);
 
     } else {
-        bool flashing = m_flashing && static_cast<int>(GG::GUI::GetGUI()->Ticks()) % (m_flash_duration * 2) > m_flash_duration;
-        auto focus_wnd = GG::GUI::GetGUI()->FocusWnd();
+        bool flashing = m_flashing && static_cast<int>(GetApp().Ticks()) % (m_flash_duration * 2) > m_flash_duration;
+        auto focus_wnd = GetApp().FocusWnd();
         bool highlight = (focus_wnd.get() == this || this->IsAncestorOf(focus_wnd));
 
         flashing ? glColor(GG::LightenClr(ClientUI::WndColor())) : glColor(ClientUI::WndColor());
@@ -366,8 +363,7 @@ void CUIWnd::LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) {
         GG::Pt requested_lr = pt - m_drag_offset;
 
         const auto parent = Parent();
-        const GG::Pt max_lr = parent ?
-            parent->ClientLowerRight() : GGHumanClientApp::GetApp()->AppSize();
+        const GG::Pt max_lr = parent ? parent->ClientLowerRight() : GetApp().AppSize();
 
         GG::X new_x = std::min(max_lr.x, requested_lr.x);
         GG::Y new_y = std::min(max_lr.y, requested_lr.y);
@@ -441,9 +437,9 @@ void CUIWnd::InitButtons() {
     // create the close button
     if (m_closable) {
         m_close_button = Wnd::Create<CUIButton>(
-            GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "close.png")),
-            GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "close_clicked.png")),
-            GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "close_mouseover.png")));
+            GG::SubTexture(GetApp().GetUI().GetTexture(button_texture_dir / "close.png")),
+            GG::SubTexture(GetApp().GetUI().GetTexture(button_texture_dir / "close_clicked.png")),
+            GG::SubTexture(GetApp().GetUI().GetTexture(button_texture_dir / "close_mouseover.png")));
         m_close_button->SetColor(ClientUI::WndInnerBorderColor());
         m_close_button->LeftClickedSignal.connect(-1, &PlayCloseSound);
         m_close_button->Resize(GG::Pt(GG::X(ClientUI::TitlePts()), GG::Y(ClientUI::TitlePts())));
@@ -482,7 +478,7 @@ void CUIWnd::CloseClicked() {
     if (auto parent = Parent())
         parent->DetachChild(this);
     else
-        GG::GUI::GetGUI()->Remove(shared_from_this());
+        GetApp().Remove(shared_from_this());
 
     //m_minimized_buffer.clear();
     //m_outer_border_buffer.clear();
@@ -601,7 +597,7 @@ void CUIWnd::Show() {
 }
 
 void CUIWnd::ResetDefaultPosition() {
-    GG::Rect default_position = CalculatePosition();
+    const GG::Rect default_position = CalculatePosition();
     if (default_position.ul.x != INVALID_X) // do nothing if not overridden
         InitSizeMove(default_position.ul, default_position.lr);
 }
@@ -624,41 +620,34 @@ void CUIWnd::SaveDefaultedOptions() {
     const std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ? ".fullscreen" : ".windowed";
     const auto size = m_minimized ? m_original_size : Size();
 
-    std::string config_name = config_prefix + window_mode + ".left";
-    int int_value = Value(RelativeUpperLeft().x);
-    if (m_defaulted_options.contains(config_name))
-        db.SetDefault(config_name, int_value);
+    const auto left_config_name = config_prefix + window_mode + ".left";
+    if (m_defaulted_options.contains(left_config_name))
+        db.SetDefault(left_config_name, Value(RelativeUpperLeft().x));
 
-    config_name = config_prefix + window_mode + ".top";
-    int_value = Value(RelativeUpperLeft().y);
-    if (m_defaulted_options.contains(config_name))
-        db.SetDefault(config_name, int_value);
+    const auto top_config_name = config_prefix + window_mode + ".top";
+    if (m_defaulted_options.contains(top_config_name))
+        db.SetDefault(top_config_name, Value(RelativeUpperLeft().y));
 
-    config_name = config_prefix + window_mode + ".width";
-    int_value = Value(size.x);
-    if (m_defaulted_options.contains(config_name))
-        db.SetDefault(config_name, int_value);
+    const auto width_config_name = config_prefix + window_mode + ".width";
+    if (m_defaulted_options.contains(width_config_name))
+        db.SetDefault(width_config_name, Value(size.x));
 
-    config_name = config_prefix + window_mode + ".height";
-    int_value = Value(size.y);
-    if (m_defaulted_options.contains(config_name))
-        db.SetDefault(config_name, int_value);
+    const auto height_config_name = config_prefix + window_mode + ".height";
+    if (m_defaulted_options.contains(height_config_name))
+        db.SetDefault(height_config_name, Value(size.y));
 
     if (!Modal()) {
-        config_name = config_prefix + ".visible";
-        bool bool_value = Visible();
-        if (m_defaulted_options.contains(config_name))
-            db.SetDefault(config_name, bool_value);
+        const auto vis_config_name = config_prefix + ".visible";
+        if (m_defaulted_options.contains(vis_config_name))
+            db.SetDefault(vis_config_name, Visible());
 
-        config_name = config_prefix + ".pinned";
-        bool_value = m_pinned;
-        if (m_defaulted_options.contains(config_name))
-            db.SetDefault(config_name, bool_value);
+        const auto pinned_config_name = config_prefix + ".pinned";
+        if (m_defaulted_options.contains(pinned_config_name))
+            db.SetDefault(pinned_config_name, m_pinned);
 
-        config_name = config_prefix + ".minimized";
-        bool_value = m_minimized;
-        if (m_defaulted_options.contains(config_name))
-            db.SetDefault(config_name, bool_value);
+        const auto min_config_name = config_prefix + ".minimized";
+        if (m_defaulted_options.contains(min_config_name))
+            db.SetDefault(min_config_name, m_minimized);
     }
 }
 
@@ -681,17 +670,16 @@ void CUIWnd::SaveOptions() const {
 
     const auto size = m_minimized ? m_original_size : Size();
 
-    const std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ?
-                              ".fullscreen" : ".windowed";
+    const std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ? ".fullscreen" : ".windowed";
 
-    db.Set(option_prefix + window_mode + ".left",      Value(RelativeUpperLeft().x));
-    db.Set(option_prefix + window_mode + ".top",       Value(RelativeUpperLeft().y));
-    db.Set(option_prefix + window_mode + ".width",     Value(size.x));
-    db.Set(option_prefix + window_mode + ".height",    Value(size.y));
+    db.Set(option_prefix + window_mode + ".left",   Value(RelativeUpperLeft().x));
+    db.Set(option_prefix + window_mode + ".top",    Value(RelativeUpperLeft().y));
+    db.Set(option_prefix + window_mode + ".width",  Value(size.x));
+    db.Set(option_prefix + window_mode + ".height", Value(size.y));
 
     if (!Modal()) {
-        db.Set(option_prefix + ".visible", Visible());
-        db.Set(option_prefix + ".pinned", m_pinned);
+        db.Set(option_prefix + ".visible",   Visible());
+        db.Set(option_prefix + ".pinned",    m_pinned);
         db.Set(option_prefix + ".minimized", m_minimized);
     }
 
@@ -702,10 +690,11 @@ void CUIWnd::LoadOptions() {
     OptionsDB& db = GetOptionsDB();
 
     // The default empty string means 'do not save/load properties'
-    std::string option_prefix = "ui." + m_config_name;
-    if (m_config_name.empty()) {
+    const std::string option_prefix = "ui." + m_config_name;
+    if (m_config_name.empty())
         return;
-    } else if (!db.OptionExists(option_prefix + ".initialized")) {
+
+    if (!db.OptionExists(option_prefix + ".initialized")) {
         ErrorLogger() << "CUIWnd::LoadOptions() : attempted to load window options using name \"" << m_config_name << "\" but the options do not appear to be registered in the OptionsDB.";
         return;
     }
@@ -722,9 +711,8 @@ void CUIWnd::LoadOptions() {
 
     m_config_save = false;
 
-    if (m_minimized) {
+    if (m_minimized)
         MinimizeClicked();
-    }
 
     if (ul.x == INVALID_X || ul.y == INVALID_Y) {
         // If no options have been saved yet, allow the window to calculate its
@@ -739,19 +727,16 @@ void CUIWnd::LoadOptions() {
     }
 
     if (!Modal()) {
-        if (db.Get<bool>(option_prefix + ".visible")) {
+        if (db.Get<bool>(option_prefix + ".visible"))
             Show();
-        } else {
+        else
             Hide();
-        }
 
-        if (db.Get<bool>(option_prefix + ".pinned") != m_pinned) {
+        if (db.Get<bool>(option_prefix + ".pinned") != m_pinned)
             PinClicked();
-        }
 
-        if (db.Get<bool>(option_prefix + ".minimized") != m_minimized) {
+        if (db.Get<bool>(option_prefix + ".minimized") != m_minimized)
             MinimizeClicked();
-        }
     }
 
     m_config_save = true;
@@ -786,14 +771,15 @@ std::string CUIWnd::AddWindowOptions(std::string_view config_name,
         } else {
             // Old window has been destroyed, use the properties it had.
             db.Add<bool>(std::string{"ui."}.append(config_name).append(".initialized"),
-                         UserStringNop("OPTIONS_DB_UI_WINDOWS_EXISTS"), false, Validator<bool>(), false);
+                         UserStringNop("OPTIONS_DB_UI_WINDOWS_EXISTS"), false, Validator<bool>(),
+                         OptionsDB::Storable::UNSTORABLE);
             new_name = config_name;
         }
     } else if (!config_name.empty()) {
         const int max_width_plus_one = GGHumanClientApp::MaximumPossibleWidth() + 1;
         const int max_height_plus_one = GGHumanClientApp::MaximumPossibleHeight() + 1;
 
-        db.Add(std::string{"ui."}.append(config_name).append(".initialized"),      UserStringNop("OPTIONS_DB_UI_WINDOWS_EXISTS"),          false,      Validator<bool>(), false);
+        db.Add(std::string{"ui."}.append(config_name).append(".initialized"),      UserStringNop("OPTIONS_DB_UI_WINDOWS_EXISTS"),          false,      Validator<bool>(), OptionsDB::Storable::UNSTORABLE);
 
         db.Add(std::string{"ui."}.append(config_name).append(".fullscreen.left"),  UserStringNop("OPTIONS_DB_UI_WINDOWS_LEFT"),            left,       OrValidator<int>(RangedValidator<int>(0, max_width_plus_one),   DiscreteValidator<int>(Value(INVALID_X))));
         db.Add(std::string{"ui."}.append(config_name).append(".fullscreen.top"),   UserStringNop("OPTIONS_DB_UI_WINDOWS_TOP"),             top,        OrValidator<int>(RangedValidator<int>(0, max_height_plus_one),  DiscreteValidator<int>(Value(INVALID_Y))));
@@ -891,9 +877,7 @@ void CUIWnd::SetParent(std::shared_ptr<GG::Wnd> wnd) noexcept {
 ///////////////////////////////////////
 CUIEditWnd::CUIEditWnd(GG::X w, std::string prompt_text, std::string edit_text, GG::Flags<GG::WndFlag> flags) :
     CUIWnd(std::move(prompt_text), GG::X0, GG::Y0, w, GG::Y1, flags)
-{
-    m_edit = GG::Wnd::Create<CUIEdit>(std::move(edit_text));
-}
+{ m_edit = GG::Wnd::Create<CUIEdit>(std::move(edit_text)); }
 
 void CUIEditWnd::CompleteConstruction() {
     CUIWnd::CompleteConstruction();
@@ -913,7 +897,7 @@ void CUIEditWnd::CompleteConstruction() {
     m_cancel_bn->OffsetMove(GG::Pt(GG::X0, (m_edit->Height() - m_ok_bn->Height()) / 2));
 
     Resize(GG::Pt(Width(), std::max(m_edit->Bottom(), m_cancel_bn->Bottom()) + BottomBorder() + 3));
-    MoveTo(GG::Pt((GG::GUI::GetGUI()->AppWidth() - Width()) / 2, (GG::GUI::GetGUI()->AppHeight() - Height()) / 2));
+    MoveTo(GG::Pt((GetApp().AppWidth() - Width()) / 2, (GetApp().AppHeight() - Height()) / 2));
 
     AttachChild(m_edit);
     AttachChild(m_ok_bn);
@@ -926,7 +910,7 @@ void CUIEditWnd::CompleteConstruction() {
 }
 
 void CUIEditWnd::ModalInit()
-{ GG::GUI::GetGUI()->SetFocusWnd(m_edit); }
+{ GetApp().SetFocusWnd(m_edit); }
 
 void CUIEditWnd::KeyPress(GG::Key key, uint32_t key_code_point,
                           GG::Flags<GG::ModKey> mod_keys)

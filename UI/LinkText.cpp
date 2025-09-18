@@ -12,6 +12,7 @@
 #include "../util/Logger.h"
 #include "../util/VarText.h"
 #include "../util/i18n.h"
+#include "../client/human/GGHumanClientApp.h"
 
 #include <GG/WndEvent.h>
 #include <GG/GUI.h>
@@ -202,7 +203,7 @@ void LinkText::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
 
 void LinkText::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto rclick_action = [this, pt, mod_keys]() { TextLinker::RClick_(pt, mod_keys); };
-    auto copy_action = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
+    auto copy_action = [this]() { GetApp().CopyWndText(this); };
 
     // create popup menu
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
@@ -262,7 +263,7 @@ namespace {
         GG::Clr color = ClientUI::DefaultLinkColor();
         // get object indicated by object_id, and then get object's owner, if any
         int object_id = CastStringToInt(object_id_str);
-        const auto& context = IApp::GetApp()->GetContext();
+        const auto& context = GetApp().GetContext();
         auto object = context.ContextObjects().get(object_id);
         if (object && !object->Unowned())
             if (auto empire = context.GetEmpire(object->Owner()))
@@ -334,8 +335,8 @@ TextLinker::TextLinker()
 { RegisterLinkTags(); }
 
 void TextLinker::SetDecorator(std::string_view link_type, DecoratorType dt) {
-    auto it = std::find_if(m_decorators.begin(), m_decorators.end(),
-                           [link_type](const auto& deco) { return deco.first == link_type; });
+    const auto is_link_type = [link_type](const auto& deco) noexcept { return deco.first == link_type; };
+    auto it = range_find_if(m_decorators, is_link_type);
     if (it != m_decorators.end())
         it->second = dt;
     else
@@ -344,15 +345,15 @@ void TextLinker::SetDecorator(std::string_view link_type, DecoratorType dt) {
 }
 
 std::string TextLinker::LinkDefaultFormatTag(const Link& link, const std::string& content) const {
-    const auto it = std::find_if(m_decorators.begin(), m_decorators.end(),
-                                 [dt{link.type}](const auto& deco) { return deco.first == dt; });
+    const auto is_link_type = [dt{link.type}](const auto& deco) noexcept { return deco.first == dt; };
+    const auto it = range_find_if(m_decorators, is_link_type);
     const auto dt = (it != m_decorators.end() ? it->second : DecoratorType::Default);
     return Decorate(dt, link.data, content);
 }
 
 std::string TextLinker::LinkRolloverFormatTag(const Link& link, const std::string& content) const {
-    const auto it = std::find_if(m_decorators.begin(), m_decorators.end(),
-                                 [dt{link.type}](const auto& deco) { return deco.first == dt; });
+    const auto is_link_type = [dt{link.type}](const auto& deco) noexcept { return deco.first == dt; };
+    const auto it = range_find_if(m_decorators, is_link_type);
     const auto dt = (it != m_decorators.end() ? it->second : DecoratorType::Default);
     return DecorateRollover(dt, link.data, content);
 }
@@ -609,12 +610,7 @@ void TextLinker::MarkLinks() {
 }
 
 namespace {
-    const Species* GetSpecies(std::string_view sv) {
-        if (const auto* app = IApp::GetApp())
-            return app->GetContext().species.GetSpecies(sv);
-        else
-            return nullptr;
-    };
+    const Species* GetSpecies(std::string_view sv) { return GetApp().GetContext().species.GetSpecies(sv); }
 }
 
 std::string LinkStringIfPossible(std::string_view raw, std::string_view user_string) {

@@ -2016,6 +2016,9 @@ Sets the color of the scan-line shading over planet graphics on the sidepanel.
 OPTIONS_DB_UI_PLANET_STATUS_ICON_SIZE
 Sets the size of the planet status icon.
 
+OPTIONS_DB_UI_SHOW_SIDEPANEL_STALE_BUILDING
+Enables display of stale visibility buildings on sidepanel. Stale visibility means previously detected and should be currently visible based on last known state and location and a player's current detection levels, but nevertheless not currently detected anywhere.
+
 OPTIONS_DB_UI_PLANET_STATUS_ICON_TITLE
 Planet status notification
 
@@ -3114,6 +3117,9 @@ Automatically reposition windows
 
 OPTIONS_DISPLAY_TIMESTAMP
 Show chat timestamp
+
+OPTIONS_SHOW_SIDEPANEL_STALE_BUILDING
+Show stale visibility buildings on sidepanel
 
 OPTIONS_MISC_UI
 Miscellaneous UI Settings
@@ -5726,6 +5732,25 @@ ADOPTED_POLICIES
 NO_POLICIES_ADOPTED
 No Policies Known Adopted
 
+# %1% name or link to policy
+# %2% turn start of current adoption, or "before first turn"
+# %3% total turns has been adopted
+POLICY_ADOPTED_ON_TURN_AND_TOTAL_TURNS
+%1%  since %2%  total turns: %3%
+
+FORMERLY_ADOPTED_POLICIES
+'''Formerly Adopted Policies: '''
+
+# %1% name or link to policy
+# %2% turn end of when policy was previously adopted
+# %3% total turns has been adopted
+POLICY_WAS_LAST_ADOPTED_ON_TURN_AND_TOTAL_TURNS
+%1%  last on %2%  total turns: %3%
+
+# %1% turn number
+POLICY_ADOPTED_TURN
+turn: %1%
+
 AVAILABLE_PARTS
 '''Available Parts: '''
 
@@ -6715,7 +6740,7 @@ Stealth
 METER_STEALTH_VALUE_DESC
 '''The term Stealth represents the ability of an object to dodge all kinds of sensors. Only empires with a [[encyclopedia DETECTION_TITLE]] higher than or equal to the Stealth value can see the object.
 
-If an empire owns more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] in a system, that empire will suffer a stealth penalty of [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of the number of excess ships.
+Larger fleets are easier to detect. Empire's ships will suffer a stealth penalty of [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied the number of ships in the system or on a starlane.
 
 Space ships, buildings, specials, systems and planets have a Stealth meter.
 
@@ -15029,7 +15054,7 @@ SPY_PLANET_STEALTH_MOD_DESC
 
 • Colonies may have an extra malus or bonus to [[metertype METER_STEALTH]] based on the colony's species.
 
-• Due to [[FLEET_UNSTEALTHINESS]], when there are more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] ships of the same empire in a system, their [[metertype METER_STEALTH]] is reduced by [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] less than the number of ships that empire has in the system.
+• Due to [[FLEET_UNSTEALTHINESS]], the [[metertype METER_STEALTH]] of an empire's ship is reduced by the number of other ships of that empire in the same system or on the same starlane.
 
 • Ships in systems with [[STAR_NONE]] receive a [[value SPY_DECEPTION_EMPTY_SPACE_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECEPTION_EMPTY_SPACE_PENALTY]].
 
@@ -16866,7 +16891,7 @@ Organic Hull
 
 SH_ORGANIC_DESC
 '''A living hull with one external slot and one internal slot.
-Organic Growth: starts with 24 [[metertype METER_STRUCTURE]], but grows an additional 24 structure over 25 turns.
+Organic Growth: starts with [[value SH_ORGANIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_ORGANIC_GROWTH_STRUCTURE]] structure over [[value SH_ORGANIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is high.
 
@@ -16893,7 +16918,7 @@ Endomorphic Hull
 
 SH_ENDOMORPHIC_DESC
 '''A half living hull with four external slots and two internal slots.
-Organic Growth: starts with 40 [[metertype METER_STRUCTURE]], but grows an additional 120 structure over 30 turns.
+Organic Growth: starts with [[value SH_ENDOMORPHIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_ENDOMORPHIC_GROWTH_STRUCTURE]] structure over [[value SH_ENDOMORPHIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is high.
 
@@ -16908,7 +16933,7 @@ Symbiotic Hull
 
 SH_SYMBIOTIC_DESC
 '''A living hull with two internal and two external slots. Exists in a symbiotic relationship with its crew, increasing its [[metertype METER_STEALTH]] and speed.
-Organic Growth: starts with 80 [[metertype METER_STRUCTURE]], but grows an additional 80 structure over 50 turns.
+Organic Growth: starts with [[value SH_SYMBIOTIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_SYMBIOTIC_GROWTH_STRUCTURE]] structure over [[value SH_SYMBIOTIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is high, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is high.
 
@@ -16923,7 +16948,7 @@ Protoplasmic Hull
 
 SH_PROTOPLASMIC_DESC
 '''A living hull with three internal slots and two external slots.
-Organic Growth: starts with 40 [[metertype METER_STRUCTURE]], gains an additional 200 over 50 turns.
+Organic Growth: starts with [[value SH_PROTOPLASMIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_PROTOPLASMIC_GROWTH_STRUCTURE]] structure over [[value SH_PROTOPLASMIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is very high, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is high.
 
@@ -16938,7 +16963,7 @@ SH_ENDOSYMBIOTIC_DESC
 '''This living mono-cellular hull exists in a symbiotic relationship with its crew, suspending them in its cytoplasm and using them as organelles.
 It has four external slots and three internal slots.
 
-The base hull is born with 40 [[metertype METER_STRUCTURE]], but grows an additional 120 structure over 30 turns.
+Organic Growth: Is born with [[value SH_ENDOSYMBIOTIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_ENDOSYMBIOTIC_GROWTH_STRUCTURE]] structure over [[value SH_ENDOSYMBIOTIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is high, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is high.
 
@@ -16955,7 +16980,7 @@ Ravenous Hull
 SH_RAVENOUS_DESC
 '''This non-living organic hull - or 'zombie' hull - has been built from the blood and parts of its brethren. It has five external slots and two internal slots.
 
-Organic Growth: starts with 40 [[metertype METER_STRUCTURE]], grows an additional 160 structure over 40 turns.
+Organic Growth: starts with [[value SH_RAVENOUS_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_RAVENOUS_GROWTH_STRUCTURE]] structure over [[value SH_RAVENOUS_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is very high and [[metertype METER_SPEED]] is high.
 
@@ -16971,7 +16996,7 @@ Bio-Adaptive Hull
 
 SH_BIOADAPTIVE_DESC
 '''A living hull with mind and body in unison, master of healing and endurance. It has three external slots and three internal slots.
-Organic Growth: starts with 120 [[metertype METER_STRUCTURE]], grows an additional 200 structure over 50 turns.
+Organic Growth: starts with [[value SH_BIOADAPTIVE_STRUCTURE]] [[metertype METER_STRUCTURE]], grows an additional [[value SH_BIOADAPTIVE_GROWTH_STRUCTURE]] structure over [[value SH_BIOADAPTIVE_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is very high, [[metertype METER_DETECTION]] is very high and [[metertype METER_SPEED]] is high.
 
@@ -16987,7 +17012,7 @@ Sentient Hull
 
 SH_SENTIENT_DESC
 '''This self-aware organic flagship with powerful analytical abilities and a tremendous memory capacity, which allow it to direct friendly vessels and provide them with useful information and subtle tactical cues in combat, giving a [[metertype METER_STEALTH]] and [[metertype METER_DETECTION]] bonus to all accompanying friendly ships. It has six external slots, three internal slots, and a core slot.
-Organic Growth: Starts with 96 [[metertype METER_STRUCTURE]], grows an additional 360 over 45 turns.
+Organic Growth: starts with [[value SH_SENTIENT_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_SENTIENT_GROWTH_STRUCTURE]] structure over [[value SH_SENTIENT_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is very high, [[metertype METER_DETECTION]] is very high and [[metertype METER_SPEED]] is high.
 

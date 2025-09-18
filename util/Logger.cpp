@@ -24,6 +24,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "Directories.h"
+#include "ranges.h"
 
 #ifdef _MSC_VER
 #  include <ctime>
@@ -179,7 +180,6 @@ namespace {
             for (const auto& name_and_frontend : m_names_to_front_ends)
                 logging::core::get()->remove_sink(name_and_frontend.second);
         }
-
     };
 
     LoggersToSinkFrontEnds& GetLoggersToSinkFrontEnds() {
@@ -237,8 +237,8 @@ namespace {
     LogLevel GetSourceThreshold(std::string_view source) {
         std::scoped_lock lock(severity_filter_mutex);
 
-        auto it = std::find_if(severity_filters.begin(), severity_filters.end(),
-                               [source](const auto& src_severity) { return src_severity.first == source; });
+        const auto is_src = [source](const auto& src_severity) noexcept { return src_severity.first == source; };
+        auto it = range_find_if(severity_filters, is_src);
         return (it == severity_filters.end()) ? LogLevel::error : it->second;
     }
 
@@ -249,8 +249,8 @@ namespace {
         severity_filter[source] = used_threshold;
         logging::core::get()->set_filter(severity_filter);
 
-        auto it = std::find_if(severity_filters.begin(), severity_filters.end(),
-                               [&source](auto& src_severity) { return src_severity.first == source; });
+        const auto is_src = [&source](const auto& src_severity) noexcept { return src_severity.first == source; };
+        auto it = range_find_if(severity_filters, is_src);
         if (it == severity_filters.end())
             severity_filters.emplace_back(std::move(source), threshold);
         else
@@ -329,14 +329,14 @@ void InitLoggingSystem(const std::string& log_file, std::string_view _unnamed_lo
         auto date_time = std::time(nullptr);
         std::tm temp_tm;
         #ifdef _MSC_VER
-            localtime_s(&temp_tm, &date_time);
+            localtime_s(std::addressof(temp_tm), std::addressof(date_time));
         #else
-            localtime_r(&date_time, &temp_tm);
+            localtime_r(&date_time, std::addressof(temp_tm));
         #endif
 
-        char time_as_string_buf[100] = {};
-        std::strftime(time_as_string_buf, sizeof(time_as_string_buf), "%c", &temp_tm);
-        InfoLogger(log) << "Logger initialized at " << time_as_string_buf;
+        std::array<char, 100> time_buf{};
+        const auto count = std::strftime(time_buf.data(), time_buf.size(), "%c", std::addressof(temp_tm));
+        InfoLogger(log) << "Logger initialized at " << (count > 0 ? std::string_view{time_buf.data(), count} : "???");
     }
 }
 

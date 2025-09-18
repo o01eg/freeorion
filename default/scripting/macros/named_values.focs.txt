@@ -42,6 +42,26 @@ SPATIAL_FLUX_STEALTH_HULL_BASE
 SPATIAL_FLUX_STEALTH_NON_AGGRESSIVE_BONUS
 '''10'''
 
+
+// Named values for living hulls - LIVING_HULL_NAMED macro and base values come from ship_hulls/hull_structures.macros
+[[LIVING_HULL_NAMED(SH_BIOADAPTIVE)]]
+[[LIVING_HULL_NAMED(SH_ENDOMORPHIC)]]
+[[LIVING_HULL_NAMED(SH_ENDOSYMBIOTIC)]]
+[[LIVING_HULL_NAMED(SH_ORGANIC)]]
+[[LIVING_HULL_NAMED(SH_PROTOPLASMIC)]]
+[[LIVING_HULL_NAMED(SH_RAVENOUS)]]
+[[LIVING_HULL_NAMED(SH_SENTIENT)]]
+[[LIVING_HULL_NAMED(SH_SYMBIOTIC)]]
+
+LIVING_HULL_NAMED
+'''
+NamedReal    name = "@1@_STRUCTURE" value = ([[@1@_BASE_STRUCTURE]] * [[SHIP_STRUCTURE_FACTOR]])
+NamedInteger name = "@1@_GROWTH_STRUCTURE" value = round([[@1@_GROWTH_STRUCTURE]] * [[SHIP_STRUCTURE_FACTOR]])
+NamedInteger name = "@1@_GROWTH_TURNS" value = [[@1@_GROWTH_TURNS]]
+NamedReal    name = "@1@_GROWTH_PER_TURN" value = (NamedIntegerLookup name = "@1@_GROWTH_STRUCTURE" / NamedIntegerLookup name = "@1@_GROWTH_TURNS")
+'''
+
+
 // Black hole and hyper dam
 NamedReal name = "BLD_BLACK_HOLE_POW_GEN_MIN_STABILITY" value = 20
 
@@ -67,6 +87,7 @@ NamedReal name = "DEF_SYST_DEF_MINE_3_DAMAGE" value = 14 * [[SYSTEM_MINES_DAMAGE
 
 NamedReal name = "FU_RAMSCOOP_REFUEL" value = 0.4
 
+#include "/scripting/ship_hulls/hull_structures.macros"
 #include "/scripting/macros/misc.macros"
 #include "/scripting/macros/base_prod.macros"
 #include "/scripting/macros/priorities.macros"

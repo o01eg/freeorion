@@ -26,6 +26,17 @@ unroll and hide the stack trace, print a message and still crash anyways. */
 #  include <windows.h>
 #endif
 
+namespace {
+const auto& GetLoggerInitHelper() {
+    // used to for init of logger before ServerApp and thus logger shutdown after ServerApp
+    static struct [[nodiscard]] LoggerHelper {
+        LoggerHelper() { ServerApp::InitLogging(); }
+        ~LoggerHelper() { ShutdownLoggingSystemFileSink(); }
+    } static_logger_init_helper;
+    return static_logger_init_helper;
+}
+}
+
 #ifndef FREEORION_WIN32
 int main(int argc, char* argv[]) {
     InitDirs(argv[0]);
@@ -51,98 +62,94 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
                                 argi8.data(), utf8_sz, NULL, NULL);
             args.push_back(argi8);
         } else {
-            ErrorLogger() << "main() couldn't convert argument to UTF8: " << argi16;
             std::cerr << "main() couldn't convert argument to UTF8" << std::endl;
         }
     }
-    InitDirs((args.empty() ? "" : *args.begin()));
+    InitDirs((args.empty() ? "" : args.front()));
 #endif
+
+    [[maybe_unused]] const auto& logger_init_helper = GetLoggerInitHelper();
+    auto& db = GetOptionsDB();
 
 #ifndef FREEORION_DMAIN_KEEP_STACKTRACE
     try {
 #endif
-        GetOptionsDB().Add<std::string>('h', "help",                                    UserStringNop("OPTIONS_DB_HELP"),                       "NOOP",
-                                        Validator<std::string>(),   false);
-        GetOptionsDB().AddFlag('v', "version",                                          UserStringNop("OPTIONS_DB_VERSION"),                    false);
-        GetOptionsDB().AddFlag('s', "singleplayer",                                     UserStringNop("OPTIONS_DB_SINGLEPLAYER"),               false);
-        GetOptionsDB().AddFlag("hostless",                                              UserStringNop("OPTIONS_DB_HOSTLESS"),                   false);
-        GetOptionsDB().AddFlag("skip-checksum",                                         UserStringNop("OPTIONS_DB_SKIP_CHECKSUM"),              false);
-        GetOptionsDB().AddFlag("testing",                                               UserStringNop("OPTIONS_DB_TESTING"),                    false);
-        GetOptionsDB().AddFlag("load-or-quickstart",                                    UserStringNop("OPTIONS_DB_LOAD_OR_QUICKSTART"),         false);
-        GetOptionsDB().Add<int>("network.server.ai.min",                                UserStringNop("OPTIONS_DB_MP_AI_MIN"),                  0);
-        GetOptionsDB().Add<int>("network.server.ai.max",                                UserStringNop("OPTIONS_DB_MP_AI_MAX"),                  -1);
-        GetOptionsDB().Add<int>("network.server.human.min",                             UserStringNop("OPTIONS_DB_MP_HUMAN_MIN"),               0);
-        GetOptionsDB().Add<int>("network.server.human.max",                             UserStringNop("OPTIONS_DB_MP_HUMAN_MAX"),               -1);
-        GetOptionsDB().Add<int>("network.server.conn-human-empire-players.min",         UserStringNop("OPTIONS_DB_MP_CONN_HUMAN_MIN"),          0);
-        GetOptionsDB().Add<int>("network.server.unconn-human-empire-players.max",       UserStringNop("OPTIONS_DB_MP_UNCONN_HUMAN_MAX"),        1);
-        GetOptionsDB().Add<int>("network.server.cookies.expire-minutes",                UserStringNop("OPTIONS_DB_COOKIES_EXPIRE"),             15);
-        GetOptionsDB().Add<bool>("network.server.publish-statistics",                   UserStringNop("OPTIONS_DB_PUBLISH_STATISTICS"),         true);
-        GetOptionsDB().Add<bool>("network.server.publish-seed",                         UserStringNop("OPTIONS_DB_PUBLISH_SEED"),               true);
-        GetOptionsDB().Add("network.server.binary.enabled",                             UserStringNop("OPTIONS_DB_SERVER_BINARY_SERIALIZATION"),true);
-        GetOptionsDB().Add<std::string>("network.server.turn-timeout.first-turn-time",  UserStringNop("OPTIONS_DB_FIRST_TURN_TIME"),            "");
-        GetOptionsDB().Add<int>("network.server.turn-timeout.max-interval",             UserStringNop("OPTIONS_DB_TIMEOUT_INTERVAL"),           0);
-        GetOptionsDB().Add<bool>("network.server.turn-timeout.fixed-interval",          UserStringNop("OPTIONS_DB_TIMEOUT_FIXED_INTERVAL"),     false);
-        GetOptionsDB().Add<std::string>("setup.game.uid",                               UserStringNop("OPTIONS_DB_GAMESETUP_UID"),              "");
-        GetOptionsDB().Add<int>("network.server.client-message-size.max",               UserStringNop("OPTIONS_DB_CLIENT_MESSAGE_SIZE_MAX"),    0);
-        GetOptionsDB().Add<bool>("network.server.drop-empire-ready",                    UserStringNop("OPTIONS_DB_DROP_EMPIRE_READY"),          true);
-        GetOptionsDB().Add<bool>("network.server.take-over-ai",                         UserStringNop("OPTIONS_DB_TAKE_OVER_AI"),               false);
-        GetOptionsDB().Add<bool>("network.server.allow-observers",                      UserStringNop("OPTIONS_DB_ALLOW_OBSERVERS"),            false);
+        db.Add<std::string>('h', "help",                                    UserStringNop("OPTIONS_DB_HELP"),                       "NOOP",
+                            Validator<std::string>(), OptionsDB::Storable::UNSTORABLE);
+        db.AddFlag('v', "version",                                          UserStringNop("OPTIONS_DB_VERSION"),                    OptionsDB::Storable::UNSTORABLE);
+        db.AddFlag('s', "singleplayer",                                     UserStringNop("OPTIONS_DB_SINGLEPLAYER"),               OptionsDB::Storable::UNSTORABLE);
+        db.AddFlag("hostless",                                              UserStringNop("OPTIONS_DB_HOSTLESS"),                   OptionsDB::Storable::UNSTORABLE);
+        db.AddFlag("skip-checksum",                                         UserStringNop("OPTIONS_DB_SKIP_CHECKSUM"),              OptionsDB::Storable::UNSTORABLE);
+        db.AddFlag("testing",                                               UserStringNop("OPTIONS_DB_TESTING"),                    OptionsDB::Storable::UNSTORABLE);
+        db.AddFlag("load-or-quickstart",                                    UserStringNop("OPTIONS_DB_LOAD_OR_QUICKSTART"),         OptionsDB::Storable::UNSTORABLE);
+        db.Add<int>("network.server.ai.min",                                UserStringNop("OPTIONS_DB_MP_AI_MIN"),                  0);
+        db.Add<int>("network.server.ai.max",                                UserStringNop("OPTIONS_DB_MP_AI_MAX"),                  -1);
+        db.Add<int>("network.server.human.min",                             UserStringNop("OPTIONS_DB_MP_HUMAN_MIN"),               0);
+        db.Add<int>("network.server.human.max",                             UserStringNop("OPTIONS_DB_MP_HUMAN_MAX"),               -1);
+        db.Add<int>("network.server.conn-human-empire-players.min",         UserStringNop("OPTIONS_DB_MP_CONN_HUMAN_MIN"),          0);
+        db.Add<int>("network.server.unconn-human-empire-players.max",       UserStringNop("OPTIONS_DB_MP_UNCONN_HUMAN_MAX"),        1);
+        db.Add<int>("network.server.cookies.expire-minutes",                UserStringNop("OPTIONS_DB_COOKIES_EXPIRE"),             15);
+        db.Add<bool>("network.server.publish-statistics",                   UserStringNop("OPTIONS_DB_PUBLISH_STATISTICS"),         true);
+        db.Add<bool>("network.server.publish-seed",                         UserStringNop("OPTIONS_DB_PUBLISH_SEED"),               true);
+        db.Add<bool>("network.server.binary.enabled",                       UserStringNop("OPTIONS_DB_SERVER_BINARY_SERIALIZATION"),true);
+        db.Add<std::string>("network.server.turn-timeout.first-turn-time",  UserStringNop("OPTIONS_DB_FIRST_TURN_TIME"),            "");
+        db.Add<int>("network.server.turn-timeout.max-interval",             UserStringNop("OPTIONS_DB_TIMEOUT_INTERVAL"),           0);
+        db.Add<bool>("network.server.turn-timeout.fixed-interval",          UserStringNop("OPTIONS_DB_TIMEOUT_FIXED_INTERVAL"),     false);
+        db.Add<std::string>("setup.game.uid",                               UserStringNop("OPTIONS_DB_GAMESETUP_UID"),              "");
+        db.Add<int>("network.server.client-message-size.max",               UserStringNop("OPTIONS_DB_CLIENT_MESSAGE_SIZE_MAX"),    0);
+        db.Add<bool>("network.server.drop-empire-ready",                    UserStringNop("OPTIONS_DB_DROP_EMPIRE_READY"),          true);
+        db.Add<bool>("network.server.take-over-ai",                         UserStringNop("OPTIONS_DB_TAKE_OVER_AI"),               false);
+        db.Add<bool>("network.server.allow-observers",                      UserStringNop("OPTIONS_DB_ALLOW_OBSERVERS"),            false);
 #if defined(FREEORION_LINUX)
-        GetOptionsDB().Add<int>("network.server.listen.fd",                             UserStringNop("OPTIONS_DB_LISTEN_FD"),                  -1);
+        db.Add<int>("network.server.listen.fd",                             UserStringNop("OPTIONS_DB_LISTEN_FD"),                  -1);
 #endif
-        GetOptionsDB().Add<int>("network.server.python.asyncio-interval",               UserStringNop("OPTIONS_DB_PYTHON_ASYNCIO_INTERVAL"),    -1);
-        GetOptionsDB().Add<std::string>("ai-executable",                                UserStringNop("OPTIONS_DB_AI_EXECUTABLE"),              "");
+        db.Add<int>("network.server.python.asyncio-interval",               UserStringNop("OPTIONS_DB_PYTHON_ASYNCIO_INTERVAL"),    -1);
+        db.Add<std::string>("ai-executable",                                UserStringNop("OPTIONS_DB_AI_EXECUTABLE"),              "");
 
         // if config.xml and persistent_config.xml are present, read and set options entries
-        GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());
-        GetOptionsDB().SetFromFile(GetPersistentConfigPath());
+        db.SetFromFile(GetConfigPath(), FreeOrionVersionString());
+        db.SetFromFile(GetPersistentConfigPath());
 
         // override previously-saved and default options with command line parameters and flags
-        GetOptionsDB().SetFromCommandLine(args);
+        db.SetFromCommandLine(args);
 
-        auto help_arg = GetOptionsDB().Get<std::string>("help");
+
+        auto help_arg = db.Get<std::string>("help");
         if (help_arg != "NOOP") {
-            GetOptionsDB().GetUsage(std::cerr, help_arg);
-            ShutdownLoggingSystemFileSink();
+            db.GetUsage(std::cerr, help_arg);
             return 0;
         }
 
         // did the player request the version output?
-        if (GetOptionsDB().Get<bool>("version")) {
+        if (db.Get<bool>("version")) {
             std::cout << "FreeOrionD " << FreeOrionVersionString() << std::endl;
-            ShutdownLoggingSystemFileSink();
             return 0;   // quit without actually starting server
         }
 
-        ServerApp g_app;
-        g_app(); // Calls ServerApp::Run() to run app (intialization and main process loop)
+        ServerApp& app = GetApp();
+        app.Run();
 
 #ifndef FREEORION_DMAIN_KEEP_STACKTRACE
     } catch (const std::invalid_argument& e) {
         ErrorLogger() << "main() caught exception(std::invalid_arg): " << e.what();
         std::cerr << "main() caught exception(std::invalid_arg): " << e.what() << std::endl;
-        ShutdownLoggingSystemFileSink();
         return 1;
     } catch (const std::runtime_error& e) {
         ErrorLogger() << "main() caught exception(std::runtime_error): " << e.what();
         std::cerr << "main() caught exception(std::runtime_error): " << e.what() << std::endl;
-        ShutdownLoggingSystemFileSink();
         return 1;
     } catch (const std::exception& e) {
         ErrorLogger() << "main() caught exception(std::exception): " << e.what();
         std::cerr << "main() caught exception(std::exception): " << e.what() << std::endl;
-        ShutdownLoggingSystemFileSink();
         return 1;
     } catch (...) {
         ErrorLogger() << "main() caught unknown exception.";
         std::cerr << "main() caught unknown exception." << std::endl;
-        ShutdownLoggingSystemFileSink();
         return 1;
     }
 #endif
 
     DebugLogger() << "freeorion server main exited cleanly.";
-    ShutdownLoggingSystemFileSink();
     return 0;
 }
 

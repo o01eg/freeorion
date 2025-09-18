@@ -129,10 +129,10 @@ namespace {
         const auto& context_objects{context.ContextObjects()};
         const auto& context_universe{context.ContextUniverse()};
 
-        if (&universe != &context_universe)
+        if (std::addressof(universe) != std::addressof(context_universe))
             ErrorLogger() << "Universe member function passed context with different Universe from this";
 
-        if (&context_objects != &universe_objects)
+        if (std::addressof(context_objects) != std::addressof(universe_objects))
             ErrorLogger() << "Universe member function passed context different ObjectMap from this Universe";
     }
 
@@ -167,7 +167,7 @@ Universe::Universe() :
 {}
 
 Universe& Universe::operator=(Universe&& other) noexcept {
-    if (this == &other)
+    if (this == std::addressof(other))
         return *this;
 
     m_pathfinder = std::move(other.m_pathfinder);
@@ -351,7 +351,7 @@ Universe::IDSet Universe::EmpireVisibleObjectIDs(int empire_id, const EmpireMana
 int Universe::HighestDestroyedObjectID() const {
     if (m_destroyed_object_ids.empty())
         return INVALID_OBJECT_ID;
-    return *std::max_element(m_destroyed_object_ids.begin(), m_destroyed_object_ids.end());
+    return *range_max_element(m_destroyed_object_ids);
 }
 
 const std::unordered_set<int>& Universe::EmpireKnownDestroyedObjectIDs(int empire_id) const {
@@ -394,7 +394,7 @@ const ShipDesign* Universe::GetGenericShipDesign(std::string_view name) const {
     const auto has_name = [name](const auto& design) { return name == design.Name(false); };
     const auto rng = m_ship_designs | range_values;
     const auto it = range_find_if(rng, has_name);
-    return it != rng.end() ? &(*it) : nullptr;
+    return it != rng.end() ? std::addressof(*it) : nullptr;
 }
 
 const std::set<int>& Universe::EmpireKnownShipDesignIDs(int empire_id) const {
@@ -1163,15 +1163,17 @@ namespace {
                     return retval;
 
                 } else {
-                    // need to apply separately to each source object, using a context with the object as source
+                    const auto eval_one = [&context, activation](const auto* obj) {
+                        const ScriptingContext source_context(context, ScriptingContext::Source{}, obj);
+                        return activation->EvalOne(source_context, obj);
+                    };
                     Condition::ObjectSet retval;
                     retval.reserve(source_objects.size());
-                    std::copy_if(source_objects.begin(), source_objects.end(), std::back_inserter(retval),
-                                 [&context, activation](const auto* obj) {
-                                     const ScriptingContext source_context(context, ScriptingContext::Source{}, obj);
-                                     return activation->EvalOne(source_context, obj);
-                                 });
+                    range_copy_if(source_objects, std::back_inserter(retval), eval_one);
                     return retval;
+                    // using range_filter crashes... not sure why...
+                    // auto evaled_rng = source_objects | range_filter(eval_one);
+                    // return {evaled_rng.begin(), evaled_rng.end()};
                 }
 
             };
@@ -1359,6 +1361,8 @@ namespace {
             });
         }
     }
+
+    constexpr std::string_view EMPTY_STRING_VIEW;
 }
 
 void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsAndCausesVec>& source_effects_targets_causes,
@@ -1407,6 +1411,18 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
 
     int n = 0;  // count dispatched condition evaluations
 
+    const auto not_destroyed = [&destroyed_object_ids](const auto& o)
+    { return o && !destroyed_object_ids.contains(o->ID()); };
+
+    const auto to_plt_sp = [&context](const Planet* p) noexcept
+        -> std::tuple<const Planet*, const Species*, std::string_view>
+    {
+        if (!p) return {nullptr, nullptr, EMPTY_STRING_VIEW};
+        const auto& species_name = p->SpeciesName();
+        return {p, species_name.empty() ? nullptr : context.species.GetSpecies(species_name), species_name};
+    };
+
+    static constexpr auto has_species = [](const auto& pssn) noexcept { return !std::get<2>(pssn).empty(); };
 
     // 1) EffectsGroups from Planet Species
     type_timer.EnterSection("planet species");
@@ -1414,21 +1430,16 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         TraceLogger(effects) << "Universe::GetEffectsAndTargets for PLANET SPECIES";
     std::map<std::string_view, Condition::ObjectSet> species_objects;
     // find each species planets in single pass, maintaining object map order per-species
-    for (auto planet : context.ContextObjects().allRaw<Planet>()) {
-        if (destroyed_object_ids.contains(planet->ID()))
-            continue;
-        const std::string& species_name = planet->SpeciesName();
-        if (species_name.empty())
-            continue;
-        const Species* species = context.species.GetSpecies(species_name);
-        if (!species) {
+    auto sp_rng = context.ContextObjects().allRaw<Planet>()
+        | range_filter(not_destroyed) | range_transform(to_plt_sp) | range_filter(has_species);
+    for (const auto& [planet, species, species_name] : sp_rng) {
+        if (!species)
             ErrorLogger() << "GetEffectsAndTargets couldn't get Species " << species_name;
-            continue;
-        }
-        species_objects[species_name].push_back(planet);
+        else
+            species_objects[species_name].push_back(planet);
     }
     // allocate storage for target sets and dispatch condition evaluations
-    for ([[maybe_unused]] auto& [species_name, species] : context.species) {
+    for ([[maybe_unused]] auto& [species_name, species] : context.species.AllSpecies()) {
         auto species_objects_it = species_objects.find(species_name);
         if (species_objects_it == species_objects.end())
             continue;
@@ -1466,7 +1477,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         species_objects[species_name].push_back(ship);
     }
     // allocate storage for target sets and dispatch condition evaluations
-    for ([[maybe_unused]] auto& [species_name, species] : context.species) {
+    for ([[maybe_unused]] auto& [species_name, species] : context.species.AllSpecies()) {
         auto species_objects_it = species_objects.find(species_name);
         if (species_objects_it == species_objects.end())
             continue;
@@ -3296,16 +3307,17 @@ std::vector<int> Universe::RecursiveDestroy(int object_id, const std::span<const
         for (auto* sys : m_objects.allRaw<System>())
             sys->RemoveStarlane(this_sys_id);
 
+
         // remove fleets / ships moving along destroyed starlane
-        std::vector<int> fleets_to_destroy;
-        fleets_to_destroy.reserve(m_objects.size<Fleet>());
-        for (const auto* fleet : m_objects.allRaw<Fleet>()) { // TODO: rangify?
-            if (fleet->SystemID() == INVALID_OBJECT_ID && (
-                fleet->NextSystemID() == this_sys_id ||
-                fleet->PreviousSystemID() == this_sys_id))
-            { fleets_to_destroy.push_back(fleet->ID()); }
-        }
-        for (const auto fleet_id : fleets_to_destroy)
+        const auto moving_to_or_from = [this_sys_id](const Fleet& fleet) noexcept {
+            return fleet.SystemID() == INVALID_OBJECT_ID &&
+                (fleet.NextSystemID() == this_sys_id || fleet.PreviousSystemID() == this_sys_id);
+        };
+
+        // collect before modifying source...
+        const auto fleet_ids_to_destroy = m_objects.findIDs<Fleet>(moving_to_or_from) | range_to_vec;
+
+        for (const auto fleet_id : fleet_ids_to_destroy)
             RecursiveDestroy(fleet_id, empire_ids);
 
         // then destroy system itself
@@ -3454,7 +3466,7 @@ const Universe::ShipDesignMap& Universe::GetShipDesignsToSerialize(
 }
 
 void Universe::GetObjectsToSerialize(ObjectMap& objects, int encoding_empire) const {
-    if (&objects == &m_objects)
+    if (std::addressof(objects) == std::addressof(m_objects))
         return;
 
     objects.clear();
@@ -3503,7 +3515,7 @@ void Universe::GetDestroyedObjectsToSerialize(std::set<int>& destroyed_object_id
 void Universe::GetEmpireKnownObjectsToSerialize(EmpireObjectMap& empire_latest_known_objects,
                                                 int encoding_empire) const
 {
-    if (&empire_latest_known_objects == &m_empire_latest_known_objects)
+    if (std::addressof(empire_latest_known_objects) == std::addressof(m_empire_latest_known_objects))
         return;
 
     DebugLogger() << "GetEmpireKnownObjectsToSerialize encoding empire: " << encoding_empire;
@@ -3563,7 +3575,7 @@ void Universe::GetEmpireObjectVisibilityTurnMap(EmpireObjectVisibilityTurnMap& e
 void Universe::GetEmpireKnownDestroyedObjects(ObjectKnowledgeMap& empire_known_destroyed_object_ids,
                                               int encoding_empire) const
 {
-    if (&empire_known_destroyed_object_ids == &m_empire_known_destroyed_object_ids)
+    if (std::addressof(empire_known_destroyed_object_ids) == std::addressof(m_empire_known_destroyed_object_ids))
         return;
 
     if (encoding_empire == ALL_EMPIRES) {
@@ -3582,7 +3594,7 @@ void Universe::GetEmpireKnownDestroyedObjects(ObjectKnowledgeMap& empire_known_d
 void Universe::GetEmpireStaleKnowledgeObjects(ObjectKnowledgeMap& empire_stale_knowledge_object_ids,
                                               int encoding_empire) const
 {
-    if (&empire_stale_knowledge_object_ids == &m_empire_stale_knowledge_object_ids)
+    if (std::addressof(empire_stale_knowledge_object_ids) == std::addressof(m_empire_stale_knowledge_object_ids))
         return;
 
     if (encoding_empire == ALL_EMPIRES) {

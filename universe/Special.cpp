@@ -28,11 +28,11 @@ std::vector<std::string_view> SpecialsManager::SpecialNames() const {
 
 const Special* SpecialsManager::GetSpecial(std::string_view name) const {
     CheckPendingSpecialsTypes();
-    auto name_it = std::find(m_special_names.begin(), m_special_names.end(), name);
+    auto name_it = range_find(m_special_names, name);
     if (name_it == m_special_names.end())
         return nullptr;
     auto offset = std::distance(m_special_names.begin(), name_it);
-    return &m_specials[offset];
+    return std::addressof(m_specials[offset]);
 }
 
 uint32_t SpecialsManager::GetCheckSum() const {
@@ -120,7 +120,7 @@ Special::Special(std::string&& name, std::string&& description,
 Special::~Special() = default;
 
 bool Special::operator==(const Special& rhs) const {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
 
     if (m_name != rhs.m_name ||

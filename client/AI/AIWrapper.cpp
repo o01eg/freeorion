@@ -80,12 +80,7 @@ namespace {
      * @return A vector containing the identifiers of all players.
      */
     auto AllPlayerIDs() -> std::vector<int>
-    {
-        std::vector<int> player_ids;
-        for (auto& entry : AIClientApp::GetApp()->Players())
-            player_ids.push_back(entry.first);
-        return player_ids;
-    }
+    { return AIClientApp::GetApp()->Players() | range_keys | range_to_vec; }
 
     /** @brief Return if the player identified by @a player_id is the game
      *      host
@@ -629,10 +624,10 @@ namespace {
 
         // create design from stuff chosen in UI
         try {
-            auto design = std::make_unique<ShipDesign>(
-                std::invalid_argument(""), name, description, context.current_turn,
-                empire_id, hull, parts, icon, model, name_desc_in_stringtable, false, uuid);
-            app->Orders().IssueOrder<ShipDesignOrder>(context, empire_id, *design);
+            ShipDesign design(std::invalid_argument(""), name, description, context.current_turn,
+                              empire_id, hull, parts, icon, model, name_desc_in_stringtable,
+                              ShipDesign::Monster::NOTMONSTER, uuid);
+            app->Orders().IssueOrder<ShipDesignOrder>(context, empire_id, design); // TODO: move?
             return 1;
 
         } catch (const std::invalid_argument&) {

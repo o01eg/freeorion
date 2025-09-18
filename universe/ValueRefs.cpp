@@ -1122,7 +1122,10 @@ int Variable<int>::Eval(const ScriptingContext& context) const
             auto fleet = static_cast<const Fleet*>(object);
             return fleet_property(*fleet);
         }
-        return INVALID_OBJECT_ID;
+
+	LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(int);
+
+	return INVALID_OBJECT_ID;
     }
 
     std::function<int (const Planet&)> planet_property{nullptr};
@@ -1501,8 +1504,9 @@ std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& co
     for (auto& entry : object_property_values)
         observed_values[std::move(entry)]++;
 
-    auto max = std::max_element(observed_values.begin(), observed_values.end(),
-                                [](const auto& p1, const auto& p2) -> bool { return p1.second < p2.second; });
+    static constexpr auto second_less = [](const auto& p1, const auto& p2) -> bool
+    { return p1.second < p2.second; };
+    auto max = range_max_element(observed_values, second_less);
 
     return max->first;
 }
@@ -1560,7 +1564,7 @@ namespace StaticTests {
 // TotalFighterShots (of a carrier during one battle)    //
 ///////////////////////////////////////////////////////////
 bool TotalFighterShots::operator==(const ValueRef<int>& rhs) const {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
@@ -1716,6 +1720,8 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         empire_property_string_key = &Empire::PolicyCurrentAdoptedDurations;
     else if (m_property_name == "CumulativeTurnsPolicyAdopted")
         empire_property_string_key = &Empire::PolicyTotalAdoptedDurations;
+    else if (m_property_name == "LatestTurnPolicyAdopted")
+        empire_property_string_key = &Empire::PolicyLatestTurnsAdopted;
 
     if (empire_property_string_key || empire_property_string_key2 || empire_property_string_key3) {
         std::shared_ptr<const Empire> empire;
@@ -3074,7 +3080,7 @@ std::string UserStringLookup<std::vector<std::string>>::Eval(const ScriptingCont
 // NameLookup                                      //
 /////////////////////////////////////////////////////
 bool NameLookup::operator==(const ValueRef<std::string>& rhs) const {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
     if (!this->ValueRefBase::operator==(rhs) || typeid(*this) != typeid(rhs))
         return false;

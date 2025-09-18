@@ -92,13 +92,10 @@ void WriteWndToPNG(const Wnd* wnd, const std::string& filename)
     glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
-    glReadPixels(Value(ul.x),
-                    Value(GUI::GetGUI()->AppHeight() - wnd->Bottom()),
-                    Value(size.x),
-                    Value(size.y),
-                    GL_RGBA,
-                    GL_UNSIGNED_BYTE,
-                    &bytes[0]);
+    glReadPixels(Value(ul.x), Value(GUI::GetGUI()->AppHeight() - wnd->Bottom()),
+                 Value(size.x), Value(size.y),
+                 GL_RGBA, GL_UNSIGNED_BYTE,
+                 bytes.data());
 
     glPopClientAttrib();
 
@@ -1297,7 +1294,7 @@ void GUI::RunModal(std::shared_ptr<Wnd> wnd)
 {
     if (!wnd)
         return;
-    //std::cout << "RunModal start on " << wnd->Name() << "  at: " << &*wnd << "\n";
+    //std::cout << "RunModal start on " << wnd->Name() << "  at: " << wnd.get() << "\n";
     while (!wnd->ModalDone()) {
         HandleSystemEvents();
         // send an idle message, so that the gui has timely updates for triggering browse info windows, etc.
@@ -1373,10 +1370,10 @@ void GUI::CancelDragDrop()
 }
 
 void GUI::RegisterTimer(Timer& timer)
-{ m_impl->m_timers.emplace(&timer); }
+{ m_impl->m_timers.emplace(std::addressof(timer)); }
 
 void GUI::RemoveTimer(Timer& timer)
-{ m_impl->m_timers.erase(&timer); }
+{ m_impl->m_timers.erase(std::addressof(timer)); }
 
 void GUI::EnableKeyPressRepeat(unsigned int delay, unsigned int interval)
 {
@@ -1686,11 +1683,11 @@ void GUI::RenderWindow(Wnd* wnd)
         std::vector<Wnd*> children;
         children.reserve(wnd->Children().size());
         std::transform(wnd_children.begin(), wnd_children.end(), std::back_inserter(children),
-                       [](const auto& child) { return child.get(); });
+                       [](const auto& child) noexcept { return child.get(); });
 
         const auto client_child_begin =
             std::partition(children.begin(), children.end(),
-                           [](const auto& child) { return child->NonClientChild(); });
+                           [](const auto& child) noexcept { return child->NonClientChild(); });
 
         if (children.begin() != client_child_begin) {
             wnd->BeginNonclientClipping();

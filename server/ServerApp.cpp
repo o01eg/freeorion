@@ -14,7 +14,6 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include "SaveLoad.h"
-#include "ServerFSM.h"
 #include "UniverseGenerator.h"
 #include "../combat/CombatEvents.h"
 #include "../combat/CombatLogManager.h"
@@ -85,22 +84,9 @@ ServerApp::ServerApp() :
                  boost::bind(&ServerApp::HandleMessage, this, boost::placeholders::_1, boost::placeholders::_2),
                  boost::bind(&ServerApp::PlayerDisconnected, this, boost::placeholders::_1)),
     m_context(*this),
-    m_fsm(std::make_unique<ServerFSM>(*this)),
+    m_fsm(*this),
     m_chat_history(1000)
 {
-    // Force the log file if requested.
-    if (GetOptionsDB().Get<std::string>("log-file").empty()) {
-        const std::string SERVER_LOG_FILENAME(PathToString(GetUserDataDir() / "freeoriond.log"));
-        GetOptionsDB().Set("log-file", SERVER_LOG_FILENAME);
-    }
-    // Force the log threshold if requested.
-    auto force_log_level = GetOptionsDB().Get<std::string>("log-level");
-    if (!force_log_level.empty())
-        OverrideAllLoggersThresholds(to_LogLevel(force_log_level));
-
-    InitLoggingSystem(GetOptionsDB().Get<std::string>("log-file"), "Server");
-    InitLoggingOptionsDBSystem();
-
     InfoLogger() << FreeOrionVersionString();
     LogDependencyVersions();
 
@@ -133,7 +119,7 @@ ServerApp::ServerApp() :
     // to have data initialized before autostart execution
     StartBackgroundParsing(PythonParser(m_python_server, GetResourceDir() / "scripting"));
 
-    m_fsm->initiate();
+    m_fsm.initiate();
 
     namespace ph = boost::placeholders;
 
@@ -151,6 +137,8 @@ ServerApp::ServerApp() :
 ServerApp::~ServerApp() {
     DebugLogger() << "ServerApp::~ServerApp";
 
+    m_networking.DisconnectAll();
+
     // Calling Py_Finalize here causes segfault when m_python_server destructing with its python
     // object fields
 
@@ -159,13 +147,30 @@ ServerApp::~ServerApp() {
     DebugLogger() << "Server exited cleanly.";
 }
 
-void ServerApp::operator()()
-{ Run(); }
+void ServerApp::InitLogging() {
+    // Force the log file if requested.
+    if (GetOptionsDB().Get<std::string>("log-file").empty()) {
+        const std::string SERVER_LOG_FILENAME(PathToString(GetUserDataDir() / "freeoriond.log"));
+        GetOptionsDB().Set("log-file", SERVER_LOG_FILENAME);
+    }
+    // Force the log threshold if requested.
+    auto force_log_level = GetOptionsDB().Get<std::string>("log-level");
+    if (!force_log_level.empty())
+        OverrideAllLoggersThresholds(to_LogLevel(force_log_level));
+
+    InitLoggingSystem(GetOptionsDB().Get<std::string>("log-file"), "Server");
+    InitLoggingOptionsDBSystem();
+}
+
+ServerApp& GetApp() {
+    static ServerApp app;
+    return app;
+}
 
 void ServerApp::SignalHandler(const boost::system::error_code& error, int signal_number) {
     if (error)
         ErrorLogger() << "Exiting due to OS error (" << error.value() << ") " << error.message();
-    m_fsm->process_event(ShutdownServer());
+    m_fsm.process_event(ShutdownServer());
 }
 
 namespace {
@@ -362,7 +367,7 @@ void ServerApp::AsyncIOTimedoutHandler(const boost::system::error_code& error) {
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
@@ -376,16 +381,14 @@ void ServerApp::AsyncIOTimedoutHandler(const boost::system::error_code& error) {
         }
     } else {
         ErrorLogger() << "Python scripted authentication failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
-                                                                      false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
 }
 
 void ServerApp::UpdateEmpireTurnReceived(bool success, int empire_id, int turn) {
     if (success) {
-        if (auto empire = m_empires.GetEmpire(empire_id)) {
+        if (auto empire = m_empires.GetEmpire(empire_id))
             empire->SetLastTurnReceived(turn);
-        }
     }
 }
 
@@ -414,7 +417,7 @@ void ServerApp::CleanupAIs() {
     DebugLogger() << "ServerApp::CleanupAIs() killing " << m_ai_client_processes.size() << " AI clients.";
     try {
         for (auto& process : m_ai_client_processes)
-        { process.second.Kill(); }
+            process.second.Kill();
     } catch (...) {
         ErrorLogger() << "ServerApp::CleanupAIs() exception while killing processes";
     }
@@ -443,28 +446,28 @@ void ServerApp::HandleMessage(const Message& msg, PlayerConnectionPtr player_con
     m_networking.UpdateCookie(player_connection->Cookie()); // update cookie expire date
 
     switch (msg.Type()) {
-    case Message::MessageType::HOST_SP_GAME:             m_fsm->process_event(HostSPGame(msg, player_connection));       break;
-    case Message::MessageType::START_MP_GAME:            m_fsm->process_event(StartMPGame(msg, player_connection));      break;
-    case Message::MessageType::LOBBY_UPDATE:             m_fsm->process_event(LobbyUpdate(msg, player_connection));      break;
-    case Message::MessageType::SAVE_GAME_INITIATE:       m_fsm->process_event(SaveGameRequest(msg, player_connection));  break;
-    case Message::MessageType::TURN_ORDERS:              m_fsm->process_event(TurnOrders(msg, player_connection));       break;
-    case Message::MessageType::TURN_PARTIAL_ORDERS:      m_fsm->process_event(TurnPartialOrders(msg, player_connection));break;
-    case Message::MessageType::UNREADY:                  m_fsm->process_event(RevokeReadiness(msg, player_connection));  break;
-    case Message::MessageType::PLAYER_CHAT:              m_fsm->process_event(PlayerChat(msg, player_connection));       break;
-    case Message::MessageType::DIPLOMACY:                m_fsm->process_event(Diplomacy(msg, player_connection));        break;
-    case Message::MessageType::MODERATOR_ACTION:         m_fsm->process_event(ModeratorAct(msg, player_connection));     break;
-    case Message::MessageType::ELIMINATE_SELF:           m_fsm->process_event(EliminateSelf(msg, player_connection));    break;
-    case Message::MessageType::AUTO_TURN:                m_fsm->process_event(AutoTurn(msg, player_connection));         break;
-    case Message::MessageType::REVERT_ORDERS:            m_fsm->process_event(RevertOrders(msg, player_connection));     break;
+    case Message::MessageType::HOST_SP_GAME:             m_fsm.process_event(HostSPGame(msg, player_connection));       break;
+    case Message::MessageType::START_MP_GAME:            m_fsm.process_event(StartMPGame(msg, player_connection));      break;
+    case Message::MessageType::LOBBY_UPDATE:             m_fsm.process_event(LobbyUpdate(msg, player_connection));      break;
+    case Message::MessageType::SAVE_GAME_INITIATE:       m_fsm.process_event(SaveGameRequest(msg, player_connection));  break;
+    case Message::MessageType::TURN_ORDERS:              m_fsm.process_event(TurnOrders(msg, player_connection));       break;
+    case Message::MessageType::TURN_PARTIAL_ORDERS:      m_fsm.process_event(TurnPartialOrders(msg, player_connection));break;
+    case Message::MessageType::UNREADY:                  m_fsm.process_event(RevokeReadiness(msg, player_connection));  break;
+    case Message::MessageType::PLAYER_CHAT:              m_fsm.process_event(PlayerChat(msg, player_connection));       break;
+    case Message::MessageType::DIPLOMACY:                m_fsm.process_event(Diplomacy(msg, player_connection));        break;
+    case Message::MessageType::MODERATOR_ACTION:         m_fsm.process_event(ModeratorAct(msg, player_connection));     break;
+    case Message::MessageType::ELIMINATE_SELF:           m_fsm.process_event(EliminateSelf(msg, player_connection));    break;
+    case Message::MessageType::AUTO_TURN:                m_fsm.process_event(AutoTurn(msg, player_connection));         break;
+    case Message::MessageType::REVERT_ORDERS:            m_fsm.process_event(RevertOrders(msg, player_connection));     break;
 
     case Message::MessageType::ERROR_MSG:
     case Message::MessageType::DEBUG:                    break;
 
     case Message::MessageType::SHUT_DOWN_SERVER:         HandleShutdownMessage(msg, player_connection);  break;
-    case Message::MessageType::AI_END_GAME_ACK:          m_fsm->process_event(LeaveGame(msg, player_connection));        break;
+    case Message::MessageType::AI_END_GAME_ACK:          m_fsm.process_event(LeaveGame(msg, player_connection));        break;
 
     case Message::MessageType::REQUEST_SAVE_PREVIEWS:    UpdateSavePreviews(msg, player_connection); break;
-    case Message::MessageType::REQUEST_COMBAT_LOGS:      m_fsm->process_event(RequestCombatLogs(msg, player_connection));break;
+    case Message::MessageType::REQUEST_COMBAT_LOGS:      m_fsm.process_event(RequestCombatLogs(msg, player_connection));break;
     case Message::MessageType::LOGGER_CONFIG:            HandleLoggerConfig(msg, player_connection); break;
 
     default:
@@ -482,7 +485,7 @@ void ServerApp::HandleShutdownMessage(const Message& msg, PlayerConnectionPtr pl
         return;
     }
     DebugLogger() << "ServerApp::HandleShutdownMessage shutting down";
-    m_fsm->process_event(ShutdownServer());
+    m_fsm.process_event(ShutdownServer());
 }
 
 void ServerApp::HandleLoggerConfig(const Message& msg, PlayerConnectionPtr player_connection) {
@@ -509,11 +512,11 @@ void ServerApp::HandleLoggerConfig(const Message& msg, PlayerConnectionPtr playe
 
 void ServerApp::HandleNonPlayerMessage(const Message& msg, PlayerConnectionPtr player_connection) {
     switch (msg.Type()) {
-    case Message::MessageType::HOST_SP_GAME:  m_fsm->process_event(HostSPGame(msg, player_connection));   break;
-    case Message::MessageType::HOST_MP_GAME:  m_fsm->process_event(HostMPGame(msg, player_connection));   break;
-    case Message::MessageType::JOIN_GAME:     m_fsm->process_event(JoinGame(msg, player_connection));     break;
-    case Message::MessageType::AUTH_RESPONSE: m_fsm->process_event(AuthResponse(msg, player_connection)); break;
-    case Message::MessageType::ERROR_MSG:     m_fsm->process_event(Error(msg, player_connection));        break;
+    case Message::MessageType::HOST_SP_GAME:  m_fsm.process_event(HostSPGame(msg, player_connection));   break;
+    case Message::MessageType::HOST_MP_GAME:  m_fsm.process_event(HostMPGame(msg, player_connection));   break;
+    case Message::MessageType::JOIN_GAME:     m_fsm.process_event(JoinGame(msg, player_connection));     break;
+    case Message::MessageType::AUTH_RESPONSE: m_fsm.process_event(AuthResponse(msg, player_connection)); break;
+    case Message::MessageType::ERROR_MSG:     m_fsm.process_event(Error(msg, player_connection));        break;
     case Message::MessageType::DEBUG:         break;
     default:
         if ((m_networking.size() == 1) &&
@@ -522,7 +525,7 @@ void ServerApp::HandleNonPlayerMessage(const Message& msg, PlayerConnectionPtr p
         {
             DebugLogger() << "ServerApp::HandleNonPlayerMessage received Message::SHUT_DOWN_SERVER from the sole "
                           << "connected player, who is local and so the request is being honored; server shutting down.";
-            m_fsm->process_event(ShutdownServer());
+            m_fsm.process_event(ShutdownServer());
         } else {
             ErrorLogger() << "ServerApp::HandleNonPlayerMessage : Received an invalid message type \""
                                             << msg.Type() << "\" for a non-player Message.  Terminating connection.";
@@ -533,14 +536,14 @@ void ServerApp::HandleNonPlayerMessage(const Message& msg, PlayerConnectionPtr p
 }
 
 void ServerApp::PlayerDisconnected(PlayerConnectionPtr player_connection)
-{ m_fsm->process_event(Disconnection(player_connection)); }
+{ m_fsm.process_event(Disconnection(player_connection)); }
 
 void ServerApp::ShutdownTimedoutHandler(boost::system::error_code error) {
     if (error)
         DebugLogger() << "Shutdown timed out cancelled";
 
     DebugLogger() << "Shutdown timed out.  Disconnecting remaining clients.";
-    m_fsm->process_event(DisconnectClients());
+    m_fsm.process_event(DisconnectClients());
 }
 
 void ServerApp::SelectNewHost() {
@@ -1062,15 +1065,14 @@ void ServerApp::LoadChatHistory() {
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
 
     if (!success) {
         ErrorLogger() << "Python scripted chat failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
-                                                                      false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
 }
 
@@ -1094,15 +1096,14 @@ void ServerApp::PushChatMessage(std::string text, std::string player_name, std::
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
 
     if (!success) {
         ErrorLogger() << "Python scripted chat failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(
-            ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
 }
 
@@ -1126,7 +1127,7 @@ namespace {
             return false;
         }
         
-        if (player_connection->GetClientType() != Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER) {
+        if (Networking::is_human(player_connection)) {
             ErrorLogger() << "ServerApp::LoadMPGameInit found player connection of wrong type "
                           << "for human player setup data with player id: " << id;
             return false;
@@ -1432,9 +1433,8 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
 
         if (Networking::is_ai(client_type)) {
             // get save state string
-            const std::string* sss = nullptr;
-            if (!psgd.save_state_string.empty())
-                sss = &psgd.save_state_string;
+            const std::string* const sss = psgd.save_state_string.empty() ?
+                nullptr : std::addressof(psgd.save_state_string);
 
             player_connection->SendMessage(GameStartMessage(m_single_player_game, empire_id,
                                                             m_current_turn, m_empires, m_universe,
@@ -1505,10 +1505,7 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
     m_species_manager.ClearSpeciesHomeworlds();
 
     // Reset the object id manager for the new empires.
-    std::vector<int> empire_ids(player_setup_data.size());
-    std::transform(player_setup_data.begin(), player_setup_data.end(), empire_ids.begin(),
-                   [](const auto& ii) { return ii.first; });
-    m_universe.ResetAllIDAllocation(empire_ids);
+    m_universe.ResetAllIDAllocation(player_setup_data | range_keys | range_to_vec);
 
     // Add predefined ship designs to universe
     GetPredefinedShipDesignManager().AddShipDesignsToUniverse(m_universe);
@@ -1527,17 +1524,16 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
         m_python_server.HandleErrorAlreadySet();
         if (!m_python_server.IsPythonRunning()) {
             ErrorLogger() << "Python interpreter is no longer running.  Exiting.";
-            m_fsm->process_event(ShutdownServer());
+            m_fsm.process_event(ShutdownServer());
         }
     }
 
     if (!success)
-        ServerApp::GetApp()->Networking().SendMessageAll(
-            ErrorMessage(UserStringNop("SERVER_UNIVERSE_GENERATION_ERRORS"), false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_UNIVERSE_GENERATION_ERRORS"), false));
 
-    for (auto& empire : m_empires) {
-        empire.second->ApplyNewTechs(m_universe, m_current_turn);
-        empire.second->ApplyPolicies(m_universe, m_current_turn);
+    for (auto& empire : m_empires | range_values) {
+        empire->ApplyNewTechs(m_universe, m_current_turn);
+        empire->ApplyPolicies(m_universe, m_current_turn);
     }
 
     DebugLogger() << "Applying first turn effects and updating meters";
@@ -1598,14 +1594,14 @@ void ServerApp::ExecuteScriptedTurnEvents() {
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
 
     if (!success) {
         ErrorLogger() << "Python scripted turn events failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
 }
 
@@ -1684,15 +1680,14 @@ bool ServerApp::IsAuthRequiredOrFillRoles(const std::string& player_name, const 
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
 
     if (!success) {
         ErrorLogger() << "Python scripted authentication failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
-                                                                      false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
     return result;
 }
@@ -1718,15 +1713,14 @@ bool ServerApp::IsAuthSuccessAndFillRoles(const std::string& player_name,
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
 
     if (!success) {
         ErrorLogger() << "Python scripted authentication failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
-                                                                      false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
     return result;
 }
@@ -1746,28 +1740,23 @@ std::vector<PlayerSetupData> ServerApp::FillListPlayers() {
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
 
     if (!success) {
         ErrorLogger() << "Python scripted player list failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(
-            ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
     return result;
 }
 
 void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
-    std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
+    const std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
+    const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
 
-    Networking::ClientType client_type = player_connection->GetClientType();
-    bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
-
-    if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER ||
-        client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
-    {
+    if (Networking::is_mod_or_obs(player_connection)) {
         // simply sends GAME_START message so established player will known he is in the game now
         player_connection->SendMessage(GameStartMessage(m_single_player_game, ALL_EMPIRES,
                                                         m_current_turn, m_empires, m_universe,
@@ -1795,12 +1784,10 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
 
     // test if there other human or disconnected players in the game
     bool other_human_player = false;
-    for (auto& [loop_empire_id, loop_empire] : m_empires) {
+    for (auto& [loop_empire_id, loop_empire] : m_empires) { // TODO: use none_of / range_none_of ?
         if (!loop_empire->Eliminated() && empire_id != loop_empire_id) {
             const auto other_client_type = GetEmpireClientType(loop_empire_id);
-            if (other_client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER ||
-                other_client_type == Networking::ClientType::INVALID_CLIENT_TYPE)
-            {
+            if (Networking::is_human(other_client_type) || Networking::is_invalid(other_client_type)) {
                 other_human_player = true;
                 break;
             }
@@ -1833,8 +1820,7 @@ bool ServerApp::EliminatePlayer(const PlayerConnectionPtr& player_connection) {
 #if (!defined(__clang_major__) || (__clang_major__ >= 16)) && (BOOST_VERSION >= 107700)
         m_universe.RecursiveDestroy(id, m_empires.EmpireIDs());
 #else
-        const auto& empire_ids = m_empires.EmpireIDs();
-        const std::vector<int> empire_ids_vec(empire_ids.begin(), empire_ids.end());
+        const auto empire_ids_vec = m_empires.EmpireIDs() | range_to_vec;
         const std::span<const int> empire_ids_span(empire_ids_vec);
         m_universe.RecursiveDestroy(id, empire_ids_span);
 #endif
@@ -1940,8 +1926,8 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     if (empire->Eliminated())
         return ALL_EMPIRES;
 
-    auto orders_it = std::find_if(m_player_data.begin(), m_player_data.end(),
-                                  [empire_id](const auto& pd) { return pd.empire_id == empire_id; });
+    const auto is_empire_id = [empire_id](const auto& pd) noexcept { return pd.empire_id == empire_id; };
+    auto orders_it = range_find_if(m_player_data, is_empire_id);
     if (orders_it == m_player_data.end()) {
         WarnLogger() << "ServerApp::AddPlayerIntoGame empire " << empire_id
                      << " for \"" << player_connection->PlayerName()
@@ -2029,24 +2015,20 @@ std::vector<std::string> ServerApp::GetPlayerDelegation(const std::string& playe
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
 
     if (!success) {
         ErrorLogger() << "Python scripted authentication failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
-                                                                      false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
-    return {result.begin(), result.end()};
+    return result;
 }
 
 bool ServerApp::IsHostless() const
 { return GetOptionsDB().Get<bool>("hostless"); }
-
-const boost::circular_buffer<ChatHistoryEntity>& ServerApp::GetChatHistory() const
-{ return m_chat_history; }
 
 Networking::ClientType ServerApp::GetEmpireClientType(int empire_id) const
 { return GetPlayerClientType(ServerApp::EmpirePlayerID(empire_id)); }
@@ -2065,8 +2047,8 @@ int ServerApp::EffectsProcessingThreads() const
 void ServerApp::AddEmpireData(PlayerSaveGameData psgd) {
     if (psgd.empire_id == ALL_EMPIRES)
         return;
-    auto it = std::find_if(m_player_data.begin(), m_player_data.end(),
-                           [eid{psgd.empire_id}](const auto& pd) { return pd.empire_id == eid; });
+    const auto is_empire_id = [eid{psgd.empire_id}](const auto& pd) noexcept { return pd.empire_id == eid; };
+    auto it = range_find_if(m_player_data, is_empire_id);
     if (it != m_player_data.end())
         *it = std::move(psgd);
     else
@@ -2076,8 +2058,8 @@ void ServerApp::AddEmpireData(PlayerSaveGameData psgd) {
 void ServerApp::RemoveEmpireData(int empire_id) {
     if (empire_id == ALL_EMPIRES)
         return;
-    auto it = std::find_if(m_player_data.begin(), m_player_data.end(),
-                           [empire_id](const auto& pd) { return pd.empire_id == empire_id; });
+    const auto is_empire_id = [empire_id](const auto& pd) noexcept { return pd.empire_id == empire_id; };
+    auto it = range_find_if(m_player_data, is_empire_id);
     if (it != m_player_data.end())
         m_player_data.erase(it);
 }
@@ -2087,8 +2069,8 @@ void ServerApp::ClearEmpireTurnOrders(int empire_id) {
         for (auto& pd : m_player_data)
             pd.orders.Reset();
     } else {
-        auto it = std::find_if(m_player_data.begin(), m_player_data.end(),
-                               [empire_id](const auto& pd) { return pd.empire_id == empire_id; });
+        const auto is_empire_id = [empire_id](const auto& pd) noexcept { return pd.empire_id == empire_id; };
+        auto it = range_find_if(m_player_data, is_empire_id);
         if (it != m_player_data.end())
             it->orders.Reset(); // leaving UI data and AI state intact
     }
@@ -2097,8 +2079,8 @@ void ServerApp::ClearEmpireTurnOrders(int empire_id) {
 void ServerApp::UpdatePartialOrders(int empire_id, OrderSet added, const std::set<int>& deleted) {
     if (empire_id == ALL_EMPIRES)
         return;
-    auto it = std::find_if(m_player_data.begin(), m_player_data.end(),
-                           [empire_id](const auto& pd) noexcept { return pd.empire_id == empire_id; });
+    const auto is_empire_id = [empire_id](const auto& pd) noexcept { return pd.empire_id == empire_id; };
+    auto it = range_find_if(m_player_data, is_empire_id);
     if (it == m_player_data.end()) {
         ErrorLogger() << "Server given partial orders for unknown empire id: " << empire_id;
         return;
@@ -2527,15 +2509,16 @@ namespace {
 #if (!defined(__clang_major__) || (__clang_major__ >= 16)) && (BOOST_VERSION >= 107700)
         const auto empire_ids = std::span<const int>(empires.EmpireIDs());
 #else
-        const std::vector<int> empire_ids_vec(empires.EmpireIDs().begin(), empires.EmpireIDs().end());
+        const auto empire_ids_vec = empires.EmpireIDs() | range_to_vec;
         const auto empire_ids = std::span<const int>(empire_ids_vec);
 #endif
 
         for (const CombatInfo& combat_info : combats) {
             // update visibilities from combat, in case anything was revealed
             // by shooting during combat
+            static constexpr auto id_0_plus = [](auto id) noexcept { return id.first >= 0; };
             for (const auto& [vis_empire_id, empire_vis] : combat_info.empire_object_visibility) {
-                for (const auto& [vis_object_id, object_vis] : empire_vis | range_filter([](auto id) { return id.first >= 0; }))
+                for (const auto& [vis_object_id, object_vis] : empire_vis | range_filter(id_0_plus))
                     universe.SetEmpireObjectVisibility(vis_empire_id, vis_object_id, object_vis);  // does not lower visibility
             }
 
@@ -2664,7 +2647,7 @@ namespace {
 
     /** De-nests sub-events into a single layer list of events */
     std::vector<ConstCombatEventPtr> FlattenEvents(const std::vector<CombatEventPtr>& events1) {
-        std::vector<ConstCombatEventPtr> flat_events{events1.begin(), events1.end()}; // copy top-level input events
+        auto flat_events = events1 | range_to<std::vector<ConstCombatEventPtr>>(); // copy top-level input events
 
         // copy nested sub-events of top-level events
         for (const auto& event1 : events1) {                        // can't modify the input events pointers
@@ -2843,7 +2826,7 @@ namespace {
         const std::span<const int> empire_ids(context.EmpireIDs());
 #else
         const auto& empire_ids_fs = context.EmpireIDs();
-        const std::vector<int> empire_ids_vec(empire_ids_fs.begin(), empire_ids_fs.end());
+        const auto empire_ids_vec = empire_ids_fs | range_to_vec;
         const std::span<const int> empire_ids(empire_ids_vec);
 #endif
 
@@ -3025,17 +3008,15 @@ namespace {
         const std::span<const int> empire_ids(context.EmpireIDs());
 #else
         const auto& empire_ids_fs = context.EmpireIDs();
-        const std::vector<int> empire_ids_vec(empire_ids_fs.begin(), empire_ids_fs.end());
+        const auto empire_ids_vec = empire_ids_fs | range_to_vec;
         const std::span<const int> empire_ids(empire_ids_vec);
 #endif
 
+        const auto is_invading_ship = [&universe](const Ship& s)
+        { return s.SystemID() != INVALID_OBJECT_ID && s.OrderedInvadePlanet() != INVALID_OBJECT_ID && s.HasTroops(universe); };
+
         // collect ships that are invading and the troops they carry
-        for (auto* ship : objects.findRaw<Ship>([&universe](const Ship& s) {
-                                                    return s.SystemID() != INVALID_OBJECT_ID &&
-                                                        s.OrderedInvadePlanet() != INVALID_OBJECT_ID &&
-                                                        s.HasTroops(universe);
-                                                }))
-        {
+        for (auto* ship : objects.findRaw<Ship>(is_invading_ship)) {
             invade_ships.push_back(ship);
 
             auto* planet = objects.getRaw<Planet>(ship->OrderedInvadePlanet());
@@ -3057,10 +3038,8 @@ namespace {
                           << " named " << ship->Name();
         }
 
-        std::vector<int> invading_ship_ids;
-        invading_ship_ids.reserve(invade_ships.size());
-        std::transform(invade_ships.begin(), invade_ships.end(), std::back_inserter(invading_ship_ids),
-                       [](const auto* ship) { return ship->ID(); });
+        static constexpr auto to_id = [](const auto& o) noexcept { return o->ID(); };
+        auto invading_ship_ids = invade_ships | range_transform(to_id) | range_to_vec;
 
         // delete ships that invaded something
         for (auto* ship : invade_ships) {
@@ -3102,11 +3081,10 @@ namespace {
             if (empires_troops.empty())
                 continue;
 
-            std::set<int> all_involved_empires;
-            for (const auto empire_id : empires_troops | range_keys) {
-                if (empire_id != ALL_EMPIRES)
-                    all_involved_empires.insert(empire_id);
-            }
+            static constexpr auto is_valid_empire_id = [](const auto id) noexcept { return id != ALL_EMPIRES; };
+            auto all_involved_empires = empires_troops | range_keys
+                | range_filter(is_valid_empire_id) | range_to<std::set<int>>();
+
             auto planet = objects.get<Planet>(planet_id);
             if (!planet) {
                 ErrorLogger() << "Ground combat couldn't get planet with id " << planet_id;
@@ -3370,7 +3348,7 @@ namespace {
         const std::span<const int> empire_ids(empires.EmpireIDs());
 #else
         const auto& empire_ids_fs = empires.EmpireIDs();
-        const std::vector<int> empire_ids_vec(empire_ids_fs.begin(), empire_ids_fs.end());
+        const auto empire_ids_vec = empire_ids_fs | range_to_vec;
         const std::span<const int> empire_ids(empire_ids_vec);
 #endif
 
@@ -3401,8 +3379,7 @@ namespace {
             }
 
             // record scrapping in empire stats
-            auto scrapping_empire = empires.GetEmpire(ship->Owner());
-            if (scrapping_empire)
+            if (auto scrapping_empire = empires.GetEmpire(ship->Owner()))
                 scrapping_empire->RecordShipScrapped(*ship);
 
             //scrapped_object_ids.push_back(ship->ID());
@@ -3471,7 +3448,7 @@ namespace {
             }
 
             // sort by annexation cost, so most expensive annexations are resolved first.
-            static constexpr auto expensive_first = [](const auto& lhs, const auto& rhs) { return lhs.second > rhs.second; };
+            static constexpr auto expensive_first = [](const auto& lhs, const auto& rhs) noexcept { return lhs.second > rhs.second; };
             std::stable_sort(planets_costs.begin(), planets_costs.end(), expensive_first);
         }
 
@@ -3606,7 +3583,7 @@ namespace {
         const std::span<const int> empire_ids(context.EmpireIDs());
 #else
         const auto& empire_ids_fs = context.EmpireIDs();
-        const std::vector<int> empire_ids_vec(empire_ids_fs.begin(), empire_ids_fs.end());
+        const auto empire_ids_vec = empire_ids_fs | range_to_vec;
         const std::span<const int> empire_ids(empire_ids_vec);
 #endif
 
@@ -3651,7 +3628,7 @@ namespace {
 
             static constexpr auto is_turn_end = [](const MovePathNode& n) { return n.turn_end || n.blockaded_here; };
             // get first turn end node. blockades also count as a turn end for this purpose
-            auto turn_end_node_it = std::find_if(nodes.begin(), nodes.end(), is_turn_end);
+            auto turn_end_node_it = range_find_if(nodes, is_turn_end);
             if (turn_end_node_it == nodes.end())
                 return {fleet_id_and_owner, {}}; // didn't find a turn end node??? (unexpected)
 
@@ -4080,49 +4057,57 @@ namespace {
         }
         return empire_blockading_fleets;
     }
+
+    static constexpr auto empire_not_null = [](const auto& id_e) noexcept -> bool { return id_e.second.get(); };
 }
 
 void ServerApp::CacheCostsTimes(const ScriptingContext& context) {
     m_cached_empire_policy_adoption_costs = [this, &context]() {
-        std::map<int, std::vector<std::pair<std::string_view, double>>> retval;
-        std::transform(m_empires.begin(), m_empires.end(), std::inserter(retval, retval.end()),
-                       [&context](const auto& e)
-                       { return std::pair{e.first, e.second->PolicyAdoptionCosts(context)}; });
-        return retval;
+        const auto to_costs = [&context](const auto& e) { return std::pair{e.first, e.second->PolicyAdoptionCosts(context)}; };
+        using OutT = decltype(m_cached_empire_policy_adoption_costs);
+        return m_empires | range_transform(to_costs) | range_to<OutT>();
     }();
     m_cached_empire_research_costs_times = [this, &context]() {
-        std::map<int, std::vector<std::tuple<std::string_view, double, int>>> retval;
+        using map_t = decltype(m_cached_empire_research_costs_times);
         const auto& tm = GetTechManager();
+
         // cache costs for each empire for techs on queue an that are researchable, which
         // may be used later when updating the queue
-        for (const auto& [empire_id, empire] : m_empires) {
-            retval[empire_id].reserve(tm.size());
 
-            const auto should_cache = [empire{empire.get()}](const auto tech_name, const auto& tech) {
-                return (tech.Researchable() &&
-                        empire->GetTechStatus(tech_name) == TechStatus::TS_RESEARCHABLE) ||
-                    empire->GetResearchQueue().InQueue(tech_name);
+        const auto to_id_and_cache = [this, &tm, &context](const auto& id_empire) {
+            const auto should_cache = [empire{id_empire.second.get()}](const auto& name_tech) -> bool {
+                return (name_tech.second.Researchable() &&
+                        empire->GetTechStatus(name_tech.first) == TechStatus::TS_RESEARCHABLE
+                       ) || empire->GetResearchQueue().InQueue(name_tech.first);
             };
 
-            for (const auto& [tech_name, tech] : tm) {
-                if (should_cache(tech_name, tech)) {
-                    retval[empire_id].emplace_back(
-                        tech_name, tech.ResearchCost(empire_id, context), tech.ResearchTime(empire_id, context));
-                }
-            }
-        }
-        return retval;
+            const auto to_name_cost_time = [&context, empire_id{id_empire.first}](const auto& name_tech) {
+                return map_t::mapped_type::value_type{name_tech.first,
+                                                      name_tech.second.ResearchCost(empire_id, context),
+                                                      name_tech.second.ResearchTime(empire_id, context)};
+            };
+
+            auto nct_rng = tm | range_filter(should_cache) | range_transform(to_name_cost_time);
+            return map_t::value_type(std::piecewise_construct, std::forward_as_tuple(id_empire.first),
+                                     std::forward_as_tuple(nct_rng.begin(), nct_rng.end()));
+        };
+        return m_empires | range_filter(empire_not_null) | range_transform(to_id_and_cache) | range_to<map_t>();
     }();
     m_cached_empire_production_costs_times = [this, &context]() {
-        std::map<int, std::vector<std::tuple<std::string_view, int, float, int>>> retval;
-        for (const auto& [empire_id, empire] : m_empires) {
-            retval[empire_id].reserve(empire->GetProductionQueue().size());
-            for (const auto& elem : empire->GetProductionQueue()) {
+        using map_t = decltype(m_cached_empire_production_costs_times);
+
+        const auto to_id_and_cache = [&context](const auto& id_empire) {
+            const auto to_name_designid_cost_time = [&context](const auto& elem) {
                 const auto [cost, time] = elem.ProductionCostAndTime(context);
-                retval[empire_id].emplace_back(elem.item.name, elem.item.design_id, cost, time);
-            }
-        }
-        return retval;
+                return map_t::mapped_type::value_type{elem.item.name, elem.item.design_id, cost, time};
+            };
+
+            auto ndct_rng = id_empire.second->GetProductionQueue() | range_transform(to_name_designid_cost_time);
+            return map_t::value_type{std::piecewise_construct, std::forward_as_tuple(id_empire.first),
+                                     std::forward_as_tuple(ndct_rng.begin(), ndct_rng.end())};
+        };
+
+        return m_empires | range_filter(empire_not_null) | range_transform(to_id_and_cache) | range_to<map_t>();
     }();
     m_cached_empire_annexation_costs = [&context]() {
         std::map<int, std::vector<std::pair<int, double>>> retval;

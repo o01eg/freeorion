@@ -169,6 +169,8 @@ namespace {
         return starting_stockpile + new_contributions + project_transfer_to_stockpile - stockpile_used;
     }
 
+    enum class Simulating : bool { SIM = true, NOTSIM = false };
+
     /** Sets the allocated_pp value for each Element in the passed
       * ProductionQueue \a queue.  Elements are allocated PP based on their need,
       * the limits they can be given per turn, and the amount available at their
@@ -191,7 +193,7 @@ namespace {
         ProductionQueue::QueueType& queue,
         std::map<boost::container::flat_set<int>, float>& allocated_pp,
         std::map<boost::container::flat_set<int>, float>& allocated_stockpile_pp,
-        int& projects_in_progress, bool simulating,
+        int& projects_in_progress, Simulating simulating,
         const Universe& universe)
     {
         //DebugLogger() << "========SetProdQueueElementSpending========";
@@ -337,7 +339,7 @@ namespace {
                 queue_element.turns_left_to_next_item = 1;
 
             // if simulating, update progress
-            if (simulating)
+            if (simulating == Simulating::SIM)
                 queue_element.progress += allocation / std::max(EPSILON, block_cost);    // add turn's progress due to allocation
 
             if (allocation > 0.0f)
@@ -712,9 +714,8 @@ void ProductionQueue::Update(const ScriptingContext& context,
             const int location_id = element.location;
 
             // search through groups to find object
-            const auto group_it = std::find_if(available_pp.begin(), available_pp.end(),
-                                               [location_id](const auto& group_pp)
-                                               { return group_pp.first.contains(location_id); });
+            const auto group_contains_location = [location_id](const auto& group_pp) noexcept { return group_pp.first.contains(location_id); };
+            const auto group_it = range_find_if(available_pp, group_contains_location);
             if (group_it == available_pp.end()) {
                 // didn't find a group containing this object, so add an empty group as this element's queue element group
                 retval.emplace_back();
@@ -734,12 +735,9 @@ void ProductionQueue::Update(const ScriptingContext& context,
     // cache producibility, and production item costs and times
     // initialize production queue item completion status to 'never'
     auto is_producible = [this, &context, &empire]() {
-        std::vector<uint8_t> is_producible;
-        is_producible.reserve(m_queue.size());
-        std::transform(m_queue.begin(), m_queue.end(), std::back_inserter(is_producible),
-                       [&context, &empire](const auto& elem)
-                       { return empire->ProducibleItem(elem.item, elem.location, context); });
-        return is_producible;
+        const auto to_producible = [&context, &empire](const auto& elem)
+        { return empire->ProducibleItem(elem.item, elem.location, context); };
+        return m_queue | range_transform(to_producible) | range_to<std::vector<uint8_t>>();
     }();
 
     boost::unordered_map<std::pair<ProductionQueue::ProductionItem, int>,
@@ -751,8 +749,7 @@ void ProductionQueue::Update(const ScriptingContext& context,
         const int location_id = elem.item.CostIsProductionLocationInvariant(universe) ?
             INVALID_OBJECT_ID : elem.location;
 
-        using key_t = decltype(queue_item_costs_and_times)::key_type;
-        queue_item_costs_and_times.try_emplace(key_t{elem.item, location_id},
+        queue_item_costs_and_times.try_emplace(std::pair(elem.item, location_id),
                                                elem.ProductionCostAndTime(context));
 
         elem.turns_left_to_next_item = -1;
@@ -773,7 +770,7 @@ void ProductionQueue::Update(const ScriptingContext& context,
         available_pp, available_stockpile, stockpile_limit, queue_element_groups,
         queue_item_costs_and_times, is_producible, m_queue,
         m_object_group_allocated_pp, m_object_group_allocated_stockpile_pp,
-        m_projects_in_progress, false, universe);
+        m_projects_in_progress, Simulating::NOTSIM, universe);
 
     //update expected new stockpile amount
     m_expected_new_stockpile_amount = CalculateNewStockpile(
@@ -786,8 +783,7 @@ void ProductionQueue::Update(const ScriptingContext& context,
     // if at least one resource-sharing system group have available PP, simulate
     // future turns to predict when build items will be finished
     const bool simulate_future =
-        std::any_of(available_pp.begin(), available_pp.end(),
-                    [](const auto& available) { return available.second > EPSILON; });
+        range_any_of(available_pp, [](const auto& available) noexcept { return available.second > EPSILON; });
 
     if (!simulate_future) {
         update_timer.EnterSection("Signal and Finish");
@@ -847,7 +843,7 @@ void ProductionQueue::Update(const ScriptingContext& context,
         const float sim_project_transfer_to_stockpile = SetProdQueueElementSpending(
             available_pp, sim_available_stockpile, stockpile_limit, queue_element_groups,
             queue_item_costs_and_times, is_producible, sim_queue,
-            allocated_pp, allocated_stockpile_pp, dummy_int, true, universe);
+            allocated_pp, allocated_stockpile_pp, dummy_int, Simulating::SIM, universe);
 
         // check completion status and update m_queue and sim_queue as appropriate
         for (unsigned int i = 0; i < sim_queue.size(); i++) {

@@ -687,9 +687,16 @@ namespace {
             else
                 operand = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(args[1])());
             return boost::python::object(value_ref_wrapper<double>(std::make_shared<ValueRef::Operation<double>>(op, std::move(operand))));
+        } else if (args[0] == parser.type_str) {
+            std::unique_ptr<ValueRef::ValueRef<std::string>> operand;
+            auto arg = boost::python::extract<value_ref_wrapper<std::string>>(args[1]);
+            if (arg.check())
+                operand = ValueRef::CloneUnique(arg().value_ref);
+            else
+                operand = std::make_unique<ValueRef::Constant<std::string>>(boost::python::extract<std::string>(args[1])());
+            return boost::python::object(value_ref_wrapper<std::string>(std::make_shared<ValueRef::Operation<std::string>>(op, std::move(operand))));
         } else {
             ErrorLogger() << "Unsupported type for 1arg : " << boost::python::extract<std::string>(boost::python::str(args[0]))();
-
             throw std::runtime_error(std::string("Not implemented ") + __func__);
         }
 
@@ -1111,7 +1118,7 @@ namespace {
     }
 
     boost::python::object insert_const_(const PythonParser& parser, const boost::python::object& type, const boost::python::object& value) {
-         if (type == parser.type_int) {
+        if (type == parser.type_int) {
             return boost::python::object(value_ref_wrapper<int>(std::make_shared<ValueRef::Constant<int>>(
                 boost::python::extract<int>(value)
             )));
@@ -1170,6 +1177,7 @@ void RegisterGlobalsValueRefs(boost::python::dict& globals, const PythonParser& 
                                  "TurnPolicyAdopted",
                                  "TurnsSincePolicyAdopted",
                                  "CumulativeTurnsPolicyAdopted",
+                                 "LatestTurnPolicyAdopted",
                                  "NumPoliciesAdopted"})
     {
         const auto f_insert_int_complex_variable = [variable](const boost::python::tuple& args, const boost::python::dict& kw) { return insert_int_complex_variable_(variable, args, kw); };
@@ -1239,7 +1247,9 @@ void RegisterGlobalsValueRefs(boost::python::dict& globals, const PythonParser& 
         const auto f = [&parser, e](const boost::python::tuple& args, const boost::python::dict& kw) { return insert_minmaxoneof_(parser, e, args, kw); };
         globals[op.first] = boost::python::raw_function(f, 3);
     }
-
+    const auto noop = ValueRef::OpType::NOOP;
+    const auto xf = [&parser](const boost::python::tuple& args, const boost::python::dict& kw) { return insert_1arg_(parser, noop, args, kw); };
+    globals["NoOpValue"] = boost::python::raw_function(xf, 2); // needs type and value like NoOpValue(int, 1)
     const auto f_insert_statistic_if = [&parser](const boost::python::tuple& args, const boost::python::dict& kw) { return insert_statistic_(parser, ValueRef::StatisticType::IF, args, kw); };
     globals["StatisticIf"] = boost::python::raw_function(f_insert_statistic_if, 1);
 

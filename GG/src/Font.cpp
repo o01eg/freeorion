@@ -124,7 +124,7 @@ namespace {
         Y BufferHeight() const noexcept { return m_capacity_height; }
 
         /// Return a pointer to the storage buffer where the data is kept
-        T* Buffer() noexcept { return &m_data.front(); }
+        T* Buffer() noexcept { return m_data.data(); }
 
         /// Returns the size of the storage buffer where the data is kept
         auto BufferSize() const noexcept { return m_data.size(); }
@@ -186,7 +186,7 @@ namespace {
     {
         FTLibraryWrapper()
         {
-            if (!m_library && FT_Init_FreeType(&m_library)) // if no library exists and we can't create one...
+            if (!m_library && FT_Init_FreeType(std::addressof(m_library))) // if no library exists and we can't create one...
                 throw FailedFTLibraryInit("Unable to initialize FreeType font library object");
         }
         ~FTLibraryWrapper() { FT_Done_FreeType(m_library); }
@@ -959,7 +959,7 @@ namespace {
     };
     constexpr struct DummyGlyphMap {
         static constexpr DummyPair value{};
-        constexpr auto* find(uint32_t) const noexcept { return &value; }
+        constexpr auto* find(uint32_t) const noexcept { return std::addressof(value); }
         constexpr decltype(value)* end() const noexcept { return nullptr; }
     } dummy_glyph_map;
 
@@ -1808,7 +1808,7 @@ namespace {
 
         xpr::sregex& BindRegexToText(const std::string& new_text, bool ignore_tags) noexcept
         {
-            m_text = &new_text;
+            m_text = std::addressof(new_text);
             m_ignore_tags = ignore_tags;
             return m_EVERYTHING;
         }
@@ -3005,10 +3005,10 @@ StrSize GG::StringIndexOfCodePoint(CPSize index, const Font::LineVec& line_data)
 { return StringIndexOfCodePointInLines(index, line_data); }
 
 FT_Error Font::GetFace(FT_Face& face)
-{ return FT_New_Face(g_library.m_library, m_font_filename.c_str(), 0, &face); }
+{ return FT_New_Face(g_library.m_library, m_font_filename.c_str(), 0, std::addressof(face)); }
 
 FT_Error Font::GetFace(const std::vector<uint8_t>& file_contents, FT_Face& face)
-{ return FT_New_Memory_Face(g_library.m_library, &file_contents[0], file_contents.size(), 0, &face); }
+{ return FT_New_Memory_Face(g_library.m_library, file_contents.data(), file_contents.size(), 0, std::addressof(face)); }
 
 void Font::CheckFace(FT_Face face, FT_Error error)
 {
@@ -3116,7 +3116,7 @@ void Font::Init(FT_Face& face)
 
             for (unsigned int row = 0; row < glyph_bitmap.rows; ++row) {
                 uint8_t* src = src_start + row * glyph_bitmap.pitch;
-                uint16_t* dst = &buffer.get(x, y + Y(row));
+                uint16_t* dst = std::addressof(buffer.get(x, y + Y(row)));
                 // Rows are always contiguous, so we can copy along a row using simple incrementation
                 for (unsigned int col = 0; col < glyph_bitmap.width; ++col) {
 #ifdef __BIG_ENDIAN__

@@ -142,8 +142,8 @@ public:
 
         } else if constexpr (invokable_on_const_reference) {
             static constexpr auto to_cref = [](const auto& id_ptr) -> const auto& { return *(id_ptr.second); };
-            static constexpr auto to_address = [](const auto& r) { return &r; };
-            auto rng = map | range_transform(to_cref) | range_filter(pred) | range_transform(to_address);
+            static constexpr auto to_addr = [](const auto& o) noexcept { return std::addressof(o); };
+            auto rng = map | range_transform(to_cref) | range_filter(pred) | range_transform(to_addr);
             result.reserve(map.size());
             range_copy(rng, std::back_inserter(result));
             return result;
@@ -847,7 +847,7 @@ std::shared_ptr<const std::decay_t<T>> ObjectMap::get(Pred pred) const
         return (it != rng.end()) ? *it : nullptr;
 
     } else if constexpr (invokable_on_const_entry) {
-        auto it = std::find_if(map.begin(), map.end(), pred);
+        auto it = range_find_if(map, pred);
         return (it != map.end()) ? it->second : nullptr;
 
     } else if constexpr (invokable_on_const_reference) {
@@ -856,7 +856,7 @@ std::shared_ptr<const std::decay_t<T>> ObjectMap::get(Pred pred) const
         return (it != rng.end()) ? it->second : nullptr;
 
     } else if constexpr (invokable_on_int) {
-        auto it = std::find_if(map.begin(), map.end(), [&pred](const auto& id_obj) { return pred(id_obj->first); });
+        auto it = range_find_if(map, [&pred](const auto& id_obj) { return pred(id_obj->first); });
         return (it != map.end()) ? it->second : nullptr;
 
     } else {
@@ -893,15 +893,22 @@ const std::decay_t<T>* ObjectMap::getRaw(Pred pred) const
         return (it != map.end()) ? it->get() : nullptr;
 
     } else if constexpr (invokable_on_const_entry) {
-        auto it = std::find_if(map.begin(), map.end(), pred);
+        auto it = range_find_if(map, pred);
         return (it != map.end()) ? it->second.get() : nullptr;
 
     } else if constexpr (invokable_on_const_reference) {
-        auto it = range_find_if(map | range_values | range_transform(ref_tx), pred);
-        return (it != map.end()) ? &*it : nullptr;
+        auto rng = map | range_values | range_transform(ref_tx);
+        auto it = range_find_if(rng, pred);
+        if (it == rng.end())
+            return nullptr;
+        const auto& result = *it;
+        static_assert(std::is_same_v<decltype(result), const DecayT&>);
+        return std::addressof(result);
 
     } else if constexpr (invokable_on_int) {
-        auto it = range_find_if(map, [pred](const auto& id_obj) { return pred(id_obj.first); });
+        static constexpr bool is_nx = noexcept(pred(INVALID_OBJECT_ID));
+        const auto check_pred = [pred](const auto& id_obj) noexcept(is_nx) { return pred(id_obj.first); };
+        auto it = range_find_if(map, check_pred);
         return (it != map.end()) ? it->second.get() : nullptr;
 
     } else {

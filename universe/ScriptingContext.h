@@ -14,6 +14,13 @@
 #    define CONSTEXPR_VEC_AND_STRING
 #  endif
 #endif
+#if !defined(CONSTEXPR_STRING)
+#  if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+#    define CONSTEXPR_STRING constexpr
+#  else
+#    define CONSTEXPR_STRING
+#  endif
+#endif
 
 struct CombatInfo;
 
@@ -22,6 +29,7 @@ struct [[nodiscard]] ScriptingContext final {
         int, double, PlanetType, PlanetSize, ::PlanetEnvironment, StarType,
         UniverseObjectType, Visibility, std::string, std::vector<std::string>>;
     inline static CONSTEXPR_VEC_AND_STRING const CurrentValueVariant DEFAULT_CURRENT_VALUE{0};
+    inline static CONSTEXPR_STRING const std::string EMPTY_STRING{};
 
     // used to disambiguate constructors
     class LocalCandidate final {};
@@ -36,9 +44,9 @@ struct [[nodiscard]] ScriptingContext final {
         galaxy_setup_data(app.GetGalaxySetupData()),
         species(          app.GetSpeciesManager()),
         supply(           app.GetSupplyManager()),
-        universe(         &app.GetUniverse()),
+        universe(         std::addressof(app.GetUniverse())),
         const_universe(   app.GetUniverse()),
-        empires(          &app.Empires()),
+        empires(          std::addressof(app.Empires())),
         const_empires(    app.Empires())
     {}
 
@@ -279,6 +287,8 @@ struct [[nodiscard]] ScriptingContext final {
         return object_it->second;
     }
 
+    [[nodiscard]] const std::string& GetVisibleObjectName(int id) const noexcept { return EMPTY_STRING; }
+
     // mutable empire not thread safe to modify
     [[nodiscard]] std::shared_ptr<Empire> GetEmpire(int id) {
         if (!empires) {
@@ -322,7 +332,7 @@ struct [[nodiscard]] ScriptingContext final {
 private: // Universe and ObjectMap getters select one of these based on constness
     Universe*                                      universe = nullptr;
     const Universe&                                const_universe;
-    ObjectMap*                                     objects = universe ? &(universe->Objects()) : nullptr;
+    ObjectMap*                                     objects = universe ? std::addressof(universe->Objects()) : nullptr;
     const ObjectMap&                               const_objects{objects ? *objects : const_universe.Objects()};
 public:
     const Universe::EmpireObjectVisibilityMap&     empire_object_vis{const_universe.GetEmpireObjectVisibility()};

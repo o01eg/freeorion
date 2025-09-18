@@ -46,16 +46,10 @@ namespace {
             const auto& prereqs = name_tech.second.Prerequisites();
             return range_all_of(prereqs, is_researched);
         };
+        static constexpr auto to_addr = [](const auto& t) noexcept { return std::addressof(t); };
 
-        std::vector<const Tech*> retval;
-        retval.reserve(techs.size());
-        // transform_if
-        for (const auto& name_tech : techs) {
-            if (is_researchable_now(name_tech))
-                retval.push_back(&name_tech.second);
-        }
-
-        return retval;
+        return techs | range_filter(is_researchable_now) | range_values
+            | range_transform(to_addr) | range_to_vec;
     }
 
     const Tech* Cheapest(const std::vector<const Tech*>& next_techs, int empire_id,
@@ -63,16 +57,18 @@ namespace {
     {
         if (next_techs.empty())
             return nullptr;
-        std::vector<float> costs;
-        costs.reserve(next_techs.size());
-        static constexpr float BIG_COST = std::numeric_limits<float>::max();
-        std::transform(next_techs.begin(), next_techs.end(), std::back_inserter(costs),
-                       [&context, empire_id](const Tech* tech)
-                       { return tech ? tech->ResearchCost(empire_id, context) : BIG_COST; });
-        const auto min_cost_it = std::min_element(costs.begin(), costs.end());
-        if (min_cost_it == costs.end() || *min_cost_it == BIG_COST)
+
+        static constexpr float BIG_COST = std::numeric_limits<float>::infinity();
+        const auto to_cost = [&context, empire_id](const Tech* tech)
+        { return tech ? tech->ResearchCost(empire_id, context) : BIG_COST; };
+
+        auto costs_rng = next_techs | range_transform(to_cost);
+        auto min_cost_it = range_min_element(costs_rng);
+
+        if (min_cost_it == costs_rng.end() || !std::isfinite(*min_cost_it))
             return nullptr;
-        const auto idx = std::distance(costs.begin(), min_cost_it);
+
+        const auto idx = range_distance(costs_rng.begin(), min_cost_it);
         return next_techs[idx];
     }
 }
@@ -160,7 +156,7 @@ Tech::Tech(std::string&& name, std::string&& description,
     m_tags_concatenated([&tags]() {
         // allocate storage for concatenated tags
         std::size_t params_sz = std::transform_reduce(tags.begin(), tags.end(), 0u, std::plus{},
-                                                      [](const auto& tag) { return tag.size(); });
+                                                      [](const auto& tag) noexcept { return tag.size(); });
         std::string retval;
         retval.reserve(params_sz);
 
@@ -221,7 +217,7 @@ Tech::Tech(std::string&& name, std::string&& description,
 {}
 
 bool Tech::operator==(const Tech& rhs) const {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
 
     if (m_name != rhs.m_name ||
@@ -396,42 +392,29 @@ uint32_t Tech::GetCheckSum() const {
 const Tech* TechManager::GetTech(std::string_view name) const {
     CheckPendingTechs();
     const auto it = m_techs.find(name);
-    return it == m_techs.end() ? nullptr : &it->second;
+    return it == m_techs.end() ? nullptr : std::addressof(it->second);
 }
 
 const TechCategory* TechManager::GetTechCategory(std::string_view name) const {
     CheckPendingTechs();
     const auto it = m_categories.find(name);
-    return it == m_categories.end() ? nullptr : &it->second;
+    return it == m_categories.end() ? nullptr : std::addressof(it->second);
 }
 
 std::vector<std::string_view> TechManager::CategoryNames() const {
     CheckPendingTechs();
-    std::vector<std::string_view> retval;
-    retval.reserve(m_categories.size());
-    std::transform(m_categories.begin(), m_categories.end(), std::back_inserter(retval),
-                   [](const auto& name_cat) -> std::string_view { return name_cat.first; });
-    return retval;
+    return m_categories | range_keys | range_to<std::vector<std::string_view>>();
 }
 
 std::vector<std::string_view> TechManager::TechNames() const {
     CheckPendingTechs();
-    std::vector<std::string_view> retval;
-    retval.reserve(m_techs.size());
-    std::transform(m_techs.begin(), m_techs.end(), std::back_inserter(retval),
-                   [](const auto& name_tech) -> std::string_view { return name_tech.first; });
-    return retval;
+    return m_techs | range_keys | range_to<std::vector<std::string_view>>();
 }
 
 std::vector<std::string_view> TechManager::TechNames(std::string_view name) const {
     CheckPendingTechs();
-    std::vector<std::string_view> retval;
-    retval.reserve(m_techs.size());
-    // transform_if
-    for (const auto& name_tech : m_techs)
-        if (name_tech.second.Category() == name)
-            retval.emplace_back(name_tech.first);
-    return retval;
+    const auto is_in_name_cat = [cat{name}](const auto& name_tech) noexcept { return name_tech.second.Category() == cat; };
+    return m_techs | range_filter(is_in_name_cat) | range_keys | range_to<std::vector<std::string_view>>();
 }
 
 std::vector<const Tech*> TechManager::AllNextTechs(const std::vector<std::string_view>& researched_techs) {
@@ -582,7 +565,7 @@ std::string TechManager::FindFirstDependencyCycle() const {
                            << current_tech_name << "\"";
                     for (auto stack_it = stack.rbegin(); stack_it != stack_duplicate_it; ++stack_it) {
                         const auto& prereqs = (*stack_it)->Prerequisites();
-                        if (std::count(prereqs.begin(), prereqs.end(), current_tech_name)) {
+                        if (range_count(prereqs, current_tech_name)) {
                             current_tech_name = (*stack_it)->Name();
                             stream << " <-- \"" << current_tech_name << "\"";
                         }
@@ -637,7 +620,7 @@ void TechManager::AllChildren(const Tech* tech, std::map<std::string, std::strin
             ErrorLogger() << "Tech " << unlocked_tech << " unlocks itself";
             continue;
         }
-        children[unlocked_tech] = tech->Name();
+        children.insert_or_assign(unlocked_tech, tech->Name());
         AllChildren(GetTech(unlocked_tech), children);
     }
 }
@@ -650,10 +633,13 @@ std::vector<std::string> TechManager::RecursivePrereqs(std::string_view tech_nam
         return {};
 
     // compile set of recursive prereqs
-    std::list<std::string> prereqs_list{initial_tech->Prerequisites().begin(), // working list of prereqs as being processed.  may contain duplicates
-                                        initial_tech->Prerequisites().end()};  // initialized with 1st order prereqs
-    std::set<std::string> prereqs_set;                                         // set of (unique) prereqs leading to tech
-    std::multimap<float, std::string> techs_to_add_map;                        // indexed and sorted by cost per turn
+    // 
+    // working list of prereqs as being processed.  may contain duplicates. initialized with 1st order prereqs
+    const auto& prereqs = initial_tech->Prerequisites();
+    std::list<std::string> prereqs_list{prereqs.begin(), prereqs.end()};  
+    std::set<std::string> prereqs_set; // set of (unique) prereqs leading to tech
+    std::vector<std::pair<float, std::string>> techs_to_add_map; // cost per turn and name of tech
+    techs_to_add_map.reserve(m_techs.size());
 
     // traverse list, appending new prereqs to it, and putting unique prereqs into set
     for (std::string& cur_name : prereqs_list) {
@@ -666,20 +652,25 @@ std::vector<std::string> TechManager::RecursivePrereqs(std::string_view tech_nam
 
         // and the map of techs, sorted by cost
         const Tech* cur_tech = this->GetTech(cur_name);
-        techs_to_add_map.emplace(cur_tech->ResearchCost(empire_id, context), std::move(cur_name));
+        if (!cur_tech)
+            continue;
+
+        techs_to_add_map.emplace_back(cur_tech->ResearchCost(empire_id, context), std::move(cur_name));
 
         // get prereqs of new tech, append to list
-        prereqs_list.insert(prereqs_list.end(), cur_tech->Prerequisites().begin(),
-                            cur_tech->Prerequisites().end());
+        const auto& cur_prereqs = cur_tech->Prerequisites();
+        prereqs_list.insert(prereqs_list.end(), cur_prereqs.begin(), cur_prereqs.end());
     }
 
     // extract sorted techs into vector, to be passed to signal...
-    std::vector<std::string> retval;
-    retval.reserve(techs_to_add_map.size());
-    for (auto& tech_to_add : techs_to_add_map)
-        retval.push_back(std::move(tech_to_add.second));
-
-    return retval;
+    std::stable_sort(techs_to_add_map.begin(), techs_to_add_map.end());
+    auto retval_rng =
+#if !defined(__GNUC__) || (__GNUC__ > 11)
+        std::move(techs_to_add_map) | range_values;
+#else
+        techs_to_add_map | range_values;
+#endif
+    return {retval_rng.begin(), retval_rng.end()};
 }
 
 uint32_t TechManager::GetCheckSum() const {

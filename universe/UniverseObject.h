@@ -244,14 +244,14 @@ public:
     [[nodiscard]] constexpr Meter* GetMeter(MeterType type) noexcept {
         const auto meters = Meters();
         auto m_it = std::find_if(meters.begin(), meters.end(),
-                                 [type](const auto& p) { return p.first == type; });
-        return (m_it == meters.end()) ? nullptr : &m_it->second;
+                                 [type](const auto& p) noexcept { return p.first == type; });
+        return (m_it == meters.end()) ? nullptr : std::addressof(m_it->second);
     };
     [[nodiscard]] constexpr const Meter* GetMeter(MeterType type) const noexcept {
         const auto meters = Meters();
         auto m_it = std::find_if(meters.begin(), meters.end(),
-                                 [type](const auto& p) { return p.first == type; });
-        return (m_it == meters.end()) ? nullptr : &m_it->second;
+                                 [type](const auto& p) noexcept { return p.first == type; });
+        return (m_it == meters.end()) ? nullptr : std::addressof(m_it->second);
     };
 
     /** Returns the name of this objectas it appears to empire \a empire_id .*/

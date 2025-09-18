@@ -192,7 +192,7 @@ ScriptingContext::ScriptingContext(CombatInfo& info, Attacker, UniverseObjectCXB
     species(                info.species),
     supply(                 info.supply),
     const_universe(         info.universe),
-    objects(                &info.objects), // not taken from Universe!
+    objects(                std::addressof(info.objects)), // not taken from Universe!
     const_objects(          info.objects),
     empire_object_vis(      info.empire_object_visibility), // not taken from Universe!
     empire_object_vis_turns(info.empire_object_vis_turns), // not taken from Universe!
@@ -1200,20 +1200,21 @@ namespace {
         /// If so, remove that empire's entry
         void CleanEmpires() {
             DebugLogger(combat) << "CleanEmpires";
-            auto temp{empire_infos};
 
-            boost::container::flat_set<int> empire_ids_with_objects;
-            empire_ids_with_objects.reserve(20); // guesstimate, should normally be enough
-            for (const auto* obj : combat_info.objects.allRaw()) // TODO: range, range init, and make container const
-                empire_ids_with_objects.insert(obj->Owner());
+            static constexpr auto to_owner_id = [](const auto& obj) noexcept { return obj->Owner(); };
+            const auto empire_ids_with_objects = combat_info.objects.allRaw() | range_transform(to_owner_id)
+                | range_to<boost::container::flat_set<int>>();
 
-            for (const auto empire_id : empire_infos | range_keys) {
-                if (!contains(empire_ids_with_objects, empire_id)) {
-                    temp.erase(empire_id);
-                    DebugLogger(combat) << "No objects left for empire with id: " << empire_id;
-                }
+            const auto has_no_objects = [&empire_ids_with_objects](int id)
+            { return !empire_ids_with_objects.contains(id); };
+
+            // copy before modifying...
+            const auto no_obj_info_ids = empire_infos | range_keys | range_filter(has_no_objects) | range_to_vec;
+
+            for (auto& empire_id : no_obj_info_ids) {
+                empire_infos.erase(empire_id);
+                DebugLogger(combat) << "No objects left for empire with id: " << empire_id;
             }
-            empire_infos = std::move(temp);
 
             if (!empire_infos.empty()) {
                 DebugLogger(combat) << "Empires with objects remaining:";
@@ -1227,7 +1228,7 @@ namespace {
 
         /// Clears and refills \a shuffled with attacker ids in a random order
         auto GetShuffledValidAttackerIDs() {
-            std::vector<int> retval{valid_attacker_object_ids.begin(), valid_attacker_object_ids.end()};
+            auto retval = valid_attacker_object_ids | range_to_vec;
             RandomShuffle(retval);
             return retval;
         }

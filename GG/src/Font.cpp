@@ -14,6 +14,7 @@
 #include <cmath>
 #include <iterator>
 #include <numeric>
+#include <shared_mutex>
 #include <sstream>
 #include <boost/format.hpp>
 #include <boost/xpressive/regex_actions.hpp>
@@ -30,8 +31,14 @@
 #define DEBUG_DETERMINELINES 0
 
 namespace GG::detail {
+    std::mutex freetype_mutex;
+
     FTFaceWrapper::~FTFaceWrapper()
-    { if (m_face) FT_Done_Face(m_face); }
+    {
+        std::scoped_lock ft_lock{freetype_mutex};
+        if (m_face)
+            FT_Done_Face(m_face);
+    }
 }
 
 using namespace GG;
@@ -182,32 +189,20 @@ namespace {
         }
     };
 
-    struct FTLibraryWrapper
-    {
-        FTLibraryWrapper()
-        {
-            if (!m_library && FT_Init_FreeType(std::addressof(m_library))) // if no library exists and we can't create one...
-                throw FailedFTLibraryInit("Unable to initialize FreeType font library object");
-        }
-        ~FTLibraryWrapper() { FT_Done_FreeType(m_library); }
-        FT_Library m_library = nullptr;
-    } g_library;
 
-    struct SetPreformattedIfPREP
-    {
-        using result_type = void ;
-
-        void operator()(const std::string* str, const Font::Substring::IterPair& tag_match_iter_pair,
-                        bool& is_preformatted, bool set_to_value) const
-        {
-            if (str) {
-                const Font::Substring tag_ss(*str, tag_match_iter_pair);
-                if (tag_ss == Font::PRE_TAG)
-                    is_preformatted = set_to_value;
+    FT_Library GetFreeTypeLibrary() {
+        static struct FTLibraryWrapper {
+            FTLibraryWrapper()
+            {
+                if (FT_Init_FreeType(std::addressof(library)))
+                    throw FailedFTLibraryInit("Unable to initialize FreeType font library object");
             }
-        }
-    };
-    const boost::xpressive::function<SetPreformattedIfPREP>::type SetPreformattedIfPRE = {{}};
+            ~FTLibraryWrapper() { FT_Done_FreeType(library); }
+            FT_Library library = nullptr;
+        } library;
+        return library.library;
+    }
+
 
     constexpr double ITALICS_SLANT_ANGLE = 12; // degrees
     const double ITALICS_FACTOR = 1.0 / tan((90 - ITALICS_SLANT_ANGLE) * 3.1415926 / 180.0); // factor used to shear glyphs ITALICS_SLANT_ANGLE degrees CW from straight up
@@ -626,7 +621,7 @@ namespace {
             justification = ALIGN_CENTER;
         else if (elem.tag_name == Font::ALIGN_RIGHT_TAG)
             justification = ALIGN_RIGHT;
-        else if (elem.tag_name != Font::PRE_TAG)
+        else
             pending_formatting_tags.push_back(elem);
         last_line_of_curr_just = false;
         code_point_offset += elem.CodePointSize();
@@ -642,7 +637,7 @@ namespace {
             (elem.tag_name == Font::ALIGN_RIGHT_TAG && justification == ALIGN_RIGHT))
         {
             last_line_of_curr_just = true;
-        } else if (elem.tag_name != Font::PRE_TAG) {
+        } else {
             pending_formatting_tags.push_back(elem);
         }
         code_point_offset += elem.CodePointSize();
@@ -1716,8 +1711,6 @@ namespace {
     constexpr std::size_t text_tag_idx = 5;
 
 
-
-
     /** TagHandler stores a set of all known tags and provides pre-compiled regexs for those tags.
 
     Known tags are tags that will be parsed into TextElement OPEN_TAG or CLOSE_TAG. */
@@ -1726,111 +1719,83 @@ namespace {
         /** Add a tag to the set of known tags.*/
         void Insert(std::vector<std::string_view> tags)
         {
+            std::unique_lock lock{m_mutex};
             std::copy_if(tags.begin(), tags.end(), std::back_inserter(m_custom_tags),
-                         [this](const auto tag) { return !IsKnown(tag); });
+                         [this](const auto tag) { return !IsKnownImpl<false>(tag); });
         }
 
         bool IsKnown(std::string_view tag) const
+        { return IsKnownImpl<true>(tag); }
+
+    private:
+        template <bool require_lock>
+        bool IsKnownImpl(std::string_view tag) const
         {
             const auto matches_tag = [tag](const auto sv) noexcept{ return sv == tag; };
-            return std::any_of(m_default_tags.begin(), m_default_tags.end(), matches_tag)
-                || std::any_of(m_custom_tags.begin(), m_custom_tags.end(), matches_tag);
+            if (std::any_of(m_default_tags.begin(), m_default_tags.end(), matches_tag)) {
+                return true;
+            } else if constexpr (require_lock) {
+                std::shared_lock lock{m_mutex};
+                return std::any_of(m_custom_tags.begin(), m_custom_tags.end(), matches_tag);
+            } else {
+                return std::any_of(m_custom_tags.begin(), m_custom_tags.end(), matches_tag);
+            }
         }
 
-    private:
         // set of tags known to the handler
-        static constexpr std::array<std::string_view, 11> m_default_tags{
-            {Font::ITALIC_TAG, Font::SHADOW_TAG, Font::UNDERLINE_TAG, Font::SUPERSCRIPT_TAG, Font::SUBSCRIPT_TAG,
-            Font::RGBA_TAG, Font::ALIGN_LEFT_TAG, Font::ALIGN_CENTER_TAG, Font::ALIGN_RIGHT_TAG, Font::PRE_TAG, Font::RESET_TAG}};
+        static constexpr std::array<std::string_view, 10> m_default_tags{
+            {Font::ITALIC_TAG, Font::SHADOW_TAG, Font::UNDERLINE_TAG, Font::SUPERSCRIPT_TAG,
+             Font::SUBSCRIPT_TAG, Font::RGBA_TAG, Font::ALIGN_LEFT_TAG, Font::ALIGN_CENTER_TAG,
+             Font::ALIGN_RIGHT_TAG, Font::RESET_TAG}};
 
         std::vector<std::string_view> m_custom_tags;
+        mutable std::shared_mutex m_mutex;
     } tag_handler;
+
+    bool MatchesKnownTagStr(std::string_view str)
+    { return tag_handler.IsKnown(str); }
+
+    bool MatchesKnownTag(const boost::xpressive::ssub_match& sm)
+    { return MatchesKnownTagStr(sm.str()); }
+
+
     namespace xpr = boost::xpressive;
 
-    /** CompiledRegex maintains a compiled boost::xpressive regular
-        expression that includes a tag stack which can be cleared and
-        provided to callers without the overhead of recompiling the
-        regular expression.*/
-    class CompiledRegex {
-    public:
-        CompiledRegex()
-        {
-            // Synonyms for s1 thru s5 sub matches
-            xpr::mark_tag tag_name_tag(tag_name_tag_idx);
-            xpr::mark_tag open_bracket_tag(open_bracket_tag_idx);
-            xpr::mark_tag close_bracket_tag(close_bracket_tag_idx);
-            xpr::mark_tag whitespace_tag(whitespace_tag_idx);
-            xpr::mark_tag text_tag(text_tag_idx);
+    // Synonyms for s1 thru s5 sub matches
+    const xpr::mark_tag tag_name_tag{tag_name_tag_idx};
+    const xpr::mark_tag open_bracket_tag{open_bracket_tag_idx};
+    const xpr::mark_tag close_bracket_tag(close_bracket_tag_idx);
+    const xpr::mark_tag whitespace_tag(whitespace_tag_idx);
+    const xpr::mark_tag text_tag(text_tag_idx);
 
-            using boost::placeholders::_1;
+    // The comments before each regex are intended to clarify the mapping from xpressive
+    // notation to the more typical regex notation.  If you read xpressive or don't read
+    // regex then ignore them.
 
-            // The comments before each regex are intended to clarify the mapping from xpressive
-            // notation to the more typical regex notation.  If you read xpressive or don't read
-            // regex then ignore them.
+    // -+ 'non-greedy',   ~ 'not',   set[|] 'set',    _s 'space' = 'anything but space or <'
+    const xpr::sregex TAG_PARAM = -+~xpr::set[xpr::_s | '<'];
 
-            // -+ 'non-greedy',   ~ 'not',   set[|] 'set',    _s 'space' = 'anything but space or <'
-            static const xpr::sregex TAG_PARAM =
-                -+~xpr::set[xpr::_s | '<'];
+    // *blank  'zero or more greedy whitespace',   >> 'followed by',    _ln 'newline',
+    // (set = 'a', 'b') is '[ab]',    +blank 'one or more greedy blank'
+    const xpr::sregex WHITESPACE = (*xpr::blank >> (xpr::_ln | (xpr::set = '\n', '\r', '\f'))) | +xpr::blank;
 
-            //+_w one or more greedy word chars,  () group no capture,  [] semantic operation
-            const xpr::sregex TAG_NAME =
-                (+xpr::_w)[xpr::check(boost::bind(&CompiledRegex::MatchesKnownTag, this, _1))];
+    // < followed by not space or <   or one or more not space or <
+    const xpr::sregex TEXT = ('<' >> *~xpr::set[xpr::_s | '<']) | (+~xpr::set[xpr::_s | '<']);
 
-            // *blank  'zero or more greedy whitespace',   >> 'followed by',    _ln 'newline',
-            // (set = 'a', 'b') is '[ab]',    +blank 'one or more greedy blank'
-            static const xpr::sregex WHITESPACE =
-                (*xpr::blank >> (xpr::_ln | (xpr::set = '\n', '\r', '\f'))) | +xpr::blank;
+    const xpr::sregex WHITESPACE_OR_TEXT = (whitespace_tag = WHITESPACE) | (text_tag = TEXT);
 
-            // < followed by not space or <   or one or more not space or <
-            static const xpr::sregex TEXT =
-                ('<' >> *~xpr::set[xpr::_s | '<']) | (+~xpr::set[xpr::_s | '<']);
+    // +_w one or more greedy word chars,  () group no capture,  [] semantic operation
+    const xpr::sregex TAG_NAME = (+xpr::_w)[xpr::check(&MatchesKnownTag)];
 
-            m_EVERYTHING =
-                ('<'                                                                    // < open tag
-                 >> (tag_name_tag = TAG_NAME)                                           // TAG_NAME 
-                    [xpr::check(boost::bind(&CompiledRegex::NotPreformatted, this, _1))]// unless in preformatted mode
-                 >> xpr::repeat<0, 9>(+xpr::blank >> TAG_PARAM)                         // repeat 0 to 9 times: blank followed by TAG_PARAM
-                 >> (open_bracket_tag.proto_base() = '>')                               // > close tag
-                    [SetPreformattedIfPRE(xpr::ref(m_text), tag_name_tag, xpr::ref(m_preformatted), true)]
-                ) |
+    const xpr::sregex TAGGED_TEXT_PARSER =
+            ('<' >> (tag_name_tag = TAG_NAME)
+                 >> xpr::repeat<0, 9>(+xpr::blank >> TAG_PARAM)
+                 >> (open_bracket_tag.proto_base() = '>'))
 
-                ("</"                                                                           // </ open tag with slash
-                 >> (tag_name_tag = TAG_NAME)                                                   // TAG_NAME
-                    [xpr::check(boost::bind(&CompiledRegex::NotPreformattedOrIsPre, this, _1))] // unless in preformatted mode or unless tag is </pre>
-                 >> (close_bracket_tag.proto_base() = '>')                                      // > close tag
-                    [SetPreformattedIfPRE(xpr::ref(m_text), tag_name_tag, xpr::ref(m_preformatted), false)]
-                ) |
+         |  ("</" >> (tag_name_tag = TAG_NAME)
+                  >> (close_bracket_tag.proto_base() = '>'))
 
-                (whitespace_tag = WHITESPACE) |
-
-                (text_tag = TEXT);
-        }
-
-        xpr::sregex& BindRegexToText(const std::string& new_text, bool ignore_tags) noexcept
-        {
-            m_text = std::addressof(new_text);
-            m_ignore_tags = ignore_tags;
-            return m_EVERYTHING;
-        }
-
-    private:
-        bool MatchesKnownTag(const boost::xpressive::ssub_match& sub) const
-        { return !m_ignore_tags && tag_handler.IsKnown(sub.str()); }
-
-        bool NotPreformatted(const boost::xpressive::ssub_match&) const noexcept
-        { return !m_preformatted; }
-
-        bool NotPreformattedOrIsPre(const boost::xpressive::ssub_match& sub) const
-        { return !m_preformatted || sub.str() == Font::PRE_TAG; }
-
-        const std::string*  m_text = nullptr;
-
-        // The combined regular expression.
-        xpr::sregex         m_EVERYTHING;
-
-        bool                m_ignore_tags = false;
-        bool                m_preformatted = false;
-    } regex_with_tags;
+         |  (whitespace_tag = WHITESPACE) | (text_tag = TEXT);
 }
 
 
@@ -2056,7 +2021,7 @@ public:
     /** Add an open tag iff it exists as a recognized tag.*/
     void AddOpenTag(std::string_view tag)
     {
-        if (!tag_handler.IsKnown(tag))
+        if (!MatchesKnownTagStr(tag))
             return;
 
         // Create open tag like "<tag>" with no parameters
@@ -2073,7 +2038,7 @@ public:
     /** Add an open tag iff it exists as a recognized tag.*/
     void AddOpenTag(std::string_view tag, const std::vector<std::string>& params)
     {
-        if (!tag_handler.IsKnown(tag))
+        if (!MatchesKnownTagStr(tag))
             return;
 
         const auto tag_begin = m_text.size();
@@ -2103,7 +2068,7 @@ public:
     /** Add a close tag iff it exists as a recognized tag.*/
     void AddCloseTag(std::string_view tag)
     {
-        if (!tag_handler.IsKnown(tag))
+        if (!MatchesKnownTagStr(tag))
             return;
 
         // Create a close tag that looks like "</tag>"
@@ -2600,17 +2565,17 @@ void Font::ProcessTags(const LineVec& line_data, RenderState& render_state)
 
 std::string Font::StripTags(std::string_view text)
 {
-    using namespace boost::xpressive;
-    std::string text_str{text};
-
-    auto& regex = regex_with_tags.BindRegexToText(text_str, false);
+    const std::string text_str{text};
 
     std::string retval;
+    if (text.empty())
+        return retval;
     retval.reserve(text.size());
 
     // scan through matched markup and text, saving only the non-tag-text
-    sregex_iterator it(text_str.begin(), text_str.end(), regex);
-    const sregex_iterator end_it;
+    xpr::sregex_iterator it(text_str.begin(), text_str.end(), TAGGED_TEXT_PARSER);
+    const xpr::sregex_iterator end_it;
+
     for (; it != end_it; ++it) {
         auto& text_match = (*it)[text_tag_idx];
         if (text_match.matched) {
@@ -2719,87 +2684,96 @@ namespace DebugOutput {
     }
 }
 
+namespace {
+    using boost::xpressive::sregex_iterator;
+    using TextElement = Font::TextElement;
+    using Substring = Font::Substring;
+
+    std::vector<TextElement> EPFTTTE(const std::string& text, const Flags<TextFormat> format,
+                                     const Font::GlyphMap& glyphs, int8_t space_width,
+                                     sregex_iterator it)
+    {
+        std::vector<TextElement> text_elements;
+
+#if defined(__cpp_using_enum)
+        using enum TextElement::TextElementType;
+#else
+        static constexpr auto OPEN_TAG = TextElement::TextElementType::OPEN_TAG;
+        static constexpr auto CLOSE_TAG = TextElement::TextElementType::CLOSE_TAG;
+        static constexpr auto WHITESPACE = TextElement::TextElementType::WHITESPACE;
+        static constexpr auto NEWLINE = TextElement::TextElementType::NEWLINE;
+#endif
+
+        const sregex_iterator end_it;
+        for (; it != end_it; ++it) {
+            const auto& it_elem = *it;
+
+            if (it_elem[text_tag_idx].matched) {
+                auto matched_text = Substring(text, it_elem[text_tag_idx]);
+                if (!matched_text.empty())
+                    text_elements.emplace_back(matched_text); // Basic text element.
+
+            } else if (it_elem[open_bracket_tag_idx].matched) {
+                // Open XML tag.
+                Substring text_substr{text, it_elem[full_regex_tag_idx]};
+                Substring tag_name_substr{text, it_elem[tag_name_tag_idx]};
+
+                // Check open tags for submatches which are parameters.
+                // For example, a color tag might have RGB parameters.
+                const auto& nested_results{it_elem.nested_results()};
+                std::vector<Substring> params;
+                if (1 < nested_results.size()) {
+                    params.reserve(nested_results.size() - 1);
+                    for (auto nested_it = std::next(nested_results.begin()); nested_it != nested_results.end(); ++nested_it)
+                    {
+                        const auto& nested_elem = *nested_it;
+                        params.emplace_back(text, nested_elem[full_regex_tag_idx]);
+                    }
+                }
+
+                text_elements.emplace_back(text_substr, tag_name_substr, std::move(params), OPEN_TAG);
+
+            } else if (it_elem[close_bracket_tag_idx].matched) {
+                // Close XML tag
+                Substring text_substr{text, it_elem[full_regex_tag_idx]};
+                Substring tag_name_substr{text, it_elem[tag_name_tag_idx]};
+
+                text_elements.emplace_back(text_substr, tag_name_substr, CLOSE_TAG);
+
+            } else if (it_elem[whitespace_tag_idx].matched) {
+                // Whitespace element
+                Substring text_substr{text, it_elem[full_regex_tag_idx]};
+                const auto& ws_elem = text_elements.emplace_back(text_substr, WHITESPACE);
+                const char last_char = ws_elem.text.empty() ? static_cast<char>(0) : *std::prev(ws_elem.text.end());
+
+                // If the last character of a whitespace element is a line ending then create a
+                // newline TextElement.
+                if (last_char == '\n' || last_char == '\f' || last_char == '\r')
+                    text_elements.emplace_back(NEWLINE);
+            }
+        }
+
+        // fill in the widths of code points in each TextElement
+        SetTextElementWidths(text, text_elements, glyphs, space_width);
+
+#if DEBUG_DETERMINELINES
+        DebugOutput::PrintParseResults(text_elements);
+#endif
+        return text_elements;
+    }
+}
+
 std::vector<Font::TextElement>
 Font::ExpensiveParseFromTextToTextElements(const std::string& text, const Flags<TextFormat> format,
                                            const GlyphMap& glyphs, int8_t space_width)
 {
-    std::vector<TextElement> text_elements;
-
-    using namespace boost::xpressive;
-#if defined(__cpp_using_enum)
-    using enum TextElement::TextElementType;
-#else
-    static constexpr auto OPEN_TAG = TextElement::TextElementType::OPEN_TAG;
-    static constexpr auto CLOSE_TAG = TextElement::TextElementType::CLOSE_TAG;
-    static constexpr auto WHITESPACE = TextElement::TextElementType::WHITESPACE;
-    static constexpr auto NEWLINE = TextElement::TextElementType::NEWLINE;
-#endif
-
     if (text.empty())
-        return text_elements;
+        return {};
 
-    const bool ignore_tags = format & FORMAT_IGNORETAGS;
+    const auto& regex = (format & FORMAT_IGNORETAGS) ? WHITESPACE_OR_TEXT : TAGGED_TEXT_PARSER;
 
-    // Fetch and use the regular expression from the TagHandler which parses all the known XML tags.
-    const sregex& regex = regex_with_tags.BindRegexToText(text, ignore_tags);
-    sregex_iterator it(text.begin(), text.end(), regex);
-    const sregex_iterator end_it;
-
-    for (; it != end_it; ++it) {
-        const auto& it_elem = *it;
-
-        if (it_elem[text_tag_idx].matched) {
-            auto matched_text = Substring(text, it_elem[text_tag_idx]);
-            if (!matched_text.empty())
-                text_elements.emplace_back(matched_text); // Basic text element.
-
-        } else if (it_elem[open_bracket_tag_idx].matched) {
-            // Open XML tag.
-            Substring text_substr{text, it_elem[full_regex_tag_idx]};
-            Substring tag_name_substr{text, it_elem[tag_name_tag_idx]};
-
-            // Check open tags for submatches which are parameters.
-            // For example, a color tag might have RGB parameters.
-            const auto& nested_results{it_elem.nested_results()};
-            std::vector<Substring> params;
-            if (1 < nested_results.size()) {
-                params.reserve(nested_results.size() - 1);
-                for (auto nested_it = std::next(nested_results.begin()); nested_it != nested_results.end(); ++nested_it)
-                {
-                    const auto& nested_elem = *nested_it;
-                    params.emplace_back(text, nested_elem[full_regex_tag_idx]);
-                }
-            }
-
-            text_elements.emplace_back(text_substr, tag_name_substr, std::move(params), OPEN_TAG);
-
-        } else if (it_elem[close_bracket_tag_idx].matched) {
-            // Close XML tag
-            Substring text_substr{text, it_elem[full_regex_tag_idx]};
-            Substring tag_name_substr{text, it_elem[tag_name_tag_idx]};
-
-            text_elements.emplace_back(text_substr, tag_name_substr, CLOSE_TAG);
-
-        } else if (it_elem[whitespace_tag_idx].matched) {
-            // Whitespace element
-            Substring text_substr{text, it_elem[full_regex_tag_idx]};
-            const auto& ws_elem = text_elements.emplace_back(text_substr, WHITESPACE);
-            const char last_char = ws_elem.text.empty() ? static_cast<char>(0) : *std::prev(ws_elem.text.end());
-
-            // If the last character of a whitespace element is a line ending then create a
-            // newline TextElement.
-            if (last_char == '\n' || last_char == '\f' || last_char == '\r')
-                text_elements.emplace_back(NEWLINE);
-        }
-    }
-
-    // fill in the widths of code points in each TextElement
-    SetTextElementWidths(text, text_elements, glyphs, space_width);
-
-#if DEBUG_DETERMINELINES
-    DebugOutput::PrintParseResults(text_elements);
-#endif
-    return text_elements;
+    xpr::sregex_iterator it(text.begin(), text.end(), regex);
+    return EPFTTTE(text, format, glyphs, space_width, it);
 }
 
 void Font::ChangeTemplatedText(std::string& text, std::vector<TextElement>& text_elements,
@@ -3005,10 +2979,16 @@ StrSize GG::StringIndexOfCodePoint(CPSize index, const Font::LineVec& line_data)
 { return StringIndexOfCodePointInLines(index, line_data); }
 
 FT_Error Font::GetFace(FT_Face& face)
-{ return FT_New_Face(g_library.m_library, m_font_filename.c_str(), 0, std::addressof(face)); }
+{
+    std::scoped_lock ft_lock{detail::freetype_mutex};
+    return FT_New_Face(GetFreeTypeLibrary(), m_font_filename.c_str(), 0, std::addressof(face));
+}
 
 FT_Error Font::GetFace(const std::vector<uint8_t>& file_contents, FT_Face& face)
-{ return FT_New_Memory_Face(g_library.m_library, file_contents.data(), file_contents.size(), 0, std::addressof(face)); }
+{
+    std::scoped_lock ft_lock{detail::freetype_mutex};
+    return FT_New_Memory_Face(GetFreeTypeLibrary(), file_contents.data(), file_contents.size(), 0, std::addressof(face));
+}
 
 void Font::CheckFace(FT_Face face, FT_Error error)
 {

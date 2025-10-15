@@ -256,9 +256,7 @@ namespace {
     }();
     static_assert(std::string_view{three_zero.data()} == "30");
 
-#if defined(__cpp_lib_constexpr_string) && \
-    (defined(_MSC_VER) || defined(__cplusplus) && (__cplusplus >= 202002L)) && \
-    (!defined(_MSC_VER) || (_MSC_VER >= 1934))
+#if defined(__cpp_lib_constexpr_string) && (__cpp_lib_constexpr_string >= 201907L) && defined(_MSC_VER)
     static_assert([](){
         const std::string str{"a"};
         return str.size() >= 1 &&
@@ -347,11 +345,11 @@ namespace {
 ///////////////////////////////////////
 // class GG::Font::Substring
 ///////////////////////////////////////
-#if !(defined(__cpp_lib_constexpr_string) && defined(_MSC_VER) && (_MSC_VER >= 1934))
-const std::string Font::Substring::EMPTY_STRING{};
-#else
+#if defined(__cpp_lib_constexpr_string) && (__cpp_lib_constexpr_string >= 201907L) && defined(_MSC_VER) && (_MSC_VER >= 1934)
 static_assert(Font::Substring(Font::Substring::EMPTY_STRING).empty());
 static_assert(Font::Substring(Font::Substring::EMPTY_STRING).data() == Font::Substring::EMPTY_STRING.data());
+#else
+const std::string Font::Substring::EMPTY_STRING{};
 #endif
 
 
@@ -848,7 +846,7 @@ namespace {
     }
 
 
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+#if defined(__cpp_lib_constexpr_string) && (__cpp_lib_constexpr_string >= 201907L)
     constexpr struct DummyNextFn {
         static constexpr uint32_t cont_byte(uint8_t c) noexcept
         { return c & 0b00111111; };
@@ -1425,7 +1423,7 @@ namespace {
     }
 
 
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+#if defined(__cpp_lib_constexpr_string) && (__cpp_lib_constexpr_string >= 201907L)
 
 #  if defined(__cpp_lib_constexpr_vector)
     // tests getting string index from glyph index in text with newlines
@@ -1469,17 +1467,18 @@ namespace {
         return StringIndexAndLengthOfLineAndGlyphInLines(0u, CPSize(idx), line_data);
     };
 
-    constexpr std::pair<std::size_t, std::size_t> Value(std::pair<StrSize, StrSize> szs)
+    using SzP = std::pair<std::size_t, std::size_t>;
+    constexpr SzP Value(std::pair<StrSize, StrSize> szs)
     { return {Value(szs.first), Value(szs.second)}; };
 
-    static_assert(Value(test_tagged_glyph_idx_to_str_idx(0u)) == std::pair{0, 1});
-    static_assert(Value(test_tagged_glyph_idx_to_str_idx(1u)) == std::pair{1, 1});
-    static_assert(Value(test_tagged_glyph_idx_to_str_idx(2u)) == std::pair{5, 1});
-    static_assert(Value(test_tagged_glyph_idx_to_str_idx(3u)) == std::pair{6, 1});
-    static_assert(Value(test_tagged_glyph_idx_to_str_idx(4u)) == std::pair{11, 1});
-    static_assert(Value(test_tagged_glyph_idx_to_str_idx(5u)) == std::pair{12, 1});
-    static_assert(Value(test_tagged_glyph_idx_to_str_idx(6u)) == std::pair{13, 0});
-    static_assert(Value(test_tagged_glyph_idx_to_str_idx(999u)) == std::pair{13, 0});
+    static_assert(Value(test_tagged_glyph_idx_to_str_idx(0u)) == SzP{0u, 1u});
+    static_assert(Value(test_tagged_glyph_idx_to_str_idx(1u)) == SzP{1u, 1u});
+    static_assert(Value(test_tagged_glyph_idx_to_str_idx(2u)) == SzP{5u, 1u});
+    static_assert(Value(test_tagged_glyph_idx_to_str_idx(3u)) == SzP{6u, 1u});
+    static_assert(Value(test_tagged_glyph_idx_to_str_idx(4u)) == SzP{11u, 1u});
+    static_assert(Value(test_tagged_glyph_idx_to_str_idx(5u)) == SzP{12u, 1u});
+    static_assert(Value(test_tagged_glyph_idx_to_str_idx(6u)) == SzP{13u, 0u});
+    static_assert(Value(test_tagged_glyph_idx_to_str_idx(999u)) == SzP{13u, 0u});
 
 
     // tests getting string index and code point string length from glyph index in text with multi-byte characters
@@ -1493,13 +1492,13 @@ namespace {
         return StringIndexAndLengthOfLineAndGlyphInLines(line_idx, cp_in_line_idx, line_data);
     };
 
-    static_assert(Value(test_multibyte_glyph_to_str_idx_len(0u)) == std::pair{0, 2});
-    static_assert(Value(test_multibyte_glyph_to_str_idx_len(1u)) == std::pair{2, 1});
-    static_assert(Value(test_multibyte_glyph_to_str_idx_len(2u)) == std::pair{3, 2});
-    static_assert(Value(test_multibyte_glyph_to_str_idx_len(3u)) == std::pair{5, 3});
-    static_assert(Value(test_multibyte_glyph_to_str_idx_len(4u)) == std::pair{8, 4});
-    static_assert(Value(test_multibyte_glyph_to_str_idx_len(5u)) == std::pair{12, 2});
-    static_assert(Value(test_multibyte_glyph_to_str_idx_len(6u)) == std::pair{14, 0});
+    static_assert(Value(test_multibyte_glyph_to_str_idx_len(0u)) == SzP{0u, 2u});
+    static_assert(Value(test_multibyte_glyph_to_str_idx_len(1u)) == SzP{2u, 1u});
+    static_assert(Value(test_multibyte_glyph_to_str_idx_len(2u)) == SzP{3u, 2u});
+    static_assert(Value(test_multibyte_glyph_to_str_idx_len(3u)) == SzP{5u, 3u});
+    static_assert(Value(test_multibyte_glyph_to_str_idx_len(4u)) == SzP{8u, 4u});
+    static_assert(Value(test_multibyte_glyph_to_str_idx_len(5u)) == SzP{12u, 2u});
+    static_assert(Value(test_multibyte_glyph_to_str_idx_len(6u)) == SzP{14u, 0u});
 
 
     // tests getting the code point from line and glyph index in text with a
@@ -1614,7 +1613,7 @@ namespace {
         return {start_str_idx, last_str_idx + last_str_size};
     }
 
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+#if defined(__cpp_lib_constexpr_string) && (__cpp_lib_constexpr_string >= 201907L)
 #  if defined(__cpp_lib_constexpr_vector)
     // tests getting a range pair of string indices from a range pair of glyph indices into text with tags,
     // where the second value should be just after the previous character in the text, which is not the same as
@@ -1628,11 +1627,18 @@ namespace {
         return GlyphIndicesRangeToStringSizeIndicesInLines(CPSize{low_idx}, CPSize{high_idx}, line_data);
     };
 
+    static_assert(test_tagged_glyph_to_str_idx_range(0u, 999u) == std::pair(StrSize{0u}, StrSize{13u}));
+    static_assert(test_tagged_glyph_to_str_idx_range(1u, 2u) == std::pair(StrSize{1u}, StrSize{2u}));
+    static_assert(test_tagged_glyph_to_str_idx_range(0u, 4u) == std::pair(StrSize{0u}, StrSize{7u}));
+    static_assert(test_tagged_glyph_to_str_idx_range(2u, 4u) == std::pair(StrSize{5u}, StrSize{7u}));
+
 
     constexpr auto to_chars = [](std::pair<StrSize, StrSize> idx) -> std::pair<char, char>
-    { return std::pair(tagged_test_text[Value(idx.first)], tagged_test_text[Value(idx.second)]); };
+    { return {tagged_test_text[Value(idx.first)], tagged_test_text[Value(idx.second)]}; };
 
+#    if defined(_MSC_VER)
     static_assert(to_chars(test_tagged_glyph_to_str_idx_range(0u, 999u)) == std::pair('a', 0));
+#    endif
     static_assert(to_chars(test_tagged_glyph_to_str_idx_range(1u, 2u)) == std::pair('b', '<'));
     static_assert(to_chars(test_tagged_glyph_to_str_idx_range(0u, 4u)) == std::pair('a', '<'));
     static_assert(to_chars(test_tagged_glyph_to_str_idx_range(2u, 4u)) == std::pair('c', '<'));
@@ -1802,7 +1808,7 @@ namespace {
 ///////////////////////////////////////
 // class GG::Font::TextElement
 ///////////////////////////////////////
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+#if defined(__cpp_lib_constexpr_string) && (__cpp_lib_constexpr_string >= 201907L)
 namespace {
     constexpr std::string_view TEST_TEXT_WITH_TAGS = "default<i>ital<u>_ul_it_</i>   _just_ul_</u>\nsecond line<i><sup>is";
 
@@ -1870,12 +1876,13 @@ namespace {
 
         for (std::size_t idx = 0; idx < std::min(widths.size(), text_elems.size()); ++idx) {
             widths[idx] = Value(text_elems[idx].Width());
-            widths_sizes[idx++] = text_elems[idx].widths.size();
+            widths_sizes[idx] = text_elems[idx].widths.size();
         }
         return std::pair{widths, widths_sizes};
     }().first;
 
-    constexpr decltype(element_widths) element_widths_expected{{28,0,16,0,28,0,12,0, 16,0,24,0,16,0,20,0}};
+    constexpr decltype(element_widths) element_widths_expected{{28,12,16,12,28,16,12,36,
+                                                                16, 0,24, 4,16,12,20, 8}};
     namespace{
         static_assert(element_widths.size() == element_widths_expected.size());
         static_assert(element_widths[0] == element_widths_expected[0]);
@@ -1936,7 +1943,7 @@ namespace {
         return {glyph_idx, cp_idx};
     }
 
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+#if defined(__cpp_lib_constexpr_string) && (__cpp_lib_constexpr_string >= 201907L)
 #  if defined(__cpp_lib_constexpr_vector)
 
     constexpr auto x_glyph_cp = []() {            //  01234567890123    // code points
@@ -2832,7 +2839,7 @@ void Font::ChangeTemplatedText(std::string& text, std::vector<TextElement>& text
 }
 
 
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+#if defined(__cpp_lib_constexpr_string) && (__cpp_lib_constexpr_string >= 201907L)
 namespace {
 #  if defined(__cpp_lib_constexpr_vector)
     constexpr auto lines_and_lengths = []() {

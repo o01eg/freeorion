@@ -76,7 +76,7 @@ RUN rm -rf \
 ENV RUSTUP_HOME=/usr/local/rustup \
 	CARGO_HOME=/usr/local/cargo \
 	PATH=/usr/local/cargo/bin:$PATH \
-	RUST_VERSION=1.87.0 \
+	RUST_VERSION=1.91.0 \
 	RUSTUP_VERSION=1.28.2
 
 RUN curl -o rustup-init https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init \

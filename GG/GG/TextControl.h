@@ -87,8 +87,6 @@ public:
     */
     explicit TextControl(const TextControl& that);
 
-    ~TextControl() = default;
-
     /** Assignment operator.
 
         Text Control requires an assignment operator because m_text_elements
@@ -173,11 +171,11 @@ public:
 
     /** Returns the upper-left corner of the text as it is would be rendered
         if it were not bound to the dimensions of this control. */
-    Pt TextUpperLeft() const noexcept;
+    Pt TextUpperLeft() const noexcept { return UpperLeft() + m_text_ul; }
 
     /** Returns the lower-right corner of the text as it is would be rendered
         if it were not bound to the dimensions of this control. */
-    Pt TextLowerRight() const noexcept;
+    Pt TextLowerRight() const noexcept { return UpperLeft() + m_text_lr; }
 
     void Render() override;
 
@@ -204,33 +202,6 @@ public:
         from examining \p text_elements then it will return without changing the TextControl.
     */
     virtual void SetText(std::string str, std::vector<Font::TextElement> text_elements);
-
-    /** Change TextControl's text to replace the text at templated \p targ_offset with \p new_text.
-
-        This replaces the entire text of the TextElement at offset \p targ_offset and adjusts the
-        string \p text to be consistent even if the \p new_text is longer/shorter than the original
-        TEXT type TextElement.
-
-        This does not reparse the TextControl's text. It is faster than SetText on a new
-        string. It will not find white space in the inserted text.
-
-        \p targ_offset is the zero based offset of the TextElements of type TEXT.  It ignores
-        other types of TextElements such as TAGS, WHITESPACE and NEWLINE, when determining the
-        offset.
-
-        Here is an example of changing a ship name from "oldname" to "New Ship Name":
-
-        original text:             "<i>Ship:<\i> oldname ID:"
-        orignal m_text_elements:   [<OPEN_TAG i>, <TEXT "Ship:">, <CLOSE_TAG i>, <WHITESPACE>, <TEXT oldname>, <WHITESPACE>, <TEXT ID:>]
-
-        ChangeTemplatedText(text, text_elements, "New Ship Name", 1);
-
-        changed text:              "<i>Ship:<\i> New Ship Name ID:"
-        changed m_text_elements:   [<OPEN_TAG i>, <TEXT "Ship:">, <CLOSE_TAG i>, <WHITESPACE>, <TEXT New Ship Name>, <WHITESPACE>, <TEXT ID:>]
-
-    */
-
-    void ChangeTemplatedText(const std::string& new_text, std::size_t targ_offset);
 
     /** Returns the Font used by this TextControl to render its text. */
     const auto& GetFont() const noexcept { return m_font; }

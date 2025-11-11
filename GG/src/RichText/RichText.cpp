@@ -133,19 +133,19 @@ auto ExtractParameters(std::string_view params_string)
 }
 
 /**
-    * \brief Private implementation class for rich text control.
-    */
+ * \brief Private implementation class for rich text control.
+ */
 class GG::RichTextPrivate {
 public:
-    RichTextPrivate(RichText& q, const std::string& content,
-                    std::shared_ptr<Font> font, Clr color,
-                    Flags<TextFormat> format = FORMAT_NONE);
-    virtual ~RichTextPrivate() = default;
+    RichTextPrivate(RichText& q, const std::string& content, std::shared_ptr<Font> font,
+                    Clr color, Flags<TextFormat> format = FORMAT_NONE);
 
     const auto BlockCount() noexcept { return m_blocks.size(); }
 
     // Set the text to show. Parses it into tags and uses the factory map to turn them into blocks.
     void SetText(const std::string& content);
+
+    void SetUnformattedText(std::string content);
 
     /**
       * @brief Set the whitespace around the content.
@@ -201,6 +201,13 @@ RichTextPrivate::RichTextPrivate(RichText& q, const std::string& content,
     // passed in reference isn't fully constructed yet
 }
 
+void RichTextPrivate::SetUnformattedText(std::string content)
+{
+    // create a single unformatted text block from the content
+    CreateBlocks(std::vector{RichTextTag{RichText::UNFORMATTED_TEXT_TAG, "", std::move(content)}});
+    AttachBlocksToOwner();
+}
+
 void RichTextPrivate::SetText(const std::string& content)
 {
     // Parse the content into a vector of tags and create
@@ -228,20 +235,6 @@ void RichTextPrivate::SizeMove(Pt ul, Pt lr)
         DoLayout();
 }
 
-namespace {
-    // Get the set of keys from a map.
-    template <typename T, typename V, typename C>
-    std::set<T> MapKeys(const std::map<T, V, C>& arg_map)
-    {
-        std::set<T> keys;
-        for ([[maybe_unused]] auto& [key, val] : arg_map) {
-            (void)val;  // quiet unused varianle warning
-            keys.insert(key);
-        }
-        return keys;
-    }
-}
-
 std::vector<RichTextTag> RichTextPrivate::ParseTags(const std::string& content)
 {
     // Get a set of tags registered for rich text usage,
@@ -261,15 +254,17 @@ void RichTextPrivate::CreateBlocks(std::vector<RichTextTag> tags)
 
     // Create blocks using factories.
     for (RichTextTag& tag : tags) {
-        const auto params = ExtractParameters(tag.tag_params);
-        const auto it = std::find_if(m_block_factory_map.begin(), m_block_factory_map.end(),
-                                     [tag = std::string_view{tag.tag}](const auto& key_fac)
-                                     { return key_fac.first == tag; });
+        const auto is_tag_factory = [tag = std::string_view{tag.tag}](const auto& key_fac) noexcept
+        { return key_fac.first == tag; };
+
+        const auto it = std::find_if(m_block_factory_map.begin(), m_block_factory_map.end(), is_tag_factory);
         if (it == m_block_factory_map.end())
             continue;
         const auto* fac = it->second.get();
         if (!fac)
             continue;
+
+        const auto params = ExtractParameters(tag.tag_params);
         if (auto block = fac->CreateFromTag(params, std::move(tag.content), m_font, m_color, m_format))
             m_blocks.push_back(std::move(block));
     }
@@ -307,10 +302,10 @@ void RichTextPrivate::DoLayout()
 /// RichText public interface //
 ///////////////////////////////
 RichText::RichText(X x, Y y, X w, Y h, const std::string& str,
-                    const std::shared_ptr<Font>& font, Clr color,
-                    Flags<TextFormat> format, Flags<WndFlag> flags) :
+                   std::shared_ptr<Font> font, Clr color,
+                   Flags<TextFormat> format, Flags<WndFlag> flags) :
     Control(x, y, w, h, flags),
-    m_self(std::make_unique<RichTextPrivate>(*this, str, font, color, format))
+    m_self(std::make_unique<RichTextPrivate>(*this, str, std::move(font), color, format))
 {
     SetName("RichText (" + std::to_string(str.size()) + "): \"" + str.substr(0, 16)
             + "\" blocks: " + std::to_string(m_self->BlockCount()));
@@ -327,8 +322,15 @@ RichText::~RichText() = default;
 
 void RichText::SetText(const std::string& str)
 {
-    std::string name_start = "RichText (" + std::to_string(str.size()) + "): \"" + str.substr(0, 16) + "\" blocks: ";
+    std::string name_start = "RichText (" + std::to_string(str.size()) + " text): \"" + str.substr(0, 16) + "\"  blocks: ";
     m_self->SetText(str);
+    SetName(name_start + std::to_string(m_self->BlockCount()));
+}
+
+void RichText::SetUnformattedText(std::string str)
+{
+    std::string name_start = "RichText (" + std::to_string(str.size()) + " unformatted text)\"  blocks: ";
+    m_self->SetUnformattedText(std::move(str));
     SetName(name_start + std::to_string(m_self->BlockCount()));
 }
 

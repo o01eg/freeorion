@@ -153,12 +153,6 @@ std::string_view TextControl::Text(CPSize from, CPSize to) const
     }
 }
 
-Pt TextControl::TextUpperLeft() const noexcept
-{ return UpperLeft() + m_text_ul; }
-
-Pt TextControl::TextLowerRight() const noexcept
-{ return UpperLeft() + m_text_lr; }
-
 void TextControl::Render()
 {
     if (!m_font)
@@ -182,7 +176,7 @@ void TextControl::RefreshCache() {
     m_render_cache.clear();
     Font::RenderState rs(TextColor());
     if (m_font)
-        m_font->PreRenderText(Pt0, Size(), m_text, m_format, m_render_cache, m_line_data, rs);
+        m_font->PreRenderText(Pt0, Size(), m_format, m_render_cache, m_line_data, rs);
 }
 
 void TextControl::SetText(std::string str)
@@ -221,12 +215,6 @@ void TextControl::SetText(std::string str, std::vector<Font::TextElement> text_e
     for (auto& elem : m_text_elements)
         elem.Bind(m_text);
 
-    RecomputeLineData();
-}
-
-void TextControl::ChangeTemplatedText(const std::string& new_text, std::size_t targ_offset) {
-    if (m_font)
-        m_font->ChangeTemplatedText(m_text, m_text_elements, new_text, targ_offset);
     RecomputeLineData();
 }
 

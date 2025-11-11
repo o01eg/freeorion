@@ -131,7 +131,10 @@ public:
 
         Substring is bound to a particular instance of a std::string.  If
         that particular std::string goes out of scope or is deleted then
-        behavior is undefined, but may seg fault with the next access. */
+        behavior is undefined, but may seg fault with the next access.
+        However, the pointed-to string may have its buffer moved without
+        invalidating Substring due to double-indirection, unlike a
+        string_view which points to the buffer, not the owning string object. */
     class GG_API Substring
     {
     public:
@@ -174,9 +177,7 @@ public:
         CONSTEXPR_FONT Substring(const std::string& str_,
                                  std::string::const_iterator first_,
                                  std::string::const_iterator second_) :
-            Substring(str_,
-                      static_cast<uint32_t>(std::distance(str_.begin(), first_)),
-                      static_cast<uint32_t>(std::distance(str_.begin(), second_)))
+            Substring(str_, std::distance(str_.begin(), first_), std::distance(str_.begin(), second_))
         {}
         CONSTEXPR_FONT Substring(const std::string& str_, const IterPair& pair) :
             Substring(str_, pair.first, pair.second)
@@ -218,11 +219,14 @@ public:
         [[nodiscard]] CONSTEXPR_FONT operator std::string_view() const noexcept(op_sv_nox) { return {data(), size()}; }
 
         /** Comparison with std::string. */
-        CONSTEXPR_FONT bool operator==(const std::string& rhs) const
+        CONSTEXPR_FONT bool operator==(const std::string& rhs) const noexcept(noexcept(std::string_view(*this)))
         { return size() == rhs.size() && std::string_view(*this) == rhs; }
 
-        CONSTEXPR_FONT bool operator==(std::string_view rhs) const
+        CONSTEXPR_FONT bool operator==(std::string_view rhs) const noexcept(noexcept(std::string_view(*this)))
         { return size() == rhs.size() && std::string_view(*this) == rhs; }
+
+        CONSTEXPR_FONT bool operator==(const char* rhs) const
+        { return std::string_view(*this) == std::string_view(rhs); }
 
         CONSTEXPR_FONT bool operator==(const Substring& rhs) const
         { return size() == rhs.size() && std::string_view(*this) == std::string_view(rhs); }
@@ -248,9 +252,13 @@ public:
     static_assert(noexcept(Substring(std::declval<Substring&&>())));
     static_assert(noexcept(Substring(std::declval<const Substring&>())));
 
-    /** \brief Describes a token-like piece of text to be rendered. */
-    struct GG_API TextElement
+    struct GG_API TextTag
     {
+        static_assert(noexcept(Substring{std::declval<Substring&&>()}) &&
+                      noexcept(Substring{std::declval<Substring>()}) &&
+                      noexcept(std::vector<Substring>{std::declval<std::vector<Substring>&&>()}) &&
+                      noexcept(std::vector<Substring>{}));
+
         /** The types of token-like entities that can be represented by a TextElement. */
         enum class TextElementType : uint8_t {
             OPEN_TAG,   ///< An opening text formatting tag (e.g. "<rgba 0 0 0 255>").
@@ -264,84 +272,76 @@ public:
             NEWLINE
         };
 
-        static_assert(noexcept(Substring{std::declval<Substring&&>()}) &&
-                      noexcept(Substring{std::declval<Substring>()}) &&
-                      noexcept(std::vector<Substring>{std::declval<std::vector<Substring>&&>()}) &&
-                      noexcept(std::vector<uint8_t>{std::declval<std::vector<uint8_t>&&>()}) &&
+        /** For a formatting tag, contains the tag name, eg. "rgba" for the tag "<rgba 0 0 0 255>". */
+        Substring tag_name;
+
+        /** The parameter strings within the tag, eg. "0", "0", "0", and "255"
+            for the tag "<rgba 0 0 0 255>". */
+        std::vector<Substring> params;
+
+        uint32_t text_size = 0u;
+
+        TextElementType type = TextElementType::TEXT;
+
+        CONSTEXPR_FONT TextTag(TextElementType type_, Substring tag_name_, uint32_t text_size_) noexcept :
+            tag_name(tag_name_),
+            text_size(text_size_),
+            type(type_)
+        {}
+        CONSTEXPR_FONT TextTag(TextElementType type_, Substring tag_name_, std::vector<Substring> params_,
+                               uint32_t text_size_) noexcept :
+            tag_name(tag_name_),
+            params(std::move(params_)),
+            text_size(text_size_),
+            type(type_)
+        {}
+
+        /** Returns the TextElementType of the element. */
+        [[nodiscard]] constexpr StrSize StringSize() const noexcept { return StrSize(text_size); };
+        [[nodiscard]] constexpr TextElementType Type() const noexcept { return type; };
+        [[nodiscard]] constexpr bool IsCloseTag() const noexcept { return type == TextElementType::CLOSE_TAG; }
+        [[nodiscard]] constexpr bool IsOpenTag() const noexcept { return type == TextElementType::OPEN_TAG; }
+        [[nodiscard]] constexpr bool IsTag() const noexcept { return IsCloseTag() || IsOpenTag(); }
+        [[nodiscard]] constexpr bool IsWhiteSpace() const noexcept { return type == TextElementType::WHITESPACE; }
+        [[nodiscard]] constexpr bool IsNewline() const noexcept { return type == TextElementType::NEWLINE; }
+
+    protected:
+        CONSTEXPR_FONT TextTag() noexcept = default;
+
+        CONSTEXPR_FONT explicit TextTag(TextElementType type_, uint32_t text_size_) noexcept :
+            text_size(text_size_),
+            type(type_)
+        {}
+    };
+
+    /** \brief Describes a token-like piece of text to be rendered. */
+    struct GG_API TextElement : public TextTag
+    {
+        static_assert(noexcept(std::vector<uint8_t>{std::declval<std::vector<uint8_t>&&>()}) &&
                       noexcept(std::vector<uint8_t>{std::declval<std::vector<uint8_t>>()}));
 
 
         CONSTEXPR_FONT explicit TextElement(TextElementType type_) noexcept :
-            type(type_)
+            TextTag(type_, 0u)
         {}
         CONSTEXPR_FONT explicit TextElement(Substring text_) noexcept :
-            text(text_),
-            type(TextElementType::TEXT)
+            TextTag(TextElementType::TEXT, static_cast<uint32_t>(text_.size())),
+            text(text_)
         {}
 
         CONSTEXPR_FONT TextElement(Substring text_, TextElementType type_) noexcept :
-            text(text_),
-            type(type_)
+            TextTag(type_, static_cast<uint32_t>(text_.size())),
+            text(text_)
         {}
         CONSTEXPR_FONT TextElement(Substring text_, Substring tag_name_, TextElementType type_) noexcept :
-            text(text_),
-            tag_name(tag_name_),
-            type(type_)
+            TextTag(type_, tag_name_, static_cast<uint32_t>(text_.size())),
+            text(text_)
         {}
         CONSTEXPR_FONT TextElement(Substring text_, Substring tag_name_, std::vector<Substring> params_,
                                    TextElementType type_) noexcept :
-            text(text_),
-            tag_name(tag_name_),
-            params(std::move(params_)),
-            type(type_)
+            TextTag(type_, tag_name_, std::move(params_), static_cast<uint32_t>(text_.size())),
+            text(text_)
         {}
-
-
-#if (defined(__GNUC__) && (__GNUC__ < 13))
-        CONSTEXPR_FONT TextElement(TextElement&& rhs) noexcept :
-            text(rhs.text),
-            tag_name(rhs.tag_name),
-            widths(std::move(rhs.widths)),
-            params(std::move(rhs.params)),
-            type(rhs.type)
-            // don't copy cached_width due to GCC < 13 error with constexpr accessing mutable members of const object
-        {}
-
-        CONSTEXPR_FONT TextElement& operator=(TextElement&& rhs) noexcept
-        {
-            if (this != std::addressof(rhs)) {
-                text = rhs.text;
-                tag_name = rhs.tag_name;
-                widths = std::move(rhs.widths);
-                params = std::move(rhs.params);
-                type = rhs.type;
-                // don't copy cached_width due to GCC < 13 error with constexpr accessing mutable members of const object
-            }
-            return *this;
-        }
-
-        CONSTEXPR_FONT TextElement(const TextElement& rhs) :
-            text(rhs.text),
-            tag_name(rhs.tag_name),
-            widths(rhs.widths),
-            params(rhs.params),
-            type(rhs.type)
-            // don't copy cached_width due to GCC < 13 error with constexpr accessing mutable members of const object
-        {}
-
-        CONSTEXPR_FONT TextElement& operator=(const TextElement& rhs)
-        {
-            if (this != std::addressof(rhs)) {
-                text = rhs.text;
-                tag_name = rhs.tag_name;
-                widths = rhs.widths;
-                params = rhs.params;
-                type = rhs.type;
-                // don't copy cached_width due to GCC < 13 error with constexpr accessing mutable members of const object
-            }
-            return *this;
-        }
-#endif
 
         /** Attach this TextElement to the string \p whole_text, by
             attaching the SubString data member text to \p whole_text.
@@ -372,83 +372,27 @@ public:
                 substring.Bind(whole_text);
         }
 
-        /** Returns the TextElementType of the element. */
-        [[nodiscard]] CONSTEXPR_FONT TextElementType Type() const noexcept { return type; };
-        [[nodiscard]] CONSTEXPR_FONT bool IsCloseTag() const noexcept { return type == TextElementType::CLOSE_TAG; }
-        [[nodiscard]] CONSTEXPR_FONT bool IsOpenTag() const noexcept { return type == TextElementType::OPEN_TAG; }
-        [[nodiscard]] CONSTEXPR_FONT bool IsTag() const noexcept { return IsCloseTag() || IsOpenTag(); }
-        [[nodiscard]] CONSTEXPR_FONT bool IsWhiteSpace() const noexcept { return type == TextElementType::WHITESPACE; }
-        [[nodiscard]] CONSTEXPR_FONT bool IsNewline() const noexcept { return type == TextElementType::NEWLINE; }
-
-        /** Returns the width of the element. */
-        [[nodiscard]] CONSTEXPR_FONT X Width() const
-        {
-            constexpr auto calc_width = [](const auto& widths) -> X {
-                X rv = X0;
-                for (const auto& w : widths)
-                    rv += w;
-                return rv;
-            };
-
-#if defined(__cpp_lib_is_constant_evaluated)
-            if (std::is_constant_evaluated()) {
-                return calc_width(widths);
-            } else 
-#endif
-            {
-                if (cached_width == -X1)
-                    cached_width = calc_width(widths);
-                return cached_width;
-            }
-        }
-
-
-        /* Returns the number of characters in the original string that the
-           element represents. */
-        [[nodiscard]] CONSTEXPR_FONT StrSize StringSize() const noexcept
-        { return StrSize(text.size()); }
 
         /** Returns the number of code points in the original string that the
             element represents. */
         [[nodiscard]] CONSTEXPR_FONT CPSize CodePointSize() const noexcept
         { return CPSize(widths.size()); }
 
-        bool operator==(const TextElement &rhs) const noexcept // ignores cached_width
-        {
-            return (type == rhs.type) &&
-                   (text == rhs.text) &&
-                   (tag_name == rhs.tag_name) &&
-                   (widths == rhs.widths) &&
-                   (params == rhs.params);
-        }
-
         /** The text from the original string represented by the element. */
         Substring text;
-
-        /** For a formatting tag, contains the tag name, eg. "rgba" for the tag "<rgba 0 0 0 255>". */
-        Substring tag_name;
 
         /** The widths of the glyphs in \a text. */
         std::vector<int8_t> widths;
 
-        /** The parameter strings within the tag, eg. "0", "0", "0", and "255"
-            for the tag "<rgba 0 0 0 255>". */
-        std::vector<Substring> params;
-
-        TextElementType type = TextElementType::TEXT;
-
     protected:
         CONSTEXPR_FONT TextElement() = default;
-
-    private:
-        mutable X cached_width{-X1};
     };
 
     /** \brief TextAndElementsAssembler is used to assemble a matched pair of text and a vector of
         TextElement, without incurring the computational cost of parsing the text with
         ExpensiveParseFromTextToTextElements().
 
-        The pair of string and vector returned by Text() and Elements() are consistent with each
+        The pair of string and vector returned by Extract() are consistent with each
         other and can be used with the fast constructor or the fast SetText variant of TextControl.
     */
     class GG_API TextAndElementsAssembler
@@ -456,14 +400,11 @@ public:
     public:
         explicit TextAndElementsAssembler(const Font& font);
         TextAndElementsAssembler(const Font& font, std::size_t text_capacity, std::size_t elements_capacity);
-        ~TextAndElementsAssembler(); // needed for unique_ptr<Impl>
 
         /** Return the constructed text.*/
-        [[nodiscard]] const std::string& Text() const noexcept;
-        /** Return the constructed TextElements.*/
-        [[nodiscard]] const std::vector<TextElement>& Elements() const;
+        [[nodiscard]] const std::string& Text() const noexcept { return m_text; }
 
-        /** Destructively extract and return the constructed text and elements */
+        /** Destructively extract and return the constructed text and elements.*/
         [[nodiscard]] std::pair<std::string, std::vector<TextElement>> Extract();
 
         /** Add an open tag iff it exists as a recognized tag.*/
@@ -474,8 +415,6 @@ public:
         TextAndElementsAssembler& AddCloseTag(std::string_view tag);
         /** Add a text element.  Any whitespace in this text element will be non-breaking.*/
         TextAndElementsAssembler& AddText(std::string_view text);
-        TextAndElementsAssembler& AddText(const char* text) { return AddText(std::string_view(text)); }
-        TextAndElementsAssembler& AddText(std::string&& text);
         /** Add a white space element.*/
         TextAndElementsAssembler& AddWhitespace(std::string_view whitespace);
         /** Add a new line element.*/
@@ -485,8 +424,9 @@ public:
         TextAndElementsAssembler& AddOpenTag(Clr color);
 
     private:
-        class Impl;
-        std::unique_ptr<Impl> const m_impl;
+        const Font& m_font;
+        std::string m_text;
+        std::vector<TextElement> m_text_elements;
     };
 
     /** \brief Holds the essential data on each line that a string occupies when
@@ -508,8 +448,9 @@ public:
         {
             CONSTEXPR_FONT CharData() = default;
 
-            CONSTEXPR_FONT CharData(X extent_, StrSize str_index, StrSize str_size, CPSize cp_index,
-                                    const std::vector<TextElement>& tags_) :
+            CONSTEXPR_FONT CharData(uint32_t code_point_, X extent_, StrSize str_index, StrSize str_size,
+                                    CPSize cp_index, const std::vector<TextElement>& tags_) :
+                code_point(code_point_),
                 extent(extent_),
                 string_index(str_index),
                 string_size(str_size),
@@ -520,6 +461,23 @@ public:
                     if (tag.IsTag())
                         tags.push_back(tag);
             }
+
+            CONSTEXPR_FONT CharData(uint32_t code_point_, X extent_, StrSize str_index, StrSize str_size,
+                                    CPSize cp_index, std::vector<TextElement>&& tags_) :
+                code_point(code_point_),
+                extent(extent_),
+                string_index(str_index),
+                string_size(str_size),
+                code_point_index(cp_index)
+            {
+                tags.reserve(tags_.size());
+                for (auto& tag : tags_)
+                    if (tag.IsTag())
+                        tags.push_back(std::move(tag));
+            }
+
+            /** The UTF-8 code point for this glyph */
+            uint32_t code_point = 0;
 
             /** The furthest-right extent of this glyph as it appears on the line. */
             X extent = X0;
@@ -534,7 +492,7 @@ public:
             CPSize code_point_index = CP0;
 
             /** The text formatting tags that should be applied before rendering this glyph. */
-            std::vector<TextElement> tags;
+            std::vector<TextTag> tags;
         };
 
         CONSTEXPR_FONT X    Width() const noexcept { return char_data.empty() ? X0 : char_data.back().extent; }
@@ -558,50 +516,109 @@ public:
         if present. */
     struct GG_API RenderState
     {
-        explicit RenderState(Clr color) : //< Takes default text color as parameter
-            color_stack{std::stack<Clr>::container_type{color}}
+        //< default text color as parameter
+        constexpr explicit RenderState(Clr color) noexcept :
+            color_stack{color}
         {}
 
-        RenderState() : RenderState(Clr{0, 0, 0, 0}) {}
+        enum class TagType : uint8_t { ITALICS, SHADOW, UNDERLINE, SUPER, SUB };
+        enum class IncDir : bool { MORE = true, LESS = false };
+        [[nodiscard]] constexpr IncDir InvertIncDir(IncDir dir) noexcept
+        { return dir == IncDir::MORE ? IncDir::LESS : IncDir::MORE; }
 
-        /** The count of open \<i> tags seen since the last \</i> seen. */
+        constexpr void HandleTag(TagType feature, IncDir inc_dir) noexcept
+        {
+            switch (feature) {
+            case TagType::ITALICS: UIntInc(use_italics, inc_dir); break;
+            case TagType::SHADOW: UIntInc(use_shadow, inc_dir); break;
+            case TagType::UNDERLINE: UIntInc(draw_underline, inc_dir); break;
+            case TagType::SUPER: IntInc(super_sub_shift, inc_dir); break;
+            case TagType::SUB: IntInc(super_sub_shift, InvertIncDir(inc_dir)); break;
+            }
+        }
+
+    private:
+        // net counts of <i>, <s>, or <u> tags seen
         uint8_t use_italics = 0;
-
-        /** The count of open \<s> tags seen since the last \</s> seen. */
         uint8_t use_shadow = 0;
-
-        /** The count of open \<u> tags seen since the last \</u> seen. */
         uint8_t draw_underline = 0;
 
-        /** The count of open \<super> (positive) minus \<sub> tags seen. */
+        // net count of <sup> tags seen minus <sub> tags seen
         int8_t super_sub_shift = 0;
 
-        /** The stack of text color indexes (as set by previous tags). */
-        std::stack<Clr> color_stack;
-
-        /// Add color to stack and remember it has been used
-        void PushColor(GLubyte r, GLubyte g, GLubyte b, GLubyte a)
+        static constexpr void UIntInc(uint8_t& ui, IncDir inc_dir) noexcept
         {
-            // The same color may end up being stored multiple times, but the cost of
-            // deduplication is greater than the cost of just letting it be so.
-            color_stack.emplace(r, g, b, a);
+            if (inc_dir == IncDir::MORE && ui < UINT8_MAX)
+                ++ui;
+            else if (ui > 0u)
+                --ui;
         }
-        void PushColor(Clr clr) { color_stack.push(std::move(clr)); };
+
+        static constexpr void IntInc(int8_t& ui, IncDir inc_dir) noexcept
+        {
+            if (inc_dir == IncDir::MORE && ui < INT8_MAX)
+                ++ui;
+            else if (ui > INT8_MIN)
+                --ui;
+        }
+
+        /** Sack of text colors. Beyond capacity, pushes and pops
+            are counted but colours are ignored. */
+        struct ClrStack {
+            static constexpr uint8_t capacity = 6u;
+            static constexpr uint8_t last_slot_idx = capacity - 1u;
+
+        private:
+            std::array<Clr, capacity> colours{};
+            uint8_t cur_idx = 0u;
+
+            static constexpr Clr ZERO{};
+            static_assert(std::array<Clr, capacity>{}.front() == ZERO);
+            static_assert(std::array<Clr, capacity>{Clr{1,2,3,4}}[last_slot_idx] == ZERO);
+
+        public:
+            [[nodiscard]] constexpr explicit ClrStack(Clr clr) noexcept :
+                colours{clr}
+            {}
+
+            [[nodiscard]] constexpr Clr current() const noexcept
+            { return colours[std::min(cur_idx, last_slot_idx)]; }
+
+            [[nodiscard]] constexpr bool full() const noexcept
+            { return cur_idx >= last_slot_idx; }
+
+            constexpr void reset() noexcept
+            { cur_idx = 0u; }
+
+            constexpr void pop() noexcept
+            { if (cur_idx > 0u) --cur_idx; }
+
+            constexpr void push(Clr clr) noexcept
+            {
+                ++cur_idx;
+                if (!full())
+                    colours[cur_idx] = clr;
+            }
+
+            constexpr void push(std::array<uint8_t, 4> clr) noexcept
+            { push(Clr{clr}); }
+
+        } color_stack;
+
+    public:
+        /// Add color to stack and remember it has been used
+        constexpr void PushColor(Clr clr) noexcept { color_stack.push(clr); };
+        constexpr void PushColor(std::array<uint8_t, 4> clr) noexcept { color_stack.push(clr); };
 
         /// Return to the previous used color, or remain as default
-        void PopColor() noexcept(noexcept(color_stack.size()) && noexcept(color_stack.pop()))
-        {
-            // Never remove the initial color from the stack
-            if (color_stack.size() > 1)
-                color_stack.pop();
-        }
+        constexpr void PopColor() noexcept
+        { color_stack.pop(); }
 
         // Revert to no tags and initial color
-        void Reset() noexcept(noexcept(color_stack.size()) && noexcept(color_stack.pop()))
+        constexpr void Reset() noexcept
         {
             // remove all but initial color
-            while (color_stack.size() > 1)
-                color_stack.pop();
+            color_stack.reset();
             // remove all tags
             use_italics = 0;
             use_shadow = 0;
@@ -609,7 +626,13 @@ public:
             super_sub_shift = 0;
         }
 
-        Clr CurrentColor() const noexcept(noexcept(color_stack.top())) { return color_stack.top(); }
+        constexpr Clr CurrentColor() const noexcept
+        { return color_stack.current(); }
+
+        constexpr bool UseItalics() const noexcept { return use_italics > 0u; }
+        constexpr bool UseShadow() const noexcept { return use_shadow > 0u; }
+        constexpr bool DrawUnderline() const noexcept { return draw_underline > 0u; }
+        constexpr int8_t SuperSubShift() const noexcept { return super_sub_shift; }
     };
 
     /** \brief Holds precomputed glyph position information for rendering. */
@@ -633,20 +656,20 @@ public:
     /** Construct a font using only the printable ASCII characters.
         \throw Font::Exception Throws a subclass of Font::Exception if the
         condition specified for the subclass is met. */
-    Font(std::string font_filename, unsigned int pts);
+    Font(std::string font_filename, uint16_t pts);
 
     /** Construct a font using only the printable ASCII characters,
         from the in-memory contents \a file_contents.  \throw Font::Exception
         Throws a subclass of Font::Exception if the condition specified for
         the subclass is met. */
-    Font(std::string font_filename, unsigned int pts, const std::vector<uint8_t>& file_contents);
+    Font(std::string font_filename, uint16_t pts, const std::vector<uint8_t>& file_contents);
 
     /** Construct a font using all the code points in the
         UnicodeCharsets in the range [first, last).  \throw Font::Exception
         Throws a subclass of Font::Exception if the condition specified for
         the subclass is met. */
     template <typename CharSetIter>
-    Font(std::string font_filename, unsigned int pts, CharSetIter first, CharSetIter last);
+    Font(std::string font_filename, uint16_t pts, CharSetIter first, CharSetIter last);
 
     /** Construct a font using all the code points in the
         UnicodeCharsets in the range [first, last), from the in-memory
@@ -654,17 +677,15 @@ public:
         of Font::Exception if the condition specified for the subclass is
         met. */
     template <typename CharSetIter>
-    Font(std::string font_filename, unsigned int pts, const std::vector<uint8_t>& file_contents,
+    Font(std::string font_filename, uint16_t pts, const std::vector<uint8_t>& file_contents,
          CharSetIter first, CharSetIter last);
-
-    ~Font() = default;
 
     /** Returns the name of the file from which this font was created. */
     const auto& FontName() const noexcept { return m_font_filename; }
 
     /** Returns the point size in which the characters in the font object are
         rendered. */
-    unsigned int PointSize() const noexcept { return m_pt_sz; }
+    uint16_t PointSize() const noexcept { return m_pt_sz; }
 
     const auto& GetTexture() const noexcept { return m_texture; }
 
@@ -694,26 +715,25 @@ public:
     X    RenderText(Pt pt, const std::string_view text, const RenderState& render_state) const;
 
     /** Formatted text rendering. */
-    void RenderText(Pt pt1, Pt pt2, const std::string& text, const Flags<TextFormat> format,
+    void RenderText(Pt pt1, Pt pt2, const Flags<TextFormat> format,
                     const LineVec& line_data, RenderState& render_state) const;
 
     /** Formatted text rendering over a subset of lines and code points.  The
         glyphs rendered are in the range [CodePointIndexOf(<i>begin_line</i>,
         <i>begin_char</i>, <i>line_data</i>), CodePointIndexOf(<i>end_line</i> -
         1, <i>end_char</i>, <i>line_data</i>)). */
-    void RenderText(Pt pt1, Pt pt2, const std::string& text, const Flags<TextFormat> format,
+    void RenderText(Pt pt1, Pt pt2, const Flags<TextFormat> format,
                     const LineVec& line_data, RenderState& render_state,
                     std::size_t begin_line, CPSize begin_char,
                     std::size_t end_line, CPSize end_char) const;
 
     /** Wrapper around PreRenderText that provides dummy values for line start and end values.*/
-    void PreRenderText(Pt ul, Pt lr, const std::string& text, const Flags<TextFormat> format,
+    void PreRenderText(Pt ul, Pt lr, const Flags<TextFormat> format,
                        RenderCache& cache, const LineVec& line_data,
                        RenderState& render_state) const;
 
     /** Fill the \p cache with glyphs corresponding to the passed in \p text and \p line_data.*/
-    void PreRenderText(Pt pt1, Pt pt2, const std::string& text,
-                       const Flags<TextFormat> format, const LineVec& line_data,
+    void PreRenderText(Pt pt1, Pt pt2, const Flags<TextFormat> format, const LineVec& line_data,
                        RenderState& render_state, std::size_t begin_line, CPSize begin_char,
                        std::size_t end_line, CPSize end_char, RenderCache& cache) const;
 
@@ -737,14 +757,30 @@ public:
         from the OpenGL texture(s) created at GG::Font creation time. */
     struct Glyph
     {
-        Glyph() = default;
-        Glyph(std::shared_ptr<Texture> texture, Pt ul, Pt lr, int8_t y_ofs, int8_t lb, int8_t adv);
+        constexpr Glyph() noexcept = default;
+        template <typename HasWidthHeight>
+        constexpr Glyph(Pt ul, Pt lr, int8_t y_ofs, int8_t lb, int8_t adv, const HasWidthHeight& t) noexcept :
+            Glyph(ul, lr, y_ofs, lb, adv, t ? t->Width() : X1, t ? t->Height() : Y1)
+        {}
+        constexpr Glyph(Pt ul, Pt lr, int8_t y_ofs, int8_t lb, int8_t adv, X tex_width, Y tex_height) noexcept :
+            tex_coords{{static_cast<GLfloat>(Value(ul.x)) / Value(tex_width),
+                        static_cast<GLfloat>(Value(ul.y)) / Value(tex_height),
+                        static_cast<GLfloat>(Value(lr.x)) / Value(tex_width),
+                        static_cast<GLfloat>(Value(lr.y)) / Value(tex_height)}},
+            y_offset(y_ofs),
+            left_bearing(lb),
+            advance(adv),
+            width(static_cast<uint8_t>(std::min(int32_t{255u}, Value(lr.x - ul.x)))),
+            height(static_cast<uint8_t>(std::min(int32_t{255u}, Value(lr.y - ul.y))))
+        {}
+        static_assert(std::numeric_limits<uint8_t>::max() == 255);
 
-        SubTexture  sub_texture;      ///< The subtexture containing just this glyph
-        int8_t      y_offset = 0;     ///< The vertical offset to draw this glyph (may be negative!)
-        int8_t      left_bearing = 0; ///< The space that should remain before the glyph
-        int8_t      advance = 0;      ///< The amount of space the glyph should occupy, including glyph graphic and inter-glyph spacing
-        int8_t      width = 0;        ///< The width of the glyph only
+        std::array<GLfloat, 4> tex_coords = {0.0f, 0.0f, 1.0f, 1.0f}; ///< Glyph texture coordinates
+        int8_t  y_offset = 0;     ///< vertical offset to draw this glyph (may be negative!)
+        int8_t  left_bearing = 0; ///< horizontal space that should remain before the glyph
+        int8_t  advance = 0;      ///< horizontal space the glyph should occupy, including glyph graphic and inter-glyph spacing
+        uint8_t width = 0;
+        uint8_t height = 0;
     };
 
     using GlyphMap = boost::unordered_map<uint32_t, Glyph>;
@@ -757,49 +793,14 @@ public:
         it from tight loops.  Do not call it from within Render().  Do not
         call it repeatedly on a known text. */
     static std::vector<Font::TextElement> ExpensiveParseFromTextToTextElements(
-        const std::string& text, const Flags<TextFormat> format, const GlyphMap& glyphs, int8_t space_width);
+        const std::string& text, const Flags<TextFormat> format, const GlyphMap& glyphs,
+        int8_t space_width, int8_t tab_width);
     std::vector<Font::TextElement> ExpensiveParseFromTextToTextElements(
         const std::string& text, const Flags<TextFormat> format) const
-    { return ExpensiveParseFromTextToTextElements(text, format, m_glyphs, m_space_width); }
+    { return ExpensiveParseFromTextToTextElements(text, format, m_glyphs, m_space_width, m_space_width * 8); }
 
-
-    /** Change \p text_elements and \p text to replace the text of the TextElement at
-        \p targ_offset with \p new_text.
-
-        This replaces the entire text of the TextElement at offset \p targ_offset and adjusts the
-        string \p text to be consistent even if the \p new_text is longer/shorter than the original
-        TEXT type TextElement.
-
-        This does not recompute the text_elements. It is faster than
-        ExpensiveParseFromTextToTextElements on a new string. It will not find white space in the
-        inserted text.
-
-        \p text and \p text_elements are assumed to be consistent with each other and both will be
-        changed to remain consistent.
-
-        \p targ_offset is the zero based offset of the TextElements of type TEXT.  It ignores
-        other types of TextElements such as TAGS, WHITESPACE and NEWLINE, when determining the
-        offset.
-
-        Here is an example of changing a ship name from "oldname" to "New Ship Name":
-
-        original text:             "<i>Ship:<\i> oldname ID:"
-        orignal text_elements:     [<OPEN_TAG i>, <TEXT "Ship:">, <CLOSE_TAG i>, <WHITESPACE>, <TEXT oldname>, <WHITESPACE>, <TEXT ID:>]
-
-        ChangeTemplatedText(text, text_elements, "New Ship Name", 1);
-
-        changed text:              "<i>Ship:<\i> New Ship Name ID:"
-        changed text_elements:     [<OPEN_TAG i>, <TEXT "Ship:">, <CLOSE_TAG i>, <WHITESPACE>, <TEXT New Ship Name>, <WHITESPACE>, <TEXT ID:>]
-    */
-    static void ChangeTemplatedText(std::string& text, std::vector<TextElement>& text_elements,
-                                    const std::string& new_text, std::size_t targ_offset,
-                                    const GlyphMap& glyphs, uint8_t space_width);
-    void ChangeTemplatedText(std::string& text, std::vector<TextElement>& text_elements,
-                             const std::string& new_text, std::size_t targ_offset) const
-    { ChangeTemplatedText(text, text_elements, new_text, targ_offset, m_glyphs, m_space_width); }
-
-    /** DetermineLines() returns the \p line_data resulting from adding the necessary line
-        breaks, to the \p text formatted with \p format and parsed into \p text_elements, to fit
+    /** returns the \p line_data resulting from adding the necessary line breaks to
+        the \p text formatted with \p format and parsed into \p text_elements, to fit
         the \p text into a box of width \p box_width.
 
         It accounts for alignment, wrapping and justification of the \p text.
@@ -865,7 +866,7 @@ private:
 
     bool              GenerateGlyph(FT_Face font, uint32_t ch);
 
-    X                 StoreGlyph(Pt pt, const Glyph& glyph, const RenderState& render_state,
+    void              StoreGlyph(Pt pt, const Glyph& glyph, const RenderState& render_state,
                                  RenderCache& cache) const;
     void              StoreGlyphImpl(RenderCache& cache, GG::Clr color, Pt pt,
                                      const Glyph& glyph, int x_top_offset,
@@ -876,10 +877,10 @@ private:
 
     bool              IsDefaultFont() const noexcept;
 
-    static std::shared_ptr<Font> GetDefaultFont(unsigned int pts);
+    static std::shared_ptr<Font> GetDefaultFont(uint16_t pts);
 
     std::string                 m_font_filename;
-    unsigned int                m_pt_sz = 0;
+    uint16_t                    m_pt_sz = 0u;
     std::vector<UnicodeCharset> m_charsets; ///< The sets of glyphs that are covered by this font object
 
     Y        m_ascent = Y0;            ///< Maximum amount above the baseline the text can go
@@ -987,7 +988,7 @@ private:
     struct GG_API FontKey
     {
         template <typename S>
-        FontKey(S&& str, unsigned int pts) :
+        FontKey(S&& str, uint16_t pts) :
             filename(std::forward<S>(str)),
             points(pts)
         {}
@@ -995,37 +996,37 @@ private:
         [[nodiscard]] bool operator<(const FontKey& rhs) const noexcept
         { return (filename < rhs.filename || (filename == rhs.filename && points < rhs.points)); }
 
-        std::string  filename; ///< The name of the file from which this font was created.
-        unsigned int points;   ///< The point size in which this font was rendered.
+        std::string filename; ///< The name of the file from which this font was created.
+        uint16_t    points;   ///< The point size in which this font was rendered.
     };
 
 public:
     /** Returns true iff this manager contains a font with the given filename
         and point size, regardless of charsets. */
-    bool HasFont(std::string_view font_filename, unsigned int pts) const noexcept;
+    bool HasFont(std::string_view font_filename, uint16_t pts) const noexcept;
 
     /** Returns true iff this manager contains a font with the given filename
         and point size, containing the given charsets. */
     template <typename CharSetIter>
-    bool HasFont(std::string_view font_filename, unsigned int pts,
+    bool HasFont(std::string_view font_filename, uint16_t pts,
                  CharSetIter first, CharSetIter last) const;
 
     /** Returns a shared_ptr to the requested font, supporting all printable
         ASCII characters.  \note May load font if unavailable at time of
         request. */
-    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts);
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, uint16_t pts);
 
     /** Returns a shared_ptr to the requested font, supporting all printable
         ASCII characters, from the in-memory contents \a file_contents.  \note
         May load font if unavailable at time of request. */
-    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, uint16_t pts,
                                   const std::vector<uint8_t>& file_contents);
 
     /** Returns a shared_ptr to the requested font, supporting all the
         code points in the UnicodeCharsets in the range [first, last).  \note
         May load font if unavailable at time of request. */
     template <typename CharSetIter>
-    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, uint16_t pts,
                                   CharSetIter first, CharSetIter last);
 
     /** Returns a shared_ptr to the requested font, supporting all the code
@@ -1033,26 +1034,26 @@ public:
         in-memory contents \a file_contents.  \note May load font if
         unavailable at time of request. */
     template <typename CharSetIter>
-    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFont(std::string_view font_filename, uint16_t pts,
                                   const std::vector<uint8_t>& file_contents,
                                   CharSetIter first, CharSetIter last);
 
     /** Removes the indicated font from the font manager.  Due to shared_ptr
         semantics, the font may not be deleted until much later. */
-    void FreeFont(std::string_view font_filename, unsigned int pts);
+    void FreeFont(std::string_view font_filename, uint16_t pts);
 
 private:
     FontManager() = default;
 
     template <typename CharSetIter>
-    std::shared_ptr<Font> GetFontImpl(std::string_view font_filename, unsigned int pts,
+    std::shared_ptr<Font> GetFontImpl(std::string_view font_filename, uint16_t pts,
                                       const std::vector<uint8_t>* file_contents,
                                       CharSetIter first, CharSetIter last);
 
     using FontContainer = std::vector<std::pair<FontKey, std::shared_ptr<Font>>>;
     using FontContainerIt = FontContainer::const_iterator;
 
-    FontContainerIt FontLookup(std::string_view font_filename, unsigned int pts) const noexcept
+    FontContainerIt FontLookup(std::string_view font_filename, uint16_t pts) const noexcept
     {
         return std::find_if(m_rendered_fonts.begin(), m_rendered_fonts.end(),
                             [font_filename, pts](const auto& key_font) {
@@ -1086,8 +1087,7 @@ namespace detail {
 
 
 template <typename CharSetIter>
-GG::Font::Font(std::string font_filename, unsigned int pts,
-               CharSetIter first, CharSetIter last) :
+GG::Font::Font(std::string font_filename, uint16_t pts, CharSetIter first, CharSetIter last) :
     m_font_filename(std::move(font_filename)),
     m_pt_sz(pts),
     m_charsets(first, last)
@@ -1101,8 +1101,7 @@ GG::Font::Font(std::string font_filename, unsigned int pts,
 }
 
 template <typename CharSetIter>
-GG::Font::Font(std::string font_filename, unsigned int pts,
-               const std::vector<uint8_t>& file_contents,
+GG::Font::Font(std::string font_filename, uint16_t pts, const std::vector<uint8_t>& file_contents,
                CharSetIter first, CharSetIter last) :
     m_font_filename(std::move(font_filename)),
     m_pt_sz(pts),
@@ -1116,7 +1115,7 @@ GG::Font::Font(std::string font_filename, unsigned int pts,
 }
 
 template <typename CharSetIter>
-bool GG::FontManager::HasFont(std::string_view font_filename, unsigned int pts,
+bool GG::FontManager::HasFont(std::string_view font_filename, uint16_t pts,
                               CharSetIter first, CharSetIter last) const
 {
     const auto it = FontLookup(font_filename, pts);
@@ -1133,13 +1132,13 @@ bool GG::FontManager::HasFont(std::string_view font_filename, unsigned int pts,
 
 template <typename CharSetIter>
 std::shared_ptr<GG::Font>
-GG::FontManager::GetFont(std::string_view font_filename, unsigned int pts,
+GG::FontManager::GetFont(std::string_view font_filename, uint16_t pts,
                          CharSetIter first, CharSetIter last)
 { return GetFontImpl(font_filename, pts, nullptr, first, last); }
 
 template <typename CharSetIter>
 std::shared_ptr<GG::Font>
-GG::FontManager::GetFont(std::string_view font_filename, unsigned int pts,
+GG::FontManager::GetFont(std::string_view font_filename, uint16_t pts,
                          const std::vector<uint8_t>& file_contents,
                          CharSetIter first, CharSetIter last)
 { return GetFontImpl(font_filename, pts, std::addressof(file_contents), first, last); }
@@ -1147,7 +1146,7 @@ GG::FontManager::GetFont(std::string_view font_filename, unsigned int pts,
 
 template <typename CharSetIter>
 std::shared_ptr<GG::Font>
-GG::FontManager::GetFontImpl(std::string_view font_filename, unsigned int pts,
+GG::FontManager::GetFontImpl(std::string_view font_filename, uint16_t pts,
                              const std::vector<uint8_t>* file_contents,
                              CharSetIter first, CharSetIter last)
 {

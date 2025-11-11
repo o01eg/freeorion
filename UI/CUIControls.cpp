@@ -1168,10 +1168,10 @@ void CUILinkTextMultiEdit::CompleteConstruction() {
     SetName("CUILinkTextMultiEdit: " + m_raw_text.substr(0, 16));
 }
 
-GG::Pt CUILinkTextMultiEdit::TextUpperLeft() const
+GG::Pt CUILinkTextMultiEdit::TextUpperLeft() const noexcept
 { return CUIMultiEdit::TextUpperLeft() - ScrollPosition() + GG::Pt(GG::X(5), GG::Y(5)); }
 
-GG::Pt CUILinkTextMultiEdit::TextLowerRight() const
+GG::Pt CUILinkTextMultiEdit::TextLowerRight() const noexcept
 { return CUIMultiEdit::TextLowerRight() - ScrollPosition() + GG::Pt(GG::X(5), GG::Y(5)); }
 
 void CUILinkTextMultiEdit::Render() {
@@ -2203,28 +2203,26 @@ FPSIndicator::FPSIndicator() :
     GetOptionsDB().OptionChangedSignal("video.fps.shown").connect(
         boost::bind(&FPSIndicator::UpdateEnabled, this));
     UpdateEnabled();
-    RequirePreRender();
+    UpdateTextWithFPS();
 }
 
-void FPSIndicator::PreRender() {
-    GG::Wnd::PreRender();
-    m_displayed_FPS = static_cast<int>(GetApp().FPS());
-    if (m_enabled)
-        SetText(boost::io::str(FlexibleFormat(UserString("MAP_INDICATOR_FPS")) % m_displayed_FPS));
+void FPSIndicator::UpdateTextWithFPS(int fps) {
+    const auto& font = this->GetFont();
+    if (!font)
+        return;
+    // Keep the ss width uniform (3) to prevent re-layout when size changes cause ChildSizeOrMinSizeOrMaxSizeChanged()
+    std::stringstream ss;
+    ss << std::setw(3) << std::right << std::to_string(fps);
+    auto str = boost::io::str(FlexibleFormat(UserString("MAP_INDICATOR_FPS")) % ss.str());
+    auto [text, elems] = GG::Font::TextAndElementsAssembler{*font}.AddText(std::move(str)).Extract();
+    SetText(std::move(text), std::move(elems));
 }
 
 void FPSIndicator::Render() {
-    if (m_enabled) {
-        int new_FPS = static_cast<int>(GetApp().FPS());
-        if (m_displayed_FPS != new_FPS) {
-            m_displayed_FPS = new_FPS;
-            // Keep the ss width uniform (2) to prevent re-layout when size changes cause ChildSizeOrMinSizeOrMaxSizeChanged()
-            std::stringstream ss;
-            ss << std::setw(2) << std::right << std::to_string(m_displayed_FPS);
-            ChangeTemplatedText(ss.str(), 0);
-        }
-        TextControl::Render();
-    }
+    if (!m_enabled)
+        return;
+    UpdateTextWithFPS(static_cast<int>(GetApp().FPS()));
+    TextControl::Render();
 }
 
 void FPSIndicator::UpdateEnabled() {

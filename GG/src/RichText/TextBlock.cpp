@@ -14,10 +14,8 @@
 
 using namespace GG;
 
-TextBlock::TextBlock(X x, Y y, X w, std::string str,
-                     std::shared_ptr<Font> font,
-                     Clr color, Flags<TextFormat> format,
-                     Flags<WndFlag> flags) :
+TextBlock::TextBlock(X x, Y y, X w, std::string str, std::shared_ptr<Font> font,
+                     Clr color, Flags<TextFormat> format, Flags<WndFlag> flags) :
     BlockControl(x, y, w, flags)
 {
     SetName("TextBlock: " + str.substr(0, 16));
@@ -37,14 +35,19 @@ void TextBlock::CompleteConstruction()
 
 Pt TextBlock::SetMaxWidth(X width)
 {
+    const auto previous_width = Width();
+
     // Reflow the text to the given width. Height is ignored.
     m_text->Resize(GG::Pt(width, Y0));
 
     // Use the size the text requires.
-    Pt text_size = m_text->MinUsableSize();
-    Resize(text_size);
+    const Pt text_size = m_text->MinUsableSize();
+    const Pt ul = UpperLeft();
+    Control::SizeMove(ul, ul + text_size);
+
     return text_size;
 }
+
 
 // A factory for creating text blocks from tags.
 class TextBlockFactory: public RichText::IBlockControlFactory {
@@ -61,8 +64,25 @@ public:
     }
 };
 
+// A factory for creating tagless text blocks from tags.
+class PreformattedTextBlockFactory: public RichText::IBlockControlFactory {
+public:
+    //! Create a Text block from a plain text tag.
+    std::shared_ptr<BlockControl> CreateFromTag(const RichText::TAG_PARAMS&,
+                                                std::string content,
+                                                std::shared_ptr<Font> font,
+                                                Clr color,
+                                                Flags<TextFormat> format) const override
+    {
+        return Wnd::Create<TextBlock>(X0, Y0, X1, std::move(content), std::move(font),
+                                      color, format | FORMAT_IGNORETAGS, NO_WND_FLAGS);
+    }
+};
+
 namespace {
-    // Register text block as the default plaintext handler.
+    // Register text block as the default plaintext handler and preformatted for ignoring tags
     const auto dummy = RichText::RegisterDefaultBlock(RichText::PLAINTEXT_TAG,
                                                       std::make_shared<TextBlockFactory>());
+    const auto dummz = RichText::RegisterDefaultBlock(RichText::UNFORMATTED_TEXT_TAG,
+                                                      std::make_shared<PreformattedTextBlockFactory>());
 }

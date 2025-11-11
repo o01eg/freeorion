@@ -272,14 +272,13 @@ public:
     void CompleteConstruction() override;
 
     void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void KeyPress(GG::Key key, uint32_t key_code_point,
-                  GG::Flags<GG::ModKey> mod_keys) override;
+    void KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
     void AcceptPastedText(const std::string& text) override;
     void GainingFocus() override;
     void LosingFocus() override;
     void Render() override;
     virtual bool AutoComplete() { return false; };
-    void DisallowChars(std::string_view chars) { m_disallowed_chars = chars; }
+    void DisallowChars(std::string_view chars) noexcept { m_disallowed_chars = chars; }
 
     mutable boost::signals2::signal<void ()> GainingFocusSignal;
     mutable boost::signals2::signal<void ()> LosingFocusSignal;
@@ -312,8 +311,7 @@ private:
 /** a FreeOrion MultiEdit control */
 class CUIMultiEdit : public GG::MultiEdit {
 public:
-    explicit CUIMultiEdit(std::string str,
-                          GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
+    explicit CUIMultiEdit(std::string str, GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
     void CompleteConstruction() override;
 
     void Render() override;
@@ -323,14 +321,14 @@ public:
 /** a FreeOrion MultiEdit control that parses its text and makes links within clickable */
 class CUILinkTextMultiEdit final : public CUIMultiEdit, public TextLinker {
 public:
-    CUILinkTextMultiEdit(std::string str, GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
+    explicit CUILinkTextMultiEdit(std::string str, GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
     void CompleteConstruction() override;
 
     const GG::Font::LineVec& GetLineData() const noexcept override { return CUIMultiEdit::GetLineData(); }
     const std::shared_ptr<GG::Font>& GetFont() const noexcept override { return CUIMultiEdit::GetFont(); }
 
-    GG::Pt TextUpperLeft() const override;
-    GG::Pt TextLowerRight() const override;
+    GG::Pt TextUpperLeft() const noexcept override;
+    GG::Pt TextLowerRight() const noexcept override;
     const std::string& RawText() const noexcept override { return m_raw_text; }
 
     void Render() override;
@@ -358,7 +356,7 @@ private:
 /** A simple GG::ListBox::Row subclass designed for use in text-only drop-down
   * lists, such as the ones used in the game setup dialogs. */
 struct CUISimpleDropDownListRow final : public GG::ListBox::Row {
-    CUISimpleDropDownListRow(std::string row_text, GG::Y row_height = DEFAULT_ROW_HEIGHT);
+    explicit CUISimpleDropDownListRow(std::string row_text, GG::Y row_height = DEFAULT_ROW_HEIGHT);
     void CompleteConstruction() override;
     static constexpr GG::Y DEFAULT_ROW_HEIGHT{22};
 private:
@@ -377,8 +375,8 @@ private:
   */
 class StatisticIcon final : public GG::Control {
 public:
-    StatisticIcon(std::shared_ptr<GG::Texture> texture,
-                  GG::X w = GG::X1, GG::Y h = GG::Y1); ///< initialized with no value (just an icon)
+    explicit StatisticIcon(std::shared_ptr<GG::Texture> texture,
+                           GG::X w = GG::X1, GG::Y h = GG::Y1); ///< initialized with no value (just an icon)
 
     StatisticIcon(std::shared_ptr<GG::Texture> texture,
                   double value, int digits, bool showsign,
@@ -576,12 +574,11 @@ public:
     FPSIndicator();
 
     void Render() override;
-    void PreRender() override;
 
 private:
+    void UpdateTextWithFPS(int fps = 999);
     void UpdateEnabled();
     bool m_enabled = false;
-    int m_displayed_FPS = 0;
 };
 
 /** Functions like a StaticGraphic, except can have multiple textures rendered

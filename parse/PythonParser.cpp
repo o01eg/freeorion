@@ -14,6 +14,7 @@
 #include "EffectPythonParser.h"
 #include "EnumPythonParser.h"
 #include "SourcePythonParser.h"
+#include "ValueRefsPythonModuleParser.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/core/noncopyable.hpp>
@@ -468,6 +469,9 @@ void PythonParser::UnloadModule(py::object module) const {
     const char* module_name = PyModule_GetName(module.ptr());
     py::import("sys").attr("modules").attr("pop")(std::string{"focs."} + module_name);
 }
+
+void PythonParser::LoadValueRefsModule() const
+{ (void)LoadModule(&PyInit__value_refs); } // marked [[nodiscard]] but result not needed in this case
 
 py::object PythonParser::find_spec(const std::string& fullname, const py::object& path, const py::object& target) const {
     auto module_path(m_scripting_dir);

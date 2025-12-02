@@ -3148,9 +3148,6 @@ Bold text
 OPTIONS_FONT_TITLE
 Window titles
 
-SHOW_FONT_TEXTURES
-Show Font Textures
-
 OPTIONS_RESEARCH_WND
 Research Window
 
@@ -14624,6 +14621,12 @@ Arc Disruptor 3
 SHP_WEAPON_ARC_DISRUPTOR_3_DESC
 Upgrades [[shippart SR_ARC_DISRUPTOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part has shot damage of [[value SHP_WEAPON_ARC_DISRUPTOR_3_UPGRADED_DAMAGE]].
 
+SHP_WEAPON_ARC_DISRUPTOR_4
+Arc Disruptor 4
+
+SHP_WEAPON_ARC_DISRUPTOR_4_DESC
+Upgrades [[shippart SR_ARC_DISRUPTOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part gets [[value SHP_WEAPON_ARC_DISRUPTOR_4_UPGRADE_SHOTS]] extra shots.
+
 SHP_ION_CANNON
 Ion Cannon
 
@@ -15600,6 +15603,12 @@ Nest Eradicator
 
 BLD_NEST_ERADICATOR_DESC
 Eradicates a [[encyclopedia KRAKEN_NEST_SPECIAL]], [[encyclopedia SNOWFLAKE_NEST_SPECIAL]], or [[encyclopedia JUGGERNAUT_NEST_SPECIAL]] from the planet it is built on. [[BUILDING_AVAILABLE_ON_OUTPOSTS]].
+
+BLD_NEST_RESERVE
+Mega-Fauna Sanctuary
+
+BLD_NEST_RESERVE_DESC
+A place to keep most native space-faring specimen from wandering off planet. Specimen from [[encyclopedia KRAKEN_NEST_SPECIAL]], [[encyclopedia SNOWFLAKE_NEST_SPECIAL]], or [[encyclopedia JUGGERNAUT_NEST_SPECIAL]] on the planet will hatch into space less often (x[[value BLD_NEST_RESERVE_WILD_SPAWN_FACTOR]]). [[BUILDING_AVAILABLE_ON_OUTPOSTS]].
 
 BLD_NEUTRONIUM_EXTRACTOR
 Neutronium Extractor

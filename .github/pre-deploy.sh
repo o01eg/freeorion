@@ -9,6 +9,8 @@ chmod 600 .github/secring.auto || exit 1
 { gpg --import .github/secring.auto ; } || { end_with_error "Could not import secret keyring into gpg." ; }
 { gpg --import .github/pubring.auto ; } || { end_with_error "Could not import public keyring into gpg." ; }
 
+gpg -K
+
 mkdir -p $HOME/.ssh/
 chmod 700 $HOME/.ssh/
 ssh-keyscan frs.sourceforge.net >> $HOME/.ssh/known_hosts

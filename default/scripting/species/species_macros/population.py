@@ -196,7 +196,7 @@ _BASIC_POPULATION = [
         priority=POPULATION_FIRST_PRIORITY,
         effects=SetPopulation(
             # growth is GROWTH_RATE_FACTOR * population * (maximum + 1 - population) / maximum
-            # which gives factor for population 1, best growth around half full and aproaching
+            # which gives factor for population 1, best growth around half full and approaching
             # factor again when almost full
             value=(
                 (Value < Value(Target.TargetPopulation))

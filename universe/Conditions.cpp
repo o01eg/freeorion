@@ -331,6 +331,8 @@ void Number::Eval(const ScriptingContext& parent_context,
 {
     // Number does not have a single valid local candidate to be matched, as it
     // will match anything if the proper number of objects match the subcondition.
+    // TODO: rethink this... why can't high and low and subcondition matches
+    //       be different for each candidate being matched?
 
     if (!m_high_low_local_invariant) {
         ErrorLogger(conditions) << "Condition::Number::Eval has local candidate-dependent ValueRefs, but no valid local candidate!";
@@ -346,6 +348,9 @@ void Number::Eval(const ScriptingContext& parent_context,
         Condition::Eval(parent_context, matches, non_matches, search_domain);
 
     } else {
+        if (std::addressof(matches) == std::addressof(non_matches))
+            return;
+
         // Matching for this condition doesn't need to check each candidate object against
         // the number of subcondition matches, so don't need to use EvalImpl
         const bool in_range = Match(parent_context);
@@ -1725,6 +1730,8 @@ namespace {
 void Capital::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
                    ObjectSet& non_matches, SearchDomain search_domain) const
 {
+    if (std::addressof(matches) == std::addressof(non_matches))
+        return;
     const auto sz = (search_domain == SearchDomain::MATCHES) ? matches.size() : non_matches.size();
     if (sz == 1) {
         // in testing, this was faster for a single candidate than setting up the loop stuff
@@ -1741,7 +1748,7 @@ void Capital::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
     } else {
         // check if candidates are capitals of any empire
         const auto is_capital = [capitals{parent_context.Empires().CapitalIDs()}](const auto* obj)
-        { return FlexibleContains(capitals, obj->ID()); };
+        { return range_contains(capitals, obj->ID()); };
         EvalImpl(matches, non_matches, search_domain, is_capital);
     }
 }
@@ -1818,7 +1825,7 @@ void CapitalWithID::Eval(const ScriptingContext& parent_context, ObjectSet& matc
             const auto empire = parent_context.GetEmpire(m_empire_id->Eval(parent_context));
             if (!empire) {
                 // no such empire, match nothing
-                if (search_domain == SearchDomain::MATCHES) {
+                if (search_domain == SearchDomain::MATCHES && (std::addressof(matches) != std::addressof(non_matches))) {
                     // move all objects from matches to non_matches
                     non_matches.insert(non_matches.end(), matches.begin(), matches.end());
                     matches.clear();
@@ -1847,6 +1854,8 @@ void CapitalWithID::Eval(const ScriptingContext& parent_context, ObjectSet& matc
 
         const auto sz = (search_domain == SearchDomain::MATCHES) ? matches.size() : non_matches.size();
         if (sz == 1) { // in testing, this was faster for a single candidate than setting up the loop stuff
+            if (std::addressof(matches) == std::addressof(non_matches))
+                return;
             const bool test_val = search_domain == SearchDomain::MATCHES;
             auto& from = test_val ? matches : non_matches;
             auto& to = test_val ? non_matches : matches;
@@ -2767,7 +2776,7 @@ void HasTag::Eval(const ScriptingContext& parent_context,
         if (!m_name) {
             EvalImpl(matches, non_matches, search_domain, HasTagSimpleMatch(parent_context));
         } else {
-            std::string name = boost::to_upper_copy<std::string>(m_name->Eval(parent_context));
+            const std::string name = boost::to_upper_copy<std::string>(m_name->Eval(parent_context));
             EvalImpl(matches, non_matches, search_domain, HasTagSimpleMatch(name, parent_context));
         }
     } else {
@@ -3497,7 +3506,7 @@ ObjectSet ObjectID::GetDefaultInitialCandidateObjects(const ScriptingContext& pa
 
 bool ObjectID::Match(const ScriptingContext& local_context) const {
     const auto* candidate = local_context.condition_local_candidate;
-    if (!candidate)
+    if (!candidate || !m_object_id)
         return false;
 
     return ObjectIDSimpleMatch(m_object_id->Eval(local_context))(candidate);
@@ -8051,7 +8060,7 @@ namespace {
 
     struct vec2 {
         [[nodiscard]] constexpr vec2(double x_, double y_) noexcept : x(x_), y(y_) {}
-        [[nodiscard]] vec2(const UniverseObjectCXBase& obj) noexcept : x(obj.X()), y(obj.Y()) {}
+        [[nodiscard]] constexpr vec2(const UniverseObjectCXBase& obj) noexcept : x(obj.X()), y(obj.Y()) {}
         double x = 0.0, y = 0.0;
         [[nodiscard]] constexpr auto operator-() const noexcept { return vec2{-x, -y}; };
         [[nodiscard]] constexpr auto operator-(const vec2& rhs) const noexcept { return vec2{x - rhs.x, y - rhs.y}; }
@@ -8073,7 +8082,7 @@ namespace {
             return retval;
         }
         [[nodiscard]] inline operator std::string() const
-        { return "(" + std::to_string(x) + ", " + std::to_string(y) + ")"; }
+        { return std::string{"("} + std::to_string(x) + ", " + std::to_string(y) + ")"; }
     };
     std::ostream& operator<<(std::ostream& os, const vec2 v2) {
         os << std::string{v2};
@@ -8783,8 +8792,8 @@ namespace {
         static_assert( LineSegmentIsCloseToPoint(seg6, seg5.e, 1.0));
     }
 
-    bool LaneWouldBeCloseToOtherObject(const auto* obj1, const auto* obj2,
-                                       const ObjectSet& close_objects, const double max_distance)
+    [[nodiscard]] constexpr bool LaneWouldBeCloseToOtherObject(
+        const auto* obj1, const auto* obj2, const auto& close_objects, const double max_distance)
     {
         if (!obj1 || !obj2 || close_objects.empty())
             return false;
@@ -8792,22 +8801,40 @@ namespace {
         const auto lane_would_be_close_to_object =
             [obj1, pt1{vec2{*obj1}}, obj2, pt2{vec2{*obj2}}, max_distance](const auto* close_obj)
         {
-            if (obj1 == close_obj || obj2 == close_obj)
+            if (obj1 == close_obj || obj2 == close_obj || !close_obj)
                 return false; // don't check if lane is close to object(s) it is connected to
 
             const auto retval = LineSegmentIsCloseToPoint(pt1, pt2, vec2{*close_obj}, max_distance);
 
-            TraceLogger(conditions) << close_obj->Name() << " @ " << vec2{*close_obj}
-                                    << " is " << (retval ? "close to" : "far from")
-                                    <<" lane from "<< obj1->Name() << " to " << obj2->Name()
-                                    << vec2{*obj1} << " - " << vec2{*obj2};
+            //TraceLogger(conditions) << close_obj->Name() << " @ " << vec2{*close_obj}
+            //                        << " is " << (retval ? "close to" : "far from")
+            //                        <<" lane from "<< obj1->Name() << " to " << obj2->Name()
+            //                        << vec2{*obj1} << " - " << vec2{*obj2};
 
             return retval;
         };
-
-        return range_any_of(close_objects, lane_would_be_close_to_object);
+#if !defined(USING_STD_RANGES) || !USING_STD_RANGES
+        if (std::is_constant_evaluated())
+            return std::any_of(close_objects.begin(), close_objects.end(), lane_would_be_close_to_object);
+        else
+#endif
+            return range_any_of(close_objects, lane_would_be_close_to_object);
     }
 
+    namespace StaticTests {
+        struct PositionalTestObj : public UniverseObjectCXBase {
+            constexpr explicit PositionalTestObj(double x = 0.0, double y = 0.0, int this_id = 2) :
+                UniverseObjectCXBase(UniverseObjectType::INVALID_UNIVERSE_OBJECT_TYPE,
+                                     ALL_EMPIRES, INVALID_GAME_TURN, x, y)
+            { this->SetID(this_id); }
+        };
+
+        constexpr std::array pos_objs{PositionalTestObj{0.0, 0.0, 0},     PositionalTestObj(-10.0, 10.0, 1),
+                                      PositionalTestObj(100.0, 100.0, 2), PositionalTestObj(0.0, 3.0, 3)};
+
+        static_assert( LaneWouldBeCloseToOtherObject(&pos_objs[0], &pos_objs[2], std::array{&pos_objs[1], &pos_objs[3]}, 8.0));
+        static_assert(!LaneWouldBeCloseToOtherObject(&pos_objs[0], &pos_objs[2], std::array{&pos_objs[1], &pos_objs[3]}, 1.0));
+    }
 
     struct StarlaneToWouldBeCloseToObjectSimpleMatch {
         [[nodiscard]] StarlaneToWouldBeCloseToObjectSimpleMatch(
@@ -8830,8 +8857,8 @@ namespace {
             // angularly close to an existing lane on either end
             const auto retval = range_any_of(m_to_objects, lane_to_close_to_other_object);
 
-            TraceLogger(conditions) << "lane from an object to " << candidate->Name()
-                                    << " would " << (retval ? "" : "not ") << "be close to another object...";
+            //TraceLogger(conditions) << "lane from an object to " << candidate->Name()
+            //                        << " would " << (retval ? "" : "not ") << "be close to another object...";
 
             return retval;
         }
@@ -10906,9 +10933,9 @@ bool And::EvalAny(const ScriptingContext& parent_context,
     if constexpr (random_pick) {
         const auto picker_val = RandInt(1, 15000);
         if (picker_val <= 5000) {
-            return std::any_of(candidates.begin(), candidates.end(),
+            return range_any_of(candidates,
                                [&parent_context, this](const auto* candidate) {
-                                   return std::all_of(m_operands.begin(), m_operands.end(),
+                                   return range_all_of(m_operands,
                                                       [&parent_context, candidate](const auto& op)
                                                       { return op->EvalOne(parent_context, candidate); });
                                });

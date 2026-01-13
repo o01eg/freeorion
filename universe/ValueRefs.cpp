@@ -526,6 +526,9 @@ std::string ComplexVariableDescription(std::string_view property_name,
     if (property_name.empty()) {
         ErrorLogger() << "ComplexVariableDescription passed empty property name?!";
         return "";
+
+    } else if (property_name == "GameRule") {
+        // TODO: look up game rule description
     }
 
     std::string PROP{property_name};
@@ -1684,7 +1687,6 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
     using boost::container::flat_map;
     // empire properties indexed by strings
     std::function<const std::map<std::string, int>& (const Empire&)> empire_property_string_key {nullptr};
-    std::function<const std::map<std::string, int, std::less<>>& (const Empire&)> empire_property_string_key2{nullptr};
     std::function<const flat_map<std::string, int, std::less<>>& (const Empire&)> empire_property_string_key3{nullptr};
 
     if (m_property_name == "TurnTechResearched")
@@ -1723,7 +1725,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
     else if (m_property_name == "LatestTurnPolicyAdopted")
         empire_property_string_key = &Empire::PolicyLatestTurnsAdopted;
 
-    if (empire_property_string_key || empire_property_string_key2 || empire_property_string_key3) {
+    if (empire_property_string_key || empire_property_string_key3) {
         std::shared_ptr<const Empire> empire;
         if (m_int_ref1) {
             int empire_id = m_int_ref1->Eval(context);
@@ -1773,10 +1775,6 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
                 auto filtered_values = empire_property_string_key(*empire) | range_filter(key_filter) | range_values;
                 return std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
 
-            } else if (empire_property_string_key2) {
-                auto filtered_values = empire_property_string_key2(*empire) | range_filter(key_filter) | range_values;
-                return std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
-
             } else if (empire_property_string_key3) {
                 auto filtered_values = empire_property_string_key3(*empire) | range_filter(key_filter) | range_values;
                 return std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
@@ -1787,10 +1785,6 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         for (const auto& loop_empire : context.Empires() | range_values) {
             if (empire_property_string_key) {
                 auto filtered_values = empire_property_string_key(*loop_empire) | range_filter(key_filter) | range_values;
-                sum += std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
-
-            } else if (empire_property_string_key2) {
-                auto filtered_values = empire_property_string_key2(*loop_empire) | range_filter(key_filter) | range_values;
                 sum += std::accumulate(filtered_values.begin(), filtered_values.end(), 0);
 
             } else if (empire_property_string_key3) {
@@ -1980,6 +1974,20 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
             return part && part->Class() == part_class;
         };
         return static_cast<int>(range_count_if(design->Parts(), part_of_class));
+    }
+    else if (m_property_name == "NumPartClassesInShipDesign") {
+        if (!m_int_ref1)
+            return 0;
+
+        const int design_id = m_int_ref1->Eval(context);
+        if (design_id == INVALID_DESIGN_ID)
+            return 0;
+
+        const ShipDesign* design = context.ContextUniverse().GetShipDesign(design_id);
+        if (!design)
+            return 0;
+
+        return design->PartClassCount().size();
     }
     else if (m_property_name == "JumpsBetween") {
         int object1_id = INVALID_OBJECT_ID;
@@ -2436,7 +2444,7 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         return static_cast<float>(std::sqrt(dx*dx + dy*dy));
 
     }
-    else if (m_property_name == "ShortestPath") {
+    else if (m_property_name == "ShortestPath" || m_property_name == "ShortestPathDistance") {
         int object1_id = INVALID_OBJECT_ID;
         if (m_int_ref1)
             object1_id = m_int_ref1->Eval(context);
@@ -2463,14 +2471,12 @@ double ComplexVariable<double>::Eval(const ScriptingContext& context) const
         if (liked_or_disliked_content_name.empty())
             return 0.0;
 
-        if (std::any_of(species->Likes().begin(), species->Likes().end(),
-                        [&liked_or_disliked_content_name](const auto& l) { return l == liked_or_disliked_content_name; }))
-        { return 1.0; }
-        else if (std::any_of(species->Dislikes().begin(), species->Dislikes().end(),
-                             [&liked_or_disliked_content_name](const auto& d) { return d == liked_or_disliked_content_name; }))
-        { return -1.0; }
+        if (range_contains(species->Likes(), liked_or_disliked_content_name))
+            return 1.0;
+        else if (range_contains(species->Dislikes(), liked_or_disliked_content_name))
+            return -1.0;
         else
-        { return 0.0; }
+            return 0.0;
 
     }
     else if (m_property_name == "SpeciesEmpireOpinion" || m_property_name == "SpeciesEmpireTargetOpinion") {
@@ -2873,7 +2879,8 @@ std::string ComplexVariable<double>::Dump(uint8_t ntabs) const
 
     }
     else if (m_property_name == "DirectDistanceBetween" ||
-             m_property_name == "ShortestPath")
+             m_property_name == "ShortestPath" ||
+             m_property_name == "ShortestPathDistance")
     {
         if (m_int_ref1)
             retval += " object = " + m_int_ref1->Dump(ntabs);
@@ -3001,12 +3008,15 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
         return Stringify(result);
 
     // special case for a few sub-value-refs to help with UI representation
-    if (property == "X" || property == "Y" || property == "DirectDistanceBetween") {
+    if (property == "X" || property == "Y" ||
+        property == "DirectDistanceBetween" ||
+        property == "ShortestPathDistance")
+    {
         if (result == UniverseObject::INVALID_POSITION)
             return UserString("INVALID_POSITION");
 
         std::stringstream ss;
-        ss << std::setprecision(6) << result;
+        ss << std::setprecision(5) << result;
         return ss.str();
     }
 

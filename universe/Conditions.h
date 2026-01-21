@@ -485,7 +485,9 @@ struct FO_COMMON_API Turn final : public Condition {
                   std::unique_ptr<ValueRef::ValueRef<int>>&& high = nullptr) :
         Condition(CondsRTSI(low, high), CheckSums::GetCheckSum("Condition::Turn", low, high)),
         m_low(std::move(low)),
-        m_high(std::move(high))
+        m_high(std::move(high)),
+        m_low_high_local_invariant((!m_low || m_low->LocalCandidateInvariant()) &&
+                                   (!m_high || m_high->LocalCandidateInvariant()))
     {}
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override {
@@ -517,6 +519,7 @@ private:
 
     std::unique_ptr<ValueRef::ValueRef<int>> m_low;
     std::unique_ptr<ValueRef::ValueRef<int>> m_high;
+    const bool m_low_high_local_invariant;
 };
 
 /** Matches a specified \a number of objects that match Condition \a condition
@@ -1121,6 +1124,7 @@ private:
 
     std::unique_ptr<ValueRef::ValueRef<int>> m_low;
     std::unique_ptr<ValueRef::ValueRef<int>> m_high;
+    const bool m_low_high_local_invariant;
 };
 
 /** Matches all objects that contain an object that matches Condition \a condition.
@@ -1479,6 +1483,9 @@ struct FO_COMMON_API ContainedBy final : public Impl::NestedCondition<ConditionT
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override
     {
+        if (std::addressof(matches) == std::addressof(non_matches)) [[unlikely]]
+            return;
+
         const auto search_domain_size = (search_domain == SearchDomain::MATCHES ?
                                          matches.size() : non_matches.size());
         const bool simple_eval_safe = parent_context.condition_root_candidate ||
@@ -1876,11 +1883,8 @@ public:
 
             } else if constexpr (requires { m_types.begin(); m_types.end(); }) {
                 // evaluate refs
-                std::vector< ::PlanetType> types; // TODO: array if m_types is array?
-                types.reserve(m_types.size());
-                // get all types from valuerefs
-                for (auto& type : m_types)
-                    types.push_back(type->Eval(parent_context));
+                const auto eval_ref = [&parent_context](const auto& ref) { return ref->Eval(parent_context); };
+                const auto types = m_types | range_transform(eval_ref) | range_to_vec;
                 EvalImpl(matches, non_matches, search_domain,
                          PlanetTypeSimpleMatch<std::dynamic_extent>(types, parent_context.ContextObjects()));
 
@@ -2115,6 +2119,7 @@ private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
     std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> m_names;
+    const bool m_names_local_invariant;
 };
 
 /** Matches objects if the specified species' opinion of the specified content
@@ -2184,6 +2189,7 @@ private:
     std::unique_ptr<ValueRef::ValueRef<int>>            m_empire_id;
     std::unique_ptr<ValueRef::ValueRef<int>>            m_low;
     std::unique_ptr<ValueRef::ValueRef<int>>            m_high;
+    const bool m_refs_local_invariant;
 };
 
 /** Matches all ProdCenter objects that have one of the FocusTypes in \a foci. */
@@ -2210,6 +2216,7 @@ private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
     std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> m_names;
+    const bool m_names_local_invariant;
 };
 
 /** Matches all System objects that have one of the StarTypes in \a types.  Note that all objects

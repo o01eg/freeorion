@@ -592,7 +592,7 @@ std::string StatisticDescription(StatisticType stat_type, std::string_view value
         return boost::io::str(formatter);
     }
 
-    return UserString("DESC_VAR_STATISITIC");
+    return UserString("DESC_VAR_STATISTIC");
 }
 
 ///////////////////////////////////////////////////////////
@@ -2975,6 +2975,10 @@ std::string StringCast<double>::Eval(const ScriptingContext& context) const
     double result = raw_ref->Eval(context);
     auto Stringify = [](double num) -> std::string {
         if (std::isnan(num))
+            return "";
+        else if (std::isinf(num))
+            return num > 0 ? "∞" : "-∞";
+        else if (!std::isfinite(num))
             return "";
 
         const auto abs_num = std::abs(num);

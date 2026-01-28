@@ -18,5 +18,5 @@ progress()
 BUILD_PPA=$(echo "$2" | sed -s 's/^ppa-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.[0-9a-f]\{7\}_\([0-9]\+\).*/\1/')
 
 DIST=$1
-DISTNAME=../freeorion_0.5.2.1rc1ppa${BUILD_PPA}~${DIST}
+DISTNAME=../freeorion_0.5.1.2rc1ppa${BUILD_PPA}~${DIST}
 

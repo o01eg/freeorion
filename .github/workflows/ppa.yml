@@ -8,10 +8,14 @@ on:
 jobs:
   build-ppa:
     name: PPA ${{ matrix.dist }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
-        dist: [jammy, noble, oracular, plucky]
+        dist:
+          - jammy    # 22.04
+          - noble    # 24.04
+          - questing # 25.10
+          - resolute # 26.04
 
     steps:
       - name: Checkout sources

@@ -103,8 +103,8 @@ else()
 endif()
 
 if(APPLE)
-    set(FreeOrionSDK_VERSION 14)
-    set(FreeOrionSDK_FILE "FreeOrionSDK_${FreeOrionSDK_VERSION}_Clang-MacOSX-10.9-x86_64.tar.bz2")
+    set(FreeOrionSDK_VERSION 17)
+    set(FreeOrionSDK_FILE "FreeOrionSDK_${FreeOrionSDK_VERSION}_Clang-MacOSX-10.15-${CMAKE_OSX_ARCHITECTURES}.tar.bz2")
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}")
     file(DOWNLOAD
             "https://github.com/freeorion/freeorion-sdk/releases/download/v${FreeOrionSDK_VERSION}/${FreeOrionSDK_FILE}"
@@ -204,10 +204,10 @@ endif()
 
 set_property(DIRECTORY APPEND
     PROPERTY COMPILE_DEFINITIONS
-        # Set minimum Windows target version to WindowsXP or Vista depending on toolset
+        # Set minimum Windows target version to Windows10
         # https://msdn.microsoft.com/en-us/library/aa383745.aspx
         # Use numeric to correctly compare it in <boost\log\detail\config.hpp>
-        $<$<PLATFORM_ID:Windows>:_WIN32_WINNT=$<IF:$<STREQUAL:${_VS_PLATFORM_TOOLSET_TARGET},_xp>,0x0501,0x0600>>
+        $<$<PLATFORM_ID:Windows>:_WIN32_WINNT=0x0A00>
         # Default to unicode variants when using Win32 API
         # https://msdn.microsoft.com/en-us/library/dybsewaf.aspx
         $<$<PLATFORM_ID:Windows>:_UNICODE>
@@ -283,9 +283,15 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
         log
         log_setup
         serialization
-        system
         thread
     REQUIRED)
+
+if(APPLE)
+find_package(Boost ${MINIMUM_BOOST_VERSION}
+    COMPONENTS
+        system
+    REQUIRED)
+endif()
 
 message(STATUS "Boost version detected ${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}")
 
@@ -345,12 +351,6 @@ set_property(DIRECTORY APPEND
         # which we don't want.
         # http://www.boost.org/doc/libs/1_59_0/boost/iostreams/detail/config/zlib.hpp
         $<$<PLATFORM_ID:Windows>:BOOST_ZLIB_BINARY=zlib.lib>
-
-        # with boost 1.61 some boost::optional internals were changed. However
-        # boost::spirit relies on some API the old implementation provided.
-        # This define enables the usage of the old boost::optional
-        # implementation.  Boost upstream tracks this bug as #12349
-        $<$<AND:$<VERSION_GREATER:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.60>,$<VERSION_LESS:${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION},1.67>>:BOOST_OPTIONAL_CONFIG_USE_OLD_IMPLEMENTATION_OF_OPTIONAL>
 
         # We don't need localized output of Boost date_time and not setting
         # the define causes the inclusion of code, which contains std::tolower.
@@ -1172,7 +1172,7 @@ endif()
 if(WIN32)
     set(PACKAGE_FILE_SYSTEM_NAME Win32)
 elseif(APPLE)
-    set(PACKAGE_FILE_SYSTEM_NAME ${CPACK_SYSTEM_NAME}_${CMAKE_OSX_DEPLOYMENT_TARGET})
+    set(PACKAGE_FILE_SYSTEM_NAME ${CPACK_SYSTEM_NAME}_${CMAKE_OSX_DEPLOYMENT_TARGET}_${CMAKE_OSX_ARCHITECTURES})
 else()
     set(PACKAGE_FILE_SYSTEM_NAME ${CPACK_SYSTEM_NAME})
 endif()

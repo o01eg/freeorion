@@ -21,12 +21,7 @@ endif
 	dh $@ --max-parallel=$(MAX) --with python3
 
 override_dh_auto_configure:
-	cd $(CURDIR)/godot-cpp && cmake \
-		-DCMAKE_BUILD_TYPE=Release
-	cd $(CURDIR)/godot-cpp && cmake --build . -j $(MAX)
 	dh_auto_configure -- \
-		-DGODOT_CPP_ROOT=$(CURDIR)/godot-cpp \
-		-DBUILD_CLIENT_GODOT=ON \
 		-DBUILD_DOCUMENTATION=off \
 		-DBUILD_TUTORIALS=off \
 		-DLIB_SUFFIX=/freeorion \
@@ -44,10 +39,6 @@ override_dh_missing:
 	dh_missing --fail-missing
 
 override_dh_install:
-#	godot-headless wants a writable homedir, simulate it (see Debian Policy 4.9)
-	mkdir -p home/
-#	Note: we use godot3-headless really (#976623)
-	HOME=$(CURDIR)/home godot3-server --path godot --export-pack "Linux/X11" $(CURDIR)/freeorion.pck
 	dh_install
 	find debian -type d -empty -delete -printf 'removed %p\n'
 	$(RM) -v debian/freeorion-data/usr/share/games/freeorion/default/LICENSE* \
@@ -55,7 +46,7 @@ override_dh_install:
 		debian/freeorion-data/usr/share/games/freeorion/default/data/fonts/LICENSE.*
 
 override_dh_auto_clean:
-	rm -rf home/ freeorion.pck
+	rm -rf home/
 
 override_dh_python3:
 	dh_python3 -pfreeorion-data /usr/share/games

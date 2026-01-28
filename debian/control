@@ -22,8 +22,7 @@ Build-Depends:
  libtiff-dev,
  libvorbis-dev,
  pkg-config,
- python3,
- godot3-server
+ python3
 Standards-Version: 4.7.0
 Homepage: http://www.freeorion.org
 Vcs-Git: https://salsa.debian.org/games-team/freeorion.git
@@ -33,7 +32,6 @@ Package: freeorion
 Architecture: linux-any
 Depends:
  freeorion-data (= ${source:Version}),
- godot3-runner,
  ${misc:Depends},
  ${shlibs:Depends}
 Description: turn-based space empire and galactic conquest game

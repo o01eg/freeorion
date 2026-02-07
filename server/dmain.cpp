@@ -36,6 +36,7 @@ int main(int argc, char* argv[]) {
     }
 #else
 int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
+    std::cout << "Start application" << std::endl;
     // copy UTF-16 command line arguments to UTF-8 vector
     std::vector<std::string> args;
     bool testing = false;
@@ -59,7 +60,9 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         }
     }
 #endif
+    std::cout << "Pre-init directories" << std::endl;
     InitDirs((args.empty() ? "" : *args.begin()), testing);
+    std::cout << "Post-init directories" << std::endl;
 
 #ifndef FREEORION_DMAIN_KEEP_STACKTRACE
     try {
@@ -95,12 +98,16 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
 #endif
         GetOptionsDB().Add<int>("network.server.python.asyncio-interval",               UserStringNop("OPTIONS_DB_PYTHON_ASYNCIO_INTERVAL"),    -1);
 
+        std::cout << "Pre-load configs" << std::endl;
+
         // if config.xml and persistent_config.xml are present, read and set options entries
         GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());
         GetOptionsDB().SetFromFile(GetPersistentConfigPath());
 
         // override previously-saved and default options with command line parameters and flags
         GetOptionsDB().SetFromCommandLine(args);
+
+        std::cout << "Post-load configs" << std::endl;
 
         auto help_arg = GetOptionsDB().Get<std::string>("help");
         if (help_arg != "NOOP") {
@@ -115,6 +122,8 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
             ShutdownLoggingSystemFileSink();
             return 0;   // quit without actually starting server
         }
+
+        std::cout << "Pre-start app" << std::endl;
 
         ServerApp g_app;
         g_app(); // Calls ServerApp::Run() to run app (intialization and main process loop)

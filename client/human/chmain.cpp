@@ -67,6 +67,7 @@ int main(int argc, char* argv[]) {
 #endif
 #ifdef FREEORION_WIN32
 int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
+    std::cout << "Start application" << std::endl;
     // copy UTF-16 command line arguments to UTF-8 vector
     std::vector<std::string> args;
     for (int i = 0; i < argc; ++i) {
@@ -81,6 +82,7 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         std::cerr << "main() failed config." << std::endl;
         return 1;
     }
+    std::cout << "Post-config option setup" << std::endl;
 #endif
 #ifndef FREEORION_MACOSX
     // did the player request help output?
@@ -98,12 +100,15 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         return 0;   // quit without actually starting game
     }
 
+    std::cout << "Pre-main setup and run" << std::endl;
     // set up rendering and run game
     if (mainSetupAndRun() != 0) {
+        std::cout << "Post-main setup and run (error)" << std::endl;
         ShutdownLoggingSystemFileSink();
         std::cerr << "main() failed to setup or run SDL." << std::endl;
         return 1;
     }
+    std::cout << "Post-main setup and run" << std::endl;
     ShutdownLoggingSystemFileSink();
     return 0;
 }
@@ -111,7 +116,9 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
 
 
 int mainConfigOptionsSetup(const std::vector<std::string>& args) {
+    std::cout << "Pre-init directories" << std::endl;
     InitDirs((args.empty() ? "" : args.front()));
+    std::cout << "Post-init directories" << std::endl;
 
     // read and process command-line arguments, if any
 #ifndef FREEORION_CHMAIN_KEEP_STACKTRACE
@@ -180,6 +187,8 @@ int mainConfigOptionsSetup(const std::vector<std::string>& args) {
         // Add the keyboard shortcuts
         Hotkey::AddOptions(GetOptionsDB());
 
+        std::cout << "Pre-load configs" << std::endl;
+
         // if config.xml and persistent_config.xml are present, read and set options entries
         GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());
         GetOptionsDB().SetFromFile(GetPersistentConfigPath());
@@ -187,7 +196,17 @@ int mainConfigOptionsSetup(const std::vector<std::string>& args) {
         // override previously-saved and default options with command line parameters and flags
         GetOptionsDB().SetFromCommandLine(args);
 
+        std::cout << "Post-load configs" << std::endl;
+
         CompleteXDGMigration();
+
+        std::cout << "Post-complete migrations" << std::endl;
+
+        std::cout << "Resource directory from option is " << GetOptionsDB().Get<std::string>("resource.path") << std::endl;
+
+        std::cout << "Resource directory is " << GetResourceDir() << std::endl;
+
+        std::cout << "Resource directory existence " << boost::filesystem::exists(GetResourceDir()) << std::endl;
 
         // Handle the case where the resource.path does not exist anymore
         // gracefully by resetting it to the standard path into the
@@ -197,6 +216,7 @@ int mainConfigOptionsSetup(const std::vector<std::string>& args) {
             !boost::filesystem::exists(GetResourceDir() / "credits.xml") ||
             !boost::filesystem::exists(GetResourceDir() / "data" / "art" / "misc" / "missing.png"))
         {
+            std::cout << "Check resourse directory failed 1-st" << std::endl;
             DebugLogger() << "Resources directory from config.xml missing or does not contain expected files. Resetting to default.";
 
             GetOptionsDB().Set<std::string>("resource.path", "");
@@ -212,6 +232,7 @@ int mainConfigOptionsSetup(const std::vector<std::string>& args) {
             }
         }
 
+        std::cout << "Post-check resource directory" << std::endl;
 
         // did the player request generation of config.xml, saving the default (or current) options to disk?
         if (GetOptionsDB().Get<bool>("generate-config-xml")) {
@@ -222,11 +243,15 @@ int mainConfigOptionsSetup(const std::vector<std::string>& args) {
             }
         }
 
+        std::cout << "Post-generate config" << std::endl;
+
         if (GetOptionsDB().Get<bool>("render-simple")) {
             GetOptionsDB().Set<bool>("ui.map.background.gas.shown", false);
             GetOptionsDB().Set<bool>("ui.map.background.starfields.shown", false);
             GetOptionsDB().Set<bool>("video.fps.shown", true);
         }
+
+        std::cout << "Post-render smple" << std::endl;
 
 #ifndef FREEORION_CHMAIN_KEEP_STACKTRACE
     } catch (const std::invalid_argument& e) {
@@ -252,10 +277,13 @@ int mainSetupAndRun() {
 #ifndef FREEORION_CHMAIN_KEEP_STACKTRACE
     try {
 #endif
+        std::cout << "Pre-register window size option after main start" << std::endl;
         RegisterOptions(&GGHumanClientApp::AddWindowSizeOptionsAfterMainStart);
 
         bool fullscreen = GetOptionsDB().Get<bool>("video.fullscreen.enabled");
         bool fake_mode_change = GetOptionsDB().Get<bool>("video.fullscreen.fake.enabled");
+
+        std::cout << "Pre-define window size" << std::endl;
 
         auto width_height = GGHumanClientApp::GetWindowWidthHeight();
         int width(width_height.first), height(width_height.second);
@@ -264,6 +292,7 @@ int mainSetupAndRun() {
 
 #ifdef FREEORION_WIN32
 #  ifdef IDI_ICON1
+        std::cout << "Pre-set icon" << std::endl;
         // set window icon to embedded application icon
         HWND hwnd;
         window->getCustomAttribute("WINDOW", &hwnd);
@@ -272,6 +301,8 @@ int mainSetupAndRun() {
             (LONG)LoadIcon (hInst, MAKEINTRESOURCE (IDI_ICON1)));
 #  endif
 #endif
+
+        std::cout << "Pre-start app" << std::endl;
 
         GGHumanClientApp app(width, height, true, "FreeOrion " + FreeOrionVersionString(),
                              left, top, fullscreen, fake_mode_change);

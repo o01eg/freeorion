@@ -64,7 +64,7 @@ jobs:
           name: weekly-artifacts-sf-windows-msvs-${{ github.run_number }}
           path: FreeOrion_*_Win32_Setup.exe
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
   windows-2025:
     name: MSVS 2022 on Windows 2025
     runs-on: windows-2025

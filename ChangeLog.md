@@ -3,7 +3,7 @@ Changelog
 
 Notable changes to the FreeOrion project will be documented in this file.
 
-[v0.5.1.2] - 2026-02-11
+[v0.5.1.2] - 2026-02-26
 
 ### Bugfixes / Improvements
 
@@ -15,6 +15,7 @@ Notable changes to the FreeOrion project will be documented in this file.
 - Provide MacOS Apple Silicone arm64 build.
 - Optimize saving memory usage by removing uncompressed buffer.
 - Fix MacOS crashes caused by moving `string_view` data.
+- Switch Windows build from x86 to x64.
 
 [v0.5.1.1] - 2025-06-22
 ---------------

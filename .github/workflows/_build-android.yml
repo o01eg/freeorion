@@ -7,12 +7,12 @@ jobs:
     name: Generate Godot API
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/bend-n/godot:3.6
+      image: ghcr.io/bend-n/godot:3.5.2
     steps:
       - name: Setup
         uses: bend-n/godot-actions/.github/actions/setup-godot@main
         env:
-          GODOT_VERSION: "3.6"
+          GODOT_VERSION: "3.5.2"
       - name: Generate API file
         run: |
           timeout 1m godot --no-window --disable-render-loop --video-driver Dummy --gdnative-generate-json-api godot-api.json
@@ -60,7 +60,7 @@ jobs:
       - name: Build
         run: |
           pushd build
-          cmake --build . -- -j2
+          cmake --build . -- -j3
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
@@ -85,25 +85,25 @@ jobs:
     runs-on: ubuntu-22.04
     needs: merge-binaries
     container:
-      image: ghcr.io/bend-n/godot:3.6
+      image: ghcr.io/bend-n/godot:3.5.2
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
       - name: Setup
         uses: bend-n/godot-actions/.github/actions/setup-godot@main
         env:
-          GODOT_VERSION: "3.6"
+          GODOT_VERSION: "3.5.2"
       - name: Download python library
         id: download-python-lib
         uses: suisei-cn/actions-download-file@v1.3.0
         with:
-          url: https://github.com/freeorion/freeorion-sdk/releases/download/v14/python39.zip
+          url: https://github.com/freeorion/freeorion-sdk/releases/download/v17/python310.zip
           target: ../
       - name: Place resources
         run: |
           mkdir -p godot/default/python/lib/
-          cp ../${{ steps.download-python-lib.outputs.filename }} godot/default/python/lib/python39.zip
-          unzip -t godot/default/python/lib/python39.zip
+          cp ../${{ steps.download-python-lib.outputs.filename }} godot/default/python/lib/python310.zip
+          unzip -t godot/default/python/lib/python310.zip
           mv default/data/art godot/assets/
           mv default/data/fonts godot/assets/
           mv default/data/sound godot/assets/
@@ -117,6 +117,6 @@ jobs:
       - name: Build
         uses: bend-n/godot-actions/.github/actions/export-android@main
         env:
-          GODOT_VERSION: "3.6"
+          GODOT_VERSION: "3.5.2"
           NAME: freeorion
           PROJECT_PATH: godot

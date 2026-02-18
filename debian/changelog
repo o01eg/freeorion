@@ -1,3 +1,9 @@
+freeorion (0.5.1.2.fo0030+git20260217.1d4211eppa1~noble) noble; urgency=medium
+
+  * Update 0.5.1.2 RC3.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Wed, 18 Feb 2026 10:35:12 +0400
+
 freeorion (0.5.1.1.fo0030+git20250615.783080appa1~noble) noble; urgency=medium
 
   * FO0023 game.

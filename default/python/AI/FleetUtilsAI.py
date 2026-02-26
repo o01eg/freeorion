@@ -2,7 +2,6 @@ import freeOrionAIInterface as fo
 import math
 from collections.abc import Sequence
 from logging import debug, error, warning
-from typing import Union
 
 import AIDependencies
 import MoveUtilsAI
@@ -88,7 +87,7 @@ def get_fleets_for_mission(  # noqa: C901
 ) -> list[int]:
     """Get fleets for a mission.
 
-    Implements breadth-first search through systems starting at the **starting_sytem**.
+    Implements breadth-first search through systems starting at the **starting_system**.
     In each system, local fleets are checked if they are in the allowed **fleet_pool_set** and suitable for the mission.
     If so, they are added to the **fleet_list** and **cur_stats** is updated with the currently selected fleet summary.
     The search continues until the requirements defined in **target_stats** are met or there are no more systems/fleets.
@@ -669,7 +668,7 @@ def calculate_estimated_time_of_arrival(fleet_id, target_system_id):
     return math.ceil(float(distance) / fleet.speed)
 
 
-def get_fleet_system(fleet: Union[TargetFleet, int]) -> int:
+def get_fleet_system(fleet: TargetFleet | int) -> int:
     """Return the current fleet location or the target system if currently on starlane."""
     if isinstance(fleet, int):
         fleet = fo.getUniverse().getFleet(fleet)

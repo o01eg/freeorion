@@ -1,4 +1,4 @@
-from buildings.buildings import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
+from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
 from focs._effects import (
     ContainedBy,
     Contains,
@@ -24,7 +24,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-BuildingType(  # type: ignore[reportUnboundVariable]
+BuildingType(  # pyrefly: ignore[unbound-name]
     name="BLD_AUTO_HISTORY_ANALYSER",
     description="BLD_AUTO_HISTORY_ANALYSER_DESC",
     buildcost=100 * BUILDING_COST_MULTIPLIER,

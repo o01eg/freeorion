@@ -407,7 +407,7 @@ class AIFleetMission:
         just_issued_move_order = False
         last_move_target_id = INVALID_ID
         for fleet_order in self.orders:
-            if isinstance(fleet_order, (OrderColonize, OrderOutpost, OrderInvade)) and self._check_abort_mission(
+            if isinstance(fleet_order, OrderColonize | OrderOutpost | OrderInvade) and self._check_abort_mission(
                 fleet_order
             ):
                 self.clear_fleet_orders()
@@ -843,7 +843,7 @@ class AIFleetMission:
                     for planet_id in system.planetIDs:
                         planet = universe.getPlanet(planet_id)
                         if planet and not planet.ownedBy(empire_id) and not planet.unowned:
-                            debug("Currently no neighboring threats. " "Staying for bombardment of planet %s", planet)
+                            debug("Currently no neighboring threats. Staying for bombardment of planet %s", planet)
                             return current_system_id
 
                 # TODO consider attacking neighboring, non-military fleets

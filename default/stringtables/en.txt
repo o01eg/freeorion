@@ -150,7 +150,7 @@ Unknown Position
 NEW_FLEET_NAME
 Fleet %1%
 
-# Name for a newly created general purpose fleet when no uniqe number could be
+# Name for a newly created general purpose fleet when no unique number could be
 # created.
 NEW_FLEET_NAME_NO_NUMBER
 Fleet
@@ -647,7 +647,7 @@ SM_TREE
 Dyson Forest
 
 SM_TREE_DESC
-A "forest" made up of numerous space-born "trees" with filamentous branches. The trees multiply and align themselves in a bubble at the proper distance around their host star. Dyson Forests are a hazard to navigation, and as time passes, the forest expands and becomes harder to eradicate. If not destroyed, they will periodically send out a seed through the starlanes to colonize other star systems. A [[SM_TREE]] seed is known as a [[predefinedshipdesign SM_FLOATER]], and may be difficult to detect. When a Dyson Forest grows, Space Krill often start nesting inbetween the trees.
+A "forest" made up of numerous space-born "trees" with filamentous branches. The trees multiply and align themselves in a bubble at the proper distance around their host star. Dyson Forests are a hazard to navigation, and as time passes, the forest expands and becomes harder to eradicate. If not destroyed, they will periodically send out a seed through the starlanes to colonize other star systems. A [[SM_TREE]] seed is known as a [[predefinedshipdesign SM_FLOATER]], and may be difficult to detect. When a Dyson Forest grows, Space Krill often start nesting in-between the trees.
 
 SM_FLOATER
 Floater
@@ -1217,7 +1217,7 @@ RULE_EXPERIMENTORS_SPAWN_BASE_TURN
 Experimentors spawn base turn
 
 RULE_EXPERIMENTORS_SPAWN_BASE_TURN_DESC
-Minimum turn experimentors spawn. Modified by galaxy size and AI Agression.
+Minimum turn Experimentors spawn. Modified by galaxy size and AI Aggression.
 
 RULE_NESTS_ALWAYS_SPAWN_WILD
 Nests always spawn wild monsters
@@ -1226,10 +1226,10 @@ RULE_NESTS_ALWAYS_SPAWN_WILD_DESC
 Monster nests will always spawn wild monsters, even when outposted
 
 RULE_WANDERING_MONSTERS_CAN_STOP_INSYSTEM
-Wandering monsters ocassionally stop insystem
+Wandering monsters occasionally stop in-system
 
 RULE_WANDERING_MONSTERS_CAN_STOP_INSYSTEM_DESC
-Wandering monsters ocassionally stop insystem
+Wandering monsters occasionally stop in-system
 
 RULE_WILD_NEST_MONSTER_SPAWN_FACTOR
 Wild nest monster spawn factor
@@ -1323,7 +1323,7 @@ Basic System Info Visible
 RULE_BASIC_VIS_SYSTEM_INFO_SHOWN_DESC
 '''<u>If On</u>: Systems that are detected by an empire at only basic visibility have their name and star type revealed to that empire. Causes a UI issue where it is difficult to tell if starlanes of a system are known.
 
-<u>If Off</u>: Basic level visible systems that have never been detected at higher visiblity have unknown name and star type.'''
+<u>If Off</u>: Basic level visible systems that have never been detected at higher visibility have unknown name and star type.'''
 
 RULE_HIDDEN_POLICIES
 Hide Empire Policies
@@ -1334,7 +1334,7 @@ RULE_HIDDEN_POLICIES_DESC
 <u>If Off</u>: All players know all other empires' adopted and available policies.'''
 
 RULE_HIDDEN_TECHS_QUEUES_AVAILABILITIES
-Hide Empire Techs, Queues, and Availabilites
+Hide Empire Techs, Queues, and Availabilities
 
 RULE_HIDDEN_TECHS_QUEUES_AVAILABILITIES_DESC
 '''<u>If On</u>: Players who are not allied to an empire do not know other empires' researched techs, queues and part, hull, or building availabilities.
@@ -1765,7 +1765,7 @@ OPTIONS_DB_COOKIES_EXPIRE
 Count of minutes after the cookie record will be considered expired.
 
 OPTIONS_DB_PUBLISH_STATISTICS
-Enable sending empire staticstics to the player.
+Enable sending empire statistics to the player.
 
 OPTIONS_DB_PUBLISH_SEED
 Enable sending galaxy seed to the player.
@@ -1799,6 +1799,9 @@ Server option to send new turn data to chat.
 
 OPTIONS_DB_PYTHON_ASYNCIO_INTERVAL
 Interval in seconds to call python asyncio event loop or -1 to disable it. By default asyncio calls disabled.
+
+OPTIONS_DB_AI_EXECUTABLE
+Path to the AI executable. By default use 'freeorion' ('freeorion.exe' on Windows) from the same folder as the server executable.
 
 OPTIONS_DB_UI_MAIN_MENU_X
 Position of the center of the intro screen main menu, as a portion of the application's total width.
@@ -2016,6 +2019,9 @@ Sets the color of the scan-line shading over planet graphics on the sidepanel.
 OPTIONS_DB_UI_PLANET_STATUS_ICON_SIZE
 Sets the size of the planet status icon.
 
+OPTIONS_DB_UI_SHOW_SIDEPANEL_STALE_BUILDING
+Enables display of stale visibility buildings on the sidepanel. Stale visibility means previously detected and should be currently visible based on last known state and location and a player's current detection levels, but nevertheless not currently detected anywhere.
+
 OPTIONS_DB_UI_PLANET_STATUS_ICON_TITLE
 Planet status notification
 
@@ -2146,6 +2152,22 @@ Automatically add game default ship designs to the player-empire known designs.
 
 OPTIONS_DB_DESIGN_PEDIA_DYNAMIC
 In the Design Window, dynamically update the pedia detail page while the design name is being edited.
+
+OPTIONS_DB_DESIGN_FUNCTIONAL_MAX_COST_RATIO
+'''Design window redundant part filtering max cost ratio. By default, parts are only considered redundant if another part of the same class is all of:
+
+• more powerful / greater capacity
+• no more expensive
+• no greater minimum production time
+• no additional location restrictions
+
+Increasing max cost ratio above 1.0 allows the filtering to let a stronger / higher capacity part that costs that much more to make a cheaper part redundant.'''
+
+OPTIONS_DB_DESIGN_FUNCTIONAL_MIN_BARGAIN_RATIO
+Design window redundant part filtering minimum bargain ratio. Setting this above 1.0 will prevent small bargains (ratio of part strength / capacity) divided by (ratio of part costs) from making a part be redundant.
+
+OPTIONS_DB_DESIGN_FUNCTIONAL_MAX_TIME_RATIO
+Design window redundant part filtering max production time ratio. Increasing this above 1.0 allows the filtering to let a stronger / higher capacity part that is slower to produce to make a faster to produce part redundant.
 
 OPTIONS_DB_UI_SIDEPANEL_WIDTH
 Sets size of system side-panel.
@@ -2707,7 +2729,7 @@ AUTHENTICATION_WINDOW_TITLE
 Authentication
 
 AUTHENTICATION_DESC
-This player name requires authentication. Reminder! Password will be transfered plain-text.
+This player name requires authentication. Reminder! Password will be transferred plain-text.
 
 PASSWORD_LABEL
 Password
@@ -3115,6 +3137,9 @@ Automatically reposition windows
 OPTIONS_DISPLAY_TIMESTAMP
 Show chat timestamp
 
+OPTIONS_SHOW_SIDEPANEL_STALE_BUILDING
+Show stale visibility buildings on sidepanel
+
 OPTIONS_MISC_UI
 Miscellaneous UI Settings
 
@@ -3142,11 +3167,11 @@ Bold text
 OPTIONS_FONT_TITLE
 Window titles
 
-SHOW_FONT_TEXTURES
-Show Font Textures
-
 OPTIONS_RESEARCH_WND
 Research Window
+
+OPTIONS_DESIGN_WND
+Ship Design Window
 
 OPTIONS_QUEUES
 Queues
@@ -3162,6 +3187,18 @@ Zoom
 
 OPTIONS_TECH_CTRL_ICON_SIZE
 Icon Size
+
+OPTIONS_DESIGN_PEDIA_DYNAMIC
+Editing dynamic pedia updates
+
+OPTIONS_DESIGN_FUNCTIONAL_MAX_COST_RATIO
+Redundancy maximum cost ratio
+
+OPTIONS_DESIGN_FUNCTIONAL_MIN_BARGAIN_RATIO
+Redundancy minimum bargain ratio
+
+OPTIONS_DESIGN_FUNCTIONAL_MAX_TIME_RATIO
+Redundancy maximum time ratio
 
 OPTIONS_TOOLTIP_DELAY
 Tooltip delay (ms)
@@ -3669,7 +3706,7 @@ Create Full Config (Intermediate Feature)
 OPTIONS_CREATE_ALL_CONFIG_TOOLTIP_DESC
 '''Saves the current config settings in config.xml including all settings, even if not modified from their defaults.
 
-The existing options.xml is overwitten, but may be regenerated (with just non-default options) if another option is changed, including by repositioning some game windows or within the options window.'''
+The existing options.xml is overwritten, but may be regenerated (with just non-default options) if another option is changed, including by repositioning some game windows or within the options window.'''
 
 
 ##
@@ -4013,7 +4050,7 @@ Cancel Annexation (%1% IP)
 # %2% name of client empire
 # %3% species on planet opinion of client empire
 # %4% name of owner empire or "unowned"
-# %5% species opinion of onwer empire
+# %5% species opinion of owner empire
 # %6% stability of planet
 # %7% population of planet
 # %8% PP cost for client empire of buildings on planet
@@ -4278,7 +4315,7 @@ FW_FLEET_MOVING_TO
 Moving to %1%
 
 # %1% system name where this fleet is moving to.
-# %2% estiminated time in turns when the fleet will arrive.
+# %2% estimated time in turns when the fleet will arrive.
 FW_FLEET_MOVING_TO_ETA
 Moving to %1% (ETA %2%)
 
@@ -4687,7 +4724,7 @@ TECH_WND_UNRESEARCHED_PREREQUISITES
 TECH_WND_VIEW_TYPE
 Tree View / List View
 
-# %1% research points already spent on a reseach.
+# %1% research points already spent on a research.
 # %2% total research points required to complete the research.
 # %3% research points used per turn.
 # %4% research points available per turn.
@@ -4732,7 +4769,7 @@ POLICY_PREREQ_MISSING
 Policy Adoption Restricted by Prerequisite %1%
 
 POLICY_PREREQ_MET
-Policy Adtoption Allowed by Prerequisite %1%
+Policy Adoption Allowed by Prerequisite %1%
 
 POLICY_ADOPTABLE_COST
 Policy Adoptable for %1% IP
@@ -5017,7 +5054,7 @@ PRODUCTION_QUEUE_EMPIRE
 PRODUCTION_QUEUE_MULTIPLES
 '''%1%x '''
 
-# %1% number of repetions an item should be produced on after another.
+# %1% number of repetitions an item should be produced on after another.
 PRODUCTION_QUEUE_REPETITIONS
 %1%⟳
 
@@ -5726,6 +5763,25 @@ ADOPTED_POLICIES
 NO_POLICIES_ADOPTED
 No Policies Known Adopted
 
+# %1% name or link to policy
+# %2% turn start of current adoption, or "before first turn"
+# %3% total turns has been adopted
+POLICY_ADOPTED_ON_TURN_AND_TOTAL_TURNS
+%1%  since %2%  total turns: %3%
+
+FORMERLY_ADOPTED_POLICIES
+'''Formerly Adopted Policies: '''
+
+# %1% name or link to policy
+# %2% turn end of when policy was previously adopted
+# %3% total turns has been adopted
+POLICY_WAS_LAST_ADOPTED_ON_TURN_AND_TOTAL_TURNS
+%1%  last on %2%  total turns: %3%
+
+# %1% turn number
+POLICY_ADOPTED_TURN
+turn: %1%
+
 AVAILABLE_PARTS
 '''Available Parts: '''
 
@@ -5931,7 +5987,7 @@ ENC_AUTO_TIME_COST_VARIABLE_DETAIL_STR
 '''
 At location %1%, the cost and time are %2% %3% over %4% turns.'''
 
-# Displays a ship design inside the Pedia with the basic informations.
+# Displays a ship design inside the Pedia with the basic information.
 # %1% description.
 # %2% hull name.
 # %3% list of builtin parts.
@@ -6139,7 +6195,7 @@ ENC_COMBAT_STEALTH_DECLOAK_LAUNCH
 %2% detects %1% during fighter launch.
 
 # %1% unused
-# %2% name of empire detecting decloacking ship
+# %2% name of empire detecting decloaking ship
 ENC_COMBAT_STEALTH_DECLOAK_ATTACK_1_EVENTS
 %2% detects
 
@@ -6712,14 +6768,17 @@ An abstract value for the size of an object, group of objects, or area.
 METER_STEALTH_VALUE_LABEL
 Stealth
 
+# This is the entry point to the stealth descriptions
 METER_STEALTH_VALUE_DESC
 '''The term Stealth represents the ability of an object to dodge all kinds of sensors. Only empires with a [[encyclopedia DETECTION_TITLE]] higher than or equal to the Stealth value can see the object.
 
-If an empire owns more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] in a system, that empire will suffer a stealth penalty of [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of the number of excess ships.
-
 Space ships, buildings, specials, systems and planets have a Stealth meter.
 
-[[DETECTION_STAR_MODIFIERS]]'''
+Modifiers of planetary Stealth meter:
+[[PLANET_STEALTH_MODIFIERS]]
+
+Modifiers of space ship Stealth meter:
+[[SHIP_STEALTH_MODIFIERS]]'''
 
 METER_DETECTION_VALUE_LABEL
 Detection Range
@@ -6733,12 +6792,13 @@ Some content may allow vision outside of this range. This includes the species a
 
 [[DETECTION_STAR_MODIFIERS]]'''
 
+# Note: stealth decrease is also shown in SHIP_STEALTH_MODIFIERS
 DETECTION_STAR_MODIFIERS
 '''Detection Range and Ship Stealth are modified by the systems star type:
-• No Star: +10 Detection Range. -10 Ship Stealth.
-• Neutron Star: -15 Detection Range. +5 Ship Stealth.
-• Black Hole: +5 Detection Range. +10 Ship Stealth.
-• Red Star: -5 Ship Stealth.
+• No Star: +10 Detection Range. [[value SPY_DECEPTION_EMPTY_SPACE_PENALTY]] Ship Stealth.
+• Neutron Star: -15 Detection Range. [[value SPY_DECEPTION_NEUTRON_INTERFERENCE]] Ship Stealth.
+• Black Hole: +5 Detection Range. [[value SPY_DECEPTION_BLACK_INTERFERENCE]] Ship Stealth.
+• Red Star: [[value SPY_DECEPTION_DIM_STAR_PENALTY]] Ship Stealth.
 • Orange Star: No Modifiers.
 • Yellow Star: -5 Detection Range.
 • White Star: -10 Detection Range.
@@ -7440,6 +7500,12 @@ Planets
 FLEETS_SUBMENU
 Fleet / Ships
 
+POSITION_SUBMENU
+Position / System
+
+EMPIRE_SUPPLY_SUBMENU
+Empire / Supply
+
 PLANET_ENVIRONMENTS_SUBMENU
 Environment For Species
 
@@ -7514,6 +7580,18 @@ Dist. to Sel. System
 
 DISTANCE_TO_SELECTED_FLEET
 Dist. to Sel. Fleet
+
+SHORTEST_PATH_DISTANCE_TO_SELECTED_SYSTEM
+Shorest Path Dist. to Sel. System
+
+SHORTEST_PATH_DISTANCE_TO_SELECTED_FLEET
+Shorest Path Dist. to Sel. Fleet
+
+JUMPS_TO_SELECTED_SYSTEM
+Jumps to Sel. System
+
+JUMPS_TO_SELECTED_FLEET
+Jumps to Sel. Fleet
 
 PROPAGATED_SUPPLY_RANGE
 Propagated Supply Range
@@ -11474,8 +11552,123 @@ last invaded by empire
 DESC_VAR_LASTCOLONIZEDBYEMPIRE
 last colonized by empire
 
+DESC_VAR_NUMPARTCLASSESINSHIPDESIGN
+number of classes of parts in ship design with id %1%
+
+# returns a large number of not researched, or 0 if no such empire
+DESC_VAR_TURNTECHRESEARCHED
+turn on which empire %1% researched tech %2%
+
+DESC_VAR_BUILDINGTYPESOWNED
+number of buildings of type %2% owned by empire %1%
+
+DESC_VAR_BUILDINGTYPESPRODUCED
+number of buildings of type %2% produced by empire %1%
+
+DESC_VAR_BUILDINGTYPESSCRAPPED
+number of buildings of type %2% scrapped by empire %1%
+
+DESC_VAR_SPECIESCOLONIESOWNED
+number of planets with species %2% owned by empire %1%
+
+DESC_VAR_SPECIESPLANETSBOMBED
+number of planets with species %2% bombed by empire %1%
+
+DESC_VAR_SPECIESPLANETSDEPOPED
+number of planets depopulated of species %2% while owned by empire %1%
+
+DESC_VAR_SPECIESPLANETSINVADED
+number of planets with species %2% invaded by empire %1%
+
+DESC_VAR_SPECIESSHIPSDESTROYED
+number of ships crewed by species %2% destroyed by empire %1%
+
+DESC_VAR_SPECIESSHIPSLOST
+number of ships crewed by species %2% destroyed that were owned by empire %1%
+
+DESC_VAR_SPECIESSHIPSOWNED
+number of ships crewed by species %2% owned by empire %1%
+
+DESC_VAR_SPECIESSHIPSPRODUCED
+number of ships crewed by species %2% produced by empire %1%
+
+DESC_VAR_SPECIESSHIPSSCRAPPED
+number of ships crewed by species %2% scrapped by empire %1%
+
+DESC_VAR_SHIPPARTSOWNED
+number of %2% parts owned by empire %1%
+
+DESC_VAR_TURNSSINCEPOLICYADOPTED
+turns since empire %1% adopted the policy %2%
+
+DESC_VAR_CUMULATIVETURNSPOLICYADOPTED
+cumulative turns empire %1% has had policy %2% adopted
+
+DESC_VAR_LATESTTURNPOLICYADOPTED
+latest turn on which empire %1% had policy %2% adopted
+
+DESC_VAR_EMPIRESHIPSDESTROYED
+number of ships owned by empire %2% destroyed by empire %1%
+
+DESC_VAR_SHIPDESIGNSDESTROYED
+number of ships of design %2% destroyed by empire %1%
+
+DESC_VAR_SHIPDESIGNSLOST
+number of ships of design %2% destroyed while owned by empire %1%
+
+DESC_VAR_SHIPDESIGNSOWNED
+number of ships of design %2% owned by empire %1%
+
+DESC_VAR_SHIPDESIGNSINPRODUCTION
+number of ships of design %2% currently in production by empire %1%
+
+DESC_VAR_SHIPDESIGNSPRODUCED
+number of ships of design %2% produced by empire %1%
+
+DESC_VAR_SHIPDESIGNSSCRAPPED
+number of ships of design %2% scrapped by empire %1%
+
+DESC_VAR_TURNSYSTEMEXPLORED
+turn on which empire %1% explored system %2%
+
+DESC_VAR_OUTPOSTSOWNED
+number of outposts owned by empire %1%
+
+DESC_VAR_GAMERULE
+setting of game rule %1%
+
+DESC_VAR_PARTSINSHIPDESIGN
+number of parts in ship design %1%
+
+DESC_VAR_PARTOFCLASSINSHIPDESIGN
+number of parts of class %2% in ship design %1%
+
 DESC_VAR_JUMPSBETWEEN
-starlane jumps between systems containing objects with ids %1% and %2%
+number of starlane jumps on the least-jumps path between %1% and %2%
+
+DESC_VAR_JUMPSBETWEENBYEMPIRESUPPLYCONNECTIONS
+(unimplemented)
+
+DESC_VAR_SLOTSINHULL
+number of slots in hull %1%
+
+DESC_VAR_SLOTSINSHIPDESIGN
+number of slots in ship design %1%
+
+DESC_VAR_SPECIALADDEDONTURN
+turn on which special %2% was added to %1%
+
+DESC_VAR_TURNPOLICYADOPTED
+turns on which empire %1% adopted the policy %2%
+
+DESC_VAR_NUMPOLICIESADOPTED
+number of policies adopted by empire %1%
+
+DESC_VAR_PLANETTYPEDIFFERENCE
+distance between planet types %1% and %2%
+
+DESC_VAR_EMPIREOBJECTVISIBILITYTURN
+turn on which empire %1% had visibility of %2%
 
 DESC_VAR_STATISTIC
 Statistic
@@ -11827,35 +12020,49 @@ DESC_ENQUEUED
 # %1% name of the empire that enqueued items.
 # %2% textual description of the lower limit for the number of enqueued items.
 # %3% textual description of the upper limit for the number of enqueued items.
-# %4% textual description fo the items enqueued.
+# %4% textual description of the items enqueued.
 DESC_ENQUEUED_NOT
 ''' where empire %1% does not have between %2% and %3% things on the production queue'''
 
 # %1% name of the empire that enqueued buildings.
 # %2% textual description of the lower limit for the number of enqueued buildings.
 # %3% textual description of the upper limit for the number of enqueued buildings.
-# %4% textual description fo the buildings enqueued.
+# %4% textual description of the buildings enqueued.
 DESC_ENQUEUED_BUILDING
 ''' where empire %1% has between %2% and %3% %4% buildings on the production queue'''
 
 # %1% name of the empire that enqueued buildings.
 # %2% textual description of the lower limit for the number of enqueued buildings.
 # %3% textual description of the upper limit for the number of enqueued buildings.
-# %4% textual description fo the buildings enqueued.
+# %4% textual description of the buildings enqueued.
 DESC_ENQUEUED_BUILDING_NOT
 ''' where empire %1% does not have between %2% and %3% %4% buildings on the production queue'''
+
+# %1% name of the empire that enqueued buildings.
+# %2% textual description of the lower limit for the number of enqueued buildings.
+# %3% textual description of the upper limit for the number of enqueued buildings.
+# %5% textual description of the subtype of buildings enqueued.
+DESC_ENQUEUED_BUILDING_SUBTYPE
+''' where empire %1% has between %2% and %3% %5% buildings on the production queue'''
+
+# %1% name of the empire that enqueued buildings.
+# %2% textual description of the lower limit for the number of enqueued buildings.
+# %3% textual description of the upper limit for the number of enqueued buildings.
+# %5% textual description of the subtype of buildings enqueued.
+DESC_ENQUEUED_BUILDING_SUBTYPE_NOT
+''' where empire %1% does not have between %2% and %3% %5% buildings on the production queue'''
 
 # %1% name of the empire that enqueued ships.
 # %2% textual description of the lower limit for the number of enqueued ships.
 # %3% textual description of the upper limit for the number of enqueued ships.
-# %4% textual description fo the ships enqueued.
+# %4% textual description of the ships enqueued.
 DESC_ENQUEUED_DESIGN
 ''' where empire %1% has between %2% and %3% %4% ships on the production queue'''
 
 # %1% name of the empire that enqueued ships.
 # %2% textual description of the lower limit for the number of enqueued ships.
 # %3% textual description of the upper limit for the number of enqueued ships.
-# %4% textual description fo the ships enqueued.
+# %4% textual description of the ships enqueued.
 DESC_ENQUEUED_DESIGN_NOT
 ''' where empire %1% does not have between %2% and %3% %4% ships on the production queue'''
 
@@ -12602,7 +12809,19 @@ PLC_DESIGN_SIMPLICITY
 Design Simplicity
 
 PLC_DESIGN_SIMPLICITY_DESC
-Reduces production cost by 20% for ship designs with 6 or fewer parts.
+'''
+Reduces production cost up to [[value PLC_DESIGN_SIMPLICITY_MAX_REDUCTION_PERCENT]]% for ships based on the ship design complexity. Not so much for outpost and colony ships.
+
+The final cost is
+• [[value PLC_DESIGN_SIMPLICITY_COMPLEXITY_FACTOR_AAA]] times the normal cost if there are two or fewer different part classes.
+• [[value PLC_DESIGN_SIMPLICITY_COMPLEXITY_FACTOR_AA]] times the normal cost if there are three different part classes.
+• [[value PLC_DESIGN_SIMPLICITY_COMPLEXITY_FACTOR_A]] times the normal cost if there are four different part classes.
+• [[value PLC_DESIGN_SIMPLICITY_COMPLEXITY_FACTOR]] times the normal cost (i.e. full normal cost) if there are five or more different part classes.
+
+Design complexity is the sum of all different part classes in a ship. For example a ship design with [[shippart AR_ZORTRIUM_PLATE]], [[shippart SR_WEAPON_1_1]], and [[shippart SR_WEAPON_0_1]] has [[PC_DIRECT_WEAPON]] and [[PC_ARMOUR]] part classes resulting in design complexity 2.
+
+Notice that [[encyclopedia PC_COLONY]] colony part class has an increased complexity, it counts as [[value DESIGN_SIMPLICITY_SOURCE_COMPLEXITY_PC_COLONY]] part classes.
+'''
 
 PLC_DESIGN_SIMPLICITY_SHORT_DESC
 Reduces Cost of Simple Designs
@@ -13077,7 +13296,7 @@ PLC_FLANKING_DESC
 
 Also ships flying a pincer attack do that additional structural damage. A pincer attack happens when ships of the adopting empire are in flight arriving next turn in a system via different starlanes.
 
-• Weapon damage for ship weapons is increased by [[value PLC_FLANKING_DAMAGE_BOOST]] (i.e. for [[shippart SR_WEAPON_1_1]], [[shippart SR_WEAPON_2_1]], [[shippart SR_WEAPON_3_1]], or [[shippart SR_WEAPON_4_1]])
+• Weapon damage for ship weapons is increased by [[value PLC_FLANKING_DAMAGE_BOOST]] (i.e. for [[shippart SR_WEAPON_1_1]], [[shippart SR_WEAPON_2_1]], [[shippart SR_WEAPON_3_1]], [[shippart SR_WEAPON_4_1]], or [[shippart SR_ARC_CONCENTRATOR]])
 • Weapon damage for strikers, bombers and heavy bombers is increased by [[value PLC_FLANKING_FIGHTER_DAMAGE_BOOST]] (i.e. for [[shippart FT_HANGAR_2]], [[shippart FT_HANGAR_3]], or [[shippart FT_HANGAR_4]])
 • Number of interceptors launched per [[FT_BAY_1]] is increased by [[value PLC_FLANKING_BAY_LAUNCH_BONUS]] (see [[shippart FT_HANGAR_1]])
 • Number of shots for [[shippart SR_ARC_DISRUPTOR]] is increased by [[value PLC_FLANKING_ARC_DISRUPTOR_SHOT_BONUS]] '''
@@ -13090,7 +13309,7 @@ Charge
 
 PLC_CHARGE_DESC
 '''For armed ships with at least [[value PLC_CHARGE_MINIMUM_SPEED]] [[metertype METER_SPEED]]:
-• Weapon damage for ship weapons is increased by [[value PLC_CHARGE_DAMAGE_BOOST]] (i.e. for [[shippart SR_WEAPON_1_1]], [[shippart SR_WEAPON_2_1]], [[shippart SR_WEAPON_3_1]], or [[shippart SR_WEAPON_4_1]])
+• Weapon damage for ship weapons is increased by [[value PLC_CHARGE_DAMAGE_BOOST]] (i.e. for [[shippart SR_WEAPON_1_1]], [[shippart SR_WEAPON_2_1]], [[shippart SR_WEAPON_3_1]], [[shippart SR_WEAPON_4_1]]), or [[shippart SR_ARC_CONCENTRATOR]])
 • Number of fighters launched per [[FT_BAY_1]] is increased by [[value PLC_CHARGE_BAY_LAUNCH_BONUS]]
 • Number of shots for [[shippart SR_ARC_DISRUPTOR]] is increased by [[value PLC_CHARGE_ARC_DISRUPTOR_SHOT_BONUS]]
 • A charging [[shippart SR_FLUX_LANCE]] can attack ships starting one combat round earlier
@@ -13830,6 +14049,13 @@ SHP_TRANSSPACE_DRIVE_DESC
 
 Even when spatial dimensions are skewed by relativistic effects, an object generally has constant space-time characteristics. By creating a device which alters the characteristics of space-time itself using quasi-relativistic effects, it would be possible to create a fast, stealthy method of propulsion.'''
 
+SHP_TRANSSPACE_HULL
+Trans-Spatial Hull
+
+SHP_TRANSSPACE_HULL_DESC
+'''The [[shiphull SH_TRANSSPATIAL]] is a by-product of the effort to develop the [[tech SHP_TRANSSPACE_DRIVE]].
+When experimenting with bending space-time or other cutting edge technology, having a cheap expandable vessel ready to iterate on prototypes is a necessity.'''
+
 SHP_MIDCOMB_LOG
 Mid-Combat Logistics
 
@@ -14449,7 +14675,7 @@ SHP_FIGHTERS_1_DESC
 
 A [[encyclopedia PC_FIGHTER_BAY]] can launch a number of fighters in each combat round. These fighters will then be both valid targets and able to attack ships and other fighters in subsequent combat rounds, but a single hit from any source will destroy a fighter. Unlike [[encyclopedia DAMAGE_TITLE]] inflicted by regular weapons, fighter damage ignores [[metertype METER_SHIELD]] on warships (they fire from within the shields).
 
-Piloting traits affect [[FT_HANGAR_2]], [[FT_HANGAR_3]], and [[FT_HANGAR_4]] fighters in the same way: bad piloting reduces damage by 6 per fighter; good piloting increases damage by 6, great piloting by 12, and ultimate piloting by 18 per fighter shot.
+Piloting traits affect [[FT_HANGAR_2]], [[FT_HANGAR_3]], and [[FT_HANGAR_4]] fighters in the same way: bad piloting reduces damage by [[value BAD_PILOT_FIGHTER_DAMAGE_BONUS]] per fighter; good piloting increases damage by [[value GOOD_PILOT_FIGHTER_DAMAGE_BONUS]], great piloting by [[value GREAT_PILOT_FIGHTER_DAMAGE_BONUS]], and ultimate piloting by [[value ULTIMATE_PILOT_FIGHTER_DAMAGE_BONUS]] per fighter shot.
 Piloting traits do not affect [[FT_HANGAR_1]] fighters.
 
 At the end of combat, carriers will collect any fighters that have survived. If a carrier is in [[metertype METER_SUPPLY]] immediately after movement is resolved, it will refill hangars to maximum.'''
@@ -14458,19 +14684,19 @@ SHP_FIGHTERS_2
 Fighters and Launch Bays 2
 
 SHP_FIGHTERS_2_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by [[value SHP_FIGHTERS_2_FT_HANGAR_2_DAMAGE_BONUS]], [[shippart FT_HANGAR_3]] by [[value SHP_FIGHTERS_2_FT_HANGAR_3_DAMAGE_BONUS]], and [[shippart FT_HANGAR_4]] by [[value SHP_FIGHTERS_2_FT_HANGAR_4_DAMAGE_BONUS]]. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_3
 Fighters and Launch Bays 3
 
 SHP_FIGHTERS_3_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have plasma weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by [[value SHP_FIGHTERS_3_FT_HANGAR_2_DAMAGE_BONUS]], [[shippart FT_HANGAR_3]] by [[value SHP_FIGHTERS_3_FT_HANGAR_3_DAMAGE_BONUS]], and [[shippart FT_HANGAR_4]] by [[value SHP_FIGHTERS_3_FT_HANGAR_4_DAMAGE_BONUS]]. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_FIGHTERS_4
 Fighters and Launch Bays 4
 
 SHP_FIGHTERS_4_DESC
-Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have death ray weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by 12, [[shippart FT_HANGAR_3]] by 18, and [[shippart FT_HANGAR_4]] by 36. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
+Upgrades the fighters of all carriers within [[metertype METER_SUPPLY]] to have laser weaponry. [[encyclopedia DAMAGE_TITLE]] from fighters in a [[shippart FT_HANGAR_2]] is increased by [[value SHP_FIGHTERS_4_FT_HANGAR_2_DAMAGE_BONUS]], [[shippart FT_HANGAR_3]] by [[value SHP_FIGHTERS_4_FT_HANGAR_3_DAMAGE_BONUS]], and [[shippart FT_HANGAR_4]] by [[value SHP_FIGHTERS_4_FT_HANGAR_4_DAMAGE_BONUS]]. For [[shippart FT_HANGAR_1]] fighters the capacity is increased by 1 and the launch rate for the [[shippart FT_BAY_1]] is increased by 1.
 
 SHP_WEAPON_1_2
 Mass Driver 2
@@ -14574,19 +14800,25 @@ SHP_WEAPON_ARC_DISRUPTOR_1
 Arc Disruptors
 
 SHP_WEAPON_ARC_DISRUPTOR_1_DESC
-Unlocks the [[shippart SR_ARC_DISRUPTOR]], an automated weapon system doing low damage to multiple targets. The base weapon part has shot damage [[value SR_ARC_DISRUPTOR_PART_CAPACITY]].
+Unlocks the [[shippart SR_ARC_DISRUPTOR]] and the [[shippart SR_ARC_CONCENTRATOR]]. The disruptor is an automated weapon system doing low damage to multiple targets with shot damage [[value SR_ARC_DISRUPTOR_PART_CAPACITY]]. The concentrator is a more heavy and restricted variant with shot damage [[value SR_ARC_CONCENTRATOR_PART_CAPACITY]], designed to be more effective against shields.
 
 SHP_WEAPON_ARC_DISRUPTOR_2
 Arc Disruptor 2
 
 SHP_WEAPON_ARC_DISRUPTOR_2_DESC
-Upgrades [[shippart SR_ARC_DISRUPTOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part has shot damage of [[value SHP_WEAPON_ARC_DISRUPTOR_2_UPGRADED_DAMAGE]].
+Upgrades [[shippart SR_ARC_DISRUPTOR]] and [[shippart SR_ARC_CONCENTRATOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part has [[value SHP_WEAPON_ARC_DISRUPTOR_2_UPGRADE_DAMAGE]] extra shot damage, resulting in [[value SHP_WEAPON_ARC_DISRUPTOR_2_UPGRADED_DAMAGE]] and [[value SHP_WEAPON_ARC_DISRUPTOR_2_SR_CONCENTRATOR_UPGRADED_DAMAGE]].
 
 SHP_WEAPON_ARC_DISRUPTOR_3
 Arc Disruptor 3
 
 SHP_WEAPON_ARC_DISRUPTOR_3_DESC
-Upgrades [[shippart SR_ARC_DISRUPTOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part has shot damage of [[value SHP_WEAPON_ARC_DISRUPTOR_3_UPGRADED_DAMAGE]].
+Upgrades [[shippart SR_ARC_DISRUPTOR]] and [[shippart SR_ARC_CONCENTRATOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part has [[value SHP_WEAPON_ARC_DISRUPTOR_3_UPGRADE_DAMAGE]] extra shot damage, resulting in [[value SHP_WEAPON_ARC_DISRUPTOR_3_UPGRADED_DAMAGE]] and [[value SHP_WEAPON_ARC_DISRUPTOR_3_SR_CONCENTRATOR_UPGRADED_DAMAGE]].
+
+SHP_WEAPON_ARC_DISRUPTOR_4
+Arc Disruptor 4
+
+SHP_WEAPON_ARC_DISRUPTOR_4_DESC
+Upgrades [[shippart SR_ARC_DISRUPTOR]] and [[shippart SR_ARC_CONCENTRATOR]] parts on all ships within [[metertype METER_SUPPLY]] (or after entering it later). The improved weapon part gets [[value SHP_WEAPON_ARC_DISRUPTOR_4_UPGRADE_SHOTS]] extra shots.
 
 SHP_ION_CANNON
 Ion Cannon
@@ -15016,30 +15248,77 @@ SPY_PLANET_STEALTH_MOD
 Stealth Modifiers
 
 SPY_PLANET_STEALTH_MOD_DESC
-'''Modifiers affect stealth:
+'''Modifiers affect planetary [[metertype METER_STEALTH]]:
 
-• [[BASIC_PLANET_STEALTH]] gives [[value PLANET_BASIC_STEALTH]] [[metertype METER_STEALTH]] to all planets.
+[[PLANET_STEALTH_MODIFIERS]]
 
+Stealth received by other types of objects are listed in [[metertype METER_STEALTH]].'''
+
+PLANET_STEALTH_MODIFIERS
+'''• [[BASIC_PLANET_STEALTH]] gives [[value PLANET_BASIC_STEALTH]] [[metertype METER_STEALTH]] to all planets.
 • Colonies may have an extra malus or bonus to [[metertype METER_STEALTH]] based on the colony's species.
+• Planetary stealth specials increase [[metertype METER_STEALTH]] of the planet. The main source for these specials is the research of planetary stealth technologies.'''
 
-• Due to [[FLEET_UNSTEALTHINESS]], when there are more than [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] ships of the same empire in a system, their [[metertype METER_STEALTH]] is reduced by [[value FLEET_UNSTEALTH_SHIPS_SCALING]] multiplied by the square root of [[value FLEET_UNSTEALTHY_SHIPS_THRESHOLD]] less than the number of ships that empire has in the system.
-
+# Note: ship stealth decrease by stars is also shown in DETECTION_STAR_MODIFIERS
+SHIP_STEALTH_MODIFIERS
+'''
+• Larger fleets are easier to detect. Empire's ships will suffer a malus to [[metertype METER_STEALTH]] based on the number of ships in the same system or on the same starlane. See [[encyclopedia FLEET_UNSTEALTHINESS_TITLE]].
+• Stealth ship parts add a bonus to ship [[metertype METER_STEALTH]].
 • Ships in systems with [[STAR_NONE]] receive a [[value SPY_DECEPTION_EMPTY_SPACE_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECEPTION_EMPTY_SPACE_PENALTY]].
-
 • Ships in systems with a [[STAR_RED]] star receive a [[value SPY_DECEPTION_DIM_STAR_PENALTY]] penalty to [[metertype METER_STEALTH]] due to being [[SPY_DECEPTION_DIM_STAR_PENALTY]].
-
 • Ships in systems with a [[STAR_NEUTRON]] star receive a [[value SPY_DECEPTION_NEUTRON_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECEPTION_SUBSTELLAR_INTERFERENCE]].
-
-• Ships in systems with a [[STAR_BLACK]] star receive a [[value SPY_DECEPTION_BLACK_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECEPTION_SUBSTELLAR_INTERFERENCE]].'''
+• Ships in systems with a [[STAR_BLACK]] star receive a [[value SPY_DECEPTION_BLACK_INTERFERENCE]] bonus to [[metertype METER_STEALTH]] due to [[SPY_DECEPTION_SUBSTELLAR_INTERFERENCE]].
+• Ships inside fields like [[fieldtype FLD_ION_STORM]] or [[fieldtype FLD_NEBULA_1]] have increased [[metertype METER_STEALTH]].
+• There are also buildings and policies which reduce [[metertype METER_STEALTH]]'''
 
 BASIC_PLANET_STEALTH
 Universal Basic Stealth
 
-FLEET_UNSTEALTHINESS
-Fleet Unstealthiness
+FLEET_UNSTEALTHINESS_INSYSTEM_LABEL
+Fleet Unstealthiness (In System)
 
+FLEET_UNSTEALTHINESS_ON_STARLANE_LABEL
+Fleet Unstealthiness (Starlane)
+
+FLEET_UNSTEALTHINESS_TITLE
+Fleet Unstealthiness (Game Concept)
+
+FLEET_UNSTEALTHINESS_TEXT
+'''Empire's ships will suffer a malus to [[metertype METER_STEALTH]] based on the number of those ships in the same system or on the same starlane. This effect is called fleet unstealthiness.
+
+
+Fleet unstealthiness decreases a ship's stealth meter by an amount equal to a count of ships:
+
+• Only ships of the ship's empire are counted. Other empires' ships are ignored, including allied empires' ships, do not contribute.
+
+• This gets counted for each starlane and each system separately. For each system all own ships in all fleets in that system are considered. For each starlane all own fleets on that starlane are considered, ignoring the direction of travel.
+Fleet unstealthiness is applied and calculated separately for each starlane and each system. For each system, all ships with the same owner are counted. For each starlane, all ships with the same owner are counted, regardless of direction of travel or location on the starlane.
+
+• Only ships which have lower or equal stealth are counted for the malus. This is for gameplay reasons: without this restriction an observer would know the count of invisible ships. With this restriction one can hide higher stealth ships in a mixed fleet completely.
+
+• In case a ship after applying the fleet unstealthiness ends up with lower stealth than a ship which had lower stealth before applying the fleet unstealthiness, the ships' stealth is reduced to the lower stealth value. This is for consistency reasons: it would be confusing that a ship with lower stealth ends up with higher stealth.
+
+• The current ship also does count. A solitary ship in a system has a fleet unstealthiness value of -1 [[metertype METER_STEALTH]].
+
+Ships with lower stealth meter value can be detected more easily, see [[encyclopedia DETECTION_TITLE]].
+'''
+
+# Note: currently unused
 FLEET_UNSTEALTHY_SHIPS_THRESHOLD
 Number of ships in a system owned by the same empire, above which ships receive a stealth penalty
+
+# specials used for FLEET_UNSTEALTHINESS implementation
+LOWER_STEALTH_COUNT_SPECIAL
+Pre-Unstealthiness Lower Stealth Ship Count
+
+LOWER_STEALTH_COUNT_SPECIAL_DESC
+Count of own ships at the same location before applying fleet unstealthiness effect. Used in implementation of [[encyclopedia FLEET_UNSTEALTHINESS_TITLE]].
+
+BASE_STEALTH_SPECIAL
+Pre-Unstealthiness Stealth
+
+BASE_STEALTH_SPECIAL_DESC
+Stealth meter before applying fleet unstealthiness effect. Used in implementation of [[encyclopedia FLEET_UNSTEALTHINESS_TITLE]].
 
 
 ##
@@ -15068,6 +15347,12 @@ Additional experience and facilities improvements further extend the size of ind
 ##
 ## Buildings
 ##
+
+BLD_SUBTYPE_COLONY
+Colony
+
+BLD_SUBTYPE_SHIPYARD
+Shipyard
 
 BLD_EVACUATION
 Evacuate Planet
@@ -15197,7 +15482,7 @@ BLD_SHIPYARD_CON_ADV_ENGINE
 Advanced Engineering Bay
 
 BLD_SHIPYARD_CON_ADV_ENGINE_DESC
-'''This is an upgrade to the [[buildingtype BLD_SHIPYARD_ORBITAL_DRYDOCK]] and allows construction of [[shiphull SH_TRANSSPATIAL]] and [[shippart FU_TRANSPATIAL_DRIVE]], and with other buildings the [[shiphull SH_LOGISTICS_FACILITATOR]].
+'''This is an upgrade to the [[buildingtype BLD_SHIPYARD_ORBITAL_DRYDOCK]] and allows construction of [[shippart FU_TRANSPATIAL_DRIVE]] and with other buildings the [[shiphull SH_LOGISTICS_FACILITATOR]].
 
 An extremely well-developed engineering facility which specializes in the production of the Trans-Spatial Drive.'''
 
@@ -15265,7 +15550,7 @@ BLD_BIOTERROR_PROJECTOR
 Bioterror Projection Base
 
 BLD_BIOTERROR_PROJECTOR_DESC
-'''Gives the planet on which it is built the Bioterror focus, which decreases [[metertype METER_POPULATION]] on enemy planets within 4 starlane jumps at a rate of 2 per turn, provided the enemy empire does not contain a Genome Bank.
+'''Gives the planet on which it is built the Bioterror focus, which decreases [[metertype METER_POPULATION]] on enemy planets within 4 starlane jumps at a rate of 2 per turn, provided the enemy empire does not contain a [[buildingtype BLD_GENOME_BANK]].
 
 This clandestine biological warfare base wreaks havoc on enemy planets in the vicinity. Such activities are not endorsed by the public however, and this facility can only be built on a planet with a resonant moon. Ineffective if there is a [[buildingtype BLD_GENOME_BANK]] building in the enemy empire. [[BUILDING_AVAILABLE_ON_OUTPOSTS]], provided it has a [[special RESONANT_MOON_SPECIAL]].'''
 
@@ -15311,7 +15596,7 @@ The research bonus requires a stability of [[value BLD_INTERSPECIES_ACADEMY_MIN_
 
 Learning to design devices for use by different species is crucial for developing universally usable tools.
 
-Each empire may contain an academy on up to six planets with different species. To build an academy, a planet must have a stability of [[value BLD_INTERSPECIES_ACADEMY_MIN_STABILITY_BUILD]], and must be more than three starlane jumps away from the nearest existing academy.'''
+Each empire may contain an academy on up to seven planets with different species. To build an academy, a planet must have a stability of [[value BLD_INTERSPECIES_ACADEMY_MIN_STABILITY_BUILD]], and must be more than three starlane jumps away from the nearest existing academy.'''
 
 BLD_STOCKPILING_CENTER
 Imperial Entanglement Center
@@ -15341,7 +15626,7 @@ BLD_GENOME_BANK
 Genome Bank
 
 BLD_GENOME_BANK_DESC
-'''Provides the empire with immunity from bioterror.
+'''Provides the empire with immunity from [[buildingtype BLD_BIOTERROR_PROJECTOR]].
 
 The largest database ever conceived. The Genome Bank includes maps of the genomes of every organism known to the empire. This database is invaluable in the treatment of disease.'''
 
@@ -15404,7 +15689,8 @@ BLD_FIELD_REPELLOR
 Field Repellor
 
 BLD_FIELD_REPELLOR_DESC
-Pushes mobile fields (those not in systems) away from its location.
+'''Pushes mobile fields (those not in systems) away from its location.
+Can only be built once per empire.'''
 
 BLD_HYPER_DAM
 Hyperspatial Dam
@@ -15516,6 +15802,12 @@ Nest Eradicator
 
 BLD_NEST_ERADICATOR_DESC
 Eradicates a [[encyclopedia KRAKEN_NEST_SPECIAL]], [[encyclopedia SNOWFLAKE_NEST_SPECIAL]], or [[encyclopedia JUGGERNAUT_NEST_SPECIAL]] from the planet it is built on. [[BUILDING_AVAILABLE_ON_OUTPOSTS]].
+
+BLD_NEST_RESERVE
+Mega-Fauna Sanctuary
+
+BLD_NEST_RESERVE_DESC
+A place to keep most native space-faring specimen from wandering off planet. Specimen from [[encyclopedia KRAKEN_NEST_SPECIAL]], [[encyclopedia SNOWFLAKE_NEST_SPECIAL]], or [[encyclopedia JUGGERNAUT_NEST_SPECIAL]] on the planet will hatch into space less often (x[[value BLD_NEST_RESERVE_WILD_SPAWN_FACTOR]]). [[BUILDING_AVAILABLE_ON_OUTPOSTS]].
 
 BLD_NEUTRONIUM_EXTRACTOR
 Neutronium Extractor
@@ -15665,13 +15957,15 @@ Starlane Bore
 
 BLD_STARLANE_BORE_DESC
 '''Generates a single new starlane to the nearest system that can be connected without crossing existing starlanes or passing too close to another system.
-New lanes may not pass closer than 20 uu to another system and may not meet existing star lanes at less than 30 degrees.'''
+New lanes may not pass closer than 20 uu to another system and may not meet existing star lanes at less than 30 degrees.
+[[BUILDING_AVAILABLE_ON_OUTPOSTS]].'''
 
 BLD_STARLANE_NEXUS
 Starlane Nexus
 
 BLD_STARLANE_NEXUS_DESC
-Generates new starlanes to other star systems. Works like a [[buildingtype BLD_STARLANE_BORE]], except that it keeps creating lanes until no new one can be added anymore.
+'''Generates new starlanes to other star systems. Works like a [[buildingtype BLD_STARLANE_BORE]], except that it keeps creating lanes until no new one can be added anymore.
+[[BUILDING_AVAILABLE_ON_OUTPOSTS]].'''
 
 BLD_XENORESURRECTION_LAB
 Xenoresurrection Lab
@@ -16090,6 +16384,18 @@ Charged polaron capacitors generate a molecular disruption flux wave that arcs t
 Upgrading the weapon technology will increase the shot damage.
 
 The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Piloting trait does not affect damage. The Arc Disruptor has [[value SR_ARC_DISRUPTOR_PART_CAPACITY]] basic shot damage. Upgrade tech [[tech SHP_WEAPON_ARC_DISRUPTOR_2]] increases this by [[value SHP_WEAPON_ARC_DISRUPTOR_2_UPGRADE_DAMAGE]].'''
+
+SR_ARC_CONCENTRATOR
+Arc Concentrator
+
+SR_ARC_CONCENTRATOR_DESC
+'''The Arc Concentrator, a heavy close combat range multi-shot ship weapon similar to [[shippart SR_ARC_DISRUPTOR]] but more effective against shielded targets. Installs in a core slot.
+
+The weapon concentrates molecular disruption flux waves. The concentrated wave can only unleashed at close range. The wave dissolves faster than unconcentrated waves but inflicts much stronger structural damage.
+
+Upgrading the arc disruptor weapon technology will increase the shot damage.
+
+The weapon's [[encyclopedia DAMAGE_TITLE]] is a combination of the shot damage and any active modifiers. Piloting trait does not affect damage. The Arc Concentrator has [[value SR_ARC_CONCENTRATOR_PART_CAPACITY]] basic shot damage. Upgrade tech [[tech SHP_WEAPON_ARC_DISRUPTOR_2]] increases this by [[value SHP_WEAPON_ARC_DISRUPTOR_2_UPGRADE_DAMAGE]].'''
 
 SR_SPINAL_ANTIMATTER
 Spinal Antimatter Cannon
@@ -16748,11 +17054,11 @@ SH_TRANSSPATIAL
 Trans-Spatial Hull
 
 SH_TRANSSPATIAL_DESC
-'''This experimental hull is primarily for testing new technologies; it has one external slot and one core slot, and its max [[metertype METER_STRUCTURE]] is extremely low. It was designed alongside the [[shippart FU_TRANSPATIAL_DRIVE]] and if equipped with that can make a very effective infiltrating scout.
+'''This cheap experimental hull is primarily for testing new technologies; it has one external slot and one core slot, and its max [[metertype METER_STRUCTURE]] is extremely low. It was designed to facilitate the development of the [[shippart FU_TRANSPATIAL_DRIVE]] and if equipped with that can make a very effective infiltrating scout.
 
-[[metertype METER_STEALTH]] is high, [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is average.
+[[metertype METER_STEALTH]] is high, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is average.
 
-Can only be built at a location with a [[buildingtype BLD_SHIPYARD_BASE]], an [[buildingtype BLD_SHIPYARD_ORBITAL_DRYDOCK]], and an [[buildingtype BLD_SHIPYARD_CON_ADV_ENGINE]].'''
+Can only be built at a location with a [[buildingtype BLD_SHIPYARD_BASE]] and an [[buildingtype BLD_SHIPYARD_ORBITAL_DRYDOCK]].'''
 
 SH_LOGISTICS_FACILITATOR
 Logistics Facilitator
@@ -16859,7 +17165,7 @@ Organic Hull
 
 SH_ORGANIC_DESC
 '''A living hull with one external slot and one internal slot.
-Organic Growth: starts with 24 [[metertype METER_STRUCTURE]], but grows an additional 24 structure over 25 turns.
+Organic Growth: starts with [[value SH_ORGANIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_ORGANIC_GROWTH_STRUCTURE]] structure over [[value SH_ORGANIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is medium and [[metertype METER_SPEED]] is high.
 
@@ -16886,7 +17192,7 @@ Endomorphic Hull
 
 SH_ENDOMORPHIC_DESC
 '''A half living hull with four external slots and two internal slots.
-Organic Growth: starts with 40 [[metertype METER_STRUCTURE]], but grows an additional 120 structure over 30 turns.
+Organic Growth: starts with [[value SH_ENDOMORPHIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_ENDOMORPHIC_GROWTH_STRUCTURE]] structure over [[value SH_ENDOMORPHIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is high.
 
@@ -16901,7 +17207,7 @@ Symbiotic Hull
 
 SH_SYMBIOTIC_DESC
 '''A living hull with two internal and two external slots. Exists in a symbiotic relationship with its crew, increasing its [[metertype METER_STEALTH]] and speed.
-Organic Growth: starts with 80 [[metertype METER_STRUCTURE]], but grows an additional 80 structure over 50 turns.
+Organic Growth: starts with [[value SH_SYMBIOTIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_SYMBIOTIC_GROWTH_STRUCTURE]] structure over [[value SH_SYMBIOTIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is high, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is high.
 
@@ -16916,7 +17222,7 @@ Protoplasmic Hull
 
 SH_PROTOPLASMIC_DESC
 '''A living hull with three internal slots and two external slots.
-Organic Growth: starts with 40 [[metertype METER_STRUCTURE]], gains an additional 200 over 50 turns.
+Organic Growth: starts with [[value SH_PROTOPLASMIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_PROTOPLASMIC_GROWTH_STRUCTURE]] structure over [[value SH_PROTOPLASMIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is very high, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is high.
 
@@ -16931,7 +17237,7 @@ SH_ENDOSYMBIOTIC_DESC
 '''This living mono-cellular hull exists in a symbiotic relationship with its crew, suspending them in its cytoplasm and using them as organelles.
 It has four external slots and three internal slots.
 
-The base hull is born with 40 [[metertype METER_STRUCTURE]], but grows an additional 120 structure over 30 turns.
+Organic Growth: Is born with [[value SH_ENDOSYMBIOTIC_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_ENDOSYMBIOTIC_GROWTH_STRUCTURE]] structure over [[value SH_ENDOSYMBIOTIC_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is high, [[metertype METER_DETECTION]] is high and [[metertype METER_SPEED]] is high.
 
@@ -16948,7 +17254,7 @@ Ravenous Hull
 SH_RAVENOUS_DESC
 '''This non-living organic hull - or 'zombie' hull - has been built from the blood and parts of its brethren. It has five external slots and two internal slots.
 
-Organic Growth: starts with 40 [[metertype METER_STRUCTURE]], grows an additional 160 structure over 40 turns.
+Organic Growth: starts with [[value SH_RAVENOUS_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_RAVENOUS_GROWTH_STRUCTURE]] structure over [[value SH_RAVENOUS_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is medium, [[metertype METER_DETECTION]] is very high and [[metertype METER_SPEED]] is high.
 
@@ -16964,7 +17270,7 @@ Bio-Adaptive Hull
 
 SH_BIOADAPTIVE_DESC
 '''A living hull with mind and body in unison, master of healing and endurance. It has three external slots and three internal slots.
-Organic Growth: starts with 120 [[metertype METER_STRUCTURE]], grows an additional 200 structure over 50 turns.
+Organic Growth: starts with [[value SH_BIOADAPTIVE_STRUCTURE]] [[metertype METER_STRUCTURE]], grows an additional [[value SH_BIOADAPTIVE_GROWTH_STRUCTURE]] structure over [[value SH_BIOADAPTIVE_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is very high, [[metertype METER_DETECTION]] is very high and [[metertype METER_SPEED]] is high.
 
@@ -16980,7 +17286,7 @@ Sentient Hull
 
 SH_SENTIENT_DESC
 '''This self-aware organic flagship with powerful analytical abilities and a tremendous memory capacity, which allow it to direct friendly vessels and provide them with useful information and subtle tactical cues in combat, giving a [[metertype METER_STEALTH]] and [[metertype METER_DETECTION]] bonus to all accompanying friendly ships. It has six external slots, three internal slots, and a core slot.
-Organic Growth: Starts with 96 [[metertype METER_STRUCTURE]], grows an additional 360 over 45 turns.
+Organic Growth: starts with [[value SH_SENTIENT_STRUCTURE]] [[metertype METER_STRUCTURE]], but grows an additional [[value SH_SENTIENT_GROWTH_STRUCTURE]] structure over [[value SH_SENTIENT_GROWTH_TURNS]] turns.
 
 [[metertype METER_STEALTH]] is very high, [[metertype METER_DETECTION]] is very high and [[metertype METER_SPEED]] is high.
 

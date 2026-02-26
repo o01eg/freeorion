@@ -14,11 +14,14 @@
 #include "EffectPythonParser.h"
 #include "EnumPythonParser.h"
 #include "SourcePythonParser.h"
+#include "ConditionsPythonModuleParser.h"
+#include "EffectsPythonModuleParser.h"
+#include "ValueRefsPythonModuleParser.h"
+#include "NamedValueRefPythonParser.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/core/noncopyable.hpp>
 #include <boost/core/ref.hpp>
-#include <boost/filesystem/operations.hpp>
 #include <boost/mpl/vector.hpp>
 #include <boost/python/class.hpp>
 #include <boost/python/import.hpp>
@@ -27,6 +30,8 @@
 #include <boost/python/raw_function.hpp>
 #include <boost/python/stl_iterator.hpp>
 #include <boost/operators.hpp>
+
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -39,6 +44,36 @@ namespace {
 
     void translate(import_error const& e) {
         PyErr_SetString(PyExc_ImportError, e.what());
+    }
+
+    constexpr bool STATIC_FALSE = false;
+
+    template<typename T>
+    void compile_eval(const char* content, const std::basic_string<T>& filename, const py::object& globals) {
+        TraceLogger() << "Trying to convert path to bytes...";
+        PyObject* filename_str;
+        if constexpr (std::is_same_v<T, wchar_t>) {
+            filename_str = PyUnicode_FromWideChar(filename.c_str(), filename.size());
+        } else {
+            filename_str = PyUnicode_FromStringAndSize(filename.c_str(), filename.size());
+        }
+        if (!filename_str) {
+            ErrorLogger() << "Failed to convert path to str";
+            py::throw_error_already_set();
+        }
+        py::object o_filename_str{py::handle<>(filename_str)};
+        PyObject* code = Py_CompileStringObject(content, o_filename_str.ptr(), Py_file_input, nullptr, 2);
+        if (!code) {
+            ErrorLogger() << "Failed to compile";
+            py::throw_error_already_set();
+        }
+        py::object o_code{py::handle<>(code)};
+        PyObject* result = PyEval_EvalCode(o_code.ptr(), globals.ptr(), globals.ptr());
+        if (!result) {
+            ErrorLogger() << "Failed to eval";
+            py::throw_error_already_set();
+        }
+        py::object o_result{py::handle<>(result)};
     }
 }
 
@@ -56,7 +91,7 @@ struct module_spec {
     const PythonParser& parser;
 };
 
-PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path& scripting_dir) :
+PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& scripting_dir) :
     m_python(_python),
     m_scripting_dir(scripting_dir)
 {
@@ -73,11 +108,17 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         throw std::runtime_error("Python sub-interpreter isn't initialized");
     }
 
+    if (!m_python.InitErrorHandler()) {
+        ErrorLogger() << "Python error handler isn't initialized!";
+        throw std::runtime_error("Python error handler isn't initialized!");
+    }
+
     try {
         type_int = py::import("builtins").attr("int");
         type_float = py::import("builtins").attr("float");
         type_bool = py::import("builtins").attr("bool");
         type_str = py::import("builtins").attr("str");
+        py::import("builtins").attr("parser_context") = true;
 
         py::register_exception_translator<import_error>(&translate);
 
@@ -91,21 +132,25 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def_readonly("_uninitialized_submodules", &module_spec::uninitialized_submodules)
             .add_static_property("loader", py::make_getter(*this, py::return_value_policy<py::reference_existing_object>()))
             .def_readonly("submodule_search_locations", &module_spec::path)
-            .def_readonly("has_location", false)
-            .def_readonly("cached", false)
+            .def_readonly("has_location", STATIC_FALSE)
+            .def_readonly("cached", STATIC_FALSE)
             .def_readonly("parent", &module_spec::parent);
 
         // Use wrappers to not collide with types in server and AI
         py::class_<value_ref_wrapper<int>>("ValueRefInt", py::no_init)
             .def(int() * py::self_ns::self)
+            .def(py::self_ns::self * py::self_ns::self)
             .def(double() * py::self_ns::self)
+            .def(py::self_ns::self / int())
             .def(py::self_ns::self - int())
             .def(int() - py::self_ns::self)
             .def(py::self_ns::self + py::self_ns::self)
             .def(py::self_ns::self + int())
+            .def(int() + py::self_ns::self)
             .def(double() + py::self_ns::self)
             .def(py::self_ns::self < py::self_ns::self)
             .def(py::self_ns::self < int())
+            .def(py::self_ns::self <= int())
             .def(py::self_ns::self > int())
             .def(py::self_ns::self >= int())
             .def(py::self_ns::self >= py::self_ns::self)
@@ -113,7 +158,9 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(double() - py::self_ns::self)
             .def(py::self_ns::self == int())
             .def(py::self_ns::self != int())
+            .def(py::self_ns::self & py::self_ns::self)
             .def(py::self_ns::self | py::self_ns::self)
+            .def(~py::self_ns::self)
             .def(py::self_ns::pow(py::self_ns::self, double()));
         py::class_<value_ref_wrapper<double>>("ValueRefDouble", py::no_init)
             .def("__call__", &value_ref_wrapper<double>::call)
@@ -125,11 +172,14 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(double() * py::self_ns::self)
             .def(py::self_ns::self / py::self_ns::self)
             .def(py::self_ns::self / int())
+            .def(int() / py::self_ns::self)
             .def(py::self_ns::self / double())
             .def(py::self_ns::self + int())
             .def(py::self_ns::self + double())
+            .def(double() + py::self_ns::self)
             .def(py::self_ns::self + py::self_ns::self)
             .def(py::self_ns::self + py::other<value_ref_wrapper<int>>())
+            .def(py::other<value_ref_wrapper<int>>() + py::self_ns::self)
             .def(py::self_ns::self - double())
             .def(py::self_ns::self - py::self_ns::self)
             .def(py::self_ns::self - py::other<value_ref_wrapper<int>>())
@@ -139,6 +189,8 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(double() <= py::self_ns::self)
             .def(py::self_ns::self <= double())
             .def(py::self_ns::self <= py::self_ns::self)
+            .def(py::other<value_ref_wrapper<int>>() <= py::self_ns::self)
+            .def(py::other<value_ref_wrapper<int>>() >= py::self_ns::self)
             .def(py::self_ns::self >= int())
             .def(py::self_ns::self > py::self_ns::self)
             .def(py::self_ns::self >= py::self_ns::self)
@@ -149,14 +201,23 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def(py::self_ns::pow(py::self_ns::self, double()))
             .def(py::self_ns::pow(double(), py::self_ns::self))
             .def(py::self_ns::pow(py::self_ns::self, py::self_ns::self))
-            .def(py::self_ns::self & py::self_ns::self);
+            .def(py::self_ns::self & py::self_ns::self)
+            .def(py::self_ns::self | py::self_ns::self)
+            .def(~py::self_ns::self)
+            .def(-py::self_ns::self);
         py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init)
             .def(py::self_ns::self + std::string())
             .def(std::string() + py::self_ns::self);
         py::class_<value_ref_wrapper<Visibility>>("ValueRefVisibility", py::no_init);
+        py::class_<value_ref_wrapper<PlanetType>>("ValueRefPlanetType", py::no_init)
+            .def(py::self_ns::self != py::self_ns::self);
+        py::class_<value_ref_wrapper< ::PlanetEnvironment>>("ValueRefPlanetEnvironment", py::no_init);
+        py::class_<value_ref_wrapper<PlanetSize>>("ValueRefPlanetSize", py::no_init)
+            .def(py::self_ns::self != py::self_ns::self);
         py::class_<condition_wrapper>("Condition", py::no_init)
             .def(py::self_ns::self & py::self_ns::self)
             .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
+            .def(py::other<value_ref_wrapper<double>>() & py::self_ns::self)
             .def(py::self_ns::self & py::other<value_ref_wrapper<int>>())
             .def(py::other<value_ref_wrapper<int>>() & py::self_ns::self)
             .def(py::self_ns::self | py::self_ns::self)
@@ -175,6 +236,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
             .def("__hash__", py::make_function(std::hash<enum_wrapper<PlanetType>>{},
                 py::default_call_policies(),
                 boost::mpl::vector<std::size_t, const enum_wrapper<PlanetType>&>()));
+        py::class_<enum_wrapper<ShipPartClass>>("__ShipPartClass", py::no_init);
         py::class_<enum_wrapper< ::StarType>>("__StarType", py::no_init);
         py::class_<enum_wrapper<ValueRef::StatisticType>>("__StatisticType", py::no_init);
         py::class_<enum_wrapper<Condition::ContentType>>("__LocationContentType", py::no_init);
@@ -226,7 +288,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
                                           "LastColonizedByEmpire"})
         {
             py_variable_wrapper.add_property(property.data(), py::make_function(
-                [property] (const variable_wrapper& w) { return w.get_int_property(std::string{property}); },
+                [property] (const variable_wrapper& w) { return w.get_property<int>(std::string{property}); },
                 py::default_call_policies(),
                 boost::mpl::vector<value_ref_wrapper<int>, const variable_wrapper&>()));
         }
@@ -272,7 +334,7 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
                                           "PropagatedSupplyRange"})
         {
             py_variable_wrapper.add_property(property.data(), py::make_function(
-                [property](const variable_wrapper& w) { return w.get_double_property(std::string{property}); },
+                [property](const variable_wrapper& w) { return w.get_property<double>(std::string{property}); },
                 py::default_call_policies(),
                 boost::mpl::vector<value_ref_wrapper<double>, const variable_wrapper&>()));
         }
@@ -286,9 +348,40 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
                                           "Hull"})
         {
             py_variable_wrapper.add_property(property.data(), py::make_function(
-                [property](const variable_wrapper& w) { return w.get_string_property(std::string{property}); },
+                [property](const variable_wrapper& w) { return w.get_property<std::string>(std::string{property}); },
                 py::default_call_policies(),
                 boost::mpl::vector<value_ref_wrapper<std::string>, const variable_wrapper&>()));
+        }
+
+        for (std::string_view property : {"PlanetType",
+                                          "OriginalType",
+                                          "NextCloserToOriginalPlanetType",
+                                          "NextBestPlanetType",
+                                          "NextBetterPlanetType",
+                                          "ClockwiseNextPlanetType",
+                                          "CounterClockwiseNextPlanetType"})
+        {
+            py_variable_wrapper.add_property(property.data(), py::make_function(
+                [property](const variable_wrapper& w) { return w.get_property<PlanetType>(std::string{property}); },
+                py::default_call_policies(),
+                boost::mpl::vector<value_ref_wrapper<PlanetType>, const variable_wrapper&>()));
+        }
+
+        for (std::string_view property : {"PlanetEnvironment"}) {
+            py_variable_wrapper.add_property(property.data(), py::make_function(
+                [property](const variable_wrapper& w) { return w.get_property< ::PlanetEnvironment>(std::string{property}); },
+                py::default_call_policies(),
+                boost::mpl::vector<value_ref_wrapper< ::PlanetEnvironment>, const variable_wrapper&>()));
+        }
+
+        for (std::string_view property : {"planetsize",
+                                          "NextLargerPlanetSize",
+                                          "NextSmallerPlanetSize"})
+        {
+            py_variable_wrapper.add_property(property.data(), py::make_function(
+                [property](const variable_wrapper& w) { return w.get_property<PlanetSize>(std::string{property}); },
+                py::default_call_policies(),
+                boost::mpl::vector<value_ref_wrapper<PlanetSize>, const variable_wrapper&>()));
         }
 
         for (std::string_view container : {"Planet",
@@ -305,14 +398,8 @@ PythonParser::PythonParser(PythonCommon& _python, const boost::filesystem::path&
         py::implicitly_convertible<value_ref_wrapper<int>, condition_wrapper>();
 
         m_meta_path = py::extract<py::list>(py::import("sys").attr("meta_path"))();
-        const auto meta_path_len = py::len(*m_meta_path);
-        for (std::decay_t<decltype(meta_path_len)> i = 0; i < meta_path_len; ++i)
-            m_meta_path->pop();
-
         m_meta_path->append(boost::cref(*this));
         m_meta_path_len = static_cast<int>(py::len(*m_meta_path));
-
-        py::import("sys").attr("modules") = py::dict();
     } catch (const boost::python::error_already_set&) {
         m_python.HandleErrorAlreadySet();
         if (!m_python.IsPythonRunning()) {
@@ -343,7 +430,7 @@ PythonParser::~PythonParser() {
     PyThreadState_Swap(m_main_thread_state);
 }
 
-bool PythonParser::ParseFileCommon(const boost::filesystem::path& path,
+bool PythonParser::ParseFileCommon(const std::filesystem::path& path,
                                    const boost::python::dict& globals,
                                    std::string& filename, std::string& file_contents) const
 {
@@ -356,7 +443,7 @@ bool PythonParser::ParseFileCommon(const boost::filesystem::path& path,
     }
 
     try {
-        py::exec(file_contents.c_str(), globals);
+        compile_eval(file_contents.c_str(), path.native(), globals);
     } catch (const boost::python::error_already_set&) {
         m_python.HandleErrorAlreadySet();
         ErrorLogger() << "Unable to parse data file " << filename;
@@ -373,6 +460,32 @@ bool PythonParser::ParseFileCommon(const boost::filesystem::path& path,
 
     return true;
 }
+
+py::object PythonParser::LoadModule(PyObject* (*init_function)()) const {
+    PyObject *py_module = init_function();
+    if (py_module) {
+        const char* module_name = PyModule_GetName(py_module);
+        DebugLogger() << "Injecting parser module " << module_name;
+        py::object module{py::handle<>(py_module)};
+        py::extract<py::dict>(py::import("sys").attr("modules"))()[std::string{"focs."} + module_name] = module;
+        return module;
+    }
+    return py::object();
+}
+
+void PythonParser::UnloadModule(py::object module) const {
+    const char* module_name = PyModule_GetName(module.ptr());
+    py::import("sys").attr("modules").attr("pop")(std::string{"focs."} + module_name);
+}
+
+void PythonParser::LoadConditionsModule() const
+{ (void)LoadModule(&PyInit__conditions); } // marked [[nodiscard]] but result not needed in this case
+
+void PythonParser::LoadValueRefsModule() const
+{ (void)LoadModule(&PyInit__value_refs); } // marked [[nodiscard]] but result not needed in this case
+
+void PythonParser::LoadEffectsModule() const
+{ (void)LoadModule(&PyInit__effects_new); } // marked [[nodiscard]] but result not needed in this case
 
 py::object PythonParser::find_spec(const std::string& fullname, const py::object& path, const py::object& target) const {
     auto module_path(m_scripting_dir);
@@ -434,16 +547,13 @@ py::object PythonParser::exec_module(py::object& module) {
             // and still import will work
             DebugLogger() << "Executing module file " << module_path.string();
             try {
-#if PY_VERSION_HEX < 0x03080000
-                m_dict["__builtins__"] = boost::python::import("builtins");
-#endif
                 RegisterGlobalsEffects(m_dict);
                 RegisterGlobalsConditions(m_dict);
                 RegisterGlobalsValueRefs(m_dict, *this);
                 RegisterGlobalsSources(m_dict);
                 RegisterGlobalsEnums(m_dict);
 
-                py::exec(file_contents.c_str(), m_dict, m_dict);
+                compile_eval(file_contents.c_str(), module_path.native(), m_dict);
             } catch (const boost::python::error_already_set&) {
                 m_python.HandleErrorAlreadySet();
                 ErrorLogger() << "Unable to parse module file " << module_path.string();

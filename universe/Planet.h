@@ -42,6 +42,36 @@ FO_ENUM(
     ((NUM_PLANET_SIZES))
 )
 
+[[nodiscard]] constexpr std::string_view DumpEnum(PlanetSize value) noexcept {
+    switch (value) {
+    case PlanetSize::SZ_TINY:      return "Tiny";
+    case PlanetSize::SZ_SMALL:     return "Small";
+    case PlanetSize::SZ_MEDIUM:    return "Medium";
+    case PlanetSize::SZ_LARGE:     return "Large";
+    case PlanetSize::SZ_HUGE:      return "Huge";
+    case PlanetSize::SZ_ASTEROIDS: return "Asteroids";
+    case PlanetSize::SZ_GASGIANT:  return "GasGiant";
+    default:                       return "?";
+    }
+}
+
+[[nodiscard]] constexpr std::string_view DumpEnum(PlanetType value) noexcept {
+    switch (value) {
+    case PlanetType::PT_SWAMP:      return "Swamp";
+    case PlanetType::PT_TOXIC:      return "Toxic";
+    case PlanetType::PT_INFERNO:    return "Inferno";
+    case PlanetType::PT_RADIATED:   return "Radiated";
+    case PlanetType::PT_BARREN:     return "Barren";
+    case PlanetType::PT_TUNDRA:     return "Tundra";
+    case PlanetType::PT_DESERT:     return "Desert";
+    case PlanetType::PT_TERRAN:     return "Terran";
+    case PlanetType::PT_OCEAN:      return "Ocean";
+    case PlanetType::PT_ASTEROIDS:  return "Asteroids";
+    case PlanetType::PT_GASGIANT:   return "GasGiant";
+    default:            return "?";
+    }
+}
+
 
 /** a class representing a FreeOrion planet. */
 class FO_COMMON_API Planet final : public UniverseObject {
@@ -51,11 +81,10 @@ public:
 
     [[nodiscard]] std::string  Dump(uint8_t ntabs = 0) const override;
 
-    using UniverseObject::IDSet;
-    [[nodiscard]] int          ContainerObjectID() const noexcept override { return this->SystemID(); }
-    [[nodiscard]] const IDSet& ContainedObjectIDs() const noexcept override { return m_buildings; }
-    [[nodiscard]] bool         Contains(int object_id) const override;
-    [[nodiscard]] bool         ContainedBy(int object_id) const noexcept override;
+    [[nodiscard]] int                  ContainerObjectID() const noexcept override { return this->SystemID(); }
+    [[nodiscard]] std::span<const int> ContainedObjectIDs() const override { return ToSpan(m_buildings); }
+    [[nodiscard]] bool                 Contains(int object_id) const override;
+    [[nodiscard]] bool                 ContainedBy(int object_id) const noexcept override;
 
     [[nodiscard]] const auto&                   Focus() const noexcept { return m_focus; }
     [[nodiscard]] int                           TurnsSinceFocusChange(int current_turn) const noexcept;
@@ -204,6 +233,9 @@ private:
         };
 #if defined(__cpp_lib_constexpr_algorithms)
         std::sort(retval.begin(), retval.end());
+#else
+        for (auto it = retval.begin(); it != retval.end(); ++it)
+            std::swap(*it, *std::min_element(it, retval.end()));
 #endif
         return retval;
     }();

@@ -22,6 +22,7 @@
 #include "../util/MultiplayerCommon.h"
 #include "../util/Random.h"
 #include "../util/i18n.h"
+#include "../util/ranges.h"
 
 #include "../network/Message.h"
 
@@ -183,15 +184,15 @@ void CombatInfo::InitializeObjectVisibility() {
 }
 
 
-ScriptingContext::ScriptingContext(CombatInfo& info, Attacker, UniverseObject* attacker_as_source) noexcept :
+ScriptingContext::ScriptingContext(CombatInfo& info, Attacker, UniverseObjectCXBase* attacker_as_source) noexcept :
     source(                 attacker_as_source),
-    current_turn(           info.turn),
     combat_bout(            info.bout),
+    current_turn(           info.turn),
     galaxy_setup_data(      info.galaxy_setup_data),
     species(                info.species),
     supply(                 info.supply),
     const_universe(         info.universe),
-    objects(                &info.objects), // not taken from Universe!
+    objects(                std::addressof(info.objects)), // not taken from Universe!
     const_objects(          info.objects),
     empire_object_vis(      info.empire_object_visibility), // not taken from Universe!
     empire_object_vis_turns(info.empire_object_vis_turns), // not taken from Universe!
@@ -947,12 +948,13 @@ namespace {
                     continue;   // destroyed objects can't launch fighters
 
                 auto weapons = ShipWeaponsStrengths(ship, combat_info.universe);
-                for (const PartAttackInfo& weapon : weapons) { // TODO: any_of
-                    if (weapon.part_class == ShipPartClass::PC_FIGHTER_BAY &&
+                static constexpr auto is_armed_launched_bay = [](const PartAttackInfo& weapon) noexcept {
+                    return weapon.part_class == ShipPartClass::PC_FIGHTER_BAY &&
                         weapon.fighters_launched > 0 &&
-                        weapon.fighter_damage > 0.0f)
-                    { return true; }
-                }
+                        weapon.fighter_damage > 0.0f;
+                };
+                if (range_any_of(weapons, is_armed_launched_bay))
+                    return true;
             }
 
             return false;
@@ -1198,20 +1200,21 @@ namespace {
         /// If so, remove that empire's entry
         void CleanEmpires() {
             DebugLogger(combat) << "CleanEmpires";
-            auto temp{empire_infos};
 
-            boost::container::flat_set<int> empire_ids_with_objects;
-            empire_ids_with_objects.reserve(20); // guesstimate, should normally be enough
-            for (const auto* obj : combat_info.objects.allRaw()) // TODO: range, range init, and make container const
-                empire_ids_with_objects.insert(obj->Owner());
+            static constexpr auto to_owner_id = [](const auto& obj) noexcept { return obj->Owner(); };
+            const auto empire_ids_with_objects = combat_info.objects.allRaw() | range_transform(to_owner_id)
+                | range_to<boost::container::flat_set<int>>();
 
-            for (const auto empire_id : empire_infos | range_keys) {
-                if (!contains(empire_ids_with_objects, empire_id)) {
-                    temp.erase(empire_id);
-                    DebugLogger(combat) << "No objects left for empire with id: " << empire_id;
-                }
+            const auto has_no_objects = [&empire_ids_with_objects](int id)
+            { return !empire_ids_with_objects.contains(id); };
+
+            // copy before modifying...
+            const auto no_obj_info_ids = empire_infos | range_keys | range_filter(has_no_objects) | range_to_vec;
+
+            for (auto& empire_id : no_obj_info_ids) {
+                empire_infos.erase(empire_id);
+                DebugLogger(combat) << "No objects left for empire with id: " << empire_id;
             }
-            empire_infos = std::move(temp);
 
             if (!empire_infos.empty()) {
                 DebugLogger(combat) << "Empires with objects remaining:";
@@ -1225,7 +1228,7 @@ namespace {
 
         /// Clears and refills \a shuffled with attacker ids in a random order
         auto GetShuffledValidAttackerIDs() {
-            std::vector<int> retval{valid_attacker_object_ids.begin(), valid_attacker_object_ids.end()};
+            auto retval = valid_attacker_object_ids | range_to_vec;
             RandomShuffle(retval);
             return retval;
         }
@@ -1272,7 +1275,7 @@ namespace {
         }
 
     private:
-        typedef std::set<int>::const_iterator const_id_iterator;
+        using const_id_iterator = std::set<int>::const_iterator;
 
         // Populate lists of things that can attack. List attackers also by empire.
         void PopulateAttackers() {
@@ -1657,15 +1660,13 @@ namespace {
                 continue;   // destroyed fighters can't return
             auto launched_from_id = fighter->LaunchedFrom();
             const auto& cidoi = combat_info.destroyed_object_ids;
-            if (std::any_of(cidoi.begin(), cidoi.end(),
-                            [launched_from_id](int id) { return launched_from_id == id; }))
-            {
+            if (range_any_of(cidoi, [launched_from_id](int id) { return launched_from_id == id; })) {
                 DebugLogger() << " ... Fighter " << fighter->Name() << " (" << obj_id
                               << ") is from destroyed ship id" << launched_from_id
                               << " so can't be recovered";
                 continue;   // can't return to a destroyed ship
             }
-            ships_fighters_to_add_back[launched_from_id]++;
+            ships_fighters_to_add_back[launched_from_id] += 1.0f;
         }
         DebugLogger() << "Fighters left at end of combat:";
         for (const auto& [ship_id, fighter_count] : ships_fighters_to_add_back)

@@ -42,7 +42,6 @@
     <ClInclude Include="..\..\GG\GG\Font.h" />
     <ClInclude Include="..\..\GG\GG\FontFwd.h" />
     <ClInclude Include="..\..\GG\GG\GLClientAndServerBuffer.h" />
-    <ClInclude Include="..\..\GG\GG\GroupBox.h" />
     <ClInclude Include="..\..\GG\GG\GUI.h" />
     <ClInclude Include="..\..\GG\GG\Layout.h" />
     <ClInclude Include="..\..\GG\GG\ListBox.h" />
@@ -90,7 +89,6 @@
     <ClCompile Include="..\..\GG\src\Edit.cpp" />
     <ClCompile Include="..\..\GG\src\Font.cpp" />
     <ClCompile Include="..\..\GG\src\GLClientAndServerBuffer.cpp" />
-    <ClCompile Include="..\..\GG\src\GroupBox.cpp" />
     <ClCompile Include="..\..\GG\src\GUI.cpp" />
     <ClCompile Include="..\..\GG\src\Layout.cpp" />
     <ClCompile Include="..\..\GG\src\ListBox.cpp" />
@@ -132,13 +130,13 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -177,6 +175,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>GiGi.dll</TargetName>
     <LinkIncremental>true</LinkIncremental>
+    <OutDir>../../</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -255,7 +254,6 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ForcedIncludeFiles>StdAfx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/utf-8</AdditionalOptions>
       <DisableSpecificWarnings>4244; 4251; 4275</DisableSpecificWarnings>
     </ClCompile>
@@ -286,11 +284,11 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ForcedIncludeFiles>StdAfx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
       <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
       <ConformanceMode>true</ConformanceMode>
+      <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

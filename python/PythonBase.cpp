@@ -4,13 +4,13 @@
 #include "../util/Logger.h"
 #include "CommonWrappers.h"
 
-#include <boost/filesystem.hpp>
+#include <fstream>
 #include <boost/python/tuple.hpp>
 #include <boost/python/list.hpp>
 #include <boost/python/extract.hpp>
 #include <boost/python/docstring_options.hpp>
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 namespace py = boost::python;
 
 // Python module for logging functions
@@ -32,6 +32,11 @@ bool PythonBase::Initialize() {
         DebugLogger() << "Python standard stream encoding set to: " << ENCODING << " with result: " << encoding_result;
 #endif
 
+        return false;
+    }
+
+    if (!InitErrorHandler()) {
+        ErrorLogger() << "Python error handler isn't initialized!";
         return false;
     }
 
@@ -126,7 +131,7 @@ void PythonBase::AddToSysPath(const fs::path& dir) {
 }
 
 void PythonBase::SetErrorModule(py::object& module)
-{ m_python_module_error = &module; }
+{ m_python_module_error = std::addressof(module); }
 
 std::vector<std::string> PythonBase::ErrorReport() {
     std::vector<std::string> err_list;

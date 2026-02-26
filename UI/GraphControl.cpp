@@ -4,6 +4,7 @@
 #include "CUIControls.h"
 #include "../util/i18n.h"
 #include "../util/ranges.h"
+#include "../client/human/GGHumanClientApp.h"
 
 #include <GG/ClrConstants.h>
 
@@ -132,22 +133,22 @@ void GraphControl::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     { UseLogScale(true); };
     auto set_linear_scale = [this]()
     { UseLogScale(false); };
-    popup->AddMenuItem(GG::MenuItem(UserString("USE_LINEAR_SCALE"), false, !m_log_scale, set_linear_scale));
-    popup->AddMenuItem(GG::MenuItem(UserString("USE_LOG_SCALE"), false, m_log_scale, set_log_scale));
+    popup->AddMenuItem(UserString("USE_LINEAR_SCALE"), false, !m_log_scale, set_linear_scale);
+    popup->AddMenuItem(UserString("USE_LOG_SCALE"), false, m_log_scale, set_log_scale);
 
     auto set_zero_limit = [this]()
     { ScaleToZero(true); };
     auto free_limit = [this]()
     { ScaleToZero(false); };
-    popup->AddMenuItem(GG::MenuItem(UserString("SCALE_TO_ZERO"), false, m_zero_in_range, set_zero_limit));
-    popup->AddMenuItem(GG::MenuItem(UserString("SCALE_FREE"), false, !m_zero_in_range, free_limit));
+    popup->AddMenuItem(UserString("SCALE_TO_ZERO"), false, m_zero_in_range, set_zero_limit);
+    popup->AddMenuItem(UserString("SCALE_FREE"), false, !m_zero_in_range, free_limit);
 
     auto show_scale = [this]()
     { ShowScale(true); };
     auto hide_scale = [this]()
     { ShowScale(false); };
-    popup->AddMenuItem(GG::MenuItem(UserString("SHOW_SCALE"), false, m_show_scale, show_scale));
-    popup->AddMenuItem(GG::MenuItem(UserString("HIDE_SCALE"), false, !m_show_scale, hide_scale));
+    popup->AddMenuItem(UserString("SHOW_SCALE"), false, m_show_scale, show_scale);
+    popup->AddMenuItem(UserString("HIDE_SCALE"), false, !m_show_scale, hide_scale);
 
     auto show_lines = [this]() {
         ShowLines(true);
@@ -157,8 +158,8 @@ void GraphControl::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
         ShowLines(false);
         ShowPoints(true);
     };
-    popup->AddMenuItem(GG::MenuItem(UserString("SHOW_LINES"), false, m_show_lines, show_lines));
-    popup->AddMenuItem(GG::MenuItem(UserString("SHOW_POINTS"), false, m_show_points, show_points));
+    popup->AddMenuItem(UserString("SHOW_LINES"), false, m_show_lines, show_lines);
+    popup->AddMenuItem(UserString("SHOW_POINTS"), false, m_show_points, show_points);
 
     popup->Run();
 }
@@ -181,11 +182,11 @@ void GraphControl::Render() {
 
     if (m_show_scale && !m_y_scale_ticks.empty()) {
         glEnable(GL_TEXTURE_2D);
-        const auto font = ClientUI::GetFont();
+        const auto font = GetApp().GetUI().GetFont();
         GG::Font::RenderState rs{ClientUI::TextColor()};
-        for (auto label : m_y_scale_ticks) {
-            const auto roundedlabel = boost::format("%|1$.12|") % label.second;
-            font->RenderText(GG::Pt{ul.x + GG::X1, lr.y + label.first}, roundedlabel.str(), rs);
+        for (auto& [y_pos, val] : m_y_scale_ticks) {
+            const auto roundedlabel = boost::format("%|1$.12|") % val;
+            font->RenderText(GG::Pt{ul.x + GG::X1, lr.y + y_pos}, roundedlabel.str(), rs);
         }
     }
 

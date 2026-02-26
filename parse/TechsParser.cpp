@@ -168,14 +168,15 @@ namespace {
         py_grammar_techs(const PythonParser& parser, TechManager::TechContainer& techs) :
             globals(boost::python::import("builtins").attr("__dict__"))
         {
-#if PY_VERSION_HEX < 0x03080000
-            globals["__builtins__"] = boost::python::import("builtins");
-#endif
             RegisterGlobalsEffects(globals);
             RegisterGlobalsConditions(globals);
             RegisterGlobalsValueRefs(globals, parser);
             RegisterGlobalsSources(globals);
             RegisterGlobalsEnums(globals);
+
+            parser.LoadConditionsModule();
+            parser.LoadValueRefsModule();
+            parser.LoadEffectsModule();
 
             globals["Tech"] = boost::python::raw_function(
                 [&techs](const boost::python::tuple& args, const boost::python::dict& kw)
@@ -188,23 +189,23 @@ namespace {
 
 namespace parse {
     template <typename T>
-    T techs(const PythonParser& parser, const boost::filesystem::path& path) {
+    T techs(const PythonParser& parser, const std::filesystem::path& path, bool& success) {
         TechManager::TechContainer techs_;
         std::map<std::string, std::unique_ptr<TechCategory>, std::less<>> categories;
         std::set<std::string> categories_seen;
 
-        g_categories_seen = &categories_seen;
-        g_categories = &categories;
+        g_categories_seen = std::addressof(categories_seen);
+        g_categories = std::addressof(categories);
 
         ScopedTimer timer("Techs Parsing");
 
-        py_parse::detail::parse_file<py_grammar_category, TechManager::TechContainer>(
+        bool file_success = py_parse::detail::parse_file<py_grammar_category, TechManager::TechContainer>(
             parser, path / "Categories.inf.py", py_grammar_category(), techs_);
 
         py_grammar_techs p = py_grammar_techs(parser, techs_);
 
         for (const auto& file : ListDir(path, IsFOCPyScript))
-            py_parse::detail::parse_file<py_grammar_techs>(parser, file, p);
+            file_success = py_parse::detail::parse_file<py_grammar_techs>(parser, file, p) && file_success;
 
         TechManager::TechCategoryContainer cats;
         cats.reserve(categories.size());
@@ -213,6 +214,7 @@ namespace parse {
 
         std::transform(categories.begin(), categories.end(), std::inserter(cats, cats.end()), extract_cats);
 
+        success = file_success;
         return std::make_tuple(std::move(techs_), std::move(cats), categories_seen);
     }
 }
@@ -221,4 +223,4 @@ namespace parse {
 // This allows Tech.h to only be included in this .cpp file and not Parse.h
 // which recompiles all parsers if Tech.h changes.
 template FO_PARSE_API TechManager::TechParseTuple parse::techs<TechManager::TechParseTuple>(
-    const PythonParser& parser, const boost::filesystem::path& path);
+    const PythonParser& parser, const std::filesystem::path& path, bool& success);

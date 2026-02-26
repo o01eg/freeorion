@@ -129,10 +129,10 @@ namespace {
         const auto& context_objects{context.ContextObjects()};
         const auto& context_universe{context.ContextUniverse()};
 
-        if (&universe != &context_universe)
+        if (std::addressof(universe) != std::addressof(context_universe))
             ErrorLogger() << "Universe member function passed context with different Universe from this";
 
-        if (&context_objects != &universe_objects)
+        if (std::addressof(context_objects) != std::addressof(universe_objects))
             ErrorLogger() << "Universe member function passed context different ObjectMap from this Universe";
     }
 
@@ -167,7 +167,7 @@ Universe::Universe() :
 {}
 
 Universe& Universe::operator=(Universe&& other) noexcept {
-    if (this == &other)
+    if (this == std::addressof(other))
         return *this;
 
     m_pathfinder = std::move(other.m_pathfinder);
@@ -329,9 +329,9 @@ Universe::IDSet Universe::EmpireVisibleObjectIDs(int empire_id, const EmpireMana
 
     // check each object's visibility by the requested empire / all empires
     const auto is_visible_to_an_empire = [&empire_ids, this](const auto obj_id) {
-        return std::any_of(empire_ids.begin(), empire_ids.end(),
-                           [obj_id, this](auto e_id)
-                           { return GetObjectVisibilityByEmpire(obj_id, e_id) >= Visibility::VIS_BASIC_VISIBILITY; });
+        const auto vis_to_empire_id = [obj_id, this](auto e_id)
+        { return GetObjectVisibilityByEmpire(obj_id, e_id) >= Visibility::VIS_BASIC_VISIBILITY; };
+        return range_any_of(empire_ids, vis_to_empire_id);
     };
 
     auto ids_rng = m_objects.allWithIDs() | range_keys | range_filter(is_visible_to_an_empire);
@@ -351,7 +351,7 @@ Universe::IDSet Universe::EmpireVisibleObjectIDs(int empire_id, const EmpireMana
 int Universe::HighestDestroyedObjectID() const {
     if (m_destroyed_object_ids.empty())
         return INVALID_OBJECT_ID;
-    return *std::max_element(m_destroyed_object_ids.begin(), m_destroyed_object_ids.end());
+    return *range_max_element(m_destroyed_object_ids);
 }
 
 const std::unordered_set<int>& Universe::EmpireKnownDestroyedObjectIDs(int empire_id) const {
@@ -373,7 +373,7 @@ const ShipDesign* Universe::GetShipDesign(int ship_design_id) const {
     if (ship_design_id == INVALID_DESIGN_ID)
         return nullptr;
     ship_design_iterator it = m_ship_designs.find(ship_design_id);
-    return (it != m_ship_designs.end() ? &it->second : nullptr);
+    return (it != m_ship_designs.end() ? std::addressof(it->second) : nullptr);
 }
 
 void Universe::RenameShipDesign(int design_id, std::string name, std::string description) {
@@ -394,7 +394,7 @@ const ShipDesign* Universe::GetGenericShipDesign(std::string_view name) const {
     const auto has_name = [name](const auto& design) { return name == design.Name(false); };
     const auto rng = m_ship_designs | range_values;
     const auto it = range_find_if(rng, has_name);
-    return it != rng.end() ? &(*it) : nullptr;
+    return it != rng.end() ? std::addressof(*it) : nullptr;
 }
 
 const std::set<int>& Universe::EmpireKnownShipDesignIDs(int empire_id) const {
@@ -438,21 +438,19 @@ std::set<std::string> Universe::GetObjectVisibleSpecialsByEmpire(int object_id, 
     if (empire_id != ALL_EMPIRES) {
         auto empire_it = m_empire_object_visible_specials.find(empire_id);
         if (empire_it == m_empire_object_visible_specials.end())
-            return std::set<std::string>();
+            return {};
         const ObjectSpecialsMap& object_specials_map = empire_it->second;
         auto object_it = object_specials_map.find(object_id);
         if (object_it == object_specials_map.end())
-            return std::set<std::string>();
+            return {};
         return object_it->second;
     } else {
         auto obj = m_objects.get(object_id);
         if (!obj)
-            return std::set<std::string>();
+            return {};
         // all specials visible
-        std::set<std::string> retval;
-        for (const auto& entry : obj->Specials())
-            retval.insert(entry.first);
-        return retval;
+        auto sp_names_rng = obj->Specials() | range_keys;
+        return {sp_names_rng.begin(), sp_names_rng.end()};
     }
 }
 
@@ -501,7 +499,7 @@ int Universe::InsertShipDesign(ShipDesign ship_design) {
     return success ? new_id : INVALID_DESIGN_ID;
 }
 
-bool Universe::InsertShipDesignID(ShipDesign ship_design, boost::optional<int> empire_id, int id) {
+bool Universe::InsertShipDesignID(ShipDesign ship_design, boost::optional<int>, int id) {
     if (!m_design_id_allocator->UpdateIDAndCheckIfOwned(id)) {
         ErrorLogger() << "Ship design id " << id << " is invalid.";
         return false;
@@ -696,9 +694,9 @@ void Universe::InitMeterEstimatesAndDiscrepancies(ScriptingContext& context) {
     for (const auto& obj : m_objects.all()) {
         auto& obj_discrep = starting_current_meter_values[obj->ID()];
         obj_discrep.reserve(obj->Meters().size());
-        for (const auto& meter_pair : obj->Meters()) {
+        for (const auto& [mt, m] : obj->Meters()) {
             // inserting in order into initially-empty map should always put next item efficiently at end
-            obj_discrep.emplace_hint(obj_discrep.end(), meter_pair.first, meter_pair.second.Current());
+            obj_discrep.emplace_hint(obj_discrep.end(), mt, m.Current());
         }
     }
 
@@ -855,11 +853,10 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
     // when iterating over the list in the following code
     auto object_ptrs = m_objects.find(objects_vec);
     if (objects_vec.empty()) {
-        object_ptrs.reserve(m_objects.allExisting().size());
-        std::transform(m_objects.allExisting().begin(), m_objects.allExisting().end(),
-                       std::back_inserter(object_ptrs), [](const auto& p) {
-            return std::const_pointer_cast<UniverseObject>(p.second);
-        });
+        static constexpr auto deconst_second = [](const auto& p) { return std::const_pointer_cast<UniverseObject>(p.second); };
+        auto& all_objs{m_objects.allExisting()};
+        object_ptrs.reserve(all_objs.size());
+        std::transform(all_objs.begin(), all_objs.end(), std::back_inserter(object_ptrs), deconst_second);
     }
 
     DebugLogger() << "UpdateMeterEstimatesImpl on " << object_ptrs.size() << " objects";
@@ -875,7 +872,7 @@ void Universe::UpdateMeterEstimatesImpl(const std::vector<int>& objects_vec,
 
     if (do_accounting) {
         for (auto& obj : object_ptrs) {
-            auto& meters = obj->Meters();
+            const auto meters = obj->Meters();
             auto& account_map = accounting_map[obj->ID()];
             account_map.clear();    // remove any old accounting info. this should be redundant here.
             account_map.reserve(meters.size());
@@ -990,16 +987,19 @@ namespace {
         const boost::container::flat_set<int>&      candidate_object_ids,   // TODO: Can this be removed along with scope is source test?
         Effect::TargetSet&                          candidate_objects_in,   // may be empty: indicates to test for full universe of objects
         Effect::SourcesEffectsTargetsAndCausesVec&  source_effects_targets_causes_out,
-        int n)
+        int n,
+        bool effects_trace_log)
     {
-        TraceLogger(effects) << [&]() -> std::string {
-            return std::string{"StoreTargetsAndCausesOfEffectsGroup < "}.append(std::to_string(n)).append(" >")
-                .append("  cause type: ").append(to_string(effect_cause_type))
-                .append("  specific cause: ").append(specific_cause_name)
-                .append("  sources (").append(std::to_string(source_objects.size())).append(")")
-                .append("  candidate ids (").append(std::to_string(candidate_object_ids.size())).append(")")
-                .append("  candidate objects (").append(std::to_string(candidate_objects_in.size())).append(")");
-        }();
+        if (effects_trace_log) {
+            TraceLogger(effects) << [&]() -> std::string {
+                return std::string{"StoreTargetsAndCausesOfEffectsGroup < "}.append(std::to_string(n)).append(" >")
+                    .append("  cause type: ").append(to_string(effect_cause_type))
+                    .append("  specific cause: ").append(specific_cause_name)
+                    .append("  sources (").append(std::to_string(source_objects.size())).append(")")
+                    .append("  candidate ids (").append(std::to_string(candidate_object_ids.size())).append(")")
+                    .append("  candidate objects (").append(std::to_string(candidate_objects_in.size())).append(")");
+            }();
+        }
 
         const auto* scope = effects_group.Scope();
         if (!scope) {
@@ -1052,8 +1052,10 @@ namespace {
                 // special case for condition that is just Source when a set of
                 // candidates is specified: only need to put the source in if
                 // it is in the candidates
-                if (candidate_object_ids.contains(source->ID()))
-                    matched_targets.push_back(const_cast<UniverseObject*>(source));
+                if (candidate_object_ids.contains(source->ID())) {
+                    if (auto source_target = dynamic_cast<const UniverseObject*>(source))
+                        matched_targets.push_back(const_cast<UniverseObject*>(source_target));
+                }
 
             } else {
                 // input candidates will all be tested
@@ -1062,15 +1064,17 @@ namespace {
                 candidate_objects_in.insert(candidate_objects_in.end(), matched_targets.begin(), matched_targets.end());
             }
 
-            TraceLogger(effects) << [=]() -> std::string {
-                std::string retval;
-                retval.reserve(30 + matched_targets.size() * 10); // guesstimate
-                retval.append("Scope Results <").append(std::to_string(n))
-                      .append(">  source: ").append(std::to_string(source->ID())).append("  matches: ");
-                for (auto& obj : matched_targets)
-                    retval.append(std::to_string(obj->ID())).append(", ");
-                return retval;
-            }();
+            if (effects_trace_log) {
+                TraceLogger(effects) << [=]() -> std::string {
+                    std::string retval;
+                    retval.reserve(30 + matched_targets.size() * 10); // guesstimate
+                    retval.append("Scope Results <").append(std::to_string(n))
+                          .append(">  source: ").append(std::to_string(source->ID())).append("  matches: ");
+                    for (auto& obj : matched_targets)
+                        retval.append(std::to_string(obj->ID())).append(", ");
+                    return retval;
+                }();
+            }
         }
     }
 
@@ -1081,27 +1085,33 @@ namespace {
     void DispatchEffectsGroupScopeEvaluations(
         EffectsCauseType effect_cause_type,
         std::string_view specific_cause_name,
-        const Condition::ObjectSet& source_objects,
+        std::span<const UniverseObjectCXBase* const> source_objects,
         const std::vector<Effect::EffectsGroup>& effects_groups,
         bool only_meter_effects,
         ScriptingContext context,
-        const Condition::ObjectSet& potential_targets,
+        const Condition::ObjectSet& potential_targets, // may be empty to indicate checking full Universe
         const boost::container::flat_set<int>& potential_target_ids,
         ReorderBufferT& source_effects_targets_causes_reorder_buffer_out,
         boost::asio::thread_pool& thread_pool,
-        int& n)
+        int& n,
+        bool effects_trace_log)
     {
+        if (effects_groups.empty())
+            return;
+
         std::vector<std::pair<Condition::Condition*, int>> already_evaluated_activation_condition_idx;
         already_evaluated_activation_condition_idx.reserve(effects_groups.size());
 
-        TraceLogger(effects) << [sos{source_objects.size()}, pts{potential_targets.size()}]() {
-            std::stringstream ss;
-            ss << "Checking activation condition for " << sos
-                << " sources and "
-                << (pts == 0 ? "full universe" : std::to_string(pts))
-                << " potential targets";
-            return ss.str();
-        }();
+        if (effects_trace_log) {
+            TraceLogger(effects) << [sos{source_objects.size()}, pts{potential_targets.size()}]() {
+                std::stringstream ss;
+                ss << "Checking activation condition for " << sos
+                   << " sources and "
+                   << (pts == 0 ? "full universe" : std::to_string(pts))
+                   << " potential targets";
+                return ss.str();
+            }();
+        }
 
         // evaluate activation conditions of effects_groups on input source objects
         std::vector<Condition::ObjectSet> active_sources{effects_groups.size()};
@@ -1117,17 +1127,17 @@ namespace {
                 continue;
 
             if (!effects_group.Activation()) {
+                auto& as = active_sources[i];
                 // no activation condition, leave all sources active
-                active_sources[i] = source_objects;
+                as.insert(as.end(), source_objects.begin(), source_objects.end());
                 continue;
             }
 
             // check if this activation condition has already been evaluated
             bool cache_hit = false;
-            for (const auto& cond_idx : already_evaluated_activation_condition_idx) {
-                if (*cond_idx.first == *(effects_group.Activation())) {
+            for (const auto* aeacond : already_evaluated_activation_condition_idx | range_keys) {
+                if (!aeacond || *aeacond == *(effects_group.Activation())) {
                     // get later after everything has evaluated...
-                    //active_sources[i] = active_sources[cond_idx.second];    // copy previous condition evaluation result
                     cache_hit = true;
                     break;
                 }
@@ -1142,27 +1152,29 @@ namespace {
                 activation{effects_group.Activation()}
             ]() -> Condition::ObjectSet
             {
-                Condition::ObjectSet retval;
-
                 if (activation->SourceInvariant()) {
                     // can apply condition to all source objects simultaneously
                     Condition::ObjectSet rejected;
                     rejected.reserve(source_objects.size());
-                    retval = source_objects;
+                    Condition::ObjectSet retval(source_objects.begin(), source_objects.end());
                     const ScriptingContext source_context{context, ScriptingContext::Source{}, nullptr};
                     activation->Eval(source_context, retval, rejected, Condition::SearchDomain::MATCHES);
+                    return retval;
 
                 } else {
-                    // need to apply separately to each source object, using a context with the object as source
+                    const auto eval_one = [&context, activation](const auto* obj) {
+                        const ScriptingContext source_context(context, ScriptingContext::Source{}, obj);
+                        return activation->EvalOne(source_context, obj);
+                    };
+                    Condition::ObjectSet retval;
                     retval.reserve(source_objects.size());
-                    std::copy_if(source_objects.begin(), source_objects.end(), std::back_inserter(retval),
-                                 [&context, activation](const UniverseObject* obj) {
-                                     const ScriptingContext source_context(context, ScriptingContext::Source{}, obj);
-                                     return activation->EvalOne(source_context, obj);
-                                 });
+                    range_copy_if(source_objects, std::back_inserter(retval), eval_one);
+                    return retval;
+                    // using range_filter crashes... not sure why...
+                    // auto evaled_rng = source_objects | range_filter(eval_one);
+                    // return {evaled_rng.begin(), evaled_rng.end()};
                 }
 
-                return retval;
             };
 
             futures.emplace_back(i, std::async(std::launch::async, eval_active_sources));
@@ -1183,23 +1195,25 @@ namespace {
             if (!effects_group.Scope() || !effects_group.Activation())
                 continue;
 
-            for (const auto& cond_idx : already_evaluated_activation_condition_idx) {
-                if (*cond_idx.first == *(effects_group.Activation())) {
-                    active_sources[i] = active_sources[cond_idx.second];    // copy previous condition evaluation result
+            for (const auto& [aeacond, cond_idx] : already_evaluated_activation_condition_idx) {
+                if (*aeacond == *(effects_group.Activation())) {
+                    active_sources[i] = active_sources[cond_idx];    // copy previous condition evaluation result
                     break;
                 }
             }
         }
 
-        TraceLogger(effects) << [&active_sources, sz{effects_groups.size()}]() {
-            std::string retval;
-            retval.reserve(30 + 10*active_sources.size()); // guesstimate
-            retval.append("After activation condition, for ").append(std::to_string(sz))
-                  .append(" effects groups have # sources: ");
-            for (auto& src_set : active_sources)
-                retval.append(std::to_string(src_set.size())).append(", ");
-            return retval;
-        }();
+        if (effects_trace_log) {
+            TraceLogger(effects) << [&active_sources, sz{effects_groups.size()}]() {
+                std::string retval;
+                retval.reserve(30 + 10*active_sources.size()); // guesstimate
+                retval.append("After activation condition, for ").append(std::to_string(sz))
+                      .append(" effects groups have # sources: ");
+                for (auto& src_set : active_sources)
+                    retval.append(std::to_string(src_set.size())).append(", ");
+                return retval;
+            }();
+        }
 
 
         // TODO: is it faster to index by scope and activation condition or scope and filtered sources set?
@@ -1209,19 +1223,31 @@ namespace {
             already_dispatched_scope_condition_ptrs;
         already_evaluated_activation_condition_idx.reserve(effects_groups.size());
 
-
         // duplicate input ObjectSet potential_targets as local TargetSet
         // that can be passed to StoreTargetsAndCausesOfEffectsGroup
-        Effect::TargetSet potential_targets_copy(potential_targets.size(), nullptr);
-        std::transform(potential_targets.begin(), potential_targets.end(), potential_targets_copy.begin(),
-                       [](const auto* obj) { return const_cast<UniverseObject*>(obj); });
+        const auto potential_targets_copy = [&]() {
+            static constexpr auto to_uobj = [](auto* obj) noexcept
+            { return const_cast<UniverseObject*>(dynamic_cast<const UniverseObject*>(obj)); };
+            auto pot_tgts_rng = potential_targets | range_transform(to_uobj)/* | range_filter(not_null)*/;
+            return Effect::TargetSet(pot_tgts_rng.begin(), pot_tgts_rng.end());
+        }();
 
+        {
+            static constexpr auto is_null = [](const auto* o) noexcept -> bool { return !o; };
+            if (!potential_targets_copy.empty() && range_any_of(potential_targets_copy, is_null)) {
+                if (range_all_of(potential_targets_copy, is_null))
+                    ErrorLogger() << "ALL potential targets were not valid UniverseObjects...";
+                else
+                    ErrorLogger() << "Some potential targets were not valid UniverseObjects...";
+            }
+        }
 
         // evaluate scope conditions for source objects that are active
         for (std::size_t i = 0; i < effects_groups.size(); ++i) {
             if (active_sources[i].empty())
                 continue;
-            TraceLogger(effects) << "Handing active sources set of size: " << active_sources[i].size();
+            if (effects_trace_log)
+                TraceLogger(effects) << "Handing active sources set of size: " << active_sources[i].size();
 
             // can assume these pointers are non-null due to previous use
             const Effect::EffectsGroup& effects_group = effects_groups[i];
@@ -1247,7 +1273,8 @@ namespace {
                 if (*cond != *scope || sources != active_sources[i])
                     continue;
 
-                TraceLogger(effects) << "scope condition cache hit !";
+                if (effects_trace_log)
+                    TraceLogger(effects) << "scope condition cache hit !";
 
                 // record pointer to previously-dispatched result struct
                 // that will contain the results to copy later, after
@@ -1274,7 +1301,8 @@ namespace {
             // if an already-dispatched evaluation of the scope was found, don't need to re-dispatch it
             if (cache_hit)
                 continue;
-            TraceLogger(effects) << "scope condition cache miss idx: " << n;
+            if (effects_trace_log)
+                TraceLogger(effects) << "scope condition cache miss idx: " << n;
 
             // add cache entry for this combination, with pointer to the
             // storage that will contain the to-be-dispatched scope
@@ -1283,29 +1311,30 @@ namespace {
                 scope, active_sources[i],
                 &source_effects_targets_causes_reorder_buffer_out.back().first);
 
-
-            TraceLogger(effects) << [n, effect_cause_type, specific_cause_name,
-                                     ac{active_sources[i]}, &potential_targets_copy,
-                                     num{potential_targets_copy.size()}]()
-            {
-                std::string retval;
-                retval.reserve(100 + 10*ac.size() + 10*potential_targets_copy.size()); // guesstimate
-                retval.append("Dispatching Scope Evaluations < ").append(std::to_string(n))
-                      .append(" > sources: ");
-                for (const auto& obj : ac)
-                    retval.append(std::to_string(obj->ID())).append(", ");
-                retval.append("  cause type: ").append(to_string(effect_cause_type))
-                      .append("  specific cause: ").append(specific_cause_name)
-                      .append("  candidates: ");
-                if (num == 0) {
-                    retval.append("[whole universe]");
-                } else {
-                    retval.append("[").append(std::to_string(num)).append(" specified objects]: ");
-                    for (auto& obj : potential_targets_copy)
+            if (effects_trace_log) {
+                TraceLogger(effects) << [n, effect_cause_type, specific_cause_name,
+                                         ac{active_sources[i]}, &potential_targets_copy,
+                                         num{potential_targets_copy.size()}]()
+                {
+                    std::string retval;
+                    retval.reserve(100 + 10*ac.size() + 10*potential_targets_copy.size()); // guesstimate
+                    retval.append("Dispatching Scope Evaluations < ").append(std::to_string(n))
+                          .append(" > sources: ");
+                    for (const auto& obj : ac)
                         retval.append(std::to_string(obj->ID())).append(", ");
-                }
-                return retval;
-            }();
+                    retval.append("  cause type: ").append(to_string(effect_cause_type))
+                          .append("  specific cause: ").append(specific_cause_name)
+                          .append("  candidates: ");
+                    if (num == 0) {
+                        retval.append("[whole universe]");
+                    } else {
+                        retval.append("[").append(std::to_string(num)).append(" specified objects]: ");
+                        for (auto& obj : potential_targets_copy)
+                            retval.append(std::to_string(obj->ID())).append(", ");
+                    }
+                    return retval;
+                }();
+            }
 
 
             // asynchronously evaluate targetset for effectsgroup for each source using worker threads
@@ -1318,18 +1347,21 @@ namespace {
                     effect_cause_type,
                     specific_cause_name,
                     &potential_target_ids,
-                    potential_targets_copy, // by value, not reference, so each dispatched call has independent input TargetSet
+                    targets{potential_targets_copy}, // copy so each dispatched call has independent input TargetSet
                     &source_effects_targets_causes_vec_out = source_effects_targets_causes_reorder_buffer_out.back().first,
-                    n
+                    n,
+                    effects_trace_log
                 ]() mutable
             {
                 StoreTargetsAndCausesOfEffectsGroup(context, effects_group, active_source_objects,
                                                     effect_cause_type, specific_cause_name,
-                                                    potential_target_ids, potential_targets_copy,
-                                                    source_effects_targets_causes_vec_out, n);
+                                                    potential_target_ids, targets,
+                                                    source_effects_targets_causes_vec_out, n, effects_trace_log);
             });
         }
     }
+
+    constexpr std::string_view EMPTY_STRING_VIEW;
 }
 
 void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsAndCausesVec>& source_effects_targets_causes,
@@ -1338,6 +1370,24 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
 {
     source_effects_targets_causes.clear();
     GetEffectsAndTargets(source_effects_targets_causes, std::vector<int>(), context, only_meter_effects);
+}
+
+namespace {
+    boost::asio::thread_pool GetThreadPool() {
+        if (errno)
+            DebugLogger() << "GetThreadPool() errno was initially: " << errno;
+        const auto thread_count = static_cast<unsigned int>(std::max(1, EffectsProcessingThreads()));
+        try {
+            errno = 0; // https://github.com/chriskohlhoff/asio/issues/1588
+            return boost::asio::thread_pool(thread_count);
+        } catch (const std::exception& e) {
+            ErrorLogger() << "GetThreadPool() with " << thread_count << " threads pool construction failed: " << e.what();
+        }
+
+        // will produce undefined behaviour, possibly unjoinable thread_pool on Boost 1.87
+        // see: https://github.com/chriskohlhoff/asio/issues/1584
+        return boost::asio::thread_pool();
+    }
 }
 
 void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsAndCausesVec>& source_effects_targets_causes,
@@ -1349,13 +1399,16 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     SectionedScopedTimer type_timer("Effect TargetSets Evaluation", std::chrono::microseconds(0));
 
     // assemble target objects from input vector of IDs
-    auto potential_targets{context.ContextObjects().findRaw<const UniverseObject>(target_object_ids)};
+    auto potential_targets{context.ContextObjects().findRaw<const UniverseObjectCXBase>(target_object_ids)};
     const boost::container::flat_set<int> potential_ids_set{target_object_ids.begin(), target_object_ids.end()};
     const auto& destroyed_object_ids{context.ContextUniverse().DestroyedObjectIds()};
 
-    TraceLogger(effects) << "GetEffectsAndTargets input candidate target objects:";
-    for (auto& obj : potential_targets)
-        TraceLogger(effects) << obj->Dump();
+    const bool effects_trace_log = LoggerThresholdEnabled(LogLevel::trace, "effects");
+    if (effects_trace_log) {
+        TraceLogger(effects) << "GetEffectsAndTargets input candidate target objects:";
+        for (auto& obj : potential_targets)
+            TraceLogger(effects) << obj->Dump();
+    }
 
 
     // deque, not vector, to avoid invaliding iterators when pushing more items
@@ -1369,33 +1422,39 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
     // source objects, and which should be copied into the paired Vec
     ReorderBufferT source_effects_targets_causes_reorder_buffer;
 
-
-    const unsigned int num_threads = static_cast<unsigned int>(std::max(1, EffectsProcessingThreads()));
-    boost::asio::thread_pool thread_pool(num_threads);
+    auto thread_pool{GetThreadPool()};
 
     int n = 0;  // count dispatched condition evaluations
 
+    const auto not_destroyed = [&destroyed_object_ids](const auto& o)
+    { return o && !destroyed_object_ids.contains(o->ID()); };
+
+    const auto to_plt_sp = [&context](const Planet* p) noexcept
+        -> std::tuple<const Planet*, const Species*, std::string_view>
+    {
+        if (!p) return {nullptr, nullptr, EMPTY_STRING_VIEW};
+        const auto& species_name = p->SpeciesName();
+        return {p, species_name.empty() ? nullptr : context.species.GetSpecies(species_name), species_name};
+    };
+
+    static constexpr auto has_species = [](const auto& pssn) noexcept { return !std::get<2>(pssn).empty(); };
 
     // 1) EffectsGroups from Planet Species
     type_timer.EnterSection("planet species");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for PLANET SPECIES";
-    std::map<std::string_view, std::vector<const UniverseObject*>> species_objects;
+    if (effects_trace_log)
+        TraceLogger(effects) << "Universe::GetEffectsAndTargets for PLANET SPECIES";
+    std::map<std::string_view, Condition::ObjectSet> species_objects;
     // find each species planets in single pass, maintaining object map order per-species
-    for (auto planet : context.ContextObjects().allRaw<Planet>()) {
-        if (destroyed_object_ids.contains(planet->ID()))
-            continue;
-        const std::string& species_name = planet->SpeciesName();
-        if (species_name.empty())
-            continue;
-        const Species* species = context.species.GetSpecies(species_name);
-        if (!species) {
+    auto sp_rng = context.ContextObjects().allRaw<Planet>()
+        | range_filter(not_destroyed) | range_transform(to_plt_sp) | range_filter(has_species);
+    for (const auto& [planet, species, species_name] : sp_rng) {
+        if (!species)
             ErrorLogger() << "GetEffectsAndTargets couldn't get Species " << species_name;
-            continue;
-        }
-        species_objects[species_name].push_back(planet);
+        else
+            species_objects[species_name].push_back(planet);
     }
     // allocate storage for target sets and dispatch condition evaluations
-    for ([[maybe_unused]] auto& [species_name, species] : context.species) {
+    for ([[maybe_unused]] auto& [species_name, species] : context.species.AllSpecies()) {
         auto species_objects_it = species_objects.find(species_name);
         if (species_objects_it == species_objects.end())
             continue;
@@ -1409,16 +1468,17 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              context, potential_targets,
                                              potential_ids_set,
                                              source_effects_targets_causes_reorder_buffer,
-                                             thread_pool, n);
+                                             thread_pool, n, effects_trace_log);
     }
 
 
     // 1.5) EffectsGroups from Ship Species
     // find each species ships in single pass, maintaining object map order per-species
     type_timer.EnterSection("ship species");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for SHIP SPECIES";
+    if (effects_trace_log)
+        TraceLogger(effects) << "Universe::GetEffectsAndTargets for SHIP SPECIES";
     species_objects.clear();
-    for (auto ship : context.ContextObjects().allRaw<Ship>()) {
+    for (const auto* ship : context.ContextObjects().allRaw<Ship>()) {
         if (destroyed_object_ids.contains(ship->ID()))
             continue;
         const std::string& species_name = ship->SpeciesName();
@@ -1432,7 +1492,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
         species_objects[species_name].push_back(ship);
     }
     // allocate storage for target sets and dispatch condition evaluations
-    for ([[maybe_unused]] auto& [species_name, species] : context.species) {
+    for ([[maybe_unused]] auto& [species_name, species] : context.species.AllSpecies()) {
         auto species_objects_it = species_objects.find(species_name);
         if (species_objects_it == species_objects.end())
             continue;
@@ -1446,14 +1506,15 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              context, potential_targets,
                                              potential_ids_set,
                                              source_effects_targets_causes_reorder_buffer,
-                                             thread_pool, n);
+                                             thread_pool, n, effects_trace_log);
     }
 
 
     // 2) EffectsGroups from Specials
     type_timer.EnterSection("specials");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for SPECIALS";
-    std::map<std::string_view, std::vector<const UniverseObject*>> specials_objects;
+    if (effects_trace_log)
+        TraceLogger(effects) << "Universe::GetEffectsAndTargets for SPECIALS";
+    std::map<std::string_view, Condition::ObjectSet> specials_objects;
     // determine objects with specials in a single pass
     for (const auto obj : context.ContextObjects().allRaw()) {
         if (destroyed_object_ids.contains(obj->ID()))
@@ -1484,13 +1545,14 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              context, potential_targets,
                                              potential_ids_set,
                                              source_effects_targets_causes_reorder_buffer,
-                                             thread_pool, n);
+                                             thread_pool, n, effects_trace_log);
     }
 
 
     // 3) EffectsGroups from Techs
     type_timer.EnterSection("techs");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for TECHS";
+    if (effects_trace_log)
+        TraceLogger(effects) << "Universe::GetEffectsAndTargets for TECHS";
     std::vector<Condition::ObjectSet> tech_sources; // for each empire, a set with a single source object for all its techs
     tech_sources.reserve(context.Empires().NumEmpires());
     // select a source object for each empire and dispatch condition evaluations
@@ -1500,25 +1562,27 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
             continue;
 
         // unlike species and special effectsgroups, all techs for an empire have the same source object
-        const auto& source_objects = tech_sources.emplace_back(1U, source);
+        const Condition::ObjectSet& source_objects = tech_sources.emplace_back(1U, source);
+        std::span<const UniverseObjectCXBase* const> source_objs_span(source_objects);
 
         for (const auto& tech_name : empire->ResearchedTechs() | range_keys) {
             const Tech* tech = GetTech(tech_name);
             if (!tech) continue;
 
             DispatchEffectsGroupScopeEvaluations(EffectsCauseType::ECT_TECH, tech_name,
-                                                 source_objects, tech->Effects(),
+                                                 source_objs_span, tech->Effects(),
                                                  only_meter_effects,
                                                  context, potential_targets,
                                                  potential_ids_set,
                                                  source_effects_targets_causes_reorder_buffer,
-                                                 thread_pool, n);
+                                                 thread_pool, n, effects_trace_log);
         }
     }
 
     // 3.5) EffectsGroups from Policies
     type_timer.EnterSection("policies");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for POLICIES";
+    if (effects_trace_log)
+        TraceLogger(effects) << "Universe::GetEffectsAndTargets for POLICIES";
     std::vector<Condition::ObjectSet> policy_sources; // for each empire, a set with a single source object for all its policies
     policy_sources.reserve(context.Empires().NumEmpires());
     for (const auto& empire : context.Empires() | range_values) {
@@ -1539,15 +1603,16 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                                  context, potential_targets,
                                                  potential_ids_set,
                                                  source_effects_targets_causes_reorder_buffer,
-                                                 thread_pool, n);
+                                                 thread_pool, n, effects_trace_log);
         }
     }
 
     // 4) EffectsGroups from Buildings
     type_timer.EnterSection("buildings");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for BUILDINGS";
+    if (effects_trace_log)
+        TraceLogger(effects) << "Universe::GetEffectsAndTargets for BUILDINGS";
     // determine buildings of each type in a single pass
-    std::map<std::string_view, std::vector<const UniverseObject*>> buildings_by_type;
+    std::map<std::string_view, Condition::ObjectSet> buildings_by_type;
     for (const auto& building : context.ContextObjects().allRaw<Building>()) {
         if (destroyed_object_ids.contains(building->ID()))
             continue;
@@ -1575,18 +1640,19 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              context, potential_targets,
                                              potential_ids_set,
                                              source_effects_targets_causes_reorder_buffer,
-                                             thread_pool, n);
+                                             thread_pool, n, effects_trace_log);
     }
 
 
     // 5) EffectsGroups from Ship Hull and Ship Parts
     type_timer.EnterSection("ship hull/parts");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for SHIPS hulls and parts";
+    if (effects_trace_log)
+        TraceLogger(effects) << "Universe::GetEffectsAndTargets for SHIPS hulls and parts";
     // determine ship hulls and parts of each type in a single pass
     // the same ship might be added multiple times if it contains the part multiple times
     // recomputing targets for the same ship and part is kind of silly here, but shouldn't hurt
-    std::map<std::string_view, std::vector<const UniverseObject*>> ships_by_ship_hull;
-    std::map<std::string_view, std::vector<const UniverseObject*>> ships_by_ship_part;
+    std::map<std::string_view, Condition::ObjectSet> ships_by_ship_hull;
+    std::map<std::string_view, Condition::ObjectSet> ships_by_ship_part;
 
     for (const auto ship : context.ContextObjects().allRaw<Ship>()) {
         if (destroyed_object_ids.contains(ship->ID()))
@@ -1628,7 +1694,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              context, potential_targets,
                                              potential_ids_set,
                                              source_effects_targets_causes_reorder_buffer,
-                                             thread_pool, n);
+                                             thread_pool, n, effects_trace_log);
     }
     // dispatch part condition evaluations
     for (const auto& [ship_part_name, ship_part] : GetShipPartManager()) {
@@ -1645,15 +1711,16 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              context, potential_targets,
                                              potential_ids_set,
                                              source_effects_targets_causes_reorder_buffer,
-                                             thread_pool, n);
+                                             thread_pool, n, effects_trace_log);
     }
 
 
     // 6) EffectsGroups from Fields
     type_timer.EnterSection("fields");
-    TraceLogger(effects) << "Universe::GetEffectsAndTargets for FIELDS";
+    if (effects_trace_log)
+        TraceLogger(effects) << "Universe::GetEffectsAndTargets for FIELDS";
     // determine fields of each type in a single pass
-    std::map<std::string_view, std::vector<const UniverseObject*>> fields_by_type;
+    std::map<std::string_view, Condition::ObjectSet> fields_by_type;
     for (const auto field : context.ContextObjects().allRaw<Field>()) {
         if (destroyed_object_ids.contains(field->ID()))
             continue;
@@ -1682,7 +1749,7 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
                                              context, potential_targets,
                                              potential_ids_set,
                                              source_effects_targets_causes_reorder_buffer,
-                                             thread_pool, n);
+                                             thread_pool, n, effects_trace_log);
     }
 
 
@@ -1698,8 +1765,9 @@ void Universe::GetEffectsAndTargets(std::map<int, Effect::SourcesEffectsTargetsA
             // job_result contains empty Effect::TargetSets that should be
             // populated from those in the pointed-to cached earlier entry
             const auto& resolved_scope_target_sets{*job_result_cached};
-            TraceLogger(effects) << "Reordering using cached result of size " << resolved_scope_target_sets.size()
-                                 << "  for expected result of size: " << job_result.size();
+            if (effects_trace_log)
+                TraceLogger(effects) << "Reordering using cached result of size " << resolved_scope_target_sets.size()
+                                     << "  for expected result of size: " << job_result.size();
 
             // copy TargetSets from the pointed-to cached results
             for (std::size_t i = 0; i < std::min(job_result.size(), resolved_scope_target_sets.size()); ++i) {
@@ -1819,7 +1887,7 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
             ScriptingContext source_context{context, ScriptingContext::Source{}, source};
             effects_group->Execute(source_context,
                                    targets_and_cause,
-                                   update_effect_accounting ? &m_effect_accounting_map : nullptr,
+                                   update_effect_accounting ? std::addressof(m_effect_accounting_map) : nullptr,
                                    only_meter_effects,
                                    only_appearance_effects,
                                    include_empire_meter_effects,
@@ -1859,7 +1927,7 @@ void Universe::ExecuteEffects(std::map<int, Effect::SourcesEffectsTargetsAndCaus
 
     for (auto obj_id : context.ContextUniverse().m_marked_destroyed | range_keys) {
         // do actual recursive destruction.
-        if (const auto* obj = m_objects.getRaw(obj_id))
+        if (m_objects.getRaw(obj_id))
             RecursiveDestroy(obj_id, empire_ids);
     }
 }
@@ -1986,8 +2054,8 @@ void Universe::ForgetKnownObject(int empire_id, int object_id) {
     }
 
     // Remove all contained objects to avoid breaking fleet+ship, system+planet invariants
-    const auto& contained_ids_set = obj->ContainedObjectIDs();
-    const std::vector<int> contained_ids(contained_ids_set.begin(), contained_ids_set.end()); // copy since forgetting will modify container while iterating over it
+    const auto contained_ids_span = obj->ContainedObjectIDs();
+    const std::vector<int> contained_ids(contained_ids_span.begin(), contained_ids_span.end()); // copy since forgetting will modify container while iterating over it
     const int container_id = obj->ContainerObjectID();
 
     for (int child_id : contained_ids)
@@ -2089,7 +2157,7 @@ std::map<int, std::map<std::pair<double, double>, float>>
 Universe::GetEmpiresAndNeutralPositionDetectionRanges(const ObjectMap& objects) const
 {
     std::map<int, std::map<std::pair<double, double>, float>> retval;
-    auto not_destroyed = [this](const UniverseObject* obj) { return !m_destroyed_object_ids.contains(obj->ID()); };
+    auto not_destroyed = [this](const auto* obj) { return !m_destroyed_object_ids.contains(obj->ID()); };
 
     CheckObjects(objects.findRaw<Planet>(not_destroyed), retval);
     CheckObjects(objects.findRaw<Ship>(not_destroyed), retval);
@@ -2103,7 +2171,7 @@ Universe::GetEmpiresAndNeutralPositionDetectionRanges(
     const ObjectMap& objects, const std::unordered_set<int>& exclude_ids) const
 {
     std::map<int, std::map<std::pair<double, double>, float>> retval;
-    auto not_destroyed_or_excluded = [this, &exclude_ids](const UniverseObject* obj)
+    auto not_destroyed_or_excluded = [this, &exclude_ids](const auto* obj)
     { return !m_destroyed_object_ids.contains(obj->ID()) && !exclude_ids.contains(obj->ID()); };
 
     CheckObjects(objects.findRaw<Planet>(not_destroyed_or_excluded), retval);
@@ -2590,7 +2658,7 @@ namespace {
         // map from empire ID to ID of systems where those empires own at least one object
         std::map<int, std::set<int>> empires_systems_with_owned_objects;
 
-        static constexpr auto in_a_system = [](const UniverseObject* obj) noexcept
+        static constexpr auto in_a_system = [](const auto* obj) noexcept
         { return obj && obj->SystemID() != INVALID_OBJECT_ID; };
 
         // get systems where empires have owned objects
@@ -3254,16 +3322,17 @@ std::vector<int> Universe::RecursiveDestroy(int object_id, const std::span<const
         for (auto* sys : m_objects.allRaw<System>())
             sys->RemoveStarlane(this_sys_id);
 
+
         // remove fleets / ships moving along destroyed starlane
-        std::vector<int> fleets_to_destroy;
-        fleets_to_destroy.reserve(m_objects.size<Fleet>());
-        for (const auto* fleet : m_objects.allRaw<Fleet>()) { // TODO: rangify?
-            if (fleet->SystemID() == INVALID_OBJECT_ID && (
-                fleet->NextSystemID() == this_sys_id ||
-                fleet->PreviousSystemID() == this_sys_id))
-            { fleets_to_destroy.push_back(fleet->ID()); }
-        }
-        for (const auto fleet_id : fleets_to_destroy)
+        const auto moving_to_or_from = [this_sys_id](const Fleet& fleet) noexcept {
+            return fleet.SystemID() == INVALID_OBJECT_ID &&
+                (fleet.NextSystemID() == this_sys_id || fleet.PreviousSystemID() == this_sys_id);
+        };
+
+        // collect before modifying source...
+        const auto fleet_ids_to_destroy = m_objects.findIDs<Fleet>(moving_to_or_from) | range_to_vec;
+
+        for (const auto fleet_id : fleet_ids_to_destroy)
             RecursiveDestroy(fleet_id, empire_ids);
 
         // then destroy system itself
@@ -3412,7 +3481,7 @@ const Universe::ShipDesignMap& Universe::GetShipDesignsToSerialize(
 }
 
 void Universe::GetObjectsToSerialize(ObjectMap& objects, int encoding_empire) const {
-    if (&objects == &m_objects)
+    if (std::addressof(objects) == std::addressof(m_objects))
         return;
 
     objects.clear();
@@ -3461,7 +3530,7 @@ void Universe::GetDestroyedObjectsToSerialize(std::set<int>& destroyed_object_id
 void Universe::GetEmpireKnownObjectsToSerialize(EmpireObjectMap& empire_latest_known_objects,
                                                 int encoding_empire) const
 {
-    if (&empire_latest_known_objects == &m_empire_latest_known_objects)
+    if (std::addressof(empire_latest_known_objects) == std::addressof(m_empire_latest_known_objects))
         return;
 
     DebugLogger() << "GetEmpireKnownObjectsToSerialize encoding empire: " << encoding_empire;
@@ -3521,7 +3590,7 @@ void Universe::GetEmpireObjectVisibilityTurnMap(EmpireObjectVisibilityTurnMap& e
 void Universe::GetEmpireKnownDestroyedObjects(ObjectKnowledgeMap& empire_known_destroyed_object_ids,
                                               int encoding_empire) const
 {
-    if (&empire_known_destroyed_object_ids == &m_empire_known_destroyed_object_ids)
+    if (std::addressof(empire_known_destroyed_object_ids) == std::addressof(m_empire_known_destroyed_object_ids))
         return;
 
     if (encoding_empire == ALL_EMPIRES) {
@@ -3540,7 +3609,7 @@ void Universe::GetEmpireKnownDestroyedObjects(ObjectKnowledgeMap& empire_known_d
 void Universe::GetEmpireStaleKnowledgeObjects(ObjectKnowledgeMap& empire_stale_knowledge_object_ids,
                                               int encoding_empire) const
 {
-    if (&empire_stale_knowledge_object_ids == &m_empire_stale_knowledge_object_ids)
+    if (std::addressof(empire_stale_knowledge_object_ids) == std::addressof(m_empire_stale_knowledge_object_ids))
         return;
 
     if (encoding_empire == ALL_EMPIRES) {

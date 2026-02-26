@@ -7,7 +7,6 @@ from operator import itemgetter
 from typing import (
     NamedTuple,
     NewType,
-    Union,
 )
 
 import AIDependencies
@@ -412,9 +411,7 @@ def generate_production_orders():  # noqa: C901
                             pass
                     use_sys = ([(-1, INVALID_ID)] + sorted([(dist, sys_id) for sys_id, dist in distance_map.items()]))[
                         :2
-                    ][-1][
-                        -1
-                    ]  # kinda messy, but ensures a value
+                    ][-1][-1]  # kinda messy, but ensures a value
                 if use_sys != INVALID_ID:
                     try:
                         use_loc = get_owned_planets_in_system(use_sys)[0]
@@ -521,9 +518,7 @@ def generate_production_orders():  # noqa: C901
                         pass
                 use_sys = ([(-1, INVALID_ID)] + sorted([(dist, sys_id) for sys_id, dist in distance_map.items()]))[:2][
                     -1
-                ][
-                    -1
-                ]  # kinda messy, but ensures a value
+                ][-1]  # kinda messy, but ensures a value
             if use_sys != INVALID_ID:
                 try:
                     use_loc = get_owned_planets_in_system(use_sys)[0]
@@ -625,9 +620,7 @@ def generate_production_orders():  # noqa: C901
                 debug([INVALID_ID] + sorted([(dist, sys_id) for sys_id, dist in distance_map.items()]))
                 use_sys = ([(-1, INVALID_ID)] + sorted([(dist, sys_id) for sys_id, dist in distance_map.items()]))[:2][
                     -1
-                ][
-                    -1
-                ]  # kinda messy, but ensures a value
+                ][-1]  # kinda messy, but ensures a value
             if use_sys != INVALID_ID:
                 try:
                     use_loc = get_owned_planets_in_system(use_sys)[0]
@@ -1394,7 +1387,7 @@ def _location_rating(planet: fo.planet) -> float:
 
 def _try_enqueue(
     building_type: BuildingTypeBase,
-    candidates: Union[PlanetId, Iterable[PlanetId]],
+    candidates: PlanetId | Iterable[PlanetId],
     *,
     at_front: bool = False,
     ignore_dislike: bool = False,

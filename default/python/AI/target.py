@@ -19,7 +19,7 @@ class Target:
             warning("Target is invalid %s" % self)
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.id == other.id
+        return type(self) is type(other) and self.id == other.id
 
     def __hash__(self):
         return hash(self.id)
@@ -100,7 +100,7 @@ class TargetFleet(Target):
         # will also return INVALID_ID if somehow the fleet cannot be retrieved
         return fleet.systemID if fleet else INVALID_ID
 
-    def get_system(self) -> Optional[TargetSystem]:
+    def get_system(self) -> TargetSystem | None:
         """
         Get current fleet location or target system if currently on starlane.
         """

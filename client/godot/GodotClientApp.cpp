@@ -71,22 +71,16 @@ GodotClientApp::GodotClientApp() {
     LogDependencyVersions();
 
     SetStringtableDependentOptionDefaults();
-
-    // Start parsing content
-    std::promise<void> barrier;
-    std::future<void> barrier_future = barrier.get_future();
-    std::thread background([this] (auto b) {
-        DebugLogger() << "Started background parser thread";
-        PythonCommon python;
-        python.Initialize();
-        StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"), std::move(b));
-    }, std::move(barrier));
-    background.detach();
-    barrier_future.wait();
 }
 
 GodotClientApp::~GodotClientApp() {
 
+}
+
+void GodotClientApp::StartParsingContent() {
+    PythonCommon python;
+    python.Initialize();
+    StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"));
 }
 
 int GodotClientApp::EffectsProcessingThreads() const
@@ -111,7 +105,9 @@ void GodotClientApp::StartServer() {
     // Otherwise the dynamic linker will look for a correct python lib in system
     // paths, and if it can't find it, throw an error and terminate!
     // Setting environment variable here, spawned child processes will inherit it.
-    setenv("DYLD_LIBRARY_PATH", GetPythonHome().string().c_str(), 1);
+    const char* old_library_path = getenv("DYLD_LIBRARY_PATH");
+    const auto library_path = (old_library_path != nullptr) ? (GetPythonHome().string() + ":" + old_library_path) : GetPythonHome().string();
+    setenv("DYLD_LIBRARY_PATH", library_path.c_str(), 1);
 #endif
 
     std::vector<std::string> args;
@@ -146,7 +142,7 @@ void GodotClientApp::StartServer() {
     DebugLogger() << "Launching server process with args: ";
     for (auto arg : args)
         DebugLogger() << arg;
-    m_server_process = Process(SERVER_CLIENT_EXE, args);
+    m_server_process = Process(m_networking->IoContext(), SERVER_CLIENT_EXE, args);
     DebugLogger() << "... finished launching server process.";
 }
 
@@ -224,13 +220,14 @@ void GodotClientApp::NewSinglePlayerGame() {
         human_player_setup_data.starting_species_name = "SP_HUMAN";   // kludge / bug workaround for bug with options storage and retreival.  Empty-string options are stored, but read in as "true" boolean, and converted to string equal to "1"
 
     if (human_player_setup_data.starting_species_name != "RANDOM" &&
-        !GetSpeciesManager().GetSpecies(human_player_setup_data.starting_species_name))
+        !m_species_manager.GetSpecies(human_player_setup_data.starting_species_name))
     {
-        const SpeciesManager& sm = GetSpeciesManager();
-        if (sm.NumPlayableSpecies() < 1)
+        if (m_species_manager.NumPlayableSpecies() < 1) {
             human_player_setup_data.starting_species_name.clear();
-        else
-            human_player_setup_data.starting_species_name = sm.playable_begin()->first;
+        } else {
+            auto playable_rng = m_species_manager.AllSpecies() | range_filter(SpeciesManager::is_playable);
+            human_player_setup_data.starting_species_name = playable_rng.front().first;
+        }
     }
 
     human_player_setup_data.save_game_empire_id = ALL_EMPIRES; // not used for new games

@@ -29,12 +29,12 @@ public:
     /** Helper struct for parsing tech definitions */
     struct TechInfo {
         TechInfo() = default;
-        TechInfo(std::string& name_, std::string& description_,
-                 std::string& short_description_, std::string& category_,
+        TechInfo(std::string name_, std::string description_,
+                 std::string short_description_, std::string category_,
                  std::unique_ptr<ValueRef::ValueRef<double>>&& research_cost_,
                  std::unique_ptr<ValueRef::ValueRef<int>>&& research_turns_,
                  bool researchable_,
-                 std::set<std::string>& tags_);
+                 std::set<std::string> tags_);
         ~TechInfo();
 
         std::string             name;
@@ -69,9 +69,9 @@ public:
 
     [[nodiscard]] bool operator==(const Tech& rhs) const;
     Tech(const Tech&) = delete;
-    Tech(Tech&&) = default;
+    Tech(Tech&&);
     Tech& operator=(const Tech&) = delete;
-    Tech& operator=(Tech&&) = default;
+    Tech& operator=(Tech&&);
 
     [[nodiscard]] const auto& Name() const noexcept             { return m_name; }
     [[nodiscard]] const auto& Description() const noexcept      { return m_description; }

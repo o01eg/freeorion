@@ -1,4 +1,4 @@
-//! GiGi - A GUI for OpenGL
+﻿//! GiGi - A GUI for OpenGL
 //!
 //!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
 //!  Copyright (C) 2013-2020 The FreeOrion Project
@@ -28,7 +28,7 @@
 #include <GG/ListBox.h>
 #include <GG/StyleFactory.h>
 #include <GG/Timer.h>
-#include <GG/utf8/checked.h>
+#include <GG/utf8/utf8.h>
 #include <GG/ZList.h>
 
 
@@ -64,13 +64,58 @@ WndEvent::EventType ButtonEvent(WndEvent::EventType left_type, unsigned int mous
 }
 
 namespace {
-    using utf8_wchar_iterator = utf8::iterator<std::string_view::const_iterator, wchar_t> ;
-    using word_regex = boost::xpressive::basic_regex<utf8_wchar_iterator>;
-    using word_regex_iterator = boost::xpressive::regex_iterator<utf8_wchar_iterator>;
+    // custom utf8::iterator reimplementation outputs wchar_t instead of char32_t.
+    // utf8_iterator = utf8::iterator<std::string_view::const_iterator> issues:
+    // - with MSVC, boost::xpressive::basic_regex leads to DLL import / export
+    //   errors because MSVC does not export locale facts for char32_t.
+    //   MSVC does provice facets for char and wchar_t.
+    // - with GCC/libstdc++, boost/xpressive/traits/cpp_regex_traits.hpp has
+    //   error: invalid conversion from ‘const wchar_t*’ to ‘const char32_t*’
+    class utf8_wchar_iterator {
+        using sv_it = std::string_view::const_iterator;
+        sv_it it{}, range_start{}, range_end{};
+    public:
+        typedef wchar_t value_type; // differs from utf8::iterator
+        typedef wchar_t* pointer;
+        typedef wchar_t& reference;
+        typedef std::ptrdiff_t difference_type;
+        typedef std::bidirectional_iterator_tag iterator_category;
 
-    constexpr wchar_t WIDE_DASH = u'-';
-    const word_regex DEFAULT_WORD_REGEX =
-        +boost::xpressive::set[boost::xpressive::_w | WIDE_DASH];
+        constexpr utf8_wchar_iterator() noexcept = default;
+        constexpr utf8_wchar_iterator(sv_it octet_it, sv_it rangestart, sv_it rangeend) noexcept :
+            it(octet_it), range_start(rangestart), range_end(rangeend)
+        {}
+
+        constexpr auto base() const noexcept { return it; }
+        constexpr value_type operator*() const { auto temp = it; return static_cast<value_type>(utf8::next(temp, range_end)); }
+
+        constexpr bool operator==(const utf8_wchar_iterator& rhs) const {
+            if (range_start != rhs.range_start || range_end != rhs.range_end)
+                throw std::logic_error("Comparing utf-8 iterators defined with different ranges");
+            return (it == rhs.it);
+        }
+        constexpr bool operator!=(const utf8_wchar_iterator& rhs) const { return !(operator==(rhs)); }
+
+        constexpr auto& operator++() { utf8::next(it, range_end); return *this; }
+        constexpr auto operator++(int) {
+            auto temp = *this;
+            utf8::next(it, range_end);
+            return temp;
+        }
+        constexpr auto& operator--() { utf8::prior(it, range_start); return *this; }
+        constexpr auto operator--(int) {
+            auto temp = *this;
+            utf8::prior(it, range_start);
+            return temp;
+        }
+    };
+
+    using utf8_iterator = utf8_wchar_iterator;
+    using word_regex = boost::xpressive::basic_regex<utf8_iterator>;
+    using word_regex_iterator = boost::xpressive::regex_iterator<utf8_iterator>;
+
+    constexpr utf8_iterator::value_type HYPHEN{'-'};
+    const word_regex DEFAULT_WORD_REGEX = +boost::xpressive::set[boost::xpressive::_w | HYPHEN];
 }
 
 void WriteWndToPNG(const Wnd* wnd, const std::string& filename)
@@ -92,13 +137,10 @@ void WriteWndToPNG(const Wnd* wnd, const std::string& filename)
     glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
-    glReadPixels(Value(ul.x),
-                    Value(GUI::GetGUI()->AppHeight() - wnd->Bottom()),
-                    Value(size.x),
-                    Value(size.y),
-                    GL_RGBA,
-                    GL_UNSIGNED_BYTE,
-                    &bytes[0]);
+    glReadPixels(Value(ul.x), Value(GUI::GetGUI()->AppHeight() - wnd->Bottom()),
+                 Value(size.x), Value(size.y),
+                 GL_RGBA, GL_UNSIGNED_BYTE,
+                 bytes.data());
 
     glPopClientAttrib();
 
@@ -284,7 +326,7 @@ void GUIImpl::HandleMouseButtonPress(unsigned int mouse_button, Pt pos, int curr
             m_wnd_resize_offset.y = curr_wnd_under_cursor->Top() - pos.y;
         else
             m_wnd_resize_offset.y = curr_wnd_under_cursor->Bottom() - pos.y;
-        auto&& drag_wnds_root_parent = curr_wnd_under_cursor->RootParent();
+        auto drag_wnds_root_parent = curr_wnd_under_cursor->RootParent();
         GUI::s_gui->MoveUp(drag_wnds_root_parent ? drag_wnds_root_parent : curr_wnd_under_cursor);
         curr_wnd_under_cursor->HandleEvent(WndEvent(
             ButtonEvent(WndEvent::EventType::LButtonDown, mouse_button), pos, m_mod_keys));
@@ -317,7 +359,7 @@ void GUIImpl::HandleMouseDrag(unsigned int mouse_button, Pt pos, int curr_ticks)
                 dragged_wnd->DragDropDataType() != "" &&// Wnd must have a defined drag-drop data type to be drag-dropped
                 mouse_button == 0)                      // left mouse button drag-drop only
             {
-                auto&& parent = dragged_wnd->Parent();
+                auto parent = dragged_wnd->Parent();
                 Pt offset = m_prev_mouse_button_press_pos - dragged_wnd->UpperLeft();
                 // start drag
                 GUI::s_gui->RegisterDragDropWnd(dragged_wnd, offset, parent);
@@ -500,7 +542,7 @@ void GUIImpl::HandleMouseButtonRelease(unsigned int mouse_button, Pt pos, int cu
                     m_drag_drop_wnds_acceptable = event.GetAcceptableDropWnds();
 
                     // prep / handle end of drag-drop
-                    auto&& drag_drop_originating_wnd = click_drag_wnd->Parent();
+                    auto drag_drop_originating_wnd = click_drag_wnd->Parent();
                     m_drag_drop_originating_wnd = drag_drop_originating_wnd;
                     curr_wnd_under_cursor->HandleEvent(WndEvent(WndEvent::EventType::DragDropLeave));
                     m_curr_drag_drop_here_wnd.reset();
@@ -537,7 +579,7 @@ void GUIImpl::HandleMouseButtonRelease(unsigned int mouse_button, Pt pos, int cu
                 m_drag_drop_wnds_acceptable = event.GetAcceptableDropWnds();
 
                 // prep / handle end of drag-drop
-                auto&& drag_drop_originating_wnd = click_drag_wnd->Parent();
+                auto drag_drop_originating_wnd = click_drag_wnd->Parent();
                 m_drag_drop_originating_wnd = drag_drop_originating_wnd;
                 curr_wnd_under_cursor->HandleEvent(WndEvent(WndEvent::EventType::DragDropLeave));
                 m_curr_drag_drop_here_wnd.reset();
@@ -662,7 +704,7 @@ void GUIImpl::HandleKeyRelease(Key key, uint32_t key_code_point,
     m_browse_info_wnd.reset();
     m_browse_info_mode = -1;
     m_browse_target = nullptr;
-    auto&& focus_wnd = FocusWnd();
+    auto focus_wnd = FocusWnd();
     if (focus_wnd)
         focus_wnd->HandleEvent(WndEvent(
             WndEvent::EventType::KeyRelease, key, key_code_point, mod_keys));
@@ -672,8 +714,7 @@ void GUIImpl::HandleTextInput(std::string text) {
     m_browse_info_wnd.reset();
     m_browse_info_mode = -1;
     m_browse_target = nullptr;
-    auto&& focus_wnd = FocusWnd();
-    if (focus_wnd)
+    if (auto focus_wnd = FocusWnd())
         focus_wnd->HandleEvent(WndEvent(WndEvent::EventType::TextInput, std::move(text)));
 }
 
@@ -682,7 +723,7 @@ void GUIImpl::HandleMouseMove(Flags<ModKey> mod_keys, Pt pos, Pt rel,
 {
     auto curr_wnd_under_cursor = GUI::s_gui->CheckedGetWindowUnder(pos, m_mod_keys);
     m_curr_wnd_under_cursor = curr_wnd_under_cursor;
-    const auto&& prev_wnd_under_cursor = LockAndResetIfExpired(m_prev_wnd_under_cursor);
+    const auto prev_wnd_under_cursor = LockAndResetIfExpired(m_prev_wnd_under_cursor);
 
     m_mouse_pos = pos; // record mouse position
     m_mouse_rel = rel; // record mouse movement
@@ -738,7 +779,7 @@ std::shared_ptr<Wnd> GUIImpl::FocusWnd() const
 
 void GUIImpl::SetFocusWnd(const std::shared_ptr<Wnd>& wnd)
 {
-    auto&& focus_wnd = FocusWnd();
+    auto focus_wnd = FocusWnd();
     if (focus_wnd == wnd)
         return;
 
@@ -747,15 +788,12 @@ void GUIImpl::SetFocusWnd(const std::shared_ptr<Wnd>& wnd)
         focus_wnd->HandleEvent(WndEvent(WndEvent::EventType::LosingFocus));
 
     if (m_modal_wnds.empty())
-        m_focus_wnd = wnd;
+        m_focus_wnd = std::move(wnd);
     else
-        // m_modal_wnds stores the window that is modal and the child that has
-        // focus separately.
-        m_modal_wnds.back().second = wnd;
+        m_modal_wnds.back().second = std::move(wnd); // m_modal_wnds stores the window that is modal and the child that has focus separately.
 
     // inform new focus wnd that it is gaining focus
-    auto&& new_focus_wnd = FocusWnd();
-    if (new_focus_wnd)
+    if (auto new_focus_wnd = FocusWnd())
         new_focus_wnd->HandleEvent(WndEvent(WndEvent::EventType::GainingFocus));
 }
 
@@ -853,10 +891,10 @@ std::shared_ptr<Wnd> GUI::FocusWnd() const
 
 bool GUI::FocusWndAcceptsTypingInput() const
 {
-    const auto&& focus_wnd = FocusWnd();
-    if (!focus_wnd)
+    if (auto focus_wnd = FocusWnd())
+        return dynamic_cast<const Edit*>(focus_wnd.get()); // currently only Edit controls accept text input, so far as I'm aware. Could add a ->AcceptsTypingInput() function to Wnd if needed
+    else
         return false;
-    return dynamic_cast<const Edit*>(focus_wnd.get());    // currently only Edit controls accept text input, so far as I'm aware. Could add a ->AcceptsTypingInput() function to Wnd if needed
 }
 
 std::shared_ptr<Wnd> GUI::PrevFocusInteractiveWnd() const
@@ -1031,8 +1069,8 @@ std::vector<std::pair<CPSize, CPSize>> GUI::FindWords(std::string_view str) cons
     std::vector<std::pair<CPSize, CPSize>> retval;
 
     try {
-        const utf8_wchar_iterator first(str.begin(), str.begin(), str.end());
-        const utf8_wchar_iterator last(str.end(), str.begin(), str.end());
+        const utf8_iterator first(str.begin(), str.begin(), str.end());
+        const utf8_iterator last(str.end(), str.begin(), str.end());
         const word_regex_iterator it(first, last, DEFAULT_WORD_REGEX);
         const word_regex_iterator end_it;
 
@@ -1050,8 +1088,8 @@ std::vector<std::pair<StrSize, StrSize>> GUI::FindWordsStringIndices(std::string
     std::vector<std::pair<StrSize, StrSize>> retval;
 
     try {
-        const utf8_wchar_iterator first(str.begin(), str.begin(), str.end());
-        const utf8_wchar_iterator last(str.end(), str.begin(), str.end());
+        const utf8_iterator first(str.begin(), str.begin(), str.end());
+        const utf8_iterator last(str.end(), str.begin(), str.end());
         const word_regex_iterator it(first, last, DEFAULT_WORD_REGEX);
         const word_regex_iterator end_it;
 
@@ -1076,8 +1114,8 @@ std::vector<std::string_view> GUI::FindWordsStringViews(std::string_view str) co
     std::vector<std::string_view> retval;
 
     try {
-        const utf8_wchar_iterator first(str.begin(), str.begin(), str.end());
-        const utf8_wchar_iterator last(str.end(), str.begin(), str.end());
+        const utf8_iterator first(str.begin(), str.begin(), str.end());
+        const utf8_iterator last(str.end(), str.begin(), str.end());
         const word_regex_iterator it(first, last, DEFAULT_WORD_REGEX);
         const word_regex_iterator end_it;
 
@@ -1244,16 +1282,14 @@ void GUI::SetFocusWnd(const std::shared_ptr<Wnd>& wnd)
 
 bool GUI::SetPrevFocusWndInCycle()
 {
-    auto&& prev_wnd = PrevFocusInteractiveWnd();
-    if (prev_wnd)
+    if (auto prev_wnd = PrevFocusInteractiveWnd())
         SetFocusWnd(prev_wnd);
     return true;
 }
 
 bool GUI::SetNextFocusWndInCycle()
 {
-    auto&& next_wnd = NextFocusInteractiveWnd();
-    if (next_wnd)
+    if (auto next_wnd = NextFocusInteractiveWnd())
         SetFocusWnd(next_wnd);
     return true;
 }
@@ -1270,7 +1306,7 @@ void GUI::Register(std::shared_ptr<Wnd> wnd)
         return;
 
     // Make top level by removing from parent
-    if (auto&& parent = wnd->Parent())
+    if (auto parent = wnd->Parent())
         parent->DetachChild(wnd);
 
     m_impl->m_zlist.Add(std::move(wnd));
@@ -1303,7 +1339,7 @@ void GUI::RunModal(std::shared_ptr<Wnd> wnd)
 {
     if (!wnd)
         return;
-    //std::cout << "RunModal start on " << wnd->Name() << "  at: " << &*wnd << "\n";
+    //std::cout << "RunModal start on " << wnd->Name() << "  at: " << wnd.get() << "\n";
     while (!wnd->ModalDone()) {
         HandleSystemEvents();
         // send an idle message, so that the gui has timely updates for triggering browse info windows, etc.
@@ -1353,7 +1389,7 @@ void GUI::RegisterDragDropWnd(std::shared_ptr<Wnd> wnd, Pt offset,
     assert(wnd);
 
     // Throw if all dragged wnds are not from the same original wnd.
-    const auto&& drag_drop_originating_wnd = LockAndResetIfExpired(m_impl->m_drag_drop_originating_wnd);
+    const auto drag_drop_originating_wnd = LockAndResetIfExpired(m_impl->m_drag_drop_originating_wnd);
     if (!m_impl->m_drag_drop_wnds.empty() && originating_wnd != drag_drop_originating_wnd) {
         std::string m_impl_orig_wnd_name("NULL");
         std::string orig_wnd_name("NULL");
@@ -1379,10 +1415,10 @@ void GUI::CancelDragDrop()
 }
 
 void GUI::RegisterTimer(Timer& timer)
-{ m_impl->m_timers.emplace(&timer); }
+{ m_impl->m_timers.emplace(std::addressof(timer)); }
 
 void GUI::RemoveTimer(Timer& timer)
-{ m_impl->m_timers.erase(&timer); }
+{ m_impl->m_timers.erase(std::addressof(timer)); }
 
 void GUI::EnableKeyPressRepeat(unsigned int delay, unsigned int interval)
 {
@@ -1441,39 +1477,34 @@ void GUI::EnableModalAcceleratorSignals(bool allow)
 void GUI::SetMouseLRSwapped(bool swapped)
 { m_impl->m_mouse_lr_swap = swapped; }
 
-std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts)
+std::shared_ptr<const Font> GUI::GetFont(std::string_view font_filename, unsigned int pts)
 { return GetFontManager().GetFont(font_filename, pts); }
 
-std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts,
-                                   const std::vector<uint8_t>& file_contents)
+std::shared_ptr<const Font> GUI::GetFont(std::string_view font_filename, unsigned int pts,
+                                         const std::vector<uint8_t>& file_contents)
 { return GetFontManager().GetFont(font_filename, pts, file_contents); }
 
-std::shared_ptr<Font> GUI::GetFont(const std::shared_ptr<Font>& font, unsigned int pts)
+std::shared_ptr<const Font> GUI::GetFont(const std::shared_ptr<const Font>& font, unsigned int pts) const
 {
-    std::shared_ptr<Font> retval;
-    if (font->FontName() == StyleFactory::DefaultFontName()) {
-        retval = GetStyleFactory().DefaultFont(pts);
-    } else {
-        retval = GetFont(font->FontName(), font->PointSize(),
-                         font->UnicodeCharsets().begin(),
-                         font->UnicodeCharsets().end());
-    }
-    return retval;
+    if (!font || font->FontName() == StyleFactory::DefaultFontName())
+        return GetStyleFactory().DefaultFont(pts);
+    else
+        return GetFontManager().GetFont(font->FontName(), pts, font->UnicodeCharsets());
 }
 
 void GUI::FreeFont(std::string_view font_filename, unsigned int pts)
 { GetFontManager().FreeFont(font_filename, pts); }
 
-std::shared_ptr<Texture> GUI::StoreTexture(Texture* texture, const std::string& texture_name)
-{ return GetTextureManager().StoreTexture(texture, texture_name); }
+void GUI::StoreTexture(Texture* texture, std::string texture_name)
+{ GetTextureManager().StoreTexture(texture, std::move(texture_name)); }
 
-std::shared_ptr<Texture> GUI::StoreTexture(const std::shared_ptr<Texture>& texture, const std::string& texture_name)
-{ return GetTextureManager().StoreTexture(texture, texture_name); }
+void GUI::StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name)
+{ GetTextureManager().StoreTexture(std::move(texture), std::move(texture_name)); }
 
-std::shared_ptr<Texture> GUI::GetTexture(const boost::filesystem::path& path, bool mipmap)
+std::shared_ptr<Texture> GUI::GetTexture(const std::filesystem::path& path, bool mipmap)
 { return GetTextureManager().GetTexture(path, mipmap); }
 
-void GUI::FreeTexture(const boost::filesystem::path& path)
+void GUI::FreeTexture(const std::filesystem::path& path)
 { GetTextureManager().FreeTexture(path); }
 
 void GUI::SetStyleFactory(std::unique_ptr<StyleFactory>&& factory) noexcept
@@ -1496,10 +1527,10 @@ bool GUI::SetClipboardText(std::string text)
 
 bool GUI::CopyFocusWndText()
 {
-    const auto&& focus_wnd = FocusWnd();
-    if (!focus_wnd)
+    if (const auto focus_wnd = FocusWnd())
+        return CopyWndText(focus_wnd.get());
+    else
         return false;
-    return CopyWndText(focus_wnd.get());
 }
 
 bool GUI::CopyWndText(const Wnd* wnd)
@@ -1525,10 +1556,10 @@ bool GUI::CopyWndText(const Wnd* wnd)
 
 bool GUI::PasteFocusWndText(const std::string& text)
 {
-    auto&& focus_wnd = FocusWnd();
-    if (!focus_wnd)
+    if (auto focus_wnd = FocusWnd())
+        return PasteWndText(focus_wnd.get(), text);
+    else
         return false;
-    return PasteWndText(focus_wnd.get(), text);
 }
 
 bool GUI::PasteWndText(Wnd* wnd, const std::string& text)
@@ -1542,22 +1573,18 @@ bool GUI::PasteWndText(Wnd* wnd, const std::string& text)
 }
 
 bool GUI::PasteFocusWndClipboardText()
-{
-    return PasteFocusWndText(ClipboardText());
-}
+{ return PasteFocusWndText(ClipboardText()); }
 
 bool GUI::CutFocusWndText()
 {
-    auto&& focus_wnd = FocusWnd();
-    if (!focus_wnd)
+    if (auto focus_wnd = FocusWnd())
+        return CutWndText(focus_wnd.get());
+    else
         return false;
-    return CutWndText(focus_wnd.get());
 }
 
 bool GUI::CutWndText(Wnd* wnd)
-{
-    return CopyWndText(wnd) && PasteWndText(wnd, "");
-}
+{ return CopyWndText(wnd) && PasteWndText(wnd, ""); }
 
 bool GUI::WndSelectAll(Wnd* wnd)
 {
@@ -1589,22 +1616,19 @@ bool GUI::WndDeselect(Wnd* wnd)
 
 bool GUI::FocusWndSelectAll()
 {
-    auto&& focus_wnd = FocusWnd();
-    if (!focus_wnd)
+    if (auto focus_wnd = FocusWnd())
+        return WndSelectAll(focus_wnd.get());
+    else
         return false;
-    return WndSelectAll(focus_wnd.get());
 }
 
 bool GUI::FocusWndDeselect()
 {
-    auto&& focus_wnd = FocusWnd();
-    if (!focus_wnd)
+    if (auto focus_wnd = FocusWnd())
+        return WndDeselect(focus_wnd.get());
+    else
         return false;
-    return WndDeselect(focus_wnd.get());
 }
-
-GUI* GUI::GetGUI() noexcept
-{ return s_gui; }
 
 void GUI::PreRenderWindow(const std::shared_ptr<Wnd>& wnd, bool even_if_not_visible)
 { PreRenderWindow(wnd.get(), even_if_not_visible); }
@@ -1696,11 +1720,11 @@ void GUI::RenderWindow(Wnd* wnd)
         std::vector<Wnd*> children;
         children.reserve(wnd->Children().size());
         std::transform(wnd_children.begin(), wnd_children.end(), std::back_inserter(children),
-                       [](const auto& child) { return child.get(); });
+                       [](const auto& child) noexcept { return child.get(); });
 
         const auto client_child_begin =
             std::partition(children.begin(), children.end(),
-                           [](const auto& child) { return child->NonClientChild(); });
+                           [](const auto& child) noexcept { return child->NonClientChild(); });
 
         if (children.begin() != client_child_begin) {
             wnd->BeginNonclientClipping();
@@ -1752,13 +1776,13 @@ void GUI::RenderDragDropWnds()
 
 void GUI::ProcessBrowseInfo()
 {
-    auto&& wnd = LockAndResetIfExpired(m_impl->m_curr_wnd_under_cursor);
+    auto wnd = LockAndResetIfExpired(m_impl->m_curr_wnd_under_cursor);
     assert(wnd);
 
     if (!m_impl->m_mouse_button_state[0] && !m_impl->m_mouse_button_state[1] && !m_impl->m_mouse_button_state[2] &&
         (m_impl->m_modal_wnds.empty() || wnd->RootParent() == m_impl->m_modal_wnds.back().first))
     {
-        auto&& parent = wnd->Parent();
+        auto parent = wnd->Parent();
         while (!ProcessBrowseInfoImpl(wnd.get())
                && parent
                && (dynamic_cast<Control*>(wnd.get()) || dynamic_cast<Layout*>(wnd.get())))
@@ -1885,13 +1909,13 @@ std::shared_ptr<Wnd> GUI::CheckedGetWindowUnder(Pt pt, Flags<ModKey> mod_keys)
     bool unregistered_drag_drop = dragged_wnd && !dragged_wnd->DragDropDataType().empty();
     bool registered_drag_drop = !m_impl->m_drag_drop_wnds.empty();
 
-    const auto&& curr_drag_drop_here_wnd = LockAndResetIfExpired(m_impl->m_curr_drag_drop_here_wnd);
+    const auto curr_drag_drop_here_wnd = LockAndResetIfExpired(m_impl->m_curr_drag_drop_here_wnd);
     if (curr_drag_drop_here_wnd && !unregistered_drag_drop && !registered_drag_drop) {
         curr_drag_drop_here_wnd->HandleEvent(WndEvent(WndEvent::EventType::DragDropLeave));
         m_impl->m_curr_drag_drop_here_wnd.reset();
     }
 
-    const auto&& curr_wnd_under_cursor = LockAndResetIfExpired(m_impl->m_curr_wnd_under_cursor);
+    const auto curr_wnd_under_cursor = LockAndResetIfExpired(m_impl->m_curr_wnd_under_cursor);
     if (wnd_under_pt == curr_wnd_under_cursor)
         return wnd_under_pt;   // same Wnd is under cursor as before; nothing to do
 

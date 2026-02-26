@@ -105,7 +105,7 @@ namespace Effect {
       * same effectsgroup.  This is useful when a Ship has multiple copies
       * of the same effects group due to having multiple copies of the same
       * ship part in its design. */
-    typedef std::vector<std::pair<SourcedEffectsGroup, TargetsAndCause>> SourcesEffectsTargetsAndCausesVec;
+    using SourcesEffectsTargetsAndCausesVec = std::vector<std::pair<SourcedEffectsGroup, TargetsAndCause>>;
 
     /** The base class for all Effects.  When an Effect is executed, the source
     * object (the object to which the Effect or its containing EffectGroup is
@@ -198,7 +198,7 @@ namespace Effect {
     * this by considering the "universe" containing only the source object. If
     * the source object meets the activation condition, the EffectsGroup will be
     * active in the current turn. */
-    class FO_COMMON_API EffectsGroup {
+    class FO_COMMON_API EffectsGroup final {
     public:
         EffectsGroup(std::unique_ptr<Condition::Condition>&& scope,
                      std::unique_ptr<Condition::Condition>&& activation,
@@ -208,7 +208,7 @@ namespace Effect {
                      int priority = 0,
                      std::string description = "",
                      std::string content_name = "");
-        virtual ~EffectsGroup();
+        ~EffectsGroup();
 
         EffectsGroup(EffectsGroup&& rhs) = default;
 
@@ -238,8 +238,8 @@ namespace Effect {
 
         [[nodiscard]] auto& TopLevelContent() const noexcept { return m_content_name; }
 
-        [[nodiscard]] std::string      Dump(uint8_t ntabs = 0) const;
-        [[nodiscard]] virtual uint32_t GetCheckSum() const;
+        [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const;
+        [[nodiscard]] uint32_t    GetCheckSum() const;
 
     protected:
         std::unique_ptr<Condition::Condition>   m_scope;

@@ -4,6 +4,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/attributes/current_thread_id.hpp>
+#include <boost/log/attributes/function.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/expressions/keyword.hpp>
 #include <boost/log/sinks/frontend_requirements.hpp>
@@ -24,6 +25,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "Directories.h"
+#include "ranges.h"
 
 #ifdef _MSC_VER
 #  include <ctime>
@@ -92,7 +94,7 @@ namespace {
 
     using LoggerFileSinkFrontEndConfigurer = std::function<void(LoggerTextFileSinkFrontend& sink_frontend)>;
 
-    boost::shared_ptr<LoggerTextFileSinkFrontend::sink_backend_type>& FileSinkBackend() noexcept {
+    auto& FileSinkBackend() noexcept {
         // Create the sink backend as a function local static variable to avoid the static
         // initilization fiasco.
         static boost::shared_ptr<LoggerTextFileSinkFrontend::sink_backend_type> m_sink_backend;
@@ -179,7 +181,6 @@ namespace {
             for (const auto& name_and_frontend : m_names_to_front_ends)
                 logging::core::get()->remove_sink(name_and_frontend.second);
         }
-
     };
 
     LoggersToSinkFrontEnds& GetLoggersToSinkFrontEnds() {
@@ -224,11 +225,25 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(log_channel, "Channel", std::string)
 BOOST_LOG_ATTRIBUTE_KEYWORD(log_src_filename, "SrcFilename", std::string);
 BOOST_LOG_ATTRIBUTE_KEYWORD(log_src_linenum, "SrcLinenum", int);
 BOOST_LOG_ATTRIBUTE_KEYWORD(thread_id, "ThreadID", boost::log::attributes::current_thread_id::value_type);
+#if defined(FREEORION_LINUX) || defined(FREEORION_ANDROID)
+BOOST_LOG_ATTRIBUTE_KEYWORD(linux_thread_id, "LinuxThreadID", pid_t);
+#endif
 
 namespace {
-    std::mutex severity_filter_mutex; /// guards severity_filter
+    std::mutex severity_filter_mutex; /// guards severity_filter and severity_filters
+
     expr::channel_severity_filter_actor<std::string, LogLevel> severity_filter =
         expr::channel_severity_filter(log_channel, log_severity);
+
+    std::vector<std::pair<std::string, LogLevel>> severity_filters{};
+
+    LogLevel GetSourceThreshold(std::string_view source) {
+        std::scoped_lock lock(severity_filter_mutex);
+
+        const auto is_src = [source](const auto& src_severity) noexcept { return src_severity.first == source; };
+        auto it = range_find_if(severity_filters, is_src);
+        return (it == severity_filters.end()) ? LogLevel::error : it->second;
+    }
 
     void SetLoggerThresholdCore(const std::string& source, LogLevel threshold) {
         std::scoped_lock lock(severity_filter_mutex);
@@ -236,6 +251,13 @@ namespace {
         auto used_threshold = ForcedThreshold() ? *ForcedThreshold() : threshold;
         severity_filter[source] = used_threshold;
         logging::core::get()->set_filter(severity_filter);
+
+        const auto is_src = [&source](const auto& src_severity) noexcept { return src_severity.first == source; };
+        auto it = range_find_if(severity_filters, is_src);
+        if (it == severity_filters.end())
+            severity_filters.emplace_back(std::move(source), threshold);
+        else
+            it->second = threshold;
     }
 
     void ConfigureFileSinkFrontEnd(LoggerTextFileSinkFrontend& sink_frontend,
@@ -245,7 +267,11 @@ namespace {
         sink_frontend.set_formatter(
             expr::stream
             << expr::format_date_time<boost::posix_time::ptime>("TimeStamp", "%Y-%m-%d %H:%M:%S.%f")
+#if defined(FREEORION_LINUX) || defined(FREEORION_ANDROID)
+            << " {" << linux_thread_id << "}"
+#else
             << " {" << thread_id << "}"
+#endif
             << " [" << log_severity << "] "
             << DisplayName(channel_name)
             << " : " << log_src_filename << ":" << log_src_linenum << " : "
@@ -262,7 +288,11 @@ void SetLoggerThreshold(const std::string& source, LogLevel threshold) {
     InfoLogger(log) << "Setting \"" << source << "\" logger threshold to \"" << threshold << "\".";
 }
 
+bool LoggerThresholdEnabled(LogLevel threshold, std::string_view source)
+{ return GetSourceThreshold(source) <= threshold; }
+
 void InitLoggingSystem(const std::string& log_file, std::string_view _unnamed_logger_identifier) {
+    // set local nunnamed logger to lower-case version of input name
     auto& unnamed_logger_identifier = LocalUnnamedLoggerIdentifier();
     unnamed_logger_identifier = _unnamed_logger_identifier;
     std::transform(unnamed_logger_identifier.begin(), unnamed_logger_identifier.end(),
@@ -288,6 +318,9 @@ void InitLoggingSystem(const std::string& log_file, std::string_view _unnamed_lo
     // Add global attributes to all records
     logging::core::get()->add_global_attribute("TimeStamp", attr::local_clock());
     logging::core::get()->add_global_attribute("ThreadID", attr::current_thread_id());
+#if defined(FREEORION_LINUX) || defined(FREEORION_ANDROID)
+    logging::core::get()->add_global_attribute("LinuxThreadID", attr::make_function(&gettid));
+#endif
 
     SetLoggerThresholdCore("", default_log_level_threshold);
 
@@ -306,14 +339,14 @@ void InitLoggingSystem(const std::string& log_file, std::string_view _unnamed_lo
         auto date_time = std::time(nullptr);
         std::tm temp_tm;
         #ifdef _MSC_VER
-            localtime_s(&temp_tm, &date_time);
+            localtime_s(std::addressof(temp_tm), std::addressof(date_time));
         #else
-            localtime_r(&date_time, &temp_tm);
+            localtime_r(&date_time, std::addressof(temp_tm));
         #endif
 
-        char time_as_string_buf[100] = {};
-        std::strftime(time_as_string_buf, sizeof(time_as_string_buf), "%c", &temp_tm);
-        InfoLogger(log) << "Logger initialized at " << time_as_string_buf;
+        std::array<char, 100> time_buf{};
+        const auto count = std::strftime(time_buf.data(), time_buf.size(), "%c", std::addressof(temp_tm));
+        InfoLogger(log) << "Logger initialized at " << (count > 0 ? std::string_view{time_buf.data(), count} : "???");
     }
 }
 

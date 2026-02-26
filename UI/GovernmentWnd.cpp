@@ -54,20 +54,20 @@ namespace {
 
     /** Returns texture with which to render a PolicySlotControl, depending on
       * \a category */
-    std::shared_ptr<GG::Texture> SlotBackgroundTexture(const std::string& category) {
+    auto SlotBackgroundTexture(const std::string& category, auto& ui) {
         std::string filename = boost::algorithm::to_lower_copy(category) + "_slot.png";
-        return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "policies" / filename, true);
+        return ui.GetTexture(ClientUI::ArtDir() / "icons" / "policies" / filename, true);
     }
 
     /** Returns background texture with which to render a PolicyControl,
       * depending on the category of slot that the indicated \a policy can
       * be put into. */
-    std::shared_ptr<GG::Texture> PolicyBackgroundTexture(const Policy* policy) {
+    auto PolicyBackgroundTexture(const Policy* policy, auto& ui) {
         if (policy) {
             std::string filename = boost::algorithm::to_lower_copy(policy->Category()) + "_policy.png";
-            return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "policies" / filename, true);
+            return ui.GetTexture(ClientUI::ArtDir() / "icons" / "policies" / filename, true);
         }
-        return ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", true);
+        return ui.GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", true);
     }
 
     //////////////////////////////////////////////////
@@ -89,7 +89,7 @@ namespace {
         /** Given the GUI's displayed availabilities as stored in this
             AvailabilityManager, return the displayed state of the \p policy.
             Return none if the \p policy should not be displayed. */
-        bool PolicyDisplayed(const Policy& policy, int empire_id = GGHumanClientApp::GetApp()->EmpireID()) const;
+        bool PolicyDisplayed(const Policy& policy, int empire_id = GetApp().EmpireID()) const;
 
     private:
         // A tuple of the toogle state of the 3-tuple of coupled
@@ -124,7 +124,7 @@ namespace {
     bool AvailabilityManager::PolicyDisplayed(const Policy& policy, int empire_id) const {
         const auto [show_adopted, show_adoptable, show_unaffordable, show_restricted, show_locked] = m_availabilities;
 
-        const ScriptingContext& context = GGHumanClientApp::GetApp()->GetContext();
+        const ScriptingContext& context = GetApp().GetContext();
         const auto* empire = context.GetEmpire(empire_id).get();
         if (!empire)
             return true;
@@ -162,16 +162,18 @@ namespace {
         if (!policy)
             return nullptr;
 
-        const auto* app = GGHumanClientApp::GetApp();
-        const ScriptingContext& context = app->GetContext();
-        const int empire_id = app->EmpireID();
+        const auto& app = GetApp();
+        const ScriptingContext& context = app.GetContext();
+        const int empire_id = app.EmpireID();
 
         std::string main_text;
         main_text += UserString(policy->Category()) + " - ";
         main_text += UserString(policy->ShortDescription()) + "\n\n";
 
         if (const auto empire = context.GetEmpire(empire_id)) {
-            bool adopted = empire->PolicyAdopted(policy_name);
+            const auto is_adopted = [empire{empire}](const auto& plc) { return empire->PolicyAdopted(plc); };
+
+            const bool adopted = is_adopted(policy_name);
             bool available = empire->PolicyAvailable(policy_name);
             bool restricted = !empire->PolicyPrereqsAndExclusionsOK(policy_name, context.current_turn);
 
@@ -184,12 +186,7 @@ namespace {
             main_text += boost::io::str(FlexibleFormat(adoption_cost_template) % cost) + "\n\n";
 
             bool exclusion_prereq_line_added = false;
-
-            const auto empire_policies = empire->AdoptedPolicies();
-            for (auto& ex : policy->Exclusions()) {
-                auto ad_it = std::find(empire_policies.begin(), empire_policies.end(), ex);
-                if (ad_it == empire_policies.end())
-                    continue;
+            for (auto& ex : policy->Exclusions() | range_filter(is_adopted)) {
                 main_text += boost::io::str(FlexibleFormat(UserString("POLICY_EXCLUDED"))
                                             % UserString(ex)) + "\n";
                 exclusion_prereq_line_added = true;
@@ -197,9 +194,8 @@ namespace {
 
             const auto empire_initial_policies = empire->InitialAdoptedPolicies();
             for (auto& prereq : policy->Prerequisites()) {
-                auto init_it = std::find(
-                    empire_initial_policies.begin(), empire_initial_policies.end(), prereq);
-                const auto& template_str = init_it == empire_initial_policies.end() ?
+                const bool prereq_in_initial_policies = range_contains(empire_initial_policies, prereq);
+                const auto& template_str = !prereq_in_initial_policies ?
                     UserString("POLICY_PREREQ_MISSING") : UserString("POLICY_PREREQ_MET");
                 main_text += boost::io::str(FlexibleFormat(template_str)
                                             % UserString(prereq)) + "\n";
@@ -219,7 +215,30 @@ namespace {
         main_text += UserString(policy->Description());
 
         return GG::Wnd::Create<IconTextBrowseWnd>(
-            ClientUI::PolicyIcon(policy_name), UserString(policy_name), main_text);
+            GetApp().GetUI().PolicyIcon(policy_name), UserString(policy_name), main_text);
+    }
+}
+
+
+class PolicySlotControl;
+
+namespace {
+    void PoliciesListBoxDropsAcceptable(auto first, auto last) {
+        for (auto it = first; it != last; ++it)
+            it->second = false;
+
+        // if more than one control dropped somehow, reject all
+        if (std::distance(first, last) != 1)
+            return;
+
+        if (first->first->DragDropDataType() == POLICY_CONTROL_DROP_TYPE_STRING) {
+            if (const auto parent = first->first->Parent()) {
+                if (dynamic_cast<const PolicySlotControl*>(parent.get())) {
+                    // accepts policies that are being removed from a PolicySlotControl
+                    first->second = true;
+                }
+            }
+        }
     }
 }
 
@@ -234,15 +253,21 @@ public:
     explicit PolicyControl(const Policy* policy);
     void CompleteConstruction() override;
 
-    const std::string&  PolicyName() const  { return m_policy ? m_policy->Name() : EMPTY_STRING; }
-    const Policy*       GetPolicy() const   { return m_policy; }
+    const std::string& PolicyName() const noexcept { return m_policy ? m_policy->Name() : EMPTY_STRING; }
+    const Policy*      GetPolicy() const noexcept  { return m_policy; }
 
     void Resize(GG::Pt sz, const int pts = ClientUI::Pts());
-    void Render() override;
+    void Render() noexcept override {}
 
     void LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
     void LDoubleClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
     void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
+
+    void AcceptDrops(GG::Pt, std::vector<std::shared_ptr<GG::Wnd>>, GG::Flags<GG::ModKey>) override
+    { ForwardEventToParent(); }
+    void DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
+                         GG::Pt, GG::Flags<GG::ModKey>) const override
+    { PoliciesListBoxDropsAcceptable(first, last); }
 
     mutable boost::signals2::signal<void (const Policy*, GG::Flags<GG::ModKey>)> ClickedSignal;
     mutable boost::signals2::signal<void (const Policy*, GG::Pt pt)> RightClickedSignal;
@@ -265,21 +290,23 @@ void PolicyControl::CompleteConstruction() {
     GG::Control::CompleteConstruction();
     if (!m_policy)
         return;
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    const ScriptingContext& context = ClientApp::GetApp()->GetContext();
+    auto& app = GetApp();
+    auto& ui = app.GetUI();
+    const int empire_id = app.EmpireID();
+    const auto& context = app.GetContext();
     const auto& name = UserString(m_policy->Name());
     const auto cost = static_cast<int>(m_policy->AdoptionCost(empire_id, context));
 
     //std::cout << "PolicyControl: " << m_policy->Name() << std::endl;
 
-    m_background = GG::Wnd::Create<GG::StaticGraphic>(PolicyBackgroundTexture(m_policy),
+    m_background = GG::Wnd::Create<GG::StaticGraphic>(PolicyBackgroundTexture(m_policy, ui),
                                                       GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
-    m_icon = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::PolicyIcon(m_policy->Name()),
+    m_icon = GG::Wnd::Create<GG::StaticGraphic>(ui.PolicyIcon(m_policy->Name()),
                                                       GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
     m_name_label = GG::Wnd::Create<GG::TextControl>(GG::X0, GG::Y0, GG::X1, GG::Y1, name,
-                                                      ClientUI::GetBoldFont(), ClientUI::TextColor(), GG::FORMAT_WORDBREAK);
+                                                    ui.GetBoldFont(), ClientUI::TextColor(), GG::FORMAT_WORDBREAK);
     m_cost_label = GG::Wnd::Create<GG::TextControl>(GG::X0, GG::Y0, GG::X1, GG::Y1, std::to_string(cost),
-                                                      ClientUI::GetBoldFont(), ClientUI::TextColor());
+                                                    ui.GetBoldFont(), ClientUI::TextColor());
 
     m_background->Show();
     m_icon->Show();
@@ -303,7 +330,7 @@ void PolicyControl::Resize(GG::Pt sz, const int pts) {
     m_background->Resize(sz);
     m_icon->Resize(GG::Pt(sz.x, sz.y * 2/3));
 
-    std::shared_ptr<GG::Font> font = ClientUI::GetBoldFont(pts);
+    auto font = GetApp().GetUI().GetBoldFont(pts);
 
     m_name_label->SetFont(font);
     m_cost_label->SetFont(std::move(font));
@@ -315,15 +342,13 @@ void PolicyControl::Resize(GG::Pt sz, const int pts) {
     GG::Control::Resize(sz);
 }
 
-void PolicyControl::Render() {}
-
-void PolicyControl::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
+void PolicyControl::LClick(GG::Pt, GG::Flags<GG::ModKey> mod_keys)
 { ClickedSignal(m_policy, mod_keys); }
 
-void PolicyControl::LDoubleClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
+void PolicyControl::LDoubleClick(GG::Pt, GG::Flags<GG::ModKey>)
 { DoubleClickedSignal(m_policy); }
 
-void PolicyControl::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
+void PolicyControl::RClick(GG::Pt pt, GG::Flags<GG::ModKey>)
 { RightClickedSignal(m_policy, pt); }
 
 
@@ -336,8 +361,16 @@ public:
     class PoliciesListBoxRow : public CUIListBox::Row {
     public:
         PoliciesListBoxRow(GG::X w, GG::Y h, const AvailabilityManager& availabilities_state);
-        void ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds,
-                                 const GG::Wnd* destination) override;
+
+        void ChildrenDraggedAway(const std::vector<GG::Wnd*>&, const GG::Wnd*) noexcept override {}
+
+        void AcceptDrops(GG::Pt, std::vector<std::shared_ptr<GG::Wnd>>, GG::Flags<GG::ModKey>) override
+        { ForwardEventToParent(); }
+
+        void DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
+                             GG::Pt, GG::Flags<GG::ModKey>) const override
+        { PoliciesListBoxDropsAcceptable(first, last); }
+
     private:
         const AvailabilityManager& m_availabilities_state;
     };
@@ -384,49 +417,7 @@ PoliciesListBox::PoliciesListBoxRow::PoliciesListBoxRow(
     m_availabilities_state(availabilities_state)
 {}
 
-void PoliciesListBox::PoliciesListBoxRow::ChildrenDraggedAway(
-    const std::vector<GG::Wnd*>& wnds, const GG::Wnd* destination)
-{
-    if (wnds.empty())
-        return;
-    // should only be one wnd in list because PolicyControls doesn't allow selection, so dragging is
-    // only one-at-a-time
-    auto control = dynamic_cast<GG::Control*>(wnds.front());
-    if (!control || empty())
-        return;
-
-    // find control in row
-    unsigned int ii = 0;
-    for (; ii < size(); ++ii) {
-        if (at(ii) != control)
-            continue;
-    }
-
-    if (ii == size())
-        return;
-
-    RemoveCell(ii);  // Wnd that accepts drop takes ownership of dragged-away control
-
-    const auto* policy_control = dynamic_cast<PolicyControl*>(control);
-    if (!policy_control)
-        return;
-
-    const auto* policy_type = policy_control->GetPolicy();
-    if (!policy_type)
-        return;
-
-    auto new_policy_control = GG::Wnd::Create<PolicyControl>(policy_type);
-    if (auto parent = std::dynamic_pointer_cast<const PoliciesListBox>(Parent())) {
-        new_policy_control->ClickedSignal.connect(parent->PolicyClickedSignal);
-        new_policy_control->DoubleClickedSignal.connect(parent->PolicyDoubleClickedSignal);
-        new_policy_control->RightClickedSignal.connect(parent->PolicyRightClickedSignal);
-    }
-
-    SetCell(ii, new_policy_control);
-}
-
 PoliciesListBox::PoliciesListBox(const AvailabilityManager& availabilities_state) :
-    CUIListBox(),
     m_availabilities_state(availabilities_state)
 {
     ManuallyManageColProps();
@@ -473,18 +464,22 @@ void PoliciesListBox::AcceptDrops(GG::Pt, std::vector<std::shared_ptr<GG::Wnd>> 
     ClearPolicySignal(policy_type->Name());
 }
 
+void PoliciesListBox::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
+                                      GG::Pt, GG::Flags<GG::ModKey>) const
+{ PoliciesListBoxDropsAcceptable(first, last); }
+
 std::map<std::string, std::vector<const Policy*>>
 PoliciesListBox::GroupAvailableDisplayablePolicies(const Empire*) const {
-    using PolicyAndCat = const std::pair<const Policy*, const std::string&>;
+    using PolicyAndCat = std::pair<const Policy*, const std::string&>;
     static constexpr auto to_policy_and_cat = [](const Policy& p) -> PolicyAndCat { return {&p, p.Category()}; };
-    const auto cat_shown_policy_displayed = [this](PolicyAndCat& p_c) {
+    const auto cat_shown_policy_displayed = [this](const PolicyAndCat& p_c) {
         return m_policy_categories_shown.contains(p_c.second) &&
-            m_availabilities_state.PolicyDisplayed(*p_c.first);
+               m_availabilities_state.PolicyDisplayed(*p_c.first);
     };
 
     // loop through all possible policies, outputting those shown
     std::map<std::string, std::vector<const Policy*>> policies_categorized;
-    auto policies_rng = std::as_const(GetPolicyManager()) | range_values;
+    auto policies_rng = GetPolicyManager().Policies() | range_values;
     auto policy_cat_rng = policies_rng | range_transform(to_policy_and_cat)
         | range_filter(cat_shown_policy_displayed);
     for (const auto& [policy, category] : policy_cat_rng)
@@ -505,7 +500,7 @@ void PoliciesListBox::Populate() {
     const GG::X TOTAL_WIDTH = ClientWidth() - ClientUI::ScrollWidth();
     const int MAX_COLUMNS = std::max(1, TOTAL_WIDTH / (slot_size.x + PAD));
 
-    const int empire_id = GGHumanClientApp::GetApp()->EmpireID();
+    const int empire_id = GetApp().EmpireID();
     const Empire* empire = GetEmpire(empire_id);  // may be nullptr
 
     m_empire_policies_changed_signal_connection.disconnect();
@@ -661,11 +656,11 @@ void GovernmentWnd::PolicyPalette::CompleteConstruction() {
     m_policies_list->ClearPolicySignal.connect(ClearPolicySignal);
 
     // class buttons
-    for (auto& cat_view : GetPolicyManager().PolicyCategories()) {
+    for (const auto& cat_view : GetPolicyManager().PolicyCategories()) {
         // are there any policies of this class?
-        if (std::none_of(GetPolicyManager().begin(), GetPolicyManager().end(),
-                         [cat_view](auto& e){ return cat_view == e.second.Category(); }))
-        { continue; }
+        const auto in_category = [cat_view](const auto& p) noexcept { return cat_view == p.Category(); };
+        if (range_none_of(GetPolicyManager().Policies() | range_values, in_category))
+            continue;
 
         const auto& us_cateory{UserString(cat_view)};
         auto ptr_it = m_category_buttons.emplace(std::string{cat_view}, GG::Wnd::Create<CUIStateButton>(
@@ -754,14 +749,14 @@ void GovernmentWnd::PolicyPalette::DoLayout() {
     // place category buttons
     int col = CATEGORY_BUTTONS_PER_ROW;
     int row = -1;
-    for (auto& entry : m_category_buttons) {
+    for (auto& entry : m_category_buttons | range_values) {
         if (col >= static_cast<int>(CATEGORY_BUTTONS_PER_ROW)) {
             col = 0;
             ++row;
         }
         GG::Pt ul(BUTTON_EDGE_PAD + col*COL_OFFSET, BUTTON_EDGE_PAD + row*ROW_OFFSET);
         GG::Pt lr = ul + GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT);
-        entry.second->SizeMove(ul, lr);
+        entry->SizeMove(ul, lr);
         ++col;
     }
     const auto NUM_CATEGORY_BUTTON_ROWS = row;
@@ -802,17 +797,13 @@ void GovernmentWnd::PolicyPalette::DoLayout() {
     m_policies_list->ResizePolicies(slot_size, text_pts);
 }
 
-void GovernmentWnd::PolicyPalette::HandlePolicyClicked(const Policy* policy_type,
-                                                       GG::Flags<GG::ModKey> modkeys)
+void GovernmentWnd::PolicyPalette::HandlePolicyClicked(const Policy* policy_type, GG::Flags<GG::ModKey> modkeys)
 { PolicyClickedSignal(policy_type, modkeys); }
 
-void GovernmentWnd::PolicyPalette::HandlePolicyRightClicked(const Policy* policy_type,
-                                                            GG::Pt pt)
+void GovernmentWnd::PolicyPalette::HandlePolicyRightClicked(const Policy* policy_type, GG::Pt pt)
 { PolicyRightClickedSignal(policy_type, pt); }
 
-void GovernmentWnd::PolicyPalette::ShowCategory(const std::string& category,
-                                                bool refresh_list)
-{
+void GovernmentWnd::PolicyPalette::ShowCategory(const std::string& category, bool refresh_list) {
     if (!m_category_buttons.contains(category)) {
         ErrorLogger() << "PolicyPalette::ShowCategory was passed an invalid category name: " << category;
         return;
@@ -824,14 +815,12 @@ void GovernmentWnd::PolicyPalette::ShowCategory(const std::string& category,
 
 void GovernmentWnd::PolicyPalette::ShowAllCategories(bool refresh_list) {
     m_policies_list->ShowAllCategories(refresh_list);
-    for (auto& entry : m_category_buttons)
-        entry.second->SetCheck();
+    for (auto& entry : m_category_buttons | range_values)
+        entry->SetCheck();
     DoLayout();
 }
 
-void GovernmentWnd::PolicyPalette::HideCategory(const std::string& category,
-                                                bool refresh_list)
-{
+void GovernmentWnd::PolicyPalette::HideCategory(const std::string& category, bool refresh_list) {
     if (!m_category_buttons.contains(category)) {
         ErrorLogger() << "PolicyPalette::HideCategory was passed an invalid category name: " << category;
         return;
@@ -843,8 +832,8 @@ void GovernmentWnd::PolicyPalette::HideCategory(const std::string& category,
 
 void GovernmentWnd::PolicyPalette::HideAllCategories(bool refresh_list) {
     m_policies_list->HideAllCategories(refresh_list);
-    for (auto& entry : m_category_buttons)
-        entry.second->SetCheck(false);
+    for (auto& entry : m_category_buttons | range_values)
+        entry->SetCheck(false);
     DoLayout();
 }
 
@@ -914,7 +903,7 @@ public:
                        GG::Flags<GG::ModKey> mod_keys) override;
     void DragDropLeave() override;
     void Resize(GG::Pt sz, const int pts = ClientUI::Pts());
-    void Render() override;
+    void Render() noexcept override {};
 
     void Highlight(bool actually = true);
 
@@ -956,7 +945,10 @@ PolicySlotControl::PolicySlotControl(std::string slot_category, int category_ind
 void PolicySlotControl::CompleteConstruction() {
     GG::Control::CompleteConstruction();
 
-    m_background = GG::Wnd::Create<GG::StaticGraphic>(SlotBackgroundTexture(m_slot_category), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
+    auto& ui = GetApp().GetUI();
+    auto sbg_texture = SlotBackgroundTexture(m_slot_category, ui);
+
+    m_background = GG::Wnd::Create<GG::StaticGraphic>(sbg_texture, GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
     m_background->Resize(GG::Pt(SLOT_CONTROL_WIDTH, SLOT_CONTROL_HEIGHT));
     m_background->Show();
     AttachChild(m_background);
@@ -964,9 +956,7 @@ void PolicySlotControl::CompleteConstruction() {
     SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
     SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
-        SlotBackgroundTexture(m_slot_category),
-        UserString(m_slot_category),
-        UserString("SL_TOOLTIP_DESC")
+        std::move(sbg_texture), UserString(m_slot_category), UserString("SL_TOOLTIP_DESC")
     ));
 }
 
@@ -989,7 +979,7 @@ bool PolicySlotControl::EventFilter(GG::Wnd* w, const GG::WndEvent& event) {
 }
 
 void PolicySlotControl::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                                        GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) const
+                                        GG::Pt, GG::Flags<GG::ModKey>) const
 {
     for (DropsAcceptableIter it = first; it != last; ++it)
         it->second = false;
@@ -997,11 +987,14 @@ void PolicySlotControl::DropsAcceptable(DropsAcceptableIter first, DropsAcceptab
     // if more than one control dropped somehow, reject all
     if (std::distance(first, last) != 1)
         return;
+    // currently don't support dropping over full slots
+    if (m_policy_control)
+        return;
 
-    const ScriptingContext& context = ClientApp::GetApp()->GetContext();
+    auto& app = GetApp();
+    const auto& context = app.GetContext();
 
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto empire = context.GetEmpire(empire_id);
+    auto empire = context.GetEmpire(app.EmpireID());
     if (!empire)
         return;
 
@@ -1029,7 +1022,7 @@ const Policy* PolicySlotControl::GetPolicy() const {
         return nullptr;
 }
 
-void PolicySlotControl::StartingChildDragDrop(const GG::Wnd* wnd, GG::Pt offset) {
+void PolicySlotControl::StartingChildDragDrop(const GG::Wnd* wnd, GG::Pt) {
     if (!m_policy_control)
         return;
 
@@ -1055,7 +1048,7 @@ void PolicySlotControl::CancellingChildDragDrop(const std::vector<const GG::Wnd*
     }
 }
 
-void PolicySlotControl::AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
+void PolicySlotControl::AcceptDrops(GG::Pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
                                     GG::Flags<GG::ModKey> mod_keys)
 {
     if (wnds.size() != 1)
@@ -1067,9 +1060,7 @@ void PolicySlotControl::AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::W
         SlotContentsAlteredSignal(policy_type, mod_keys & GG::MOD_KEY_CTRL);
 }
 
-void PolicySlotControl::ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds,
-                                            const GG::Wnd* destination)
-{
+void PolicySlotControl::ChildrenDraggedAway(const std::vector<GG::Wnd*>& wnds, const GG::Wnd*) {
     if (wnds.empty())
         return;
     const GG::Wnd* wnd = wnds.front();
@@ -1100,7 +1091,7 @@ void PolicySlotControl::DragDropLeave() {
     // Note:  If m_policy_control is being dragged, this does nothing, because it is detached.
     //        If this PolicySlotControl is being dragged over this indicates the dragged policy would
     //        replace this policy.
-    if (m_policy_control && !GG::GUI::GetGUI()->DragDropWnd(m_policy_control.get()))
+    if (m_policy_control && !GetApp().DragDropWnd(m_policy_control.get()))
         m_policy_control->Show();
 }
 
@@ -1113,9 +1104,6 @@ void PolicySlotControl::Resize(GG::Pt sz, const int pts) {
 
     GG::Control::Resize(sz);
 }
-
-void PolicySlotControl::Render()
-{}
 
 void PolicySlotControl::Highlight(bool actually)
 { m_highlighted = actually; }
@@ -1144,30 +1132,10 @@ void PolicySlotControl::SetPolicy(const Policy* policy) {
     SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
     m_policy_control->SetBrowseInfoWnd(GG::Wnd::Create<IconTextBrowseWnd>(
-        ClientUI::PolicyIcon(policy->Name()),
+        GetApp().GetUI().PolicyIcon(policy->Name()),
         UserString(policy->Name()) + " (" + UserString(policy->Category()) + ")",
         UserString(policy->Description())
     ));
-}
-
-/** PoliciesListBox accepts policies that are being removed from a PolicySlotControl.*/
-void PoliciesListBox::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                                      GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) const
-{
-    for (DropsAcceptableIter it = first; it != last; ++it)
-        it->second = false;
-
-    // if more than one control dropped somehow, reject all
-    if (std::distance(first, last) != 1)
-        return;
-
-    const auto&& parent = first->first->Parent();
-    if (first->first->DragDropDataType() == POLICY_CONTROL_DROP_TYPE_STRING
-        && parent
-        && dynamic_cast<const PolicySlotControl*>(parent.get()))
-    {
-        first->second = true;
-    }
 }
 
 
@@ -1182,7 +1150,7 @@ public:
     std::vector<std::string> Policies() const; //!< returns vector of names of policies in slots of current shown design.  empty slots are represented with empty string
 
     //void LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) override;
+    void AcceptDrops(GG::Pt, std::vector<std::shared_ptr<GG::Wnd>>, GG::Flags<GG::ModKey>) noexcept override {}
     void SizeMove(GG::Pt ul, GG::Pt lr) override;
     void Sanitize();
     void Refresh();
@@ -1291,9 +1259,7 @@ namespace {
     }
 }
 
-void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot,
-                                         bool update_empire_and_refresh)
-{
+void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot, bool update_empire_and_refresh) {
     DebugLogger() << "GovernmentWnd::MainPanel::SetPolicy(" << (policy ? policy->Name() : "no policy") << ", slot " << slot << ")";
 
     if (slot >= m_slots.size()) {
@@ -1301,9 +1267,9 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
         return;
     }
 
-    auto* app = GGHumanClientApp::GetApp();
-    ScriptingContext& context = app->GetContext();
-    const int empire_id = app->EmpireID();
+    auto& app = GetApp();
+    ScriptingContext& context = app.GetContext();
+    const int empire_id = app.EmpireID();
 
     auto empire = std::as_const(context).GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
@@ -1320,9 +1286,8 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
 
     // what slots are available...
     const auto total_policy_slots = empire->TotalPolicySlots();
-    const auto total_policy_slots_it = std::find_if(total_policy_slots.begin(), total_policy_slots.end(),
-                                                    [aic{adopt_in_category}](const auto& cat_slots)
-                                                    { return cat_slots.first == aic; });
+    const auto slot_is_cat = [aic{adopt_in_category}](const auto& cat_slots) noexcept { return cat_slots.first == aic; };
+    const auto total_policy_slots_it = range_find_if(total_policy_slots, slot_is_cat);
     if (total_policy_slots_it == total_policy_slots.end()) {
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy asked to adopt in category " << adopt_in_category << " which has no slots";
         return;
@@ -1359,20 +1324,20 @@ void GovernmentWnd::MainPanel::SetPolicy(const Policy* policy, unsigned int slot
 
     // issue order to adopt or revoke
     if (adopt)
-        app->Orders().IssueOrder<PolicyOrder>(context, empire_id, std::move(order_policy_name),
-                                              std::string{adopt_in_category}, adopt_in_category_slot);
+        app.Orders().IssueOrder<PolicyOrder>(context, empire_id, std::move(order_policy_name),
+                                             std::string{adopt_in_category}, adopt_in_category_slot);
     else
-        app->Orders().IssueOrder<PolicyOrder>(context, empire_id, std::move(order_policy_name));
+        app.Orders().IssueOrder<PolicyOrder>(context, empire_id, std::move(order_policy_name));
 
     if (update_empire_and_refresh)
         PostChangeBigUpdate();
 }
 
 void GovernmentWnd::MainPanel::PostChangeBigUpdate() {
-    auto* app = GGHumanClientApp::GetApp();
-    auto& context = app->GetContext();
+    auto& app = GetApp();
+    auto& context = app.GetContext();
 
-    const int empire_id = app->EmpireID();
+    const int empire_id = app.EmpireID();
     auto empire = context.GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
         ErrorLogger() << "GovernmentWnd::MainPanel::SetPolicy has no empire to set policies for";
@@ -1417,8 +1382,8 @@ int GovernmentWnd::MainPanel::FindEmptySlotForPolicy(const Policy* policy) const
     if (!policy)
         return -1;
 
-    const auto* app = GGHumanClientApp::GetApp();
-    const auto empire = app->GetContext().GetEmpire(app->EmpireID());
+    const auto& app = GetApp();
+    const auto empire = app.GetContext().GetEmpire(app.EmpireID());
 
     // reject unavailable and already-adopted policies
     if (!empire || !empire->PolicyAvailable(policy->Name())
@@ -1438,10 +1403,10 @@ int GovernmentWnd::MainPanel::FindEmptySlotForPolicy(const Policy* policy) const
 }
 
 void GovernmentWnd::MainPanel::RevertPolicies() {
-    auto* app = GGHumanClientApp::GetApp();
-    ScriptingContext& context = app->GetContext();
+    auto& app = GetApp();
+    ScriptingContext& context = app.GetContext();
 
-    const int empire_id = app->EmpireID();
+    const int empire_id = app.EmpireID();
     auto empire = context.GetEmpire(empire_id);  // may be nullptr
     if (!empire) {
         ErrorLogger() << "GovernmentWnd::MainPanel::RevertPolicies has no empire to revert policies for";
@@ -1452,7 +1417,7 @@ void GovernmentWnd::MainPanel::RevertPolicies() {
         return;
 
     // issue order to revoke changes
-    app->Orders().IssueOrder<PolicyOrder>(context, empire_id);
+    app.Orders().IssueOrder<PolicyOrder>(context, empire_id);
 
     PostChangeBigUpdate();
 }
@@ -1480,11 +1445,11 @@ void GovernmentWnd::MainPanel::Populate() {
         DetachChild(slot);
     m_slots.clear();
 
-    const auto* app = GGHumanClientApp::GetApp();
-    const ScriptingContext& context = app->GetContext();
+    const auto& app = GetApp();
+    const ScriptingContext& context = app.GetContext();
 
     // loop over policy slots the empire's government has, add slot controls
-    const auto empire = context.GetEmpire(app->EmpireID());
+    const auto empire = context.GetEmpire(app.EmpireID());
     if (!empire)
         return;
 
@@ -1558,19 +1523,11 @@ void GovernmentWnd::MainPanel::DoLayout() {
 }
 
 void GovernmentWnd::MainPanel::DropsAcceptable(DropsAcceptableIter first, DropsAcceptableIter last,
-                                               GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) const
+                                               GG::Pt, GG::Flags<GG::ModKey>) const
 {
     for (DropsAcceptableIter it = first; it != last; ++it)
         it->second = false;
-
-    // if multiple things dropped simultaneously somehow, reject all
-    if (std::distance(first, last) != 1)
-        return;
 }
-
-void GovernmentWnd::MainPanel::AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
-                                           GG::Flags<GG::ModKey> mod_keys)
-{}
 
 
 //////////////////////////////////////////////////
@@ -1601,9 +1558,10 @@ void GovernmentWnd::CompleteConstruction() {
     m_policy_size_buttons->ExpandButtons(true);
     m_policy_size_buttons->ExpandButtonsProportionally(true);
 
-    auto large_size_icon = std::make_shared<GG::SubTexture>(ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "policy_large.png"));
-    auto medium_size_icon = std::make_shared<GG::SubTexture>(ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "policy_medium.png"));
-    auto small_size_icon = std::make_shared<GG::SubTexture>(ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "policy_small.png"));
+    auto& ui = GetApp().GetUI();
+    auto large_size_icon = std::make_shared<GG::SubTexture>(ui.GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "policy_large.png"));
+    auto medium_size_icon = std::make_shared<GG::SubTexture>(ui.GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "policy_medium.png"));
+    auto small_size_icon = std::make_shared<GG::SubTexture>(ui.GetTexture(ClientUI::ArtDir() / "icons" / "buttons" / "policy_small.png"));
 
     m_policy_size_buttons->AddButton(
         GG::Wnd::Create<CUIStateButton>("", GG::FORMAT_LEFT, std::make_shared<CUIIconButtonRepresenter>(large_size_icon, GG::CLR_WHITE)));
@@ -1617,7 +1575,7 @@ void GovernmentWnd::CompleteConstruction() {
     m_revert_button = GG::Wnd::Create<CUIButton>(UserString("GOVERNMENT_WND_REVERT"));
     AttachChild(m_revert_button);
 
-    auto zoom_to_policy_action = [](const Policy* policy, GG::Flags<GG::ModKey> modkeys) { ClientUI::GetClientUI()->ZoomToPolicy(policy->Name()); };
+    static constexpr auto zoom_to_policy_action = [](const Policy* policy, GG::Flags<GG::ModKey>) { if (policy) GetApp().GetUI().ZoomToPolicy(policy->Name()); };
     //m_main_panel->PolicyClickedSignal.connect(zoom_to_policy_action);
     m_policy_palette->PolicyClickedSignal.connect(zoom_to_policy_action);
     m_policy_size_buttons->ButtonChangedSignal.connect(boost::bind(&GovernmentWnd::PolicySizeButtonClicked, this, _1));
@@ -1703,12 +1661,9 @@ void GovernmentWnd::DoLayout() {
     m_revert_button->SizeMove(revert_button_ul, revert_button_lr);
 }
 
-void GovernmentWnd::PolicySizeButtonClicked(std::size_t idx)
-{ Refresh(); }
+void GovernmentWnd::PolicySizeButtonClicked(std::size_t) { Refresh(); }
 
-void GovernmentWnd::EnableOrderIssuing(bool enable)
-{}
+void GovernmentWnd::EnableOrderIssuing(bool) {}
 
-void GovernmentWnd::CloseClicked()
-{ ClosingSignal(); }
+void GovernmentWnd::CloseClicked() { ClosingSignal(); }
 

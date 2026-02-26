@@ -15,7 +15,7 @@
 #include "../Empire/Empire.h"
 #include "../Empire/EmpireManager.h"
 
-#include <boost/filesystem/fstream.hpp>
+#include <fstream>
 
 namespace {
     #define UserStringNop(key) key
@@ -170,48 +170,34 @@ uint32_t Policy::GetCheckSum() const {
 ///////////////////////////////////////////////////////////
 const Policy* PolicyManager::GetPolicy(std::string_view name) const {
     CheckPendingPolicies();
-    auto it = m_policies.find(name);
-    return it == m_policies.end() ? nullptr : &it->second;
+    auto it = range_find_if(m_policies, [name](const auto& n_p) noexcept { return n_p.first == name; });
+    return it == m_policies.end() ? nullptr : std::addressof(it->second);
 }
 
-std::vector<std::string_view> PolicyManager::PolicyNames() const {
+const PolicyManager::PoliciesTypeMap& PolicyManager::Policies() const noexcept {
     CheckPendingPolicies();
-    std::vector<std::string_view> retval;
-    retval.reserve(m_policies.size());
-    std::transform(m_policies.begin(), m_policies.end(), std::back_inserter(retval),
-                   [](const auto& name_policy) -> std::string_view { return name_policy.first; });
-    return retval;
+    return m_policies;
 }
 
-std::vector<std::string_view> PolicyManager::PolicyNames(const std::string& category_name) const {
+std::vector<std::string> PolicyManager::PolicyNamesCopies() const {
     CheckPendingPolicies();
-    std::vector<std::string_view> retval;
-    retval.reserve(m_policies.size());
-    const auto in_category = [&category_name](const auto& p) { return p.second.Category() == category_name; };
-    range_copy(m_policies | range_filter(in_category) | range_keys, std::back_inserter(retval));
-    return retval;
+    return m_policies | range_keys | range_to_vec;
+}
+
+std::vector<std::string_view> PolicyManager::PolicyNames(std::string_view category_name) const {
+    CheckPendingPolicies();
+    const auto is_cat = [cat{category_name}](const auto& n_p) noexcept { return n_p.second.Category() == cat; };
+    return m_policies | range_filter(is_cat) | range_keys | range_to<std::vector<std::string_view>>();
 }
 
 std::vector<std::string_view> PolicyManager::PolicyCategories() const {
     CheckPendingPolicies();
-    std::vector<std::string_view> retval;
-    retval.reserve(12); // guesstimate
-    std::transform(m_policies.begin(), m_policies.end(), std::back_inserter(retval),
-                   [](const auto& name_policy) -> std::string_view { return name_policy.second.Category(); });
+    static constexpr auto to_cat = [](const auto& n_p) noexcept -> std::string_view { return n_p.second.Category(); };
+    auto retval = m_policies | range_transform(to_cat) | range_to_vec;
     std::sort(retval.begin(), retval.end());
     auto unique_it = std::unique(retval.begin(), retval.end());
     retval.erase(unique_it, retval.end());
     return retval;
-}
-
-PolicyManager::iterator PolicyManager::begin() const {
-    CheckPendingPolicies();
-    return m_policies.begin();
-}
-
-PolicyManager::iterator PolicyManager::end() const {
-    CheckPendingPolicies();
-    return m_policies.end();
 }
 
 void PolicyManager::CheckPendingPolicies() const {
@@ -226,13 +212,18 @@ void PolicyManager::CheckPendingPolicies() const {
         return;
 
     std::sort(parsed_vec.begin(), parsed_vec.end(),
-              [](const auto& lhs, const auto& rhs) { return lhs.Name() < rhs.Name(); });
+              [](const auto& lhs, const auto& rhs) noexcept { return lhs.Name() < rhs.Name(); });
 
     m_policies.reserve(parsed_vec.size());
 
     for (auto& policy : parsed_vec) {
         auto name{policy.Name()};
-        m_policies.try_emplace(m_policies.end(), std::move(name), std::move(policy));
+
+        auto name_it = range_find_if(m_policies, [&name](const auto& n_p) noexcept { return n_p.first == name; });
+        if (name_it != m_policies.end())
+            name_it->second = std::move(policy);
+        else
+            m_policies.emplace_back(std::move(name), std::move(policy));
     }
 }
 

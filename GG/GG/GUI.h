@@ -289,50 +289,49 @@ public:
 
     /** Returns a shared_ptr to the desired font, supporting all printable
         ASCII characters. */
-    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts);
+    std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts);
 
     /** Returns a shared_ptr to the desired font, supporting all printable
         ASCII characters, from the in-memory contents \a file_contents. */
-    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
-                                  const std::vector<uint8_t>& file_contents);
+    std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts,
+                                        const std::vector<uint8_t>& file_contents);
 
     /** Returns a shared_ptr to the desired font, supporting all the
         characters in the UnicodeCharsets in the range [first, last). */
-    template <typename CharSetIter>
-    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
-                                  CharSetIter first, CharSetIter last);
+    template <typename CharSets, std::enable_if_t<is_charset_container<CharSets>>* = nullptr>
+    std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts, CharSets&& charsets)
+    { return GetFontManager().GetFont(font_filename, pts, std::forward<CharSets>(charsets)); }
 
     /** Returns a shared_ptr to the desired font, supporting all the
         characters in the UnicodeCharsets in the range [first, last), from the
         in-memory contents \a file_contents. */
-    template <typename CharSetIter>
-    std::shared_ptr<Font> GetFont(std::string_view font_filename, unsigned int pts,
-                                  const std::vector<uint8_t>& file_contents,
-                                  CharSetIter first, CharSetIter last);
+    template <typename CharSets, std::enable_if_t<is_charset_container<CharSets>>* = nullptr>
+    std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts,
+                                        const std::vector<uint8_t>& file_contents, CharSets&& charsets)
+    { return GetFontManager().GetFont(font_filename, pts, file_contents, std::forward<CharSets>(charsets)); }
 
     /** Returns a shared_ptr to existing font \a font in a new size, \a pts. */
-    std::shared_ptr<Font> GetFont(const std::shared_ptr<Font>& font, unsigned int pts);
+    std::shared_ptr<const Font> GetFont(const std::shared_ptr<const Font>& font, unsigned int pts) const;
 
     /** Removes the desired font from the managed pool; since shared_ptr's are
         used, the font may be deleted much later. */
-    void FreeFont(std::string_view font_filename, unsigned int pts);
+    static void FreeFont(std::string_view font_filename, unsigned int pts);
 
     /** Adds an already-constructed texture to the managed pool \warning
         calling code <b>must not</b> delete \a texture; the texture pool will
         do that. */
-    std::shared_ptr<Texture> StoreTexture(Texture* texture, const std::string& texture_name);
+    void StoreTexture(Texture* texture, std::string texture_name);
 
     /** Adds an already-constructed texture to the managed pool. */
-    std::shared_ptr<Texture> StoreTexture(const std::shared_ptr<Texture>& texture,
-                                          const std::string& texture_name);
+    void StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name);
 
     /** Loads the requested texture from file \a name; mipmap textures are
       * generated if \a mipmap is true. */
-    std::shared_ptr<Texture> GetTexture(const boost::filesystem::path& path, bool mipmap = false);
+    std::shared_ptr<Texture> GetTexture(const std::filesystem::path& path, bool mipmap = false);
 
     /** Removes the desired texture from the managed pool; since shared_ptr
       * are used, the texture may be deleted much later. */
-    void FreeTexture(const boost::filesystem::path& path);
+    void FreeTexture(const std::filesystem::path& path);
 
     /** Sets the currently-installed style factory. */
     void SetStyleFactory(std::unique_ptr<StyleFactory>&& factory) noexcept;
@@ -358,7 +357,7 @@ public:
     bool SetPrevFocusWndInCycle();                          ///< sets the focus Wnd to the next INTERACTIVE Wnd in a cycle determined by Wnd parent-child relationships
     bool SetNextFocusWndInCycle();                          ///< sets the focus Wnd to the next in the cycle.
 
-    static GUI*  GetGUI() noexcept;                         ///< allows any GG code access to GUI framework by calling GUI::GetGUI()
+    static GUI*  GetGUI() noexcept { return s_gui; }        ///< allows any GG code access to GUI framework by calling GUI::GetGUI()
 
     /** If \p wnd is visible recursively call PreRenderWindow() on all \p wnd's children and then
         call \p wnd->PreRender().  The order guarantees that when wnd->PreRender() is called all
@@ -378,13 +377,13 @@ public:
 
     /** Emitted when the Window in which the GUI is operating gains or loses
       * focus. bool parameter is true when gaining focus, and false otherwise.*/
-     boost::signals2::signal<void (bool)>   FocusChangedSignal;
+    boost::signals2::signal<void (bool)>    FocusChangedSignal;
 
     /** Emitted whenever the window manager requests the window close. */
-    boost::signals2::signal<void ()>    WindowClosingSignal;
+    boost::signals2::signal<void ()>        WindowClosingSignal;
 
     /** Emitted whenever the app is requested to close. */
-    boost::signals2::signal<void ()>    AppQuittingSignal;
+    boost::signals2::signal<void ()>        AppQuittingSignal;
 
     /** The base class for GUI exceptions. */
     GG_ABSTRACT_EXCEPTION(Exception);
@@ -454,17 +453,6 @@ bool GUI::OrCombiner::operator()(InIt first, const InIt last) const
     //    retval |= static_cast<bool>(*first++);
     //return retval;
 }
-
-template <typename CharSetIter>
-std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts,
-                                   CharSetIter first, CharSetIter last)
-{ return GetFontManager().GetFont(font_filename, pts, first, last); }
-
-template <typename CharSetIter>
-std::shared_ptr<Font> GUI::GetFont(std::string_view font_filename, unsigned int pts,
-                                   const std::vector<uint8_t>& file_contents,
-                                   CharSetIter first, CharSetIter last)
-{ return GetFontManager().GetFont(font_filename, pts, file_contents, first, last); }
 
 }
 

@@ -5,6 +5,8 @@
 #include "universe/BuildingType.h"
 #include "universe/Conditions.h"
 #include "universe/Effects.h"
+#include "universe/Encyclopedia.h"
+#include "universe/FieldType.h"
 #include "universe/Planet.h"
 #include "universe/Tech.h"
 #include "universe/UnlockableItem.h"
@@ -50,10 +52,24 @@ BOOST_AUTO_TEST_CASE(parse_game_rules) {
     PythonParser parser(m_python, m_test_scripting_dir);
 
     auto game_rules_p = Pending::ParseSynchronously(parse::game_rules, parser,  m_test_scripting_dir / "game_rules.focs.py");
-    auto game_rules = *Pending::WaitForPendingUnlocked(std::move(game_rules_p));
+    auto game_rules_opt = Pending::WaitForPendingUnlocked(std::move(game_rules_p));
+
+    BOOST_REQUIRE(game_rules_opt);
+
+    const auto game_rules = *std::move(game_rules_opt);
+
     BOOST_REQUIRE(!game_rules.empty());
     BOOST_REQUIRE(game_rules.contains("RULE_HABITABLE_SIZE_MEDIUM"));
     BOOST_REQUIRE(GameRule::Type::TOGGLE == game_rules.at("RULE_ENABLE_ALLIED_REPAIR").type);
+}
+
+BOOST_AUTO_TEST_CASE(parse_game_rules_failed) {
+    PythonParser parser(m_python, m_test_scripting_dir);
+
+    auto game_rules_p = Pending::ParseSynchronously(parse::game_rules, parser,  m_test_scripting_dir / "game_rules_failed.focs.py");
+    auto game_rules_opt = Pending::WaitForPendingUnlocked(std::move(game_rules_p));
+
+    BOOST_REQUIRE(!game_rules_opt);
 }
 
 BOOST_AUTO_TEST_CASE(parse_techs) {
@@ -328,10 +344,64 @@ BOOST_AUTO_TEST_CASE(parse_species) {
         BOOST_REQUIRE_EQUAL(false, effect->IsSitrepEffect());
         BOOST_REQUIRE_EQUAL(false, effect->IsConditionalEffect());
 
+        BOOST_REQUIRE_EQUAL(831, CheckSums::GetCheckSum(species.Name()));
+        BOOST_REQUIRE_EQUAL(1218, CheckSums::GetCheckSum(species.Description()));
+        BOOST_REQUIRE_EQUAL(53880, CheckSums::GetCheckSum(species.GameplayDescription()));
+        BOOST_REQUIRE_EQUAL(325629, CheckSums::GetCheckSum(species.Foci()));
+        BOOST_REQUIRE_EQUAL(1135, CheckSums::GetCheckSum(species.DefaultFocus()));
+        BOOST_REQUIRE_EQUAL(16966, CheckSums::GetCheckSum(species.Likes()));
+        BOOST_REQUIRE_EQUAL(16450, CheckSums::GetCheckSum(species.Dislikes()));
+        BOOST_REQUIRE_EQUAL(328, CheckSums::GetCheckSum(species.PlanetEnvironments()));
+        BOOST_REQUIRE_EQUAL(0, CheckSums::GetCheckSum(species.CombatTargets()));
+        BOOST_REQUIRE_EQUAL(4056455, CheckSums::GetCheckSum(species.AnnexationCondition()));
+
+        const auto* annex_cost_op = dynamic_cast<const ValueRef::Operation<double>*>(species.AnnexationCost());
+        BOOST_REQUIRE_EQUAL(static_cast<int16_t>(annex_cost_op->GetOpType()),
+                            static_cast<int16_t>(ValueRef::OpType::MAXIMUM));
+        BOOST_REQUIRE_EQUAL(static_cast<int16_t>(annex_cost_op->GetReferenceType()),
+                            static_cast<int16_t>(ValueRef::ReferenceType::INVALID_REFERENCE_TYPE));
+        const auto& operands = annex_cost_op->Operands();
+        BOOST_REQUIRE_EQUAL(2, operands.size());
+
+        const auto* op0 = dynamic_cast<const ValueRef::ComplexVariable<double>*>(operands.at(0));
+        BOOST_REQUIRE_EQUAL(static_cast<int16_t>(op0->GetContainerType()),
+                            static_cast<int16_t>(ValueRef::ContainerType::NONE));
+        BOOST_REQUIRE_EQUAL(static_cast<int16_t>(op0->GetReferenceType()),
+                            static_cast<int16_t>(ValueRef::ReferenceType::INVALID_REFERENCE_TYPE));
+        BOOST_REQUIRE_EQUAL(op0->Property(), ValueRef::Property::GameRule);
+        BOOST_REQUIRE_EQUAL(op0->IntRef1(), nullptr);
+        BOOST_REQUIRE_EQUAL(op0->IntRef2(), nullptr);
+        BOOST_REQUIRE_EQUAL(op0->IntRef3(), nullptr);
+        BOOST_REQUIRE_EQUAL(op0->StringRef2(), nullptr);
+
+        const auto* op0str1 = dynamic_cast<const ValueRef::Constant<std::string>*>(op0->StringRef1());
+        BOOST_REQUIRE_EQUAL(op0str1->Value(), "RULE_ANNEX_COST_MINIMUM");
+        BOOST_REQUIRE_EQUAL(op0str1->GetCheckSum(), 4414);
+
+        BOOST_REQUIRE_EQUAL(7677, CheckSums::GetCheckSum("ValueRef::ComplexVariable", "GameRule", false,
+                                                         nullptr, nullptr, nullptr, op0str1, nullptr));
+        BOOST_REQUIRE_EQUAL(7677, op0->GetCheckSum());
+
+        const auto* op1 = dynamic_cast<const ValueRef::Operation<double>*>(operands.at(1));
+        BOOST_REQUIRE_EQUAL(104225, op1->GetCheckSum());
+
+        BOOST_REQUIRE_EQUAL(113801, CheckSums::GetCheckSum(species.AnnexationCost()));
+
+        BOOST_REQUIRE_EQUAL(8239795, CheckSums::GetCheckSum(species.Effects()));
+        BOOST_REQUIRE_EQUAL(14018, CheckSums::GetCheckSum(species.Location()));
+        BOOST_REQUIRE_EQUAL(1, CheckSums::GetCheckSum(species.Playable()));
+        BOOST_REQUIRE_EQUAL(0, CheckSums::GetCheckSum(species.Native()));
+        BOOST_REQUIRE_EQUAL(1, CheckSums::GetCheckSum(species.CanColonize()));
+        BOOST_REQUIRE_EQUAL(1, CheckSums::GetCheckSum(species.CanProduceShips()));
+        BOOST_REQUIRE_EQUAL(4000000, CheckSums::GetCheckSum(species.SpawnRate()));
+        BOOST_REQUIRE_EQUAL(9999, CheckSums::GetCheckSum(species.SpawnLimit()));
+        BOOST_REQUIRE_EQUAL(6705, CheckSums::GetCheckSum(species.Tags()));
+        BOOST_REQUIRE_EQUAL(2917, CheckSums::GetCheckSum(species.Graphic()));
+
         BOOST_TEST_MESSAGE("Dump " << species.Name() << ":");
         BOOST_TEST_MESSAGE(species.Dump(0));
 
-        BOOST_REQUIRE_EQUAL(6764239, species.GetCheckSum());
+        BOOST_REQUIRE_EQUAL(6808164, species.GetCheckSum());
 
         const Species test_species{"SP_ABADDONI",
             "SP_ABADDONI_DESC",
@@ -359,44 +429,44 @@ BOOST_AUTO_TEST_CASE(parse_species) {
                 {"FOCUS_LOGISTICS", "FOCUS_LOGISTICS_DESC", std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("SHP_INTSTEL_LOG")), "icons/focus/supply.png"},
                 {"FOCUS_STOCKPILE", "FOCUS_STOCKPILE_DESC", std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("PRO_GENERIC_SUPPLIES")), "icons/focus/stockpile.png"},
                 {"FOCUS_STEALTH", "FOCUS_STEALTH_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_PLANET_CLOAK")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_PLANET_CLOAK")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("DEF_PLANET_CLOAK"))
                     )
                 ), "icons/focus/stealth.png"},
                 {"FOCUS_BIOTERROR", "FOCUS_BIOTERROR_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_BIOTERROR_PROJECTOR")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_BIOTERROR_PROJECTOR")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("GRO_BIOTERROR"))
                     )
                 ), "icons/focus/bioterror.png"},
                 {"FOCUS_STARGATE_SEND", "FOCUS_STARGATE_SEND_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_STARGATE")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_STARGATE")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_STARGATE"))
                     )
                 ), "icons/focus/stargate_send.png"},
                 {"FOCUS_STARGATE_RECEIVE", "FOCUS_STARGATE_RECEIVE_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_STARGATE")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_STARGATE")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_STARGATE"))
                     )
                 ), "icons/focus/stargate_receive.png"},
                 {"FOCUS_PLANET_DRIVE", "FOCUS_PLANET_DRIVE_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_PLANET_DRIVE")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_PLANET_DRIVE")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_PLANET_DRIVE"))
                     )
                 ), "icons/building/planetary_stardrive.png"},
                 {"FOCUS_DISTORTION", "FOCUS_DISTORTION_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_SPATIAL_DISTORT_GEN")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_SPATIAL_DISTORT_GEN")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("LRN_SPATIAL_DISTORT_GEN"))
                     )
                 ), "icons/focus/distortion.png"},
@@ -591,7 +661,8 @@ BOOST_AUTO_TEST_CASE(parse_buildings) {
             )
         },
         CaptureResult::CR_CAPTURE,
-        "icons/building/blackhole.png" 
+        "icons/building/blackhole.png",
+        BuildingType::SubType::NONE
     };
 
     BOOST_CHECK_EQUAL(test_building.Name(), building->Name());
@@ -606,29 +677,29 @@ BOOST_AUTO_TEST_CASE(parse_buildings) {
 
     const Condition::And* location_cond = dynamic_cast<const Condition::And*>(building->Location());
     BOOST_REQUIRE(location_cond != nullptr);
-    std::vector<const Condition::Condition*> location_conds = location_cond->OperandsRaw();
+    const auto location_conds = location_cond->OperandsRaw();
     BOOST_REQUIRE_EQUAL(4, location_conds.size());
     BOOST_CHECK(dynamic_cast<const Condition::Type*>(location_conds[0]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::Not*>(location_conds[1]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::EmpireAffiliation*>(location_conds[2]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::StarType*>(location_conds[3]) != nullptr);
-    BOOST_CHECK_EQUAL(22510, location_cond->GetCheckSum());
+    BOOST_CHECK_EQUAL(22520, location_cond->GetCheckSum());
     BOOST_CHECK_EQUAL(3267, location_conds[0]->GetCheckSum());
-    BOOST_CHECK_EQUAL(9108, location_conds[1]->GetCheckSum());
+    BOOST_CHECK_EQUAL(9118, location_conds[1]->GetCheckSum());
     BOOST_CHECK_EQUAL(5108, location_conds[2]->GetCheckSum());
     BOOST_CHECK_EQUAL(3683, location_conds[3]->GetCheckSum());
 
     const Condition::And* test_location_cond = dynamic_cast<const Condition::And*>(test_building.Location());
     BOOST_REQUIRE(test_location_cond != nullptr);
-    std::vector<const Condition::Condition*> test_location_conds = test_location_cond->OperandsRaw();
+    const auto test_location_conds = test_location_cond->OperandsRaw();
     BOOST_REQUIRE_EQUAL(4, test_location_conds.size());
     BOOST_CHECK(dynamic_cast<const Condition::Type*>(test_location_conds[0]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::Not*>(test_location_conds[1]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::EmpireAffiliation*>(test_location_conds[2]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::StarType*>(test_location_conds[3]) != nullptr);
-    BOOST_CHECK_EQUAL(22510, test_location_cond->GetCheckSum());
+    BOOST_CHECK_EQUAL(22520, test_location_cond->GetCheckSum());
     BOOST_CHECK_EQUAL(3267, test_location_conds[0]->GetCheckSum());
-    BOOST_CHECK_EQUAL(9108, test_location_conds[1]->GetCheckSum());
+    BOOST_CHECK_EQUAL(9118, test_location_conds[1]->GetCheckSum());
     BOOST_CHECK_EQUAL(5108, test_location_conds[2]->GetCheckSum());
     BOOST_CHECK_EQUAL(3683, test_location_conds[3]->GetCheckSum());
 
@@ -654,6 +725,91 @@ BOOST_AUTO_TEST_CASE(parse_buildings) {
     BOOST_CHECK_EQUAL(test_building.Effects()[1].GetCheckSum(), building->Effects()[1].GetCheckSum());
     BOOST_CHECK_EQUAL(test_building.Icon(), building->Icon());
     BOOST_CHECK_EQUAL(test_building.GetCheckSum(), building->GetCheckSum());
+}
+
+BOOST_AUTO_TEST_CASE(parse_empire_statistics) {
+    PythonParser parser(m_python, m_test_scripting_dir);
+
+    auto empire_statistics_p = Pending::ParseSynchronously(parse::statistics, parser, m_test_scripting_dir / "empire_statistics");
+    auto empire_statistics_opt = Pending::WaitForPendingUnlocked(std::move(empire_statistics_p));
+
+    BOOST_REQUIRE(empire_statistics_opt);
+
+    const auto empire_statistics = *std::move(empire_statistics_opt);
+    BOOST_REQUIRE_EQUAL(1, empire_statistics.size());
+
+    const auto statistic_it = empire_statistics.find("ARMED_MONSTER_COUNT");
+
+    BOOST_REQUIRE(statistic_it != empire_statistics.end());
+
+    BOOST_REQUIRE_EQUAL("ARMED_MONSTER_COUNT", statistic_it->first);
+
+    const auto* statistic = dynamic_cast<const ValueRef::Statistic<double>*>(statistic_it->second.get());
+
+    BOOST_REQUIRE(statistic != nullptr);
+
+    BOOST_REQUIRE_EQUAL(ValueRef::StatisticType::COUNT, statistic->GetStatisticType());
+
+    const auto* condition = dynamic_cast<const Condition::And*>(statistic->GetSamplingCondition());
+
+    BOOST_REQUIRE(condition != nullptr);
+    BOOST_REQUIRE_EQUAL(4, condition->OperandsRaw().size());
+    BOOST_CHECK_EQUAL(3265, condition->OperandsRaw()[0]->GetCheckSum());
+    BOOST_CHECK_EQUAL(1813, condition->OperandsRaw()[1]->GetCheckSum());
+    BOOST_CHECK_EQUAL(1556, condition->OperandsRaw()[2]->GetCheckSum());
+    BOOST_CHECK_EQUAL(2830, condition->OperandsRaw()[3]->GetCheckSum());
+}
+
+BOOST_AUTO_TEST_CASE(parse_encyclopedia_articles) {
+    PythonParser parser(m_python, m_test_scripting_dir);
+
+    auto encyclopedia_articles_p = Pending::ParseSynchronously(parse::encyclopedia_articles, parser, m_test_scripting_dir / "encyclopedia");
+    auto encyclopedia_articles_opt = Pending::WaitForPendingUnlocked(std::move(encyclopedia_articles_p));
+
+    BOOST_REQUIRE(encyclopedia_articles_opt);
+
+    const auto encyclopedia_articles = *std::move(encyclopedia_articles_opt);
+    BOOST_REQUIRE_EQUAL(1, encyclopedia_articles.size());
+
+    const auto articles_it = encyclopedia_articles.find("ENC_SPECIES");
+    BOOST_REQUIRE(articles_it != encyclopedia_articles.end());
+
+    BOOST_REQUIRE_EQUAL(1, articles_it->second.size());
+    const auto article = articles_it->second[0];
+
+    BOOST_CHECK_EQUAL("ENC_SPECIES", article.name);
+    BOOST_CHECK_EQUAL("ENC_SPECIES", article.category);
+    BOOST_CHECK_EQUAL("", article.short_description);
+    BOOST_CHECK_EQUAL("ENC_SPECIES_DESC", article.description);
+    BOOST_CHECK_EQUAL("icons/species/humanoid-01.png", article.icon);
+}
+
+BOOST_AUTO_TEST_CASE(parse_fields) {
+    PythonParser parser(m_python, m_test_scripting_dir);
+
+    auto fields_p = Pending::ParseSynchronously(parse::fields, parser, m_test_scripting_dir / "fields");
+    auto fields_opt = Pending::WaitForPendingUnlocked(std::move(fields_p));
+
+    BOOST_REQUIRE(fields_opt);
+
+    const auto fields = *std::move(fields_opt);
+    BOOST_CHECK_EQUAL(1, fields.size());
+
+    const auto fields_it = fields.find("FLD_SUBSPACE_RIFT");
+    BOOST_REQUIRE(fields_it != fields.end());
+    
+    const auto& field = fields_it->second;
+    BOOST_CHECK_EQUAL("FLD_SUBSPACE_RIFT", field->Name());
+    BOOST_CHECK_EQUAL("FLD_SUBSPACE_RIFT_DESC", field->Description());
+    BOOST_CHECK_EQUAL(0.0, field->Stealth());
+    BOOST_CHECK_EQUAL("nebulae/nebula9.png", field->Graphic());
+
+    const auto& effects = field->Effects();
+    BOOST_REQUIRE_EQUAL(4, effects.size());
+    BOOST_CHECK_EQUAL(4028904, effects[0].GetCheckSum());
+    BOOST_CHECK_EQUAL(4027442, effects[1].GetCheckSum());
+    BOOST_CHECK_EQUAL(4016711, effects[2].GetCheckSum());
+    BOOST_CHECK_EQUAL(4014678, effects[3].GetCheckSum());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

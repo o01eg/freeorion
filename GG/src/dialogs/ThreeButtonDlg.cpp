@@ -19,7 +19,7 @@
 
 using namespace GG;
 
-ThreeButtonDlg::ThreeButtonDlg(X w, Y h, std::string msg, const std::shared_ptr<Font>& font,
+ThreeButtonDlg::ThreeButtonDlg(X w, Y h, std::string msg, const std::shared_ptr<const Font>& font,
                                Clr color, Clr border_color, Clr button_color, Clr text_color,
                                std::size_t buttons, std::string zero, std::string one, std::string two) :
     Wnd((GUI::GetGUI()->AppWidth() - w) / 2, (GUI::GetGUI()->AppHeight() - h) / 2,
@@ -100,7 +100,7 @@ std::size_t ThreeButtonDlg::EscapeButton() const
 void ThreeButtonDlg::Render()
 { FlatRectangle(UpperLeft(), LowerRight(), m_color, m_border_color, 1); }
 
-void ThreeButtonDlg::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
+void ThreeButtonDlg::KeyPress(Key key, uint32_t, Flags<ModKey>)
 {
     if (key == Key::GGK_RETURN || key == Key::GGK_KP_ENTER) {
         if (m_default == 0)

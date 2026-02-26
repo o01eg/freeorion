@@ -1,5 +1,7 @@
 #include "GameRules.h"
 
+#include "ranges.h"
+
 namespace {
     std::vector<GameRulesFn>& GameRulesRegistry() {
         static std::vector<GameRulesFn> game_rules_registry;
@@ -36,8 +38,8 @@ namespace {
         if (category.empty())
             return static_cast<int8_t>(GameRuleCategories::GameRuleCategory::GENERAL);
 
-        const auto it = std::find_if(category_ranks.begin(), category_ranks.end(),
-                                     [category](auto entry) { return entry.second == category; });
+        const auto it = range_find_if(category_ranks,
+                                     [category](const auto& entry) noexcept { return entry.second == category; });
         return static_cast<int8_t>(
             (it == category_ranks.end() ? GameRuleCategories::GameRuleCategory::UNDEFINED : it->first));
     }
@@ -51,8 +53,9 @@ GameRule::GameRule(Type type_, std::string name_, boost::any value_,
                    std::unique_ptr<ValidatorBase>&& validator_, bool engine_internal_, uint32_t rank_,
                    std::string category_) :
     OptionsDB::Option(static_cast<char>(0), std::move(name_), std::move(value_),
-                      std::move(default_value_), std::move(description_),
-                      std::move(validator_), engine_internal_, false, true, "setup.rules"),
+                      std::move(default_value_), std::move(description_), std::move(validator_),
+                      engine_internal_ ? OptionsDB::Storable::STORABLE : OptionsDB::Storable::UNSTORABLE,
+                      OptionsDB::Flag::NOTFLAG, OptionsDB::Recognized::RECOGNIZED, "setup.rules"),
     type(type_),
     category(std::move(category_)),
     rank(rank_)
@@ -150,20 +153,28 @@ std::map<std::string, std::string> GameRules::GetRulesAsStrings() {
     return retval;
 }
 
+namespace {
+    static constexpr auto rule_ptr_less = [](const GameRule* lhs, const GameRule* rhs) {
+        if (lhs == rhs)
+            return false;
+        if (!lhs)
+            return true;
+        if (!rhs)
+            return false;
+        auto lhs_category_rank = GetCategoryRank(lhs->category);
+        auto rhs_category_rank = GetCategoryRank(rhs->category);
+        return lhs_category_rank == rhs_category_rank ?
+            lhs->rank < rhs->rank :
+            lhs_category_rank < rhs_category_rank;
+    };
+}
+
 std::vector<const GameRule*> GameRules::GetSortedByCategoryAndRank() {
     CheckPendingGameRules();
-    std::vector<const GameRule*> sorted_rules;
-    sorted_rules.reserve(m_game_rules.size());
-    std::transform(m_game_rules.begin(), m_game_rules.end(), std::back_inserter(sorted_rules),
-                   [](const auto& rule_pair) { return &rule_pair.second; });
-    std::sort(sorted_rules.begin(), sorted_rules.end(),
-              [](const GameRule* lhs, const GameRule* rhs) {
-                auto lhs_category_rank = GetCategoryRank(lhs->category);
-                auto rhs_category_rank = GetCategoryRank(rhs->category);
-                return lhs_category_rank == rhs_category_rank ?
-                    lhs->rank < rhs->rank :
-                    lhs_category_rank < rhs_category_rank;
-    });
+    static constexpr auto to_addr = [](const auto& rule) noexcept { return std::addressof(rule); };
+    auto rules_ptr_rng = m_game_rules | range_values | range_transform(to_addr);
+    std::vector<const GameRule*> sorted_rules(rules_ptr_rng.begin(), rules_ptr_rng.end());
+    std::stable_sort(sorted_rules.begin(), sorted_rules.end(), rule_ptr_less);
     return sorted_rules;
 }
 void GameRules::Add(Pending::Pending<GameRulesTypeMap>&& future)
@@ -193,7 +204,7 @@ void GameRules::Add(GameRule&& rule) {
         throw std::runtime_error("GameRules::Add<>() : GameRule " + name + " was added twice.");
 
     if (!GetOptionsDB().OptionExists("setup.rules.server-locked." + name))
-        GetOptionsDB().Add<bool>("setup.rules.server-locked." + name, rule.description, false);
+        GetOptionsDB().Add("setup.rules.server-locked." + name, rule.description, false);
 
     switch (rule.type) {
     case GameRule::Type::TOGGLE:    CheckValidatorAndAddRuleOption<bool>(rule);         break;

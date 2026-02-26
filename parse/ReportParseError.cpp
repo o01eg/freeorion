@@ -50,7 +50,7 @@ void parse::detail::info_visitor::operator()(const boost::spirit::info& what) co
 { boost::apply_visitor(info_visitor(m_os, what.tag, m_indent), what.value); }
 
 void parse::detail::info_visitor::operator()(const std::pair<boost::spirit::info, boost::spirit::info>& pair) const {
-    const boost::spirit::info* infos = &pair.first;
+    const boost::spirit::info* infos = std::addressof(pair.first);
     multi_info(infos, infos + 2);
 }
 
@@ -63,7 +63,7 @@ void parse::detail::info_visitor::multi_info(Iter first, const Iter last) const
     if (m_tag == "sequence" || m_tag == "expect") {
         if (first->tag.find(" =") == first->tag.size() - 2)
             ++first;
-        const string* value = boost::get<string>(&first->value);
+        const string* value = boost::get<string>(std::addressof(first->value));
         if (value && *value == "[") {
             for (; first != last; ++first)
                 boost::apply_visitor(info_visitor(m_os, first->tag, 1), first->value);

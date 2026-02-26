@@ -43,6 +43,8 @@ struct FO_COMMON_API ParsedShipDesign {
 
 class FO_COMMON_API ShipDesign {
 public:
+    enum class Monster : bool { MONSTER = true, NOTMONSTER = false };
+
     /** The ShipDesign() constructor constructs invalid designs and is only used by boost
         serialization. */
     ShipDesign();
@@ -71,11 +73,16 @@ public:
                int designed_on_turn, int designed_by_empire, std::string hull,
                std::vector<std::string> parts,
                std::string icon, std::string model,
-               bool name_desc_in_stringtable = false, bool monster = false,
+               bool name_desc_in_stringtable = false, Monster monster = Monster::NOTMONSTER,
                boost::uuids::uuid uuid = boost::uuids::nil_uuid());
 
     /** Convert a parsed ship design and do any required verification. */
     ShipDesign(const ParsedShipDesign& design);
+
+    ShipDesign(const ShipDesign&);
+    ShipDesign(ShipDesign&&);
+    ShipDesign& operator=(const ShipDesign&) = delete;
+    ShipDesign& operator=(ShipDesign&&);
 
     [[nodiscard]] int ID() const noexcept { return m_id; }    ///< returns id number of design
     /** returns name of design.  if \a stringtable_lookup is true and the
@@ -166,7 +173,7 @@ public:
     void SetID(int id);                                                  ///< sets the ID number of the design to \a id .  Should only be used by Universe class when inserting new design into Universe.
     void SetUUID(boost::uuids::uuid uuid) { m_uuid = uuid; }
     void Rename(std::string name) noexcept { m_name = std::move(name); } ///< renames this design to \a name
-    void SetMonster(const bool is_monster) noexcept { m_is_monster = is_monster; }
+    void SetMonster(bool is_monster) noexcept { m_is_monster = is_monster; }
 
     /** Return true if \p hull and \p parts would make a valid design. */
     [[nodiscard]] static bool ValidDesign(const std::string& hull, const std::vector<std::string>& parts);
@@ -210,7 +217,7 @@ private:
     std::string                   m_tags_concatenated;
     std::vector<std::string_view> m_tags;
 
-    float   m_detection = 0.0f; // TODO: const all these?
+    float   m_detection = 0.0f;
     float   m_colony_capacity = 0.0f;
     float   m_troop_capacity = 0.0f;
     float   m_stealth = 0.0f;
@@ -247,7 +254,7 @@ private:
 class FO_COMMON_API PredefinedShipDesignManager {
 public:
     using ParsedShipDesignsType = std::pair<
-        std::vector<std::pair<std::unique_ptr<ParsedShipDesign>, boost::filesystem::path>>, // designs_and_paths,
+        std::vector<std::pair<std::unique_ptr<ParsedShipDesign>, std::filesystem::path>>, // designs_and_paths,
         std::vector<boost::uuids::uuid> // ordering
     >;
 
@@ -317,7 +324,7 @@ private:
 [[nodiscard]] FO_COMMON_API std::tuple<
     bool,
     std::unordered_map<boost::uuids::uuid,
-                       std::pair<std::unique_ptr<ShipDesign>, boost::filesystem::path>,
+                       std::pair<std::unique_ptr<ShipDesign>, std::filesystem::path>,
                        boost::hash<boost::uuids::uuid>>,
     std::vector<boost::uuids::uuid>>
 LoadShipDesignsAndManifestOrderFromParseResults(PredefinedShipDesignManager::ParsedShipDesignsType& parsed);

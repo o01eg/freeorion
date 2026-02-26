@@ -6,7 +6,7 @@
 #include "../util/AppInterface.h"
 #include "../util/Export.h"
 
-#include <boost/filesystem.hpp>
+#include <fstream>
 #include <boost/signals2/signal.hpp>
 
 #include <map>
@@ -29,7 +29,6 @@ public:
 
     EmpireManager() = default;
     EmpireManager& operator=(EmpireManager&& other) noexcept;
-    ~EmpireManager() = default;
 
     [[nodiscard]] const auto&                           EmpireIDs() const noexcept { return m_empire_ids; }
     [[nodiscard]] const const_container_type&           GetEmpires() const noexcept { return m_const_empire_map; }
@@ -118,7 +117,7 @@ private:
 [[nodiscard]] FO_COMMON_API const std::vector<std::array<uint8_t, 4>>& EmpireColors();
 
 /** Initialize empire colors from \p path */
-FO_COMMON_API void InitEmpireColors(const boost::filesystem::path& path);
+FO_COMMON_API void InitEmpireColors(const std::filesystem::path& path);
 
 
 #endif

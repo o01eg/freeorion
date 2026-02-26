@@ -9,98 +9,13 @@
 
 #include <GG/DrawUtil.h>
 #include <GG/TextControl.h>
-#include <GG/utf8/checked.h>
+#include <GG/utf8/utf8.h>
 
 using namespace GG;
-
-namespace {
-    [[nodiscard]] constexpr Flags<TextFormat> ValidateFormat(Flags<TextFormat> format) noexcept
-    {
-        int dup_ct = 0;   // duplication count
-        if (format & FORMAT_LEFT) ++dup_ct;
-        if (format & FORMAT_RIGHT) ++dup_ct;
-        if (format & FORMAT_CENTER) ++dup_ct;
-        if (dup_ct != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_CENTER by default
-            format &= ~(FORMAT_RIGHT | FORMAT_LEFT);
-            format |= FORMAT_CENTER;
-        }
-        dup_ct = 0;
-        if (format & FORMAT_TOP) ++dup_ct;
-        if (format & FORMAT_BOTTOM) ++dup_ct;
-        if (format & FORMAT_VCENTER) ++dup_ct;
-        if (dup_ct != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_VCENTER by default
-            format &= ~(FORMAT_TOP | FORMAT_BOTTOM);
-            format |= FORMAT_VCENTER;
-        }
-        if ((format & FORMAT_WORDBREAK) && (format & FORMAT_LINEWRAP))   // only one of these can be picked; FORMAT_WORDBREAK overrides FORMAT_LINEWRAP
-            format &= ~FORMAT_LINEWRAP;
-        return format;
-    }
-}
 
 ////////////////////////////////////////////////
 // GG::TextControl
 ////////////////////////////////////////////////
-TextControl::TextControl(X x, Y y, X w, Y h, std::string str,
-                         std::shared_ptr<Font> font, Clr color,
-                         Flags<TextFormat> format,
-                         Flags<WndFlag> flags) :
-    Control(x, y, w, h, flags),
-    m_format(ValidateFormat(format)),
-    m_text_color(color),
-    m_font(std::move(font))
-{ TextControl::SetText(std::move(str)); }
-
-TextControl::TextControl(X x, Y y, X w, Y h, std::string str,
-                         std::vector<Font::TextElement> text_elements,
-                         std::shared_ptr<Font> font,
-                         Clr color, Flags<TextFormat> format,
-                         Flags<WndFlag> flags) :
-    Control(x, y, w, h, flags),
-    m_format(ValidateFormat(format)),
-    m_text_color(color),
-    m_font(std::move(font))
-{ TextControl::SetText(std::move(str), std::move(text_elements)); }
-
-TextControl::TextControl(const TextControl& that) :
-    Control(that.Left(), that.Top(), that.Width(), that.Height()),
-    m_text(that.m_text),
-    m_format(that.m_format),
-    m_text_color(that.m_text_color),
-    m_clip_text(that.m_clip_text),
-    m_set_min_size(that.m_set_min_size),
-    m_text_elements(that.m_text_elements),
-    m_code_points(that.m_code_points),
-    m_font(that.m_font),
-    m_cached_minusable_size_width(that.m_cached_minusable_size_width),
-    m_cached_minusable_size(that.m_cached_minusable_size)
-{
-    for (auto& elem : m_text_elements)
-        elem.Bind(m_text);
-}
-
-TextControl& TextControl::operator=(const TextControl& that)
-{
-    m_text = that.m_text;
-    m_format = that.m_format;
-    m_text_color = that.m_text_color;
-    m_clip_text = that.m_clip_text;
-    m_set_min_size = that.m_set_min_size;
-    m_text_elements = that.m_text_elements;
-    m_code_points = that.m_code_points;
-    m_font = that.m_font;
-    m_render_cache.clear();
-    m_cached_minusable_size_width = that.m_cached_minusable_size_width;
-    m_cached_minusable_size = that.m_cached_minusable_size;
-
-    for (auto& elem : m_text_elements)
-        elem.Bind(m_text);
-
-    return *this;
-}
-
-Pt TextControl::MinUsableSize() const noexcept
-{ return m_text_lr - m_text_ul; }
 
 Pt TextControl::MinUsableSize(X width) const
 {
@@ -122,6 +37,18 @@ Pt TextControl::MinUsableSize(X width) const
     return m_cached_minusable_size;
 }
 
+namespace {
+    template <typename T>
+    constexpr auto to_addr(T it) noexcept
+    {
+#if defined(__cpp_lib_to_address)
+        return std::to_address(it);
+#else
+        return std::addressof(*it);
+#endif
+    }
+}
+
 std::string_view TextControl::Text(CPSize from, CPSize to) const
 {
     if (from == INVALID_CP_SIZE || to == INVALID_CP_SIZE)
@@ -138,17 +65,11 @@ std::string_view TextControl::Text(CPSize from, CPSize to) const
     const auto low_it = m_text.begin() + low_string_idx;
 
     try {
-        return {&*low_it, out_length};
+        return {to_addr(low_it), out_length};
     } catch (...) {
         return {};
     }
 }
-
-Pt TextControl::TextUpperLeft() const noexcept
-{ return UpperLeft() + m_text_ul; }
-
-Pt TextControl::TextLowerRight() const noexcept
-{ return UpperLeft() + m_text_lr; }
 
 void TextControl::Render()
 {
@@ -173,7 +94,7 @@ void TextControl::RefreshCache() {
     m_render_cache.clear();
     Font::RenderState rs(TextColor());
     if (m_font)
-        m_font->PreRenderText(Pt0, Size(), m_text, m_format, m_render_cache, m_line_data, rs);
+        m_font->PreRenderText(Pt0, Size(), m_format, m_render_cache, m_line_data, rs);
 }
 
 void TextControl::SetText(std::string str)
@@ -215,12 +136,6 @@ void TextControl::SetText(std::string str, std::vector<Font::TextElement> text_e
     RecomputeLineData();
 }
 
-void TextControl::ChangeTemplatedText(const std::string& new_text, std::size_t targ_offset) {
-    if (m_font)
-        m_font->ChangeTemplatedText(m_text, m_text_elements, new_text, targ_offset);
-    RecomputeLineData();
-}
-
 void TextControl::RecomputeLineData() {
     if (!m_font)
         return;
@@ -240,7 +155,7 @@ void TextControl::RecomputeLineData() {
     m_cached_minusable_size_width = X0;
 }
 
-void TextControl::SetFont(std::shared_ptr<Font> font)
+void TextControl::SetFont(std::shared_ptr<const Font> font)
 {
     m_font = std::move(font);
     SetText(std::move(m_text));

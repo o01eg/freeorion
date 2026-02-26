@@ -11,7 +11,7 @@ RUN dnf install -y cmake \
 	zlib-devel \
 	SDL2-devel \
 	freetype-devel \
-	openal-devel \
+	openal-soft-devel \
 	libogg-devel \
 	libvorbis-devel \
 	glew-devel \

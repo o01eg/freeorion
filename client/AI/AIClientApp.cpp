@@ -25,7 +25,7 @@
 #include "../../parse/PythonParser.h"
 
 #include <boost/lexical_cast.hpp>
-#include <boost/filesystem/fstream.hpp>
+#include <fstream>
 #include <boost/functional/hash.hpp>
 #include <boost/uuid/nil_generator.hpp>
 
@@ -45,13 +45,13 @@ namespace {
         ...
         ai.trait.\<trait name\>.ai_40          -- Use for AI_40
      */
-    void AddTraitBypassOption(OptionsDB& db, std::string const & root, std::string ROOT,
+    void AddTraitBypassOption(OptionsDB& db, std::string const& root, std::string ROOT,
                               auto def, const ValidatorBase& validator)
     {
         const std::string option_root = "ai.trait." + root + ".";
         const std::string user_string_root = "OPTIONS_DB_AI_CONFIG_TRAIT_" + ROOT;
-        db.Add(option_root + "force.enabled", UserStringNop(user_string_root + "_FORCE"),       false);
-        db.Add(option_root + "default",       UserStringNop(user_string_root + "_FORCE_VALUE"), def,    validator.Clone());
+        db.Add<bool>(option_root + "force.enabled", UserStringNop(user_string_root + "_FORCE"),       false);
+        db.Add(option_root + "default",             UserStringNop(user_string_root + "_FORCE_VALUE"), def,    validator.Clone());
 
         for (int ii = 1; ii <= IApp::MAX_AI_PLAYERS(); ++ii) {
             db.Add(option_root + "ai_" + std::to_string(ii),
@@ -69,7 +69,7 @@ namespace {
         AddTraitBypassOption(db, "aggression", "AGGRESSION", no_value, RangedValidator<int>(no_value, max_aggression));
         AddTraitBypassOption(db, "empire-id",  "EMPIREID",   no_value, RangedValidator<int>(no_value, IApp::MAX_AI_PLAYERS()));
     }
-    bool temp_bool = RegisterOptions(&AddOptions);
+    bool temp_bool = RegisterOptions(std::addressof(AddOptions));
 
 }
 
@@ -134,10 +134,7 @@ void AIClientApp::Run() {
                                                  boost::uuids::nil_uuid()));
 
         // Start parsing content
-        std::promise<void> barrier;
-        std::future<void> barrier_future = barrier.get_future();
-        StartBackgroundParsing(PythonParser(*m_AI, GetResourceDir() / "scripting"), std::move(barrier));
-        barrier_future.wait();
+        StartBackgroundParsing(PythonParser(*m_AI, GetResourceDir() / "scripting"));
 
         // Import python main module only after game content has been parsed, allowing
         // python to query e.g. NamedReals during module initialization.

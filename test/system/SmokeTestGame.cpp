@@ -1,6 +1,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include "ClientAppFixture.h"
+#include "client/ClientNetworking.h"
 #include "Empire/Empire.h"
 #include "universe/Planet.h"
 #include "universe/Ship.h"
@@ -41,15 +42,6 @@ BOOST_AUTO_TEST_CASE(host_server) {
 
     BOOST_TEST_MESSAGE(SERVER_CLIENT_EXE);
 
-#ifdef FREEORION_MACOSX
-    // On OSX set environment variable DYLD_LIBRARY_PATH to python framework folder
-    // bundled with app, so the dynamic linker uses the bundled python library.
-    // Otherwise the dynamic linker will look for a correct python lib in system
-    // paths, and if it can't find it, throw an error and terminate!
-    // Setting environment variable here, spawned child processes will inherit it.
-    setenv("DYLD_LIBRARY_PATH", GetPythonHome().string().c_str(), 1);
-#endif
-
     std::vector<std::string> args{
         "\"" + SERVER_CLIENT_EXE + "\"",
         "--singleplayer",
@@ -64,7 +56,7 @@ BOOST_AUTO_TEST_CASE(host_server) {
     args.push_back("/proc/self/fd/1");
 #endif
 
-    Process server = Process(SERVER_CLIENT_EXE, args);
+    Process server = Process(m_networking->IoContext(), SERVER_CLIENT_EXE, args);
 
     BOOST_REQUIRE(ConnectToLocalHostServer());
 

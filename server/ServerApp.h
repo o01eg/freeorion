@@ -8,6 +8,7 @@
 #include <boost/asio/high_resolution_timer.hpp>
 #include "ServerFramework.h"
 #include "ServerNetworking.h"
+#include "ServerFSM.h"
 #include "../Empire/EmpireManager.h"
 #include "../Empire/Supply.h"
 #include "../universe/ScriptingContext.h"
@@ -34,8 +35,9 @@ public:
     const ServerApp& operator=(const ServerApp&) = delete;
     ServerApp& operator=(IApp&&) = delete;
 
+    static void InitLogging();
+
     /** Returns a ClientApp pointer to the singleton instance of the app. */
-    [[nodiscard]] static ServerApp* GetApp() noexcept { return static_cast<ServerApp*>(s_app); }
     [[nodiscard]] Universe& GetUniverse() noexcept override { return m_universe; }
     [[nodiscard]] EmpireManager& Empires() noexcept override { return m_empires; }
     [[nodiscard]] Empire* GetEmpire(int id) override;
@@ -83,7 +85,7 @@ public:
     [[nodiscard]] bool IsHostless() const;
 
     /** Returns chat history buffer. */
-    [[nodiscard]] const boost::circular_buffer<ChatHistoryEntity>& GetChatHistory() const;
+    [[nodiscard]] const auto& GetChatHistory() const noexcept { return m_chat_history; }
 
     /** Extracts player save game data. */
     [[nodiscard]] const auto& GetPlayerSaveGameData() const { return m_player_data; }
@@ -92,9 +94,10 @@ public:
 
     [[nodiscard]] bool IsHaveWinner() const;
 
-    void operator()(); ///< external interface to Run()
+    /** initializes app state, then executes main event handler/render loop (Poll()) */
+    void Run();
 
-    void StartBackgroundParsing(const PythonParser& python, std::promise<void>&& barrier) override;
+    void StartBackgroundParsing(const PythonParser& python) override;
 
     /** Returns the galaxy setup data used for the current game */
     [[nodiscard]] GalaxySetupData&    GetGalaxySetupData() { return m_galaxy_setup_data; }
@@ -220,8 +223,6 @@ public:
 
     [[nodiscard]] ServerNetworking& Networking() noexcept { return m_networking; };
 private:
-    void Run();          ///< initializes app state, then executes main event handler/render loop (Poll())
-
     /** Initialize the python engine if not already running.*/
     void InitializePython();
 
@@ -264,7 +265,7 @@ private:
     void CleanupAIs();   ///< cleans up AI processes: kills the process and empties the container of AI processes
 
     /** Sets the priority for all AI processes */
-    void  SetAIsProcessPriorityToLow(bool set_to_low);
+    void SetAIsProcessPriorityToLow(bool set_to_low);
 
     /** Get players info map to send it in GameStart message */
     std::map<int, PlayerInfo> GetPlayerInfoMap() const;
@@ -323,7 +324,7 @@ private:
 
     ScriptingContext m_context;
 
-    std::unique_ptr<ServerFSM> m_fsm;
+    ServerFSM        m_fsm;
 
     PythonServer            m_python_server;
     std::map<int, int>      m_player_empire_ids;                ///< map from player id to empire id that the player controls.
@@ -362,5 +363,6 @@ private:
     friend struct ShuttingDownServer;
 };
 
+[[nodiscard]] ServerApp& GetApp();
 
 #endif

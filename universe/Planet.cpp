@@ -36,16 +36,9 @@ namespace {
         }
     }
 
-#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
-    constexpr std::string EMPTY_STRING;
-#else
-    const std::string EMPTY_STRING;
-#endif
-
     /** @content_tag{CTRL_STAT_SKIP_DEPOP} Do not count Planets with this tag for SpeciesPlanetsDepoped stat */
     constexpr std::string_view TAG_STAT_SKIP_DEPOP = "CTRL_STAT_SKIP_DEPOP";
 }
-
 
 ////////////////////////////////////////////////////////////
 // Planet
@@ -81,7 +74,7 @@ std::shared_ptr<UniverseObject> Planet::Clone(const Universe& universe, int empi
 }
 
 void Planet::Copy(const UniverseObject& copied_object, const Universe& universe, int empire_id) {
-    if (&copied_object == this)
+    if (std::addressof(copied_object) == this)
         return;
 
     if (copied_object.ObjectType() != UniverseObjectType::OBJ_PLANET) {
@@ -564,9 +557,9 @@ bool Planet::FocusAvailable(std::string_view focus, const ScriptingContext& cont
     const auto* species = context.species.GetSpecies(this->SpeciesName());
     if (!species)
         return false;
+    const auto is_focus = [focus](const FocusType& focus_type) noexcept { return focus_type.Name() == focus; };
     const auto& foci = species->Foci();
-    const auto it = std::find_if(foci.begin(), foci.end(),
-                                 [focus](const FocusType& focus_type) noexcept { return focus_type.Name() == focus; });
+    const auto it = range_find_if(foci, is_focus);
     if (it == foci.end())
         return false;
     const auto* location = it->Location();

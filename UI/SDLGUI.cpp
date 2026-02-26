@@ -1,7 +1,7 @@
 #include "SDLGUI.h"
 
 #include <GG/WndEvent.h>
-#include <GG/utf8/checked.h>
+#include <GG/utf8/utf8.h>
 
 #include <cctype>
 #include <iostream>
@@ -36,8 +36,8 @@ namespace {
         target.driverdata = nullptr;
         target.refresh_rate = 0;
         SDL_DisplayMode closest{};
-        SDL_GetClosestDisplayMode(display_id, &target, &closest);
-        SDL_SetWindowDisplayMode(window, &closest);
+        SDL_GetClosestDisplayMode(display_id, std::addressof(target), std::addressof(closest));
+        SDL_SetWindowDisplayMode(window, std::addressof(closest));
         return Pt(X(closest.w), Y(closest.h));
     }
 
@@ -70,7 +70,7 @@ namespace {
     }
 
     struct QuitSignal {
-        QuitSignal(int exit_code_) :
+        constexpr QuitSignal(int exit_code_) noexcept:
             exit_code(exit_code_)
         {}
 
@@ -79,11 +79,11 @@ namespace {
 
     class FramebufferFailedException : public std::exception {
     public:
-        FramebufferFailedException(GLenum status):
+        FramebufferFailedException(GLenum status) noexcept :
             m_status(status)
         {}
 
-        const char* what() const noexcept override {
+        [[nodiscard]] const char* what() const noexcept override {
             switch (m_status) {
                 case GL_FRAMEBUFFER_UNSUPPORTED_EXT:
                     return "The requested framebuffer format was unsupported";
@@ -108,16 +108,12 @@ class Framebuffer {
 public:
     /// Construct a framebuffer of dimensions \a size.
     /// \throws FramebufferFailedException if using framebuffers is not going to work.
-    Framebuffer(GG::Pt size) :
-        m_id(0),
-        m_texture(0),
-        m_depth_rbo(0)
-    {
+    explicit Framebuffer(GG::Pt size) {
         int width = Value(size.x);
         int height = Value(size.y);
 
         // Create the texture to render the image on
-        glGenTextures(1, &m_texture);
+        glGenTextures(1, std::addressof(m_texture));
         glBindTexture(GL_TEXTURE_2D, m_texture);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -125,63 +121,60 @@ public:
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0,
-                        GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+                     GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         glBindTexture(GL_TEXTURE_2D, 0);
 
         // create a renderbuffer object to store depth and stencil info
-        glGenRenderbuffersEXT(1, &m_depth_rbo);
+        glGenRenderbuffersEXT(1, std::addressof(m_depth_rbo));
         glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, m_depth_rbo);
         glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH24_STENCIL8_EXT, width, height);
         glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
 
-        glGenFramebuffersEXT(1, &m_id);
+        glGenFramebuffersEXT(1, std::addressof(m_id));
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_id);
 
         // attach the texture to FBO color attachment point
-        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,        // 1. fbo target: GL_FRAMEBUFFER_EXT
-                                    GL_COLOR_ATTACHMENT0_EXT,  // 2. attachment point
-                                    GL_TEXTURE_2D,         // 3. tex target: GL_TEXTURE_2D
-                                    m_texture,             // 4. tex ID
-                                    0);                    // 5. mipmap level: 0(base)
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,       // 1. fbo target: GL_FRAMEBUFFER_EXT
+                                  GL_COLOR_ATTACHMENT0_EXT, // 2. attachment point
+                                  GL_TEXTURE_2D,            // 3. tex target: GL_TEXTURE_2D
+                                  m_texture,                // 4. tex ID
+                                  0);                       // 5. mipmap level: 0(base)
 
         // attach the renderbuffer to depth attachment point
-        glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,     // 1. fbo target: GL_FRAMEBUFFER_EXT
-                                        GL_DEPTH_ATTACHMENT_EXT,
-                                        GL_RENDERBUFFER_EXT,     // 3. rbo target: GL_RENDERBUFFER_EXT
-                                        m_depth_rbo);              // 4. rbo ID
+        glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,    // 1. fbo target: GL_FRAMEBUFFER_EXT
+                                     GL_DEPTH_ATTACHMENT_EXT,
+                                     GL_RENDERBUFFER_EXT,   // 3. rbo target: GL_RENDERBUFFER_EXT
+                                     m_depth_rbo);          // 4. rbo ID
 
         // the same render buffer has the stencil data in other bits
         glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,
-                                    GL_STENCIL_ATTACHMENT_EXT,
-                                    GL_RENDERBUFFER_EXT,
-                                    m_depth_rbo);
+                                     GL_STENCIL_ATTACHMENT_EXT,
+                                     GL_RENDERBUFFER_EXT,
+                                     m_depth_rbo);
 
         // check FBO status
         GLenum status = glCheckFramebufferStatusEXT (GL_FRAMEBUFFER_EXT);
-        if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
+        if (status != GL_FRAMEBUFFER_COMPLETE_EXT)
             throw FramebufferFailedException (status);
-        }
 
         // switch back to window-system-provided framebuffer
         glBindFramebufferEXT (GL_FRAMEBUFFER_EXT, 0);
     }
 
-    GLuint OpenGLId()
-    { return m_id; }
+    [[nodiscard]] GLuint OpenGLId() const noexcept { return m_id; }
 
-    GLuint TextureId()
-    { return m_texture; }
+    [[nodiscard]] GLuint TextureId() const noexcept { return m_texture; }
 
     ~Framebuffer() {
-        glDeleteFramebuffersEXT(1, &m_id);
-        glDeleteRenderbuffersEXT(1, &m_depth_rbo);
-        glDeleteTextures(1, &m_texture);
+        glDeleteFramebuffersEXT(1, std::addressof(m_id));
+        glDeleteRenderbuffersEXT(1, std::addressof(m_depth_rbo));
+        glDeleteTextures(1, std::addressof(m_texture));
     }
 
 private:
-    GLuint m_id;
-    GLuint m_texture;
-    GLuint m_depth_rbo;
+    GLuint m_id = 0;
+    GLuint m_texture = 0;
+    GLuint m_depth_rbo = 0;
 };
 
 // member functions
@@ -194,9 +187,7 @@ SDLGUI::SDLGUI(int w, int h, bool calc_FPS, std::string app_name, int x, int y,
     m_initial_y{y},
     m_fullscreen(fullscreen),
     m_fake_mode_change(fake_mode_change)
-{
-    SDLInit();
-}
+{ SDLInit(); }
 
 SDLGUI::~SDLGUI()
 { SDLQuit(); }
@@ -206,8 +197,7 @@ unsigned int SDLGUI::Ticks() const
 
 std::string SDLGUI::ClipboardText() const {
     if (SDL_HasClipboardText()) {
-        char* text = SDL_GetClipboardText();
-        if (text) {
+        if (char* text = SDL_GetClipboardText()) {
             std::string result{text};
             SDL_free(text);
             return result;
@@ -359,7 +349,7 @@ void SDLGUI::HandleSystemEvents() {
         // Therefore we need to get the position,
         int mouse_x = 0;
         int mouse_y = 0;
-        SDL_GetMouseState(&mouse_x, &mouse_y);
+        SDL_GetMouseState(std::addressof(mouse_x), std::addressof(mouse_y));
         Pt mouse_pos = Pt(X(mouse_x), Y(mouse_y));
         Pt mouse_rel(X(event.motion.xrel), Y(event.motion.yrel));
 
@@ -479,23 +469,34 @@ void SDLGUI::RenderEnd() {
         // Clear the real screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         int width, height;
-        SDL_GetWindowSize(m_window, &width, &height);
+        SDL_GetWindowSize(m_window, std::addressof(width), std::addressof(height));
         Enter2DModeImpl(width, height);
         // Disable blending, we want a direct copy
         glDisable(GL_BLEND);
         // Draw the virtual screen on the real screen
         glBindTexture(GL_TEXTURE_2D, m_framebuffer->TextureId());
         glEnable(GL_TEXTURE_2D);
-        glBegin(GL_QUADS);
-            glTexCoord2f(0.0, 1.0);
-            glVertex2i(0, 0);
-            glTexCoord2f(1.0, 1.0);
-            glVertex2i(width, 0);
-            glTexCoord2f(1.0, 0.0);
-            glVertex2i(width, height);
-            glTexCoord2f(0.0, 0.0);
-            glVertex2i(0, height);
-        glEnd();
+
+        GL2DVertexBuffer verts;
+        verts.store(std::array<float, 8>{
+            0, 0, static_cast<float>(width), 0,
+            static_cast<float>(width), static_cast<float>(height), 0, static_cast<float>(height)});
+        verts.activate();
+
+        GLTexCoordBuffer tex;
+        tex.store(std::array<float, 8>{0, 1, 1, 1, 1, 0, 0, 0});
+        tex.activate();
+
+        glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_NORMAL_ARRAY);
+        glDisableClientState(GL_COLOR_ARRAY);
+        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+        glDrawArrays(GL_QUADS, 0, verts.size());
+
+        glPopClientAttrib();
+
         glEnable(GL_BLEND);
         Exit2DMode();
     }
@@ -524,7 +525,6 @@ void SDLGUI::SDLQuit() {
 
 void SDLGUI::Run() {
     try {
-        Initialize();
         RunModal(m_done);
     } catch (const QuitSignal& e) {
         if (e.exit_code != 0)
@@ -554,7 +554,7 @@ std::vector<std::string> SDLGUI::GetSupportedResolutions() const {
     } else {
         for (unsigned i = 0; i < valid_mode_count; ++i) {
             SDL_DisplayMode mode;
-            if (SDL_GetDisplayMode(m_display_id, i, &mode) != 0) {
+            if (SDL_GetDisplayMode(m_display_id, i, std::addressof(mode)) != 0) {
                 SDL_Log("SDL_GetDisplayMode failed: %s", SDL_GetError());
             } else {
                 mode_vec.push_back(boost::io::str(boost::format("%1% x %2%") % mode.w % mode.h));
@@ -582,7 +582,7 @@ Pt SDLGUI::GetDefaultResolutionStatic(int display_id) {
 
     if (display_id >= 0 && display_id < SDL_GetNumVideoDisplays()) {
         SDL_DisplayMode mode;
-        SDL_GetDesktopDisplayMode(display_id, &mode);
+        SDL_GetDesktopDisplayMode(display_id, std::addressof(mode));
         Pt resolution(X(mode.w), Y(mode.h));
         return resolution;
     } else {
@@ -601,7 +601,7 @@ int SDLGUI::MaximumPossibleDimension(bool is_width) {
     int num_displays = NumVideoDisplaysStatic();
     for (int i_display = 0; i_display < num_displays; ++i_display) {
         SDL_Rect r;
-        if (SDL_GetDisplayBounds(i_display, &r) == 0) {
+        if (SDL_GetDisplayBounds(i_display, std::addressof(r)) == 0) {
             dim += is_width ? r.w : r.h;
         }
     }
@@ -648,5 +648,5 @@ void SDLGUI::Exit2DMode() {
     glPopAttrib();
 }
 
-bool SDLGUI::FramebuffersAvailable() const
+bool SDLGUI::FramebuffersAvailable() noexcept
 { return GLEW_EXT_framebuffer_object && GLEW_EXT_packed_depth_stencil; }

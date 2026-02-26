@@ -101,7 +101,7 @@ namespace {
                 =    tok.ShipDesign_
                 >    label(tok.name_) > tok.string [ _r1 = _1 ]
                 >    ((label(tok.uuid_)
-                       > tok.string [_pass = is_valid_uuid_(_1),  _r5 = parse_uuid_(_1) ])
+                       > tok.string [ (_pass = is_valid_uuid_(_1),  _r5 = parse_uuid_(_1)) ])
                       | eps [ _r5 = boost::uuids::nil_generator()() ]
                      )
                 >    label(tok.description_) > tok.string [ _r2 = _1 ]
@@ -211,19 +211,19 @@ namespace {
 
 namespace parse {
     std::pair<
-        std::vector<std::pair<std::unique_ptr<ParsedShipDesign>, boost::filesystem::path>>, // designs_and_paths
+        std::vector<std::pair<std::unique_ptr<ParsedShipDesign>, std::filesystem::path>>, // designs_and_paths
         std::vector<boost::uuids::uuid> //ordering
         >
-    ship_designs(const boost::filesystem::path& path) {
+    ship_designs(const std::filesystem::path& path) {
         /* Note: Parsing to ParsedShipDesign instead of ShipDesign means that
            checks of parts, hulls etc are done elsewhere.  A successful parse
            depends only on the parsed string and not other potentially
            concurrent parses of hulls and parts.*/
         std::vector<std::pair<std::unique_ptr<ParsedShipDesign>,
-                    boost::filesystem::path>> designs_and_paths;
+                    std::filesystem::path>> designs_and_paths;
         std::vector<boost::uuids::uuid> ordering;
 
-        boost::filesystem::path manifest_file;
+        std::filesystem::path manifest_file;
 
         ScopedTimer timer("Ship Designs Parsing");
 

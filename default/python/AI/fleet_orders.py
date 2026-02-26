@@ -69,7 +69,7 @@ class AIFleetOrder:
     def can_issue_order(self, verbose=False):
         """If FleetOrder can be issued now."""
         # for some orders, may need to re-issue if invasion/outposting/colonization was interrupted
-        if self.executed and not isinstance(self, (OrderOutpost, OrderColonize, OrderInvade)):
+        if self.executed and not isinstance(self, OrderOutpost | OrderColonize | OrderInvade):
             return False
         if not self.is_valid():
             return False
@@ -103,7 +103,7 @@ class AIFleetOrder:
         return f"[{self.ORDER_NAME}] of {self.fleet.get_object()} to {self.target.get_object()} {execute_status}"
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.fleet == other.fleet and self.target == other.target
+        return type(self) is type(other) and self.fleet == other.fleet and self.target == other.target
 
     def __hash__(self):
         return hash(self.fleet)

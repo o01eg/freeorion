@@ -36,74 +36,73 @@ void MilitaryPanel::CompleteConstruction() {
 
     SetName("MilitaryPanel");
 
-    auto planet = Objects().get<Planet>(m_planet_id);
-    if (!planet)
-        throw std::invalid_argument("Attempted to construct a MilitaryPanel with an object id is not a Planet");
+    auto& app = GetApp();
+
+    auto planet = app.GetContext().ContextObjects().get<Planet>(m_planet_id);
+    if (!planet) {
+        ErrorLogger() << "MilitaryPanel::CompleteConstruction couldn't get planet with id  " << m_planet_id;
+        return;
+    }
 
     m_expand_button->LeftPressedSignal.connect(
         boost::bind(&MilitaryPanel::ExpandCollapseButtonPressed, this));
 
-    const auto obj = Objects().get(m_planet_id);
-    if (!obj) {
-        ErrorLogger() << "Invalid object id " << m_planet_id;
-        return;
-    }
-
     // meter and production indicators
     std::vector<std::pair<MeterType, MeterType>> meters;
+    meters.reserve(5);
 
     // small meter indicators - for use when panel is collapsed
     for (MeterType meter : {MeterType::METER_SHIELD, MeterType::METER_DEFENSE, MeterType::METER_TROOPS,
                             MeterType::METER_DETECTION, MeterType::METER_STEALTH})
     {
-        auto stat = GG::Wnd::Create<StatisticIcon>(
-            ClientUI::MeterIcon(meter), obj->GetMeter(meter)->Initial(),
-            3, false, MeterIconSize().x, MeterIconSize().y);
+        auto stat = GG::Wnd::Create<StatisticIcon>(app.GetUI().MeterIcon(meter), app.GetUI().GetFont(),
+                                                   MeterIconSize().x, MeterIconSize().y, 3,
+                                                   StatisticIcon::IndicateChangeColour::INDICATE_FOR_OTHER,
+                                                   StatisticIcon::ShowSign::HIDE_IF_NON_NEGATIVE);
+
         AttachChild(stat);
         m_meter_stats.emplace_back(meter, stat);
         meters.emplace_back(meter, AssociatedMeterType(meter));
         stat->RightClickedSignal.connect([meter](GG::Pt pt) {
             auto meter_string = to_string(meter);
 
-            auto zoom_action = [meter_string]() { ClientUI::GetClientUI()->ZoomToMeterTypeArticle(std::string{meter_string}); };
+            auto zoom_action = [meter_string]() { GetApp().GetUI().ZoomToMeterTypeArticle(std::string{meter_string}); };
 
             auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
             std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                     UserString(meter_string));
-            popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false, zoom_action));
+            popup->AddMenuItem(std::move(popup_label), false, false, zoom_action);
             popup->Run();
         });
     }
 
     // attach and show meter bars and large resource indicators
-    m_multi_meter_status_bar =      GG::Wnd::Create<MultiMeterStatusBar>(Width() - 2*EDGE_PAD,       m_planet_id, meters);
-    m_multi_icon_value_indicator =  GG::Wnd::Create<MultiIconValueIndicator>(Width() - 2*EDGE_PAD,   m_planet_id, meters);
+    m_multi_meter_status_bar =
+        GG::Wnd::Create<MultiMeterStatusBar>(Width() - 2*EDGE_PAD, m_planet_id, meters);
+    m_multi_icon_value_indicator =
+        GG::Wnd::Create<MultiIconValueIndicator>(Width() - 2*EDGE_PAD, m_planet_id, std::move(meters));
 
-    // determine if this panel has been created yet.
-    auto it = s_expanded_map.find(m_planet_id);
-    if (it == s_expanded_map.end())
-        s_expanded_map[m_planet_id] = false; // if not, default to collapsed state
+    // if this panel has been created yet, default to collapsed state
+    s_expanded_map.try_emplace(m_planet_id, false);
 
     Refresh();
 }
 
 void MilitaryPanel::ExpandCollapse(bool expanded) {
-    if (expanded == s_expanded_map[m_planet_id]) return; // nothing to do
-    s_expanded_map[m_planet_id] = expanded;
-
-    DoLayout();
+    if (expanded != std::exchange(s_expanded_map[m_planet_id], expanded))
+        DoLayout();
 }
 
-void MilitaryPanel::Update() {
-    auto obj = Objects().get(m_planet_id);
+void MilitaryPanel::Update(const ObjectMap& objects) {
+    auto obj = objects.get(m_planet_id);
     if (!obj) {
-        ErrorLogger() << "MilitaryPanel::Update coudln't get object with id  " << m_planet_id;
+        ErrorLogger() << "MilitaryPanel::Update couldn't get object with id  " << m_planet_id;
         return;
     }
 
     // meter bar displays military stats
-    m_multi_meter_status_bar->Update();
-    m_multi_icon_value_indicator->Update();
+    m_multi_meter_status_bar->Update(objects);
+    m_multi_icon_value_indicator->Update(objects);
 
     // tooltips
     for (auto& [meter_type, stat] : m_meter_stats) {
@@ -114,7 +113,8 @@ void MilitaryPanel::Update() {
             continue;
         }
 
-        stat->SetValue(meter->Initial());
+        stat->SetValue(meter->Initial(), 0);
+        stat->SetValue(meter->Current() - meter->Initial(), 1);
 
         auto browse_wnd = GG::Wnd::Create<MeterBrowseWnd>(m_planet_id, meter_type, AssociatedMeterType(meter_type));
         m_multi_icon_value_indicator->SetToolTip(meter_type, browse_wnd);
@@ -131,7 +131,7 @@ void MilitaryPanel::Refresh() {
 
 void MilitaryPanel::PreRender() {
     AccordionPanel::PreRender();
-    Update();
+    Update(GetApp().GetContext().ContextObjects());
     DoLayout();
 }
 

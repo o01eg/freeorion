@@ -10,14 +10,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-24.04, ubuntu-22.04]
         compiler: [gcc, clang]
+        client-godot: ["ON"]
+        build-type: [Release]
+        include:
+          - os: ubuntu-24.04
+            compiler: gcc-asan
+            client-godot: "ON"
+            build-type: RelWithDebInfo
     env:
       CACHE_NAME: linux
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
-      - uses: actions/cache@v3
+        uses: actions/checkout@v4
+      - uses: actions/cache@v4
         id: build-ubuntu-install-cache-id
         with:
           path: ${{ runner.temp }}/cache-build-linux-install
@@ -36,7 +43,7 @@ jobs:
           string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
           file(APPEND "$ENV{GITHUB_OUTPUT}" "timestamp=${current_date}")
       - name: Cache files with ccache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/ccache
           key: build-${{ matrix.os }}-${{ matrix.compiler }}-ccache-${{ steps.build-ubuntu-ccache-timestamp.outputs.timestamp }}
@@ -53,26 +60,39 @@ jobs:
         if: ${{ matrix.compiler == 'gcc' }}
         env:
           CCACHE_DIR: ${{ runner.temp }}/ccache
+          CC: ${{ matrix.os == 'ubuntu-22.04' && 'gcc-12' || 'gcc-14' }}
+          CXX: ${{ matrix.os == 'ubuntu-22.04' && 'g++-12' || 'g++-14' }}
         run: |
           cd build
-          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=ON -DBUILD_CLIENT_GODOT=ON ..
-      
+          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=ON -DBUILD_CLIENT_GODOT=${{ matrix.client-godot }} -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} ..
       - name: Configure for clang
         if: ${{ matrix.compiler == 'clang' }}
         env:
           CCACHE_DIR: ${{ runner.temp }}/ccache
           CXXFLAGS: '-I/usr/include/SDL2 -I/usr/include/x86_64-linux-gnu/SDL2/ -I/usr/include/x86_64-linux-gnu/'
           CFLAGS: '-I/usr/include/SDL2 -I/usr/include/x86_64-linux-gnu/SDL2/ -I/usr/include/x86_64-linux-gnu/'
-          CC: clang-15
-          CXX: clang++-15
+          CC: ${{ matrix.os == 'ubuntu-22.04' && 'clang-15' || 'clang-18' }}
+          CXX: ${{ matrix.os == 'ubuntu-22.04' && 'clang++-15' || 'clang++-18' }}
         run: |
           cd build
-          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=ON -DBUILD_CLIENT_GODOT=ON ..
-
+          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=ON -DBUILD_CLIENT_GODOT=${{ matrix.client-godot }} -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} ..
+      # try to catch possible issues with memory access
+      - name: Configure for gcc with address sanitizer
+        if: ${{ matrix.compiler == 'gcc-asan' }}
+        env:
+          CCACHE_DIR: ${{ runner.temp }}/ccache
+          CXXFLAGS: '-fsanitize=address -g'
+          CFLAGS: '-fsanitize=address -g'
+          CC: gcc-14
+          CXX: g++-14
+          LDFLAGS: '-fsanitize=address'
+        run: |
+          cd build
+          cmake -DBUILD_TESTING=ON -DBUILD_CLIENT_GG=ON -DBUILD_CLIENT_GODOT=${{ matrix.client-godot }} -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} ..
       - name: Build
         env:
           CCACHE_DIR: ${{ runner.temp }}/ccache
-          CMAKE_BUILD_PARALLEL_LEVEL: 2
+          CMAKE_BUILD_PARALLEL_LEVEL: 3
         run: |
           cd build
           cmake --build .
@@ -84,11 +104,15 @@ jobs:
       - name: Run C++ unit tests
         env:
           FO_TEST_HOSTLESS_GAMES: 1
+          ASAN_OPTIONS: ${{ matrix.compiler == 'gcc-asan' && 'detect_leaks=0:abort_on_error=1' || ''}}
         run: |
           cd build
-          cmake --build . --config Release --target unittest
+          cmake --build . --config ${{ matrix.build-type }} --target unittest
       - name: Run Godot unit tests
         if: matrix.client-godot == 'ON'
+        env:
+          ASAN_OPTIONS: ${{ matrix.compiler == 'gcc-asan' && 'detect_leaks=0:abort_on_error=1' || ''}}
+          LD_PRELOAD: ${{ matrix.compiler == 'gcc-asan' && '/usr/lib/gcc/x86_64-linux-gnu/13/libasan.so' || '' }}
         run: |
           cp `which godot3-server` build/
           ./build/godot3-server --disable-render-loop --verbose -s --path godot addons/gut/gut_cmdln.gd -gdir=res://test/ -ginclude_subdirs -gexit

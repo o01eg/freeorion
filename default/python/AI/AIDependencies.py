@@ -19,7 +19,31 @@ Example usage:
     import AIDependencies
     my_industry = AIDependencies.INDUSTRY_PER_POP * my_population
 """
+
 import freeOrionAIInterface as fo
+
+
+# FIXMW Note this would do a dependency cycle
+# from freeorion_tools import (
+#    get_named_real,
+# )
+def get_named_int(name: str) -> int:
+    if fo.namedIntDefined(name):
+        return fo.getNamedInt(name)
+    return 1.0
+
+
+def get_named_real(name: str) -> float:
+    """
+    Returns a NamedReal from FOCS.
+    If the value does not exist, reports an error and returns 1.0.
+    Note that we do not raise and exception so that the AI can continue, as good as it can, with outdated information.
+    This is also why we return 1, returning 0 could cause followup errors if the value is used as divisor.
+    """
+    if fo.namedRealDefined(name):
+        return fo.getNamedReal(name)
+    return 1.0
+
 
 # Note re common dictionary lookup structure, "PlanetSize-Dependent-Lookup":
 # Many dictionaries herein (a prime example being the building_supply dictionary) have a primary key (such as
@@ -375,37 +399,45 @@ FUEL_UPGRADE_TECHS = frozenset(
 # TODO (Morlic): Consider using only 1 dict with (capacity, secondaryStat) tuple as entries
 WEAPON_UPGRADE_DICT = {
     part_name: tuple(
-        {tech_name: damage * SHIP_WEAPON_DAMAGE_FACTOR for tech_name, damage, in techs_damage.items()}.items()
+        {tech_name: damage * SHIP_WEAPON_DAMAGE_FACTOR for tech_name, damage in techs_damage.items()}.items()
     )
     for part_name, techs_damage in {
         # Output "PARTNAME": tuple((tech_name, dmg_upgrade), (tech_name2, dmg_upgrade2), ...)
         #  Input "PARTNAME": {tech_name: dmg_upgrade, tech_name2, dmg_upgrade2, ...}
+        # FIXME:  the damage boost for weapons which do not shoot each bout has to be wrong
+        #         note the concentrator claims half the boost
         "SR_WEAPON_0_1": {},
         "SR_WEAPON_1_1": {"SHP_WEAPON_1_%d" % i: 1 for i in [2, 3, 4]},
         "SR_WEAPON_2_1": {"SHP_WEAPON_2_%d" % i: 2 for i in [2, 3, 4]},
         "SR_WEAPON_3_1": {"SHP_WEAPON_3_%d" % i: 3 for i in [2, 3, 4]},
         "SR_WEAPON_4_1": {"SHP_WEAPON_4_%d" % i: 5 for i in [2, 3, 4]},
-        "SR_ARC_DISRUPTOR": {"SHP_WEAPON_ARC_DISRUPTOR_%d" % i: i for i in [2, 3]},
+        "SR_ARC_DISRUPTOR": {"SHP_WEAPON_ARC_DISRUPTOR_%d" % 2: i for i in [2, 3]},
+        "SR_ARC_CONCENTRATOR": {"SHP_WEAPON_ARC_DISRUPTOR_2": 4 / 2, "SHP_WEAPON_ARC_DISRUPTOR_3": 4 / 2},
         SR_FLUX_LANCE: {},
         "SR_SPINAL_ANTIMATTER": {},
+        "SR_GRAV_PULSE": {},
     }.items()
 }
 
 # ROF == rate of fire == weapon shots
 WEAPON_ROF_UPGRADE_DICT = {
     # "PARTNAME": tuple((tech_name, rof_upgrade), (tech_name2, rof_upgrade2), ...)
+    # FIXME:  the shot boost for weapons which do not shoot each bout has to be wrong
+    #         note that the concentrator boost should be halved, but there are no half shots
     "SR_WEAPON_0_1": (("SHP_WEAPON_1_3", 1), ("SHP_WEAPON_2_3", 1), ("SHP_WEAPON_3_3", 1), ("SHP_WEAPON_4_3", 1)),
     "SR_WEAPON_1_1": (),
     "SR_WEAPON_2_1": (),
     "SR_WEAPON_3_1": (),
     "SR_WEAPON_4_1": (),
-    "SR_ARC_DISRUPTOR": (),
-    SR_FLUX_LANCE: {},
+    "SR_ARC_DISRUPTOR": (("SHP_WEAPON_ARC_DISRUPTOR_4", 1),),
+    "SR_ARC_CONCENTRATOR": (("SHP_WEAPON_ARC_DISRUPTOR_4", 1),),
+    SR_FLUX_LANCE: (),
     "SR_SPINAL_ANTIMATTER": (),
+    "SR_GRAV_PULSE": (),
 }
 
 FIGHTER_DAMAGE_UPGRADE_DICT = {
-    part_name: tuple({tech_name: damage * FIGHTER_DAMAGE_FACTOR for tech_name, damage, in techs_damage.items()}.items())
+    part_name: tuple({tech_name: damage * FIGHTER_DAMAGE_FACTOR for tech_name, damage in techs_damage.items()}.items())
     for part_name, techs_damage in {
         # Output "PARTNAME": tuple((tech_name, dmg_upgrade), (tech_name2, dmg_upgrade2), ...)
         #  Input "PARTNAME": {tech_name: dmg_upgrade, tech_name2: dmg_upgrade2, ...}
@@ -502,9 +534,9 @@ PILOT_FIGHTERDAMAGE_UNSCALED_MODIFIER_DICT = {
     # Note: FT_HANGAR_1 fighters are not able to attack ships so pilot damage modifier does not apply
     "NO": {},
     "BAD": {"FT_HANGAR_1": 0, "FT_HANGAR_2": -1, "FT_HANGAR_3": -1, "FT_HANGAR_4": -1},
-    "GOOD": {"FT_HANGAR_1": 0, "FT_HANGAR_2": 1, "FT_HANGAR_3": 1, "FT_HANGAR_4": 1},
-    "GREAT": {"FT_HANGAR_1": 0, "FT_HANGAR_2": 2, "FT_HANGAR_3": 2, "FT_HANGAR_4": 2},
-    "ULTIMATE": {"FT_HANGAR_1": 0, "FT_HANGAR_2": 3, "FT_HANGAR_3": 3, "FT_HANGAR_4": 3},
+    "GOOD": {"FT_HANGAR_1": 0, "FT_HANGAR_2": 1.5, "FT_HANGAR_3": 1.5, "FT_HANGAR_4": 1.5},
+    "GREAT": {"FT_HANGAR_1": 0, "FT_HANGAR_2": 3, "FT_HANGAR_3": 3, "FT_HANGAR_4": 3},
+    "ULTIMATE": {"FT_HANGAR_1": 0, "FT_HANGAR_2": 4.5, "FT_HANGAR_3": 4.5, "FT_HANGAR_4": 4.5},
 }
 
 PILOT_FIGHTER_CAPACITY_MODIFIER_DICT = {
@@ -607,6 +639,7 @@ class CombatTarget:
         "SR_WEAPON_2_1": SHIP | PLANET,
         "SR_WEAPON_3_1": SHIP | PLANET,
         "SR_WEAPON_4_1": SHIP | PLANET,
+        "SR_ARC_CONCENTRATOR": ANY,
         "SR_ARC_DISRUPTOR": ANY,
         SR_FLUX_LANCE: SHIP | PLANET,
         "SR_SPINAL_ANTIMATTER": SHIP | PLANET,
@@ -732,45 +765,60 @@ HULL_EFFECTS = {
     "SH_ORGANIC": {
         REPAIR_PER_TURN: 2 * SHIP_STRUCTURE_FACTOR,
         FUEL_PER_TURN: 0.2,
-        ORGANIC_GROWTH: (0.2 * SHIP_STRUCTURE_FACTOR, 3 * SHIP_STRUCTURE_FACTOR),
+        ORGANIC_GROWTH: (get_named_real("SH_ORGANIC_GROWTH_PER_TURN"), get_named_int("SH_ORGANIC_GROWTH_STRUCTURE")),
     },
     "SH_ENDOMORPHIC": {
         DETECTION: 50,
-        ORGANIC_GROWTH: (0.5 * SHIP_STRUCTURE_FACTOR, 15 * SHIP_STRUCTURE_FACTOR),
+        ORGANIC_GROWTH: (
+            get_named_real("SH_ENDOMORPHIC_GROWTH_PER_TURN"),
+            get_named_int("SH_ENDOMORPHIC_GROWTH_STRUCTURE"),
+        ),
     },
     "SH_SYMBIOTIC": {
         REPAIR_PER_TURN: 2 * SHIP_STRUCTURE_FACTOR,
         FUEL_PER_TURN: 0.2,
-        DETECTION: 40,
-        ORGANIC_GROWTH: (0.2 * SHIP_STRUCTURE_FACTOR, 10 * SHIP_STRUCTURE_FACTOR),
+        DETECTION: 50,
+        ORGANIC_GROWTH: (
+            get_named_real("SH_SYMBIOTIC_GROWTH_PER_TURN"),
+            get_named_int("SH_SYMBIOTIC_GROWTH_STRUCTURE"),
+        ),
     },
     "SH_PROTOPLASMIC": {
         REPAIR_PER_TURN: 2 * SHIP_STRUCTURE_FACTOR,
         FUEL_PER_TURN: 0.2,
-        DETECTION: 40,
-        ORGANIC_GROWTH: (0.5 * SHIP_STRUCTURE_FACTOR, 25 * SHIP_STRUCTURE_FACTOR),
+        DETECTION: 50,
+        ORGANIC_GROWTH: (
+            get_named_real("SH_PROTOPLASMIC_GROWTH_PER_TURN"),
+            get_named_int("SH_PROTOPLASMIC_GROWTH_STRUCTURE"),
+        ),
     },
     "SH_ENDOSYMBIOTIC": {
         REPAIR_PER_TURN: 2 * SHIP_STRUCTURE_FACTOR,
         FUEL_PER_TURN: 0.2,
-        DETECTION: 40,
-        ORGANIC_GROWTH: (0.5 * SHIP_STRUCTURE_FACTOR, 15 * SHIP_STRUCTURE_FACTOR),
+        DETECTION: 50,
+        ORGANIC_GROWTH: (
+            get_named_real("SH_ENDOSYMBIOTIC_GROWTH_PER_TURN"),
+            get_named_int("SH_ENDOSYMBIOTIC_GROWTH_STRUCTURE"),
+        ),
     },
     "SH_RAVENOUS": {
         DETECTION: 75,
-        ORGANIC_GROWTH: (0.5 * SHIP_STRUCTURE_FACTOR, 20 * SHIP_STRUCTURE_FACTOR),
+        ORGANIC_GROWTH: (get_named_real("SH_RAVENOUS_GROWTH_PER_TURN"), get_named_int("SH_RAVENOUS_GROWTH_STRUCTURE")),
     },
     "SH_BIOADAPTIVE": {
         REPAIR_PER_TURN: (STRUCTURE, 1),
         FUEL_PER_TURN: 0.2,
         DETECTION: 75,
-        ORGANIC_GROWTH: (0.5 * SHIP_STRUCTURE_FACTOR, 25 * SHIP_STRUCTURE_FACTOR),
+        ORGANIC_GROWTH: (
+            get_named_real("SH_BIOADAPTIVE_GROWTH_PER_TURN"),
+            get_named_int("SH_BIOADAPTIVE_GROWTH_STRUCTURE"),
+        ),
     },
     "SH_SENTIENT": {
         REPAIR_PER_TURN: 2 * SHIP_STRUCTURE_FACTOR,
         FUEL_PER_TURN: 0.2,
-        DETECTION: 90,
-        ORGANIC_GROWTH: (1 * SHIP_STRUCTURE_FACTOR, 45 * SHIP_STRUCTURE_FACTOR),
+        DETECTION: 70,
+        ORGANIC_GROWTH: (get_named_real("SH_SENTIENT_GROWTH_PER_TURN"), get_named_int("SH_SENTIENT_GROWTH_STRUCTURE")),
         STEALTH_MODIFIER: 20,
     },
     # Energy Line

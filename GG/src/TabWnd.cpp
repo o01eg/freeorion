@@ -1,7 +1,7 @@
 //! GiGi - A GUI for OpenGL
 //!
 //!  Copyright (C) 2003-2008 T. Zachary Laine <whatwasthataddress@gmail.com>
-//!  Copyright (C) 2013-2020 The FreeOrion Project
+//!  Copyright (C) 2013-2025 The FreeOrion Project
 //!
 //! Released under the GNU Lesser General Public License 2.1 or later.
 //! Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
@@ -21,12 +21,12 @@ struct TabChangedEcho
 {
     TabChangedEcho(std::string name) : m_name(std::move(name)) {}
     void operator()(std::size_t index)
-        { std::cerr << "GG SIGNAL : " << m_name << "(index=" << index << ")\n"; }
-    std::string m_name;
+    { std::cerr << "GG SIGNAL : " << m_name << "(index=" << index << ")\n"; }
+    const std::string m_name;
 };
 
-Y TabHeightFromFont(const std::shared_ptr<Font>& font)
-{ return font->Lineskip() + 10; }
+Y TabHeightFromFont(const std::shared_ptr<const Font>& font)
+{ return font ? font->Lineskip() + 10 : Y{10}; }
 
 }
 
@@ -116,7 +116,7 @@ void OverlayWnd::SetCurrentWnd(std::size_t index)
         GG::Pt lr = old_current_wnd ? old_current_wnd->LowerRight() : current_wnd->LowerRight();
         current_wnd->SizeMove(ul, lr);
 
-        auto&& layout = GetLayout();
+        auto layout = GetLayout();
         layout->Remove(old_current_wnd.get());
         layout->Add(current_wnd, 0, 0);
 
@@ -134,10 +134,9 @@ void OverlayWnd::SetCurrentWnd(std::size_t index)
 ////////////////////////////////////////////////
 // GG::TabWnd
 ////////////////////////////////////////////////
-TabWnd::TabWnd(X x, Y y, X w, Y h, const std::shared_ptr<Font>& font, Clr color,
-               Clr text_color) :
+TabWnd::TabWnd(X x, Y y, X w, Y h, std::shared_ptr<const Font> font, Clr color, Clr text_color) :
     Wnd(x, y, w, h, INTERACTIVE),
-    m_tab_bar(GetStyleFactory().NewTabBar(font, color, text_color)),
+    m_tab_bar(GetStyleFactory().NewTabBar(std::move(font), color, text_color)),
     m_overlay(Wnd::Create<OverlayWnd>(X0, Y0, X1, Y1))
 {}
 
@@ -148,8 +147,8 @@ void TabWnd::CompleteConstruction()
     layout->Add(m_tab_bar, 0, 0);
     layout->Add(m_overlay, 1, 0);
     SetLayout(std::move(layout));
-    m_tab_bar->TabChangedSignal.connect(
-        boost::bind(&TabWnd::TabChanged, this, boost::placeholders::_1, true));
+    m_bar_connection = m_tab_bar->TabChangedSignal.connect(
+        [this](std::size_t index) { TabChanged(index, true); });
 
     if (INSTRUMENT_ALL_SIGNALS)
         TabChangedSignal.connect(TabChangedEcho("TabWnd::TabChangedSignal"));
@@ -164,17 +163,17 @@ Pt TabWnd::MinUsableSize() const
     return retval;
 }
 
-bool TabWnd::Empty() const
-{ return m_tab_bar->Empty(); }
+bool TabWnd::Empty() const noexcept
+{ return m_tab_bar && m_tab_bar->Empty(); }
 
-std::size_t TabWnd::NumWnds() const
-{ return m_tab_bar->NumTabs(); }
+std::size_t TabWnd::NumWnds() const noexcept
+{ return m_tab_bar ? m_tab_bar->NumTabs() : 0u; }
 
-Wnd* TabWnd::CurrentWnd() const
-{ return m_overlay->CurrentWnd().get(); }
+Wnd* TabWnd::CurrentWnd() const noexcept
+{ return m_overlay ? m_overlay->CurrentWnd().get() : nullptr; }
 
-std::size_t TabWnd::CurrentWndIndex() const
-{ return m_tab_bar->CurrentTabIndex(); }
+std::size_t TabWnd::CurrentWndIndex() const noexcept
+{ return m_tab_bar ? m_tab_bar->CurrentTabIndex() : 0u; }
 
 std::size_t TabWnd::AddWnd(std::shared_ptr<Wnd> wnd, std::string name)
 {
@@ -230,11 +229,10 @@ void TabWnd::TabChanged(std::size_t index, bool signal)
 ////////////////////////////////////////////////
 // GG::TabBar
 ////////////////////////////////////////////////
-TabBar::TabBar(const std::shared_ptr<Font>& font, Clr color, Clr text_color,
-               Flags<WndFlag> flags) :
+TabBar::TabBar(std::shared_ptr<const Font> font, Clr color, Clr text_color, Flags<WndFlag> flags) :
     Control(X0, Y0, X1, TabHeightFromFont(font), flags),
-    m_font(font),
-    m_left_right_button_layout(Wnd::Create<Layout>(X0, Y0, X1, TabHeightFromFont(font), 1, 3)),
+    m_font(std::move(font)),
+    m_left_right_button_layout(Wnd::Create<Layout>(X0, Y0, X1, TabHeightFromFont(m_font), 1, 3)),
     m_text_color(text_color)
 {
     SetColor(color);
@@ -267,9 +265,15 @@ void TabBar::CompleteConstruction()
     AttachChild(m_tabs);
     AttachChild(m_left_right_button_layout);
 
-    m_tabs->ButtonChangedSignal.connect(boost::bind(&TabBar::TabChanged, this, boost::placeholders::_1, true));
-    m_left_button->LeftPressedSignal.connect(boost::bind(&TabBar::LeftClicked, this));
-    m_right_button->LeftPressedSignal.connect(boost::bind(&TabBar::RightClicked, this));
+    if (m_tabs)
+        m_tabs_connection = m_tabs->ButtonChangedSignal.connect(
+            [this](std::size_t index) { TabChanged(index, true); });
+    if (m_left_button)
+        m_left_button_connection = m_left_button->LeftPressedSignal.connect(
+            [this]() { LeftClicked(); });
+    if (m_right_button)
+        m_right_button_connection = m_right_button->LeftPressedSignal.connect(
+            [this]() { RightClicked(); });
 
     if (INSTRUMENT_ALL_SIGNALS)
         TabChangedSignal.connect(TabChangedEcho("TabBar::TabChangedSignal"));
@@ -281,54 +285,37 @@ Pt TabBar::MinUsableSize() const
 {
     Y y(Y0);
     for (auto& button : m_tab_buttons) {
-        Y button_min_y = button->MinUsableSize().y;
+        Y button_min_y = button ? button->MinUsableSize().y : Y0;
         if (y < button_min_y)
             y = button_min_y;
     }
     return Pt(4 * ButtonWidth(), y);
 }
 
-bool TabBar::Empty() const
-{ return m_tabs->Empty(); }
-
-std::size_t TabBar::NumTabs() const
-{ return m_tabs->NumButtons(); }
-
-std::size_t TabBar::CurrentTabIndex() const
-{ return m_tabs->CheckedButton(); }
-
-Clr TabBar::TextColor() const
-{ return m_text_color; }
-
 void TabBar::MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys)
 {
-    if (move < 0 && m_right_button && !m_right_button->Disabled()) {
+    if (move < 0 && m_right_button && !m_right_button->Disabled())  // scroll down gives negative move -> moves right
         RightClicked();
-        return;
-    }
-    if (move > 0 && m_left_button && !m_left_button->Disabled()) {
+    else if (move > 0 && m_left_button && !m_left_button->Disabled())
         LeftClicked();
-        return;
-    }
 }
 
 void TabBar::SizeMove(Pt ul, Pt lr)
 {
     const auto old_size = Size();
     Control::SizeMove(ul, lr);
-    if(old_size != Size())
+    if (old_size != Size())
         DoLayout();
 }
 
 void TabBar::DoLayout()
 {
-    m_tabs->Resize(Pt(m_tabs->Size().x, LowerRight().y - UpperLeft().y));
-    m_left_right_button_layout->SizeMove(Pt(), LowerRight() - UpperLeft());
+    if (m_tabs)
+        m_tabs->Resize(Pt(m_tabs->Size().x, LowerRight().y - UpperLeft().y));
+    if (m_left_right_button_layout)
+        m_left_right_button_layout->SizeMove(Pt(), LowerRight() - UpperLeft());
     RecalcLeftRightButton();
 }
-
-void TabBar::Render()
-{}
 
 std::size_t TabBar::AddTab(std::string name)
 {
@@ -344,6 +331,7 @@ void TabBar::InsertTab(std::size_t index, std::string name)
         std::move(name), m_font, FORMAT_CENTER, Color(), m_text_color);
     button->InstallEventFilter(shared_from_this());
     m_tab_buttons.insert(m_tab_buttons.begin() + index, button);
+    if (!m_tabs) return;
     m_tabs->InsertButton(index, m_tab_buttons[index]);
     RecalcLeftRightButton();
     if (m_tabs->CheckedButton() == RadioButtonGroup::NO_BUTTON)
@@ -354,16 +342,20 @@ void TabBar::RemoveTab(const std::string& name)
 {
     std::size_t index = NO_TAB;
     for (std::size_t i = 0; i < m_tab_buttons.size(); ++i) {
-        if (m_tab_buttons[i]->Text() == name) {
+        if (m_tab_buttons[i] && m_tab_buttons[i]->Text() == name) {
             index = i;
             break;
         }
     }
-    assert(index < m_tab_buttons.size());
+    if (index >= m_tab_buttons.size())
+        return;
 
-    m_tab_buttons[index]->RemoveEventFilter(shared_from_this());
-    m_tabs->RemoveButton(m_tab_buttons[index].get());
-    m_tab_buttons.erase(m_tab_buttons.begin() + index);
+    {
+        auto& tb_at_idx = m_tab_buttons.at(index);
+        tb_at_idx->RemoveEventFilter(shared_from_this());
+        m_tabs->RemoveButton(tb_at_idx.get());
+    }
+    m_tab_buttons.erase(std::next(m_tab_buttons.begin(), index));
     RecalcLeftRightButton();
     if (m_tabs->CheckedButton() == RadioButtonGroup::NO_BUTTON && !m_tab_buttons.empty())
         m_tabs->SetCheck(0);
@@ -373,29 +365,23 @@ void TabBar::RecalcLeftRightButton()
 {
     if (m_left_button)
         m_left_button->Disable(m_first_tab_shown == 0);
-    if (m_left_button && m_right_button && m_tab_buttons.size())
+    if (m_left_button && m_right_button && !m_tab_buttons.empty())
         m_right_button->Disable(m_tab_buttons.back()->Right() <= m_left_button->Left());
-    if (Width() < m_tabs->Width() && !m_left_right_button_layout->Visible()) {
+    if (Width() < m_tabs->Width() && !m_left_right_button_layout->Visible())
         m_left_right_button_layout->Show();
-    }
     if (m_tabs->Width() <= Width() && m_left_right_button_layout->Visible())
         m_left_right_button_layout->Hide();
 }
 
 void TabBar::SetCurrentTab(std::size_t index)
 {
-    m_tabs->SetCheck(index);
+    if (m_tabs)
+        m_tabs->SetCheck(index);
     TabChanged(index, false);
 }
 
-X TabBar::ButtonWidth() const
-{ return ToX(m_font->SpaceWidth() * 2.5); }
-
-const Button* TabBar::LeftButton() const
-{ return m_left_button.get(); }
-
-const Button* TabBar::RightButton() const
-{ return m_right_button.get(); }
+X TabBar::ButtonWidth() const noexcept
+{ return m_font ? ToX(m_font->SpaceWidth() * 2.5) : X1; }
 
 void TabBar::DistinguishCurrentTab(const std::vector<StateButton*>& tab_buttons)
 { RaiseCurrentTabButton(); }
@@ -419,29 +405,34 @@ void TabBar::LeftClicked()
         return;
     const auto& first_shown_tab = m_tab_buttons[m_first_tab_shown];
     const auto& prev_tab = m_tab_buttons[m_first_tab_shown - 1u];
-    if (!first_shown_tab || !prev_tab)
+    if (!first_shown_tab || !prev_tab || !m_tabs)
         return;
 
     m_tabs->OffsetMove(Pt(first_shown_tab->Left() - prev_tab->Left(), Y0));
     --m_first_tab_shown;
-    m_left_button->Disable(m_first_tab_shown == 0);
+    m_left_button->Disable(m_first_tab_shown == 0u);
     m_right_button->Disable(false);
 }
 
 void TabBar::RightClicked()
 {
-    assert(m_first_tab_shown < m_tab_buttons.size() - 1);
-    m_tabs->OffsetMove(Pt(m_tab_buttons[m_first_tab_shown]->Left() -
-                            m_tab_buttons[m_first_tab_shown + 1]->Left(),
-                          Y0));
+    if (m_tabs &&
+        m_tab_buttons.size() > m_first_tab_shown + 1 &&
+        m_tab_buttons[m_first_tab_shown] &&
+        m_tab_buttons[m_first_tab_shown + 1u])
+    {
+        m_tabs->OffsetMove(Pt(m_tab_buttons[m_first_tab_shown]->Left() -
+                                m_tab_buttons[m_first_tab_shown + 1u]->Left(),
+                              Y0));
+    }
     ++m_first_tab_shown;
     X right_side = m_left_right_button_layout->Visible() ?
         m_left_button->Left() :
         Right();
     // Is there anything to the right the user may want to see?
-    bool more_to_show = m_tab_buttons.back()->Right() > right_side;
+    const bool more_to_show = !m_tab_buttons.empty() && m_tab_buttons.back() && m_tab_buttons.back()->Right() > right_side;
     // Are there any tabs left to hide to the left?
-    bool more_to_hide = m_first_tab_shown < m_tab_buttons.size() - 1;
+    const bool more_to_hide = !m_tab_buttons.empty() && m_first_tab_shown < m_tab_buttons.size() - 1;
     m_right_button->Disable( !(more_to_show && more_to_hide) );
     m_left_button->Disable(false);
 }
@@ -466,9 +457,7 @@ void TabBar::BringTabIntoView(std::size_t index)
         while (right_side < target_tab->Right() && index != m_first_tab_shown)
             RightClicked();
 
-    } else {
-        if (m_first_tab_shown >= m_tab_buttons.size())
-            return;
+    } else if (m_first_tab_shown < m_tab_buttons.size()) {
         const auto& first_shown_tab = m_tab_buttons[m_first_tab_shown];
         if (!first_shown_tab || !m_tab_buttons.back())
             return;

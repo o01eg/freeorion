@@ -249,17 +249,25 @@ public:
         void Render() override;
     };
 
-    ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<Font>& font,
+    static constexpr X DEFAULT_WIDTH{512};
+    static constexpr Y DEFAULT_HEIGHT{400};
+
+    ColorDlg(X x, Y y, X w, Y h, Clr original_color, const std::shared_ptr<const Font>& font,
              Clr dialog_color, Clr border_color, Clr text_color = CLR_BLACK);
+    ColorDlg(X x, Y y, Clr original_color, const std::shared_ptr<const Font>& font,
+             Clr dialog_color, Clr border_color, Clr text_color = CLR_BLACK) :
+        ColorDlg(x, y, DEFAULT_WIDTH, DEFAULT_HEIGHT, original_color, font,
+                 dialog_color, border_color, text_color)
+    {}
     void CompleteConstruction() override;
 
     /** Returns true iff the user selected a color and then clicked the "Ok"
         button.  Otherwise, the color returned by Result() will be the
         original color if one was selected, or undefined if one was not. */
-    bool ColorWasSelected() const;
+    bool ColorWasSelected() const noexcept { return m_color_was_picked; }
 
     /** returns the color selected by the user, if the "Ok" button was used to close the dialog. */
-    Clr Result() const;
+    Clr Result() const noexcept { return m_current_color; }
 
     void Render() override;
     void KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys) override;
@@ -299,7 +307,7 @@ private:
     std::shared_ptr<Layout>                   m_color_squares_layout;
     std::vector<std::shared_ptr<ColorButton>> m_color_buttons;
     std::shared_ptr<Layout>                   m_color_buttons_layout;
-    std::size_t                               m_current_color_button;
+    std::size_t                               m_current_color_button = INVALID_COLOR_BUTTON;
     std::vector<std::shared_ptr<TextControl>> m_slider_labels;
     std::vector<std::shared_ptr<TextControl>> m_slider_values;
     std::vector<std::shared_ptr<Slider<int>>> m_sliders;

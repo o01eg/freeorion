@@ -18,6 +18,7 @@
 #include <GG/GLClientAndServerBuffer.h>
 
 #include "LinkText.h"
+#include "../universe/ConstantsFwd.h"
 
 /** \file
  *
@@ -33,9 +34,9 @@ struct ScriptingContext;
 class CUILabel final : public GG::TextControl {
 public:
     CUILabel(std::string str,
-             GG::Flags<GG::TextFormat> format,
-             GG::Flags<GG::WndFlag> flags,
-             std::shared_ptr<GG::Font> font,
+             const ClientUI& ui,
+             GG::Flags<GG::TextFormat> format = GG::FORMAT_NONE,
+             GG::Flags<GG::WndFlag> flags = GG::NO_WND_FLAGS,
              GG::X x = GG::X0, GG::Y y = GG::Y0, GG::X w = GG::X1, GG::Y h = GG::Y1);
 
     CUILabel(std::string str,
@@ -45,6 +46,7 @@ public:
 
     CUILabel(std::string str,
              std::vector<GG::Font::TextElement> text_elements,
+             const ClientUI& ui,
              GG::Flags<GG::TextFormat> format = GG::FORMAT_NONE,
              GG::Flags<GG::WndFlag> flags = GG::NO_WND_FLAGS,
              GG::X x = GG::X0, GG::Y y = GG::Y0, GG::X w = GG::X1, GG::Y h = GG::Y1);
@@ -55,11 +57,12 @@ public:
 /** a FreeOrion Button control */
 class CUIButton : public GG::Button {
 public:
-    CUIButton(std::string str);
-
+    CUIButton(std::string str, std::shared_ptr<const GG::Font> font, GG::Clr ctrl_clr, GG::Clr text_clr);
+    explicit CUIButton(std::string str);
+    CUIButton(std::string str, const ClientUI& ui);
     CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed, GG::SubTexture rollover);
 
-    GG::Pt MinUsableSize() const override;
+    GG::Pt MinUsableSize() const noexcept override;
 
     bool InWindow(GG::Pt pt) const override;
 
@@ -189,8 +192,7 @@ public:
 /** Tab bar with buttons for selecting tabbed windows. */
 class CUITabBar final : public GG::TabBar {
 public:
-    CUITabBar(const std::shared_ptr<GG::Font>& font, GG::Clr color,
-              GG::Clr text_color);
+    CUITabBar(std::shared_ptr<const GG::Font> font, GG::Clr color, GG::Clr text_color);
 
 private:
     void DistinguishCurrentTab(const std::vector<GG::StateButton*>& tab_buttons) override;
@@ -270,14 +272,13 @@ public:
     void CompleteConstruction() override;
 
     void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
-    void KeyPress(GG::Key key, uint32_t key_code_point,
-                  GG::Flags<GG::ModKey> mod_keys) override;
+    void KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
     void AcceptPastedText(const std::string& text) override;
     void GainingFocus() override;
     void LosingFocus() override;
     void Render() override;
     virtual bool AutoComplete() { return false; };
-    void DisallowChars(std::string_view chars) { m_disallowed_chars = chars; }
+    void DisallowChars(std::string_view chars) noexcept { m_disallowed_chars = chars; }
 
     mutable boost::signals2::signal<void ()> GainingFocusSignal;
     mutable boost::signals2::signal<void ()> LosingFocusSignal;
@@ -310,8 +311,7 @@ private:
 /** a FreeOrion MultiEdit control */
 class CUIMultiEdit : public GG::MultiEdit {
 public:
-    explicit CUIMultiEdit(std::string str,
-                          GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
+    explicit CUIMultiEdit(std::string str, GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
     void CompleteConstruction() override;
 
     void Render() override;
@@ -321,14 +321,14 @@ public:
 /** a FreeOrion MultiEdit control that parses its text and makes links within clickable */
 class CUILinkTextMultiEdit final : public CUIMultiEdit, public TextLinker {
 public:
-    CUILinkTextMultiEdit(std::string str, GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
+    explicit CUILinkTextMultiEdit(std::string str, GG::Flags<GG::MultiEditStyle> style = GG::MULTI_LINEWRAP);
     void CompleteConstruction() override;
 
     const GG::Font::LineVec& GetLineData() const noexcept override { return CUIMultiEdit::GetLineData(); }
-    const std::shared_ptr<GG::Font>& GetFont() const noexcept override { return CUIMultiEdit::GetFont(); }
+    const std::shared_ptr<const GG::Font>& GetFont() const noexcept override { return CUIMultiEdit::GetFont(); }
 
-    GG::Pt TextUpperLeft() const override;
-    GG::Pt TextLowerRight() const override;
+    GG::Pt TextUpperLeft() const noexcept override;
+    GG::Pt TextLowerRight() const noexcept override;
     const std::string& RawText() const noexcept override { return m_raw_text; }
 
     void Render() override;
@@ -356,7 +356,7 @@ private:
 /** A simple GG::ListBox::Row subclass designed for use in text-only drop-down
   * lists, such as the ones used in the game setup dialogs. */
 struct CUISimpleDropDownListRow final : public GG::ListBox::Row {
-    CUISimpleDropDownListRow(std::string row_text, GG::Y row_height = DEFAULT_ROW_HEIGHT);
+    explicit CUISimpleDropDownListRow(std::string row_text, GG::Y row_height = DEFAULT_ROW_HEIGHT);
     void CompleteConstruction() override;
     static constexpr GG::Y DEFAULT_ROW_HEIGHT{22};
 private:
@@ -375,20 +375,80 @@ private:
   */
 class StatisticIcon final : public GG::Control {
 public:
-    StatisticIcon(std::shared_ptr<GG::Texture> texture,
-                  GG::X w = GG::X1, GG::Y h = GG::Y1); ///< initialized with no value (just an icon)
+    enum class ShowSign : uint8_t {
+        HIDE_IF_NON_NEGATIVE = false,
+        SHOW_ALWAYS = true
+    };
 
-    StatisticIcon(std::shared_ptr<GG::Texture> texture,
-                  double value, int digits, bool showsign,
-                  GG::X w = GG::X1, GG::Y h = GG::Y1); ///< initializes with one value
+    enum class IndicateChangeColour : uint8_t {
+        NOINDICATE,         // no text colouration
+        INDICATE_SELF,      // colour text based on sign of value itself
+        INDICATE_FOR_OTHER  // colour text based on sign of other value
+    };
+
+    enum class NumValuesDisplayed : uint8_t { ZERO = 0, ONE = 1, TWO = 2 };
+
+    // create StatisticIcon that shows no numbers. acts as a wrapper of StaticGraphic but provides RightClickedSignal
+    StatisticIcon(std::shared_ptr<GG::Texture> texture, GG::X w, GG::Y h) :
+        GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
+        m_icon(GG::Wnd::Create<GG::StaticGraphic>(std::move(texture), GG::GRAPHIC_FITGRAPHIC)),
+        m_values_shown(NumValuesDisplayed::ZERO)
+    {}
+
+    // create StatisticIcon that shows no numbers, with width and height determined from \a texture
+    explicit StatisticIcon(std::shared_ptr<GG::Texture> texture) :
+        StatisticIcon(texture, texture ? texture->Width() : GG::X1, texture ? texture->Height() : GG::Y1)
+    {}
+
+    // create StatisticIcon that shows one number
+    StatisticIcon(std::shared_ptr<GG::Texture> texture, std::shared_ptr<const GG::Font> font,
+                  GG::X w, GG::Y h, NumValuesDisplayed values_shown) :
+        GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
+        m_icon(GG::Wnd::Create<GG::StaticGraphic>(std::move(texture), GG::GRAPHIC_FITGRAPHIC)),
+        m_font(std::move(font)),
+        m_values_shown(values_shown)
+    {}
+
+    // create StatisticIcon that shows one number
+    StatisticIcon(std::shared_ptr<GG::Texture> texture, std::shared_ptr<const GG::Font> font,
+                  GG::X w, GG::Y h, uint8_t digits = 3,
+                  IndicateChangeColour indicate0 = IndicateChangeColour::NOINDICATE,
+                  ShowSign show_sign0 = ShowSign::HIDE_IF_NON_NEGATIVE,
+                  NumValuesDisplayed values_shown = NumValuesDisplayed::ONE) :
+        GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
+        m_icon(GG::Wnd::Create<GG::StaticGraphic>(std::move(texture), GG::GRAPHIC_FITGRAPHIC)),
+        m_font(std::move(font)),
+        m_digits(digits),
+        m_show_sign0(show_sign0),
+        m_indicate_change0(indicate0),
+        m_values_shown(values_shown)
+    {}
+
+    // create StatisticIcon that shows two numbers
+    StatisticIcon(std::shared_ptr<GG::Texture> texture, std::shared_ptr<const GG::Font> font,
+                  GG::X w, GG::Y h, uint8_t digits,
+                  IndicateChangeColour indicate0, IndicateChangeColour indicate1, 
+                  ShowSign show_sign0 = ShowSign::HIDE_IF_NON_NEGATIVE,
+                  ShowSign show_sign1 = ShowSign::SHOW_ALWAYS,
+                  NumValuesDisplayed values_shown = NumValuesDisplayed::TWO) :
+        GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
+        m_icon(GG::Wnd::Create<GG::StaticGraphic>(std::move(texture), GG::GRAPHIC_FITGRAPHIC)),
+        m_font(std::move(font)),
+        m_digits(digits),
+        m_show_sign0(show_sign0),
+        m_show_sign1(show_sign1),
+        m_indicate_change0(indicate0),
+        m_indicate_change1(indicate1),
+        m_values_shown(values_shown)
+    {}
 
     void CompleteConstruction() override;
 
-    double GetValue(std::size_t index = 0) const;
-    GG::Pt MinUsableSize() const override;
+    [[nodiscard]] double GetValue(std::size_t index = 0) const;
+    [[nodiscard]] GG::Pt MinUsableSize() const noexcept override;
 
     void PreRender() override;
-    void Render() override {}
+    void Render() noexcept override {}
 
     void SizeMove(GG::Pt ul, GG::Pt lr) override;
 
@@ -398,7 +458,8 @@ public:
     void RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) override;
     void MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) override;
 
-    void AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds, GG::Flags<GG::ModKey> mod_keys) override;
+    void AcceptDrops(GG::Pt pt, std::vector<std::shared_ptr<GG::Wnd>> wnds,
+                     GG::Flags<GG::ModKey> mod_keys) override;
     void DragDropEnter(GG::Pt pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable,
                        GG::Flags<GG::ModKey> mod_keys) override;
     void DragDropHere(GG::Pt pt, std::map<const GG::Wnd*, bool>& drop_wnds_acceptable,
@@ -416,15 +477,24 @@ private:
     void DoLayout();
 
     /// The value, precision and sign of the statistic value(s)
-    std::shared_ptr<GG::StaticGraphic>           m_icon;
-    std::shared_ptr<GG::Label>                   m_text;
-    std::array<std::tuple<double, int, bool>, 2> m_values{{{0.0, 0, false}, {0.0, 0, false}}};
-    bool                                         m_have_two = false;
+    std::shared_ptr<GG::StaticGraphic>  m_icon;
+    std::shared_ptr<GG::Label>          m_text;
+    std::shared_ptr<const GG::Font>     m_font;
+    double                              m_value0 = 0.0;
+    double                              m_value1 = 0.0;
+    uint8_t                             m_digits = 3;
+    ShowSign                            m_show_sign0 = ShowSign::HIDE_IF_NON_NEGATIVE;
+    ShowSign                            m_show_sign1 = ShowSign::SHOW_ALWAYS;
+    IndicateChangeColour                m_indicate_change0 = IndicateChangeColour::NOINDICATE;
+    IndicateChangeColour                m_indicate_change1 = IndicateChangeColour::INDICATE_SELF;
+    NumValuesDisplayed                  m_values_shown = NumValuesDisplayed::ONE;
 };
 
 class CUIToolBar final : public GG::Control {
 public:
-    CUIToolBar();
+    CUIToolBar() :
+        GG::Control(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::ONTOP | GG::INTERACTIVE)
+    {}
 
     bool InWindow(GG::Pt pt) const override;
 
@@ -510,7 +580,7 @@ private:
 
     std::string m_units_str;
     std::string m_title_str;
-    int         m_empire_id;
+    int         m_empire_id = ALL_EMPIRES;
 
     std::shared_ptr<GG::Label>  m_empire_column_label;
     std::shared_ptr<GG::Label>  m_local_column_label;
@@ -574,12 +644,11 @@ public:
     FPSIndicator();
 
     void Render() override;
-    void PreRender() override;
 
 private:
+    void UpdateTextWithFPS(int fps = 999);
     void UpdateEnabled();
     bool m_enabled = false;
-    int m_displayed_FPS = 0;
 };
 
 /** Functions like a StaticGraphic, except can have multiple textures rendered

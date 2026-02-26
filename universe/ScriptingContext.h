@@ -14,6 +14,13 @@
 #    define CONSTEXPR_VEC_AND_STRING
 #  endif
 #endif
+#if !defined(CONSTEXPR_STRING)
+#  if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+#    define CONSTEXPR_STRING constexpr
+#  else
+#    define CONSTEXPR_STRING
+#  endif
+#endif
 
 struct CombatInfo;
 
@@ -22,6 +29,7 @@ struct [[nodiscard]] ScriptingContext final {
         int, double, PlanetType, PlanetSize, ::PlanetEnvironment, StarType,
         UniverseObjectType, Visibility, std::string, std::vector<std::string>>;
     inline static CONSTEXPR_VEC_AND_STRING const CurrentValueVariant DEFAULT_CURRENT_VALUE{0};
+    inline static CONSTEXPR_STRING const std::string EMPTY_STRING{};
 
     // used to disambiguate constructors
     class LocalCandidate final {};
@@ -36,14 +44,14 @@ struct [[nodiscard]] ScriptingContext final {
         galaxy_setup_data(app.GetGalaxySetupData()),
         species(          app.GetSpeciesManager()),
         supply(           app.GetSupplyManager()),
-        universe(         &app.GetUniverse()),
+        universe(         std::addressof(app.GetUniverse())),
         const_universe(   app.GetUniverse()),
-        empires(          &app.Empires()),
+        empires(          std::addressof(app.Empires())),
         const_empires(    app.Empires())
     {}
 
     [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
-                                   LocalCandidate, const UniverseObject* condition_local_candidate_) noexcept :
+                                   LocalCandidate, const UniverseObjectCXBase* condition_local_candidate_) noexcept :
         source(                   parent_context.source),
         effect_target(            parent_context.effect_target),
         condition_root_candidate( parent_context.condition_root_candidate ?
@@ -72,7 +80,7 @@ struct [[nodiscard]] ScriptingContext final {
     [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
                                    const Universe::EmpireObjectVisibilityMap& vis,
                                    const Universe::EmpireObjectVisibilityTurnMap& vis_turns,
-                                   Source, const UniverseObject* source_,
+                                   Source, const UniverseObjectCXBase* source_,
                                    Target, UniverseObject* target_) noexcept :
         source(                   source_),
         effect_target(            target_),
@@ -100,7 +108,7 @@ struct [[nodiscard]] ScriptingContext final {
     [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
                                    const Universe::EmpireObjectVisibilityMap& vis,
                                    const Universe::EmpireObjectVisibilityTurnMap& vis_turns,
-                                   Source, const UniverseObject* source_) noexcept :
+                                   Source, const UniverseObjectCXBase* source_) noexcept :
         ScriptingContext(parent_context, vis, vis_turns, Source{}, source_,
                          Target{}, parent_context.effect_target)
     {}
@@ -112,7 +120,7 @@ struct [[nodiscard]] ScriptingContext final {
     {}
 
     [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
-                                   Source, const UniverseObject* source_) noexcept :
+                                   Source, const UniverseObjectCXBase* source_) noexcept :
         ScriptingContext(parent_context, parent_context.empire_object_vis,
                          parent_context.empire_object_vis_turns, Source{}, source_)
     {}
@@ -150,7 +158,7 @@ struct [[nodiscard]] ScriptingContext final {
     ScriptingContext(const ScriptingContext&, T) = delete;
 
     [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
-                                   Source, const UniverseObject* source_,
+                                   Source, const UniverseObjectCXBase* source_,
                                    Target, UniverseObject* target_,
                                    int in_design_id_, int production_block_size_) noexcept :
         source(                   source_),
@@ -177,7 +185,7 @@ struct [[nodiscard]] ScriptingContext final {
     {}
 
     [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
-                                   Source, const UniverseObject* source_,
+                                   Source, const UniverseObjectCXBase* source_,
                                    Target, UniverseObject* target_) noexcept :
         ScriptingContext(parent_context, Source{}, source_, Target{}, target_,
                          parent_context.in_design_id, parent_context.production_block_size)
@@ -186,7 +194,7 @@ struct [[nodiscard]] ScriptingContext final {
     [[nodiscard]] ScriptingContext(const ScriptingContext& parent_context,
                                    Target, UniverseObject* target_,
                                    const CurrentValueVariant& current_value_,
-                                   Source, const UniverseObject* source_) noexcept :
+                                   Source, const UniverseObjectCXBase* source_) noexcept :
         source(                   source_),
         effect_target(            target_),
         condition_root_candidate( parent_context.condition_root_candidate),
@@ -221,14 +229,14 @@ struct [[nodiscard]] ScriptingContext final {
     template <typename T>
     ScriptingContext(const ScriptingContext&, Target, UniverseObject*, T) = delete;
     template <typename T>
-    ScriptingContext(const ScriptingContext&, Target, UniverseObject*, T, Source, const UniverseObject*) = delete;
+    ScriptingContext(const ScriptingContext&, Target, UniverseObject*, T, Source, const UniverseObjectCXBase*) = delete;
     template <typename T>
-    ScriptingContext(ScriptingContext&&, Target, UniverseObject*, T, Source, const UniverseObject*) = delete;
+    ScriptingContext(ScriptingContext&&, Target, UniverseObject*, T, Source, const UniverseObjectCXBase*) = delete;
     template <typename T>
     ScriptingContext(ScriptingContext&&, Target, UniverseObject*, T) = delete;
 
     [[nodiscard]] explicit ScriptingContext(CombatInfo& info, // in CombatSystem.cpp
-                                            Attacker = Attacker{}, UniverseObject* attacker_as_source = nullptr) noexcept;
+                                            Attacker = Attacker{}, UniverseObjectCXBase* attacker_as_source = nullptr) noexcept;
 
     // helper functions for accessing state in this context
 
@@ -305,11 +313,11 @@ struct [[nodiscard]] ScriptingContext final {
     { return const_empires.EmpireIDs(); }
 
     // script evaluation local state, some of which may vary during evaluation of an expression
-    const UniverseObject*      source = nullptr;
-    UniverseObject*            effect_target = nullptr;
-    const UniverseObject*      condition_root_candidate = nullptr;
-    const UniverseObject*      condition_local_candidate = nullptr;
-    const CurrentValueVariant& current_value = DEFAULT_CURRENT_VALUE;
+    const UniverseObjectCXBase* source = nullptr;
+    UniverseObject*             effect_target = nullptr;
+    const UniverseObjectCXBase* condition_root_candidate = nullptr;
+    const UniverseObjectCXBase* condition_local_candidate = nullptr;
+    const CurrentValueVariant&  current_value = DEFAULT_CURRENT_VALUE;
 
     // general gamestate info
     int                                            combat_bout = 0; // first round of battle is combat_bout == 1
@@ -322,7 +330,7 @@ struct [[nodiscard]] ScriptingContext final {
 private: // Universe and ObjectMap getters select one of these based on constness
     Universe*                                      universe = nullptr;
     const Universe&                                const_universe;
-    ObjectMap*                                     objects = universe ? &(universe->Objects()) : nullptr;
+    ObjectMap*                                     objects = universe ? std::addressof(universe->Objects()) : nullptr;
     const ObjectMap&                               const_objects{objects ? *objects : const_universe.Objects()};
 public:
     const Universe::EmpireObjectVisibilityMap&     empire_object_vis{const_universe.GetEmpireObjectVisibility()};

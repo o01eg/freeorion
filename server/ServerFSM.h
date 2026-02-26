@@ -13,7 +13,7 @@
 #include <boost/statechart/state.hpp>
 #include <boost/statechart/state_machine.hpp>
 #include <boost/asio/high_resolution_timer.hpp>
-#include <boost/asio/deadline_timer.hpp>
+#include <boost/asio/system_timer.hpp>
 
 #include <memory>
 #include <set>
@@ -124,9 +124,9 @@ struct ProcessingTurn;
 
 /** The finite state machine that represents the server's operation. */
 struct ServerFSM : sc::state_machine<ServerFSM, Idle> {
-    ServerFSM(ServerApp &server);
+    ServerFSM(ServerApp& server);
 
-    void unconsumed_event(const sc::event_base &event);
+    void unconsumed_event(const sc::event_base& event);
     ServerApp& Server() noexcept { return m_server; }
     void HandleNonLobbyDisconnection(const Disconnection& d);
     void UpdateIngameLobby();
@@ -320,8 +320,8 @@ struct PlayingGame : sc::state<PlayingGame, ServerFSM, WaitingForTurnEnd> {
                          std::string client_version_string, Networking::AuthRoles roles);
     void TurnTimedoutHandler(boost::system::error_code error);
 
-    boost::asio::deadline_timer                     m_turn_timeout;
-    std::chrono::high_resolution_clock::time_point  m_start;
+    boost::asio::system_timer                      m_turn_timeout;
+    std::chrono::high_resolution_clock::time_point m_start;
 
     SERVER_ACCESSOR
 };

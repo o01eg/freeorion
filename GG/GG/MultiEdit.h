@@ -46,11 +46,10 @@ class Scroll;
 class GG_API MultiEdit : public Edit
 {
 public:
-    MultiEdit(std::string str, const std::shared_ptr<Font>& font,
+    MultiEdit(std::string str, const std::shared_ptr<const Font>& font,
               Clr color, Flags<MultiEditStyle> style = MULTI_LINEWRAP,
               Clr text_color = CLR_BLACK, Clr interior = CLR_ZERO);
 
-    ~MultiEdit() = default;
     void CompleteConstruction() override;
 
     Pt MinUsableSize() const noexcept override;
@@ -69,7 +68,7 @@ public:
     auto MaxLinesOfHistory() const noexcept { return m_max_lines_history; }
 
     /** Returns the positions of the scrollbars. */
-    Pt ScrollPosition() const;
+    Pt ScrollPosition() const noexcept;
 
     void Render() override;
 
@@ -204,6 +203,8 @@ private:
     std::shared_ptr<Scroll> m_hscroll;
     unsigned int            m_vscroll_wheel_scroll_increment = 0;
     unsigned int            m_hscroll_wheel_scroll_increment = 0;
+    boost::signals2::scoped_connection m_vscroll_connection;
+    boost::signals2::scoped_connection m_hscroll_connection;
 
     bool            m_preserve_text_position_on_next_set_text = false;
     bool            m_ignore_adjust_scrolls = false;

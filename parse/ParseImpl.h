@@ -4,12 +4,13 @@
 #include "ReportParseError.h"
 #include "../util/Logger.h"
 #include "../util/ScopedTimer.h"
+#include "../util/ranges.h"
 
 #include <array>
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/container/flat_map.hpp>
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <boost/spirit/include/qi.hpp>
 
 
@@ -43,13 +44,13 @@ namespace parse::detail {
             if constexpr (is_map_v<Container>) {
                 using key_type = typename Container::key_type;
                 static_assert(std::is_same_v<std::string, key_type>);
-                will_be_unique = (container.find(key) == container.end());
+                will_be_unique = !container.contains(key);
 
             } else if constexpr (is_vector_v<Container>) {
                 using value_type = typename Container::value_type;
                 static_assert(!std::is_pointer_v<value_type>); // doesn't check for unique_ptr
-                will_be_unique = container.end() == std::find_if(container.begin(), container.end(),
-                                              [&key](const auto& entry) { return entry.Name() == key; });
+                auto names_rng = container | range_transform([](const auto& e) -> const auto& { return e.Name(); });
+                will_be_unique = !range_contains(names_rng, key);
 
             } else {
                 static_assert(is_map_v<Container>, "unknown container, can't check for uniqueness of parsed content...");
@@ -176,7 +177,7 @@ namespace parse::detail {
         color_rule_type start;
     };
 
-    void parse_file_common(const boost::filesystem::path& path,
+    void parse_file_common(const std::filesystem::path& path,
                            const lexer& lexer,
                            std::string& filename,
                            std::string& file_contents,
@@ -186,14 +187,14 @@ namespace parse::detail {
 
     /** Report warnings about unparsed end of file and return true for a good
         parse. */
-    bool parse_file_end_of_file_warnings(const boost::filesystem::path& path,
+    bool parse_file_end_of_file_warnings(const std::filesystem::path& path,
                                          bool parser_success,
                                          const std::string& file_contents,
                                          const text_iterator first,
                                          const text_iterator last);
 
     template <typename Grammar, typename Arg1>
-    bool parse_file(const lexer& lexer, const boost::filesystem::path& path, Arg1& arg1) {
+    bool parse_file(const lexer& lexer, const std::filesystem::path& path, Arg1& arg1) {
         ScopedTimer timer("parse_file \"" + path.filename().string()  + "\"", std::chrono::milliseconds(100));
 
         std::string filename;
@@ -217,7 +218,7 @@ namespace parse::detail {
     }
 
     template <typename Grammar, typename Arg1, typename Arg2>
-    bool parse_file(const lexer& lexer, const boost::filesystem::path& path, Arg1& arg1, Arg2& arg2) {
+    bool parse_file(const lexer& lexer, const std::filesystem::path& path, Arg1& arg1, Arg2& arg2) {
         ScopedTimer timer("parse_file \"" + path.filename().string()  + "\"", std::chrono::milliseconds(10));
 
         std::string filename;

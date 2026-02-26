@@ -7,7 +7,7 @@
 # Some Rights Reserved.  See COPYING file or https://www.gnu.org/licenses/lgpl-2.1.txt
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
 if(POLICY CMP0072)
   cmake_policy(SET CMP0072 NEW)
@@ -28,12 +28,6 @@ include(UseCodeCoverage)
 include(Util)
 
 set(GIGI_VERSION 0.8.0)
-if(WIN32)
-    set(CMAKE_CXX_STANDARD 20)
-else()
-    set(CMAKE_CXX_STANDARD 17)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(ENABLE_PNG_TEXTURES "Enable PNG texture support." ON)
 option(ENABLE_TIFF_TEXTURES "Enable TIFF texture support." OFF)
@@ -66,7 +60,35 @@ endif()
 
 set(MINIMUM_BOOST_VERSION 1.69.0)
 
-find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS filesystem regex system REQUIRED)
+find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS filesystem regex REQUIRED)
+
+message(STATUS "Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Compiler Version: ${CMAKE_CXX_COMPILER_VERSION}")
+
+# Normalize Boost_VERSION to a string like "1.81.0"
+if (Boost_VERSION MATCHES "^[0-9]+$")
+    message(STATUS "Boost version number: ${Boost_VERSION}")
+    math(EXPR Boost_MAJOR "${Boost_VERSION} / 100000")
+    math(EXPR Boost_MINOR "(${Boost_VERSION} / 100) % 1000")
+    math(EXPR Boost_PATCH "${Boost_VERSION} % 100")
+    set(Boost_VERSION_STRING "${Boost_MAJOR}.${Boost_MINOR}.${Boost_PATCH}")
+else()
+    set(Boost_VERSION_STRING "${Boost_VERSION}")
+endif()
+
+message(STATUS "Boost version string: ${Boost_VERSION_STRING}")
+
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND Boost_VERSION_STRING VERSION_LESS "1.80.0")
+    set(CMAKE_CXX_STANDARD 17)
+    message(STATUS "Using C++17 for GG for compatability Boost < 1.80")
+else()
+    set(CMAKE_CXX_STANDARD 20)
+    message(STATUS "Using C++20 for GG")
+endif()
+
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)

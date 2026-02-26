@@ -6,14 +6,22 @@ from focs._effects import (
     GameRule,
     IsSource,
     IsTarget,
+    LocalCandidate,
     NamedIntegerLookup,
-    NoEffect,
+    NoOpEffect,
+    Object,
     OwnedBy,
+    OwnerHasTech,
     Planet,
+    SetPopulation,
+    SetSpecies,
+    Source,
     StatisticIf,
     System,
+    Turn,
     WithinStarlaneJumps,
 )
+from macros.priorities import POPULATION_DEFAULT_PRIORITY
 
 MIN_RECOLONIZING_SIZE = 3
 
@@ -23,7 +31,7 @@ IMPOSSIBLY_LARGE_TURN = 2**15
 
 
 def DESCRIPTION_EFFECTSGROUP_MACRO(desc: str):
-    return EffectsGroup(description=desc, scope=IsSource, activation=None, effects=NoEffect)
+    return EffectsGroup(description=desc, scope=IsSource, activation=None, effects=NoOpEffect)
 
 
 FIGHTER_DAMAGE_FACTOR = GameRule(type=float, name="RULE_FIGHTER_DAMAGE_FACTOR")
@@ -43,7 +51,7 @@ SYSTEM_MINES_DAMAGE_FACTOR = GameRule(type=float, name="RULE_SHIP_STRUCTURE_FACT
 SUPPLY_DISCONNECTED_INFLUENCE_MALUS = 1
 
 # empire id used for unowned planets/ships - as defined in Universe.cpp(?)
-UNOWNED_EMPIRE_ID = -1  # type: ignore[assignment]
+UNOWNED_EMPIRE_ID = -1
 
 
 MINIMUM_DISTANCE_EMPIRE_CHECK = ~WithinStarlaneJumps(
@@ -60,3 +68,22 @@ GROWTH_RATE_FACTOR = (
         1 + 0.5 * StatisticIf(float, condition=IsTarget & EmpireHasAdoptedPolicy(name="PLC_POPULATION"))
     )  # +50% growth with population policy
 )
+
+
+def LIFECYCLE_MANIP_POPULATION_EFFECTS(species: str):
+    return [
+        EffectsGroup(
+            scope=Object(id=Source.PlanetID) & Planet(),
+            activation=~OwnerHasTech(name="GRO_LIFECYCLE_MAN")
+            & Turn(low=LocalCandidate.CreationTurn + 1, high=LocalCandidate.CreationTurn + 1),
+            priority=POPULATION_DEFAULT_PRIORITY,
+            effects=[SetSpecies(name=species), SetPopulation(value=1)],
+        ),
+        EffectsGroup(
+            scope=Object(id=Source.PlanetID) & Planet(),
+            activation=OwnerHasTech(name="GRO_LIFECYCLE_MAN")
+            & Turn(low=LocalCandidate.CreationTurn + 1, high=LocalCandidate.CreationTurn + 1),
+            priority=POPULATION_DEFAULT_PRIORITY,
+            effects=[SetSpecies(name=species), SetPopulation(value=MIN_RECOLONIZING_SIZE)],
+        ),
+    ]

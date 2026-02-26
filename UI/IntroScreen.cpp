@@ -19,7 +19,7 @@
 #include <GG/Texture.h>
 #include <GG/Layout.h>
 
-#include <boost/filesystem/fstream.hpp>
+#include <fstream>
 
 #include <cstdlib>
 #include <string>
@@ -29,7 +29,7 @@ namespace {
     constexpr GG::Y MAIN_MENU_HEIGHT{450};
 
     void Options(OptionsDB& db) {
-        db.AddFlag("network.server.external.force", UserStringNop("OPTIONS_DB_FORCE_EXTERNAL_SERVER"),  false);
+        db.AddFlag("network.server.external.force", UserStringNop("OPTIONS_DB_FORCE_EXTERNAL_SERVER"),  OptionsDB::Storable::UNSTORABLE);
         db.Add<std::string>("network.server.uri",   UserStringNop("OPTIONS_DB_EXTERNAL_SERVER_ADDRESS"),"localhost");
         db.Add("ui.intro.menu.center.x",            UserStringNop("OPTIONS_DB_UI_MAIN_MENU_X"),         0.75,           RangedStepValidator<double>(0.01, 0.0, 1.0));
         db.Add("ui.intro.menu.center.y",            UserStringNop("OPTIONS_DB_UI_MAIN_MENU_Y"),         0.5,            RangedStepValidator<double>(0.01, 0.0, 1.0));
@@ -64,14 +64,14 @@ private:
     void DrawCredits(GG::X x1, GG::Y y1, GG::X x2, GG::Y y2);
     void OnExit();
 
-    std::string                 m_credits;
-    int                         m_cx, m_cy, m_cw, m_ch, m_co;
-    int                         m_start_time;
-    int                         m_scroll_offset = 0;
-    int                         m_render = true;
-    int                         m_display_list_id = 0;
-    int                         m_credits_height = 0;
-    std::shared_ptr<GG::Font>   m_font;
+    std::string m_credits;
+    int m_cx, m_cy, m_cw, m_ch, m_co;
+    int m_start_time;
+    int m_scroll_offset = 0;
+    bool m_render = true;
+    int m_display_list_id = 0;
+    int m_credits_height = 0;
+    std::shared_ptr<const GG::Font> m_font;
 };
 
 CreditsWnd::CreditsWnd(GG::X x, GG::Y y, GG::X w, GG::Y h, int cx, int cy, int cw, int ch, int co) :
@@ -81,16 +81,14 @@ CreditsWnd::CreditsWnd(GG::X x, GG::Y y, GG::X w, GG::Y h, int cx, int cy, int c
     m_cw(cw),
     m_ch(ch),
     m_co(co),
-    m_start_time(GG::GUI::GetGUI()->Ticks())
+    m_start_time(GetApp().Ticks()),
+    m_font(GetApp().GetUI().GetFont(static_cast<int>(ClientUI::Pts()*1.3)))
 {
-    m_font = ClientUI::GetFont(static_cast<int>(ClientUI::Pts()*1.3));
-
     /** Handle app resizing by closing the credits window. */
-    GG::GUI::GetGUI()->WindowResizedSignal.connect(
-        boost::bind(&CreditsWnd::OnExit, this));
+    GetApp().WindowResizedSignal.connect(boost::bind(&CreditsWnd::OnExit, this));
 
     XMLDoc doc;
-    boost::filesystem::ifstream ifs(GetResourceDir() / "credits.xml");
+    std::ifstream ifs(GetResourceDir() / "credits.xml");
     doc.ReadDoc(ifs);
     ifs.close();
 
@@ -166,7 +164,7 @@ void CreditsWnd::DrawCredits(GG::X x1, GG::Y y1, GG::X x2, GG::Y y2) {
     GG::Font::RenderState rs{GG::CLR_WHITE};
     const auto text_elements = m_font->ExpensiveParseFromTextToTextElements(m_credits, format);
     const auto lines = m_font->DetermineLines(m_credits, format, x2 - x1, text_elements);
-    m_font->RenderText(GG::Pt(x1, y1), GG::Pt(x2, y2), m_credits, format, lines, rs);
+    m_font->RenderText(GG::Pt(x1, y1), GG::Pt(x2, y2), format, lines, rs);
     const auto offset = m_font->TextExtent(lines).y;
     //store complete height for self destruction
     m_credits_height = Value(offset);
@@ -184,7 +182,7 @@ void CreditsWnd::Render() {
         glEndList();
     }
     //time passed
-    int ticks_delta = GG::GUI::GetGUI()->Ticks() - m_start_time + m_scroll_offset;
+    int ticks_delta = GetApp().Ticks() - m_start_time + m_scroll_offset;
 
     //draw background
     GG::FlatRectangle(ul, lr, GG::FloatClr(0.0f, 0.0f, 0.0f, 0.5f), GG::CLR_ZERO, 0);
@@ -194,7 +192,7 @@ void CreditsWnd::Render() {
 
     // define clip area
     glEnable(GL_SCISSOR_TEST);
-    glScissor(Value(ul.x + m_cx), Value(GG::GUI::GetGUI()->AppHeight() - lr.y), m_cw, m_ch);
+    glScissor(Value(ul.x + m_cx), Value(GetApp().AppHeight() - lr.y), m_cw, m_ch);
 
     // move credits
     glTranslatef(0, m_co - ticks_delta/40, 0);
@@ -221,7 +219,7 @@ void CreditsWnd::Render() {
 // IntroScreen
 /////////////////////////////////
 IntroScreen::IntroScreen() :
-    GG::Wnd(GG::X0, GG::Y0, GG::GUI::GetGUI()->AppWidth(), GG::GUI::GetGUI()->AppHeight(), GG::NO_WND_FLAGS)
+    GG::Wnd(GG::X0, GG::Y0, GetApp().AppWidth(), GetApp().AppHeight(), GG::NO_WND_FLAGS)
 {}
 
 void IntroScreen::CompleteConstruction() {
@@ -230,39 +228,41 @@ void IntroScreen::CompleteConstruction() {
     m_menu = GG::Wnd::Create<CUIWnd>(UserString("INTRO_WINDOW_TITLE"), GG::X1, GG::Y1,
                                      MAIN_MENU_WIDTH, MAIN_MENU_HEIGHT, GG::ONTOP | GG::INTERACTIVE);
 
-    auto today = boost::gregorian::day_clock::local_day();
+    auto& ui = GetApp().GetUI();
+
+    const auto today = boost::gregorian::day_clock::local_day();
     if (today.month() == 4 && today.day() == 1) {
-        m_splash = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "splash0104.png"),
+        m_splash = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "splash0104.png"),
                                                       GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE,
                                                       GG::INTERACTIVE);
-        m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo0104.png"),
+        m_logo = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "logo0104.png"),
                                                     GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
 
     } else if (today.month() == 12 && today.day() == 25) {
-        m_splash = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "splash2512.png"),
+        m_splash = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "splash2512.png"),
                                                       GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE,
                                                       GG::INTERACTIVE);
-        m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo2512.png"),
+        m_logo = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "logo2512.png"),
                                                     GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
 
     } else if (today.month() == 10 && today.day() == 31) {
-            m_splash = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "splash3110.png"),
+            m_splash = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "splash3110.png"),
                                                           GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE,
                                                           GG::INTERACTIVE);
-            m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo3110.png"),
+            m_logo = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "logo3110.png"),
                                                         GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
 
     } else {
-        m_splash = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "splash.png"),
+        m_splash = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "splash.png"),
                                                       GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE,
                                                       GG::INTERACTIVE);
 
         auto now{boost::posix_time::second_clock::local_time()};
         if (now.time_of_day().seconds() == 42)
-            m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo0104.png"),
+            m_logo = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "logo0104.png"),
                                                         GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
         else
-            m_logo = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(ClientUI::ArtDir() / "logo.png"),
+            m_logo = GG::Wnd::Create<GG::StaticGraphic>(ui.GetTexture(ClientUI::ArtDir() / "logo.png"),
                                                         GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
     }
 
@@ -311,7 +311,7 @@ void IntroScreen::CompleteConstruction() {
         needed_height = std::max(needed_height, b->MinUsableSize().y);
     }
     int PAD = Value(needed_width) / 16;
-    bool have_load = GGHumanClientApp::GetApp()->IsLoadGameAvailable();
+    bool have_load = GetApp().IsLoadGameAvailable();
 
     //Layout(X x, Y y, X w, Y h, std::size_t rows, std::size_t columns,
     //       unsigned int border_margin = 0, unsigned int cell_margin = INVALID_CELL_MARGIN);
@@ -345,19 +345,19 @@ void IntroScreen::CompleteConstruction() {
 }
 
 void IntroScreen::OnContinue()
-{ GGHumanClientApp::GetApp()->ContinueSinglePlayerGame(); }
+{ GetApp().ContinueSinglePlayerGame(); }
 
 void IntroScreen::OnSinglePlayer()
-{ GGHumanClientApp::GetApp()->NewSinglePlayerGame(); }
+{ GetApp().NewSinglePlayerGame(); }
 
 void IntroScreen::OnQuickStart()
-{ GGHumanClientApp::GetApp()->NewSinglePlayerGame(true); }
+{ GetApp().NewSinglePlayerGame(true); }
 
 void IntroScreen::OnMultiPlayer()
-{ GGHumanClientApp::GetApp()->MultiPlayerGame(); }
+{ GetApp().MultiPlayerGame(); }
 
 void IntroScreen::OnLoadGame()
-{ GGHumanClientApp::GetApp()->LoadSinglePlayerGame(); }
+{ GetApp().LoadSinglePlayerGame(); }
 
 void IntroScreen::OnOptions() {
     auto options_wnd = GG::Wnd::Create<OptionsWnd>(false);
@@ -385,18 +385,18 @@ void IntroScreen::OnAbout() {
 }
 
 void IntroScreen::OnWebsite()
-{ GGHumanClientApp::GetApp()->OpenURL("https://freeorion.org"); }
+{ GetApp().OpenURL("https://freeorion.org"); }
 
 void IntroScreen::OnCredits() {
     // only the area between the upper and lower line of the splash screen should be darkend
     // if we use another splash screen we have the change the following values
-    GG::Y nUpperLine = ( 79 * GG::GUI::GetGUI()->AppHeight()) / 768;
-    GG::Y nLowerLine = (692 * GG::GUI::GetGUI()->AppHeight()) / 768;
+    GG::Y nUpperLine = ( 79 * GetApp().AppHeight()) / 768;
+    GG::Y nLowerLine = (692 * GetApp().AppHeight()) / 768;
 
     static constexpr int credit_side_pad(30);
 
     auto credits_wnd = GG::Wnd::Create<CreditsWnd>(
-        GG::X0, nUpperLine, GG::GUI::GetGUI()->AppWidth(), nLowerLine-nUpperLine,
+        GG::X0, nUpperLine, GetApp().AppWidth(), nLowerLine-nUpperLine,
         credit_side_pad, 0, Value(m_menu->Left()) - credit_side_pad,
         Value(nLowerLine-nUpperLine), Value((nLowerLine-nUpperLine))/2);
 
@@ -405,7 +405,7 @@ void IntroScreen::OnCredits() {
 
 void IntroScreen::OnExitGame() {
     DebugLogger() << "IntroScreen::OnExitGame";
-    GG::GUI::GetGUI()->ExitApp(0);
+    GetApp().ExitApp(0);
 }
 
 void IntroScreen::KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {

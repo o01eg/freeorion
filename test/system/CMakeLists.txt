@@ -38,11 +38,9 @@ add_dependencies(unittest
 target_sources(fo_systemtest_game
     PUBLIC
         ${PROJECT_SOURCE_DIR}/client/ClientApp.h
-        ${PROJECT_SOURCE_DIR}/client/ClientFSMEvents.h
         ${PROJECT_SOURCE_DIR}/client/ClientNetworking.h
     PRIVATE
         ${PROJECT_SOURCE_DIR}/client/ClientApp.cpp
-        ${PROJECT_SOURCE_DIR}/client/ClientFSMEvents.cpp
         ${PROJECT_SOURCE_DIR}/client/ClientNetworking.cpp
         ${PROJECT_SOURCE_DIR}/util/DependencyVersions.cpp
 )
@@ -58,11 +56,9 @@ foreach(_TEST ${FO_TEST_GAME})
         PRIVATE
         ${_TEST}.cpp
     )
-    if(NOT APPLE)
-        add_test(
-            NAME ${_TEST}
-            COMMAND fo_systemtest_game --log_level=all "--run_test=${_TEST}" --catch_system_error=yes
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
-    endif()
+    add_test(
+        NAME ${_TEST}
+        COMMAND fo_systemtest_game --log_level=all "--run_test=${_TEST}" --catch_system_error=yes
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
 endforeach()

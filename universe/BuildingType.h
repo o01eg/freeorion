@@ -43,12 +43,18 @@ FO_ENUM(
 //! looked up using GetBuildingType(...).
 class FO_COMMON_API BuildingType {
 public:
+    enum class SubType : uint8_t { NONE = 0, COLONY = 1, SHIPYARD = 2 };
+
     BuildingType(std::string&& name, std::string&& description,
                  CommonParams&& common_params, CaptureResult capture_result,
-                 std::string&& icon);
+                 std::string&& icon, SubType subtype, std::string&& species = std::string{});
     ~BuildingType(); // needed due to forward-declared Condition held in unique_ptr
 
     [[nodiscard]] bool operator==(const BuildingType& rhs) const;
+    BuildingType(const BuildingType&) = delete;
+    BuildingType(BuildingType&&) = delete;
+    BuildingType& operator=(const BuildingType&) = delete;
+    BuildingType& operator=(BuildingType&&) = delete;
 
     //! Returns the unique name for this type of building
     [[nodiscard]] auto& Name() const noexcept { return m_name; }
@@ -58,6 +64,10 @@ public:
 
     //! Returns a data file format representation of this object
     [[nodiscard]] auto Dump(uint8_t ntabs = 0) const -> std::string;
+
+    [[nodiscard]] auto IsColony() const noexcept { return m_subtype == SubType::COLONY; }
+    [[nodiscard]] auto IsShipYard() const noexcept { return m_subtype == SubType::SHIPYARD; }
+    [[nodiscard]] const auto& SpeciesName() const noexcept { return m_species; }
 
     //! Returns true if the production cost and time are invariant (does not
     //! depend on) the location
@@ -141,9 +151,11 @@ private:
     const std::unique_ptr<const ValueRef::ValueRef<double>> m_production_cost;
     const std::unique_ptr<const ValueRef::ValueRef<int>>    m_production_time;
     const bool                                        m_producible = true;
+    const SubType                                     m_subtype = SubType::NONE;
     const CaptureResult                               m_capture_result;
     const std::string                                 m_tags_concatenated;
     const std::vector<std::string_view>               m_tags;
+    const std::string                                 m_species;
     const ConsumptionMap<MeterType>                   m_production_meter_consumption;
     const ConsumptionMap<std::string>                 m_production_special_consumption;
     const std::unique_ptr<const Condition::Condition> m_location;

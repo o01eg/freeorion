@@ -37,7 +37,11 @@ private:
 
     void network_thread(); ///< Function called in a separate networking thread
 
+    void parsing_thread(); ///< Function called in a separate parsing thread
+
     void start_network_thread(); ///< Starts separate networking thread, should be called after initialization
+
+    void start_parsing_thread(); ///< Starts separate parsing thread, should be called after initialization
 
     void new_single_player_game(); ///< Starts new single player game
 
@@ -61,8 +65,11 @@ private:
 
     void options_set(godot::String option, godot::Variant value); ///< Sets options DB value
 
+    godot::String get_user_data_dir() const; ///< Returns user data dir 
+
     std::unique_ptr<GodotClientApp> m_app;
     godot::Ref<godot::Thread> m_network_thread;
+    godot::Ref<godot::Thread> m_parsing_thread;
 
 #if defined(FREEORION_ANDROID)
     static const godot_gdnative_ext_android_api_struct* s_android_api_struct;

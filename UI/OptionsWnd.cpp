@@ -21,11 +21,12 @@
 
 #include <boost/format.hpp>
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/filesystem/operations.hpp>
+
+#include <filesystem>
 #include <regex>
 
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 namespace {
     constexpr GG::X PAGE_WIDTH{400};
@@ -110,7 +111,7 @@ namespace {
                     m_edit->EditedSignal(m_edit->Text());
                 }
             } catch (const std::exception& e) {
-                ClientUI::MessageBox(e.what(), true);
+                GetApp().GetUI().MessageBox(e.what(), true);
             }
         }
 
@@ -123,7 +124,7 @@ namespace {
 
     bool ValidStringtableFile(const std::string& file) {
         // putting this in try-catch block prevents crash with error output along the lines of:
-        // main() caught exception(std::exception): boost::filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
+        // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
             fs::path path = FilenameToPath(file);
             return boost::algorithm::ends_with(file, STRINGTABLE_FILE_SUFFIX) &&
@@ -135,7 +136,7 @@ namespace {
 
     bool ValidFontFile(const std::string& file) {
         // putting this in try-catch block prevents crash with error output along the lines of:
-        // main() caught exception(std::exception): boost::filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
+        // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
             fs::path path = FilenameToPath(file);
             return boost::algorithm::ends_with(file, FONT_FILE_SUFFIX) &&
@@ -147,7 +148,7 @@ namespace {
 
     bool ValidMusicFile(const std::string& file) {
         // putting this in try-catch block prevents crash with error output along the lines of:
-        // main() caught exception(std::exception): boost::filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
+        // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
             fs::path path = FilenameToPath(file);
             return boost::algorithm::ends_with(file, MUSIC_FILE_SUFFIX) &&
@@ -159,7 +160,7 @@ namespace {
 
     bool ValidSoundFile(const std::string& file) {
         // putting this in try-catch block prevents crash with error output along the lines of:
-        // main() caught exception(std::exception): boost::filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
+        // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
             fs::path path = FilenameToPath(file);
             return boost::algorithm::ends_with(file, SOUND_FILE_SUFFIX) &&
@@ -171,7 +172,7 @@ namespace {
 
     bool ValidDirectory(const std::string& file) {
         // putting this in try-catch block prevents crash with error output along the lines of:
-        // main() caught exception(std::exception): boost::filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
+        // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
             fs::path path = FilenameToPath(file);
             return fs::exists(path) && fs::is_directory(path);
@@ -182,7 +183,7 @@ namespace {
 
     bool ValidExecutableBinary(const std::string& file) {
         // putting this in try-catch block prevents crash with error output along the lines of:
-        // main() caught exception(std::exception): boost::filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
+        // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
             fs::path path = FilenameToPath(file);
 #ifdef FREEORION_WIN32
@@ -229,106 +230,6 @@ namespace {
             return std::pair{ct->m_key, ct->m_mods};
         };
     };
-
-    // Displays current font textures
-    class FontTextureWnd : public CUIWnd {
-    public:
-        FontTextureWnd() :
-            CUIWnd(UserString("OPTIONS_FONTS"),
-                   GG::GUI::GetGUI()->AppWidth() / 6,       GG::GUI::GetGUI()->AppHeight() / 6,
-                   GG::GUI::GetGUI()->AppWidth() * 2 / 3,   GG::GUI::GetGUI()->AppHeight() * 2 / 3,
-                   GG::INTERACTIVE | GG::DRAGABLE | GG::MODAL | GG::RESIZABLE | CLOSABLE)
-        {}
-
-        void CompleteConstruction() override {
-            CUIWnd::CompleteConstruction();
-
-            GG::Y top = GG::Y1;
-
-            std::shared_ptr<GG::Font> font = ClientUI::GetFont();
-            std::shared_ptr<GG::Texture> texture;
-            if (font)
-                texture = font->GetTexture();
-            if (texture) {
-                m_font_graphic = GG::Wnd::Create<GG::StaticGraphic>(texture);
-                m_font_graphic->MoveTo(GG::Pt(GG::X0, top));
-                m_font_graphic->Resize(GG::Pt(texture->Width(), texture->Height()));
-                AttachChild(m_font_graphic);
-                top += m_font_graphic->Height() + 1;
-            }
-
-            font = ClientUI::GetBoldFont();
-            if (font)
-                texture = font->GetTexture();
-            if (texture) {
-                m_bold_font_graphic = GG::Wnd::Create<GG::StaticGraphic>(texture);
-                m_bold_font_graphic->MoveTo(GG::Pt(GG::X0, top));
-                m_bold_font_graphic->Resize(GG::Pt(texture->Width(), texture->Height()));
-                AttachChild(m_bold_font_graphic);
-                top += m_bold_font_graphic->Height() + 1;
-            }
-
-            font = ClientUI::GetTitleFont();
-            texture.reset();
-            if (font)
-                texture = font->GetTexture();
-            if (texture) {
-                m_title_font_graphic = GG::Wnd::Create<GG::StaticGraphic>(texture);
-                m_title_font_graphic->MoveTo(GG::Pt(GG::X0, top));
-                m_title_font_graphic->Resize(GG::Pt(texture->Width(), texture->Height()));
-                AttachChild(m_title_font_graphic);
-            }
-
-
-            m_hscroll =  GG::Wnd::Create<CUIScroll>(GG::Orientation::HORIZONTAL);
-            AttachChild(m_hscroll);
-
-            namespace ph = boost::placeholders;
-
-            m_hscroll->ScrolledSignal.connect([this](int tab_low, int tab_high, int low, int high)
-                                              { ScrolledSlot(tab_low, tab_high, low, high); });
-            DoLayout();
-        }
-
-    public:
-        void SizeMove(GG::Pt ul, GG::Pt lr) override {
-            GG::Pt old_size = GG::Wnd::Size();
-
-            CUIWnd::SizeMove(ul, lr);
-
-            if (old_size != GG::Wnd::Size())
-                DoLayout();
-        }
-
-        void DoLayout() {
-            m_hscroll->SizeMove(GG::Pt(GG::X0,          ClientHeight() - ClientUI::ScrollWidth()),
-                                GG::Pt(ClientWidth(),   ClientHeight()));
-
-            int texture_width = 1;
-            if (m_font_graphic)
-                texture_width = std::max(texture_width, Value(m_font_graphic->Width()));
-            if (m_title_font_graphic)
-                texture_width = std::max(texture_width, Value(m_title_font_graphic->Width()));
-
-             m_hscroll->SizeScroll(0, texture_width - Value(ClientWidth()) / 2, 1, 50);
-        }
-
-        void ScrolledSlot(int tab_low, int tab_high, int low, int high) {
-            m_font_graphic->MoveTo(      GG::Pt(GG::X(-tab_low), GG::Y1));
-            m_title_font_graphic->MoveTo(GG::Pt(GG::X(-tab_low), m_font_graphic->Height() + 2));
-        }
-
-    private:
-        std::shared_ptr<GG::StaticGraphic>  m_font_graphic;
-        std::shared_ptr<GG::StaticGraphic>  m_bold_font_graphic;
-        std::shared_ptr<GG::StaticGraphic>  m_title_font_graphic;
-        std::shared_ptr<GG::Scroll>         m_hscroll;
-    };
-
-    void ShowFontTextureWnd() {
-        auto font_wnd =  GG::Wnd::Create<FontTextureWnd>();
-        font_wnd->Run();
-    }
 
     class OptionsListRow : public GG::ListBox::Row {
     public:
@@ -458,7 +359,7 @@ namespace {
                     return;
                 const auto dropdown_row = dynamic_cast<CUISimpleDropDownListRow* const>(it->get());
                 const auto& option_value = dropdown_row->Name();
-                GGHumanClientApp::GetApp()->ChangeLoggerThreshold(option_name, to_LogLevel(option_value));
+                GetApp().ChangeLoggerThreshold(option_name, to_LogLevel(option_value));
             });
     }
 }
@@ -476,7 +377,7 @@ void OptionsWnd::CompleteConstruction() {
     // The placement of the tab register buttons assumes that the whole TabWnd is at least
     // wider than the first tab button.
     m_tabs = GG::Wnd::Create<GG::TabWnd>(GG::X0, GG::Y0, PAGE_WIDTH, GG::Y1,
-                                         ClientUI::GetFont(), ClientUI::WndColor(),
+                                         GetApp().GetUI().GetFont(), ClientUI::WndColor(),
                                          ClientUI::TextColor());
 
     CUIWnd::CompleteConstruction();
@@ -547,6 +448,7 @@ void OptionsWnd::CompleteConstruction() {
     BoolOption(current_page, 0, "ui.map.sidepanel.planet.shown", UserString("OPTIONS_SHOW_SIDEPANEL_PLANETS"));
     BoolOption(current_page, 0, "ui.reposition.auto.enabled", UserString("OPTIONS_AUTO_REPOSITION_WINDOWS"));
     BoolOption(current_page, 0, "ui.map.messages.timestamp.shown", UserString("OPTIONS_DISPLAY_TIMESTAMP"));
+    BoolOption(current_page, 0, "ui.map.sidepanel.stale-buildings.shown", UserString("OPTIONS_SHOW_SIDEPANEL_STALE_BUILDING"));
 
     // manual reposition windows button
     auto window_reset_button = Wnd::Create<CUIButton>(UserString("OPTIONS_WINDOW_RESET"));
@@ -554,8 +456,7 @@ void OptionsWnd::CompleteConstruction() {
         ROW_WIDTH, window_reset_button->MinUsableSize().y + LAYOUT_MARGIN + 6,
         window_reset_button, 0);
     current_page->Insert(row);
-    window_reset_button->LeftClickedSignal.connect(
-        GGHumanClientApp::GetApp()->RepositionWindowsSignal);
+    window_reset_button->LeftClickedSignal.connect(GetApp().RepositionWindowsSignal);
 
     FileOption(current_page, 0, "resource.stringtable.path",    UserString("OPTIONS_LANGUAGE"),
                GetRootDataDir() / "default" / "stringtables",
@@ -582,6 +483,12 @@ void OptionsWnd::CompleteConstruction() {
     DoubleOption(current_page, 0, "ui.research.tree.zoom.scale",        UserString("OPTIONS_TECH_LAYOUT_ZOOM"));
     DoubleOption(current_page, 0, "ui.research.control.graphic.size",   UserString("OPTIONS_TECH_CTRL_ICON_SIZE"));
 
+    CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_DESIGN_WND"));
+    BoolOption(current_page, 0, "ui.design.pedia.title.dynamic.enabled",UserString("OPTIONS_DESIGN_PEDIA_DYNAMIC"));
+    DoubleOption(current_page, 0, "ui.design.functional.cost.ratio",    UserString("OPTIONS_DESIGN_FUNCTIONAL_MAX_COST_RATIO"));
+    DoubleOption(current_page, 0, "ui.design.functional.bargain.ratio", UserString("OPTIONS_DESIGN_FUNCTIONAL_MIN_BARGAIN_RATIO"));
+    DoubleOption(current_page, 0, "ui.design.functional.time.ratio",    UserString("OPTIONS_DESIGN_FUNCTIONAL_MAX_TIME_RATIO"));
+
     CreateSectionHeader(current_page, 0,                                UserString("OPTIONS_QUEUES"));
     IntOption(current_page,    0, "ui.queue.width",                     UserString("OPTIONS_UI_QUEUE_WIDTH"));
     BoolOption(current_page,   0, "ui.queue.production_location.shown", UserString("OPTIONS_UI_PROD_QUEUE_LOCATION"));
@@ -600,15 +507,6 @@ void OptionsWnd::CompleteConstruction() {
     FontOption(current_page, 0, "ui.font.path",                         UserString("OPTIONS_FONT_TEXT"));
     FontOption(current_page, 0, "ui.font.bold.path",                    UserString("OPTIONS_FONT_BOLD_TEXT"));
     FontOption(current_page, 0, "ui.font.title.path",                   UserString("OPTIONS_FONT_TITLE"));
-
-    // show font texture button
-    auto show_font_texture_button = Wnd::Create<CUIButton>(UserString("SHOW_FONT_TEXTURES"));
-    row = GG::Wnd::Create<OptionsListRow>(
-        ROW_WIDTH, show_font_texture_button ->MinUsableSize().y + LAYOUT_MARGIN + 6,
-        show_font_texture_button , 0);
-    current_page->Insert(row);
-    show_font_texture_button->LeftClickedSignal.connect(
-        &ShowFontTextureWnd);
 
     CreateSectionHeader(current_page, 0, UserString("OPTIONS_FONT_SIZES"));
     IntOption(current_page,    0, "ui.font.size",                       UserString("OPTIONS_FONT_TEXT"));
@@ -806,10 +704,9 @@ void OptionsWnd::CompleteConstruction() {
         GG::Wnd::Create<TextBrowseWnd>(UserString("OPTIONS_CREATE_ALL_CONFIG_TOOLTIP_TITLE"),
                                        UserString("OPTIONS_CREATE_ALL_CONFIG_TOOLTIP_DESC"), ROW_WIDTH));
     all_config_button->LeftClickedSignal.connect([]() {
-        if (GetOptionsDB().Commit(false, false))
-            ClientUI::MessageBox(UserString("OPTIONS_CREATE_ALL_CONFIG_SUCCESS"));
-        else
-            ClientUI::MessageBox(UserString("OPTIONS_CREATE_ALL_CONFIG_FAILURE"));
+        GetApp().GetUI().MessageBox(UserString(GetOptionsDB().Commit(false, false) ?
+                                               UserStringNop("OPTIONS_CREATE_ALL_CONFIG_SUCCESS") :
+                                               UserStringNop("OPTIONS_CREATE_ALL_CONFIG_FAILURE")));
     });
     current_page->Insert(GG::Wnd::Create<OptionsListRow>(ROW_WIDTH,
                                                          all_config_button->MinUsableSize().y + LAYOUT_MARGIN + 6,
@@ -822,10 +719,9 @@ void OptionsWnd::CompleteConstruction() {
         GG::Wnd::Create<TextBrowseWnd>(UserString("OPTIONS_CREATE_PERSISTENT_CONFIG_TOOLTIP_TITLE"),
                                        UserString("OPTIONS_CREATE_PERSISTENT_CONFIG_TOOLTIP_DESC"), ROW_WIDTH));
     persistent_config_button->LeftClickedSignal.connect([]() {
-        if (GetOptionsDB().CommitPersistent())
-            ClientUI::MessageBox(UserString("OPTIONS_CREATE_PERSISTENT_CONFIG_SUCCESS"));
-        else
-            ClientUI::MessageBox(UserString("OPTIONS_CREATE_PERSISTENT_CONFIG_FAILURE"));
+        GetApp().GetUI().MessageBox(UserString(GetOptionsDB().CommitPersistent() ?
+                                               UserStringNop("OPTIONS_CREATE_PERSISTENT_CONFIG_SUCCESS") :
+                                               UserStringNop("OPTIONS_CREATE_PERSISTENT_CONFIG_FAILURE")));
     });
     current_page->Insert(GG::Wnd::Create<OptionsListRow>(ROW_WIDTH,
                                                          persistent_config_button->MinUsableSize().y + LAYOUT_MARGIN + 6,
@@ -853,7 +749,8 @@ void OptionsWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
 
 void OptionsWnd::DoLayout() {
     static constexpr GG::X BUTTON_WIDTH{75};
-    const GG::Y BUTTON_HEIGHT(ClientUI::GetFont()->Lineskip() + 6);
+    const auto font = GetApp().GetUI().GetFont();
+    const GG::Y BUTTON_HEIGHT((font ? font->Lineskip() : GG::Y1) + 6);
 
     GG::Pt done_button_lr = ScreenToClient(ClientLowerRight()) - GG::Pt(GG::X(LAYOUT_MARGIN), GG::Y(LAYOUT_MARGIN));
     GG::Pt done_button_ul = done_button_lr - GG::Pt(BUTTON_WIDTH, BUTTON_HEIGHT);
@@ -865,10 +762,9 @@ void OptionsWnd::DoLayout() {
 }
 
 GG::Rect OptionsWnd::CalculatePosition() const {
-    GG::Pt ul((GG::GUI::GetGUI()->AppWidth() - (PAGE_WIDTH + 20)) / 2,
-              (GG::GUI::GetGUI()->AppHeight() - (PAGE_HEIGHT + 70)) / 2);
-    GG::Pt wh(PAGE_WIDTH + 20, PAGE_HEIGHT + 70);
-    return GG::Rect(ul, ul + wh);
+    static constexpr GG::Pt PG_SZ{PAGE_WIDTH + 20, PAGE_HEIGHT + 70};
+    GG::Pt ul = (GetApp().AppSize() - PG_SZ) / 2;
+    return GG::Rect(ul, ul + PG_SZ);
 }
 
 GG::ListBox* OptionsWnd::CreatePage(std::string name) {
@@ -884,7 +780,8 @@ void OptionsWnd::CreateSectionHeader(GG::ListBox* page, int indentation_level,
 {
     assert(0 <= indentation_level);
     auto heading_text = GG::Wnd::Create<CUILabel>(std::move(name), GG::FORMAT_LEFT | GG::FORMAT_NOWRAP);
-    heading_text->SetFont(ClientUI::GetFont(ClientUI::Pts() * 4 / 3));
+    if (auto font = GetApp().GetUI().GetFont(ClientUI::Pts() * 4 / 3))
+        heading_text->SetFont(std::move(font));
 
     auto heading_min_sz_y{heading_text->MinUsableSize().y};
     auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH,
@@ -1135,7 +1032,7 @@ void OptionsWnd::VolumeOption(GG::ListBox* page, int indentation_level, std::str
 }
 
 void OptionsWnd::PathDisplay(GG::ListBox* page, int indentation_level, std::string text,
-                             boost::filesystem::path path)
+                             std::filesystem::path path)
 {
     auto text_control = GG::Wnd::Create<CUILabel>(std::move(text), GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
     auto edit = GG::Wnd::Create<CUIEdit>(PathToString(path));
@@ -1216,14 +1113,14 @@ void OptionsWnd::FileOptionImpl(GG::ListBox* page, int indentation_level, std::s
 }
 
 void OptionsWnd::FileOption(GG::ListBox* page, int indentation_level, std::string option_name,
-                            std::string text, boost::filesystem::path path,
+                            std::string text, std::filesystem::path path,
                             std::function<bool (const std::string&)> string_validator)
 {
     FileOption(page, indentation_level, std::move(option_name), std::move(text), std::move(path),
                std::vector<std::pair<std::string, std::string>>(), std::move(string_validator)); }
 
 void OptionsWnd::FileOption(GG::ListBox* page, int indentation_level, std::string option_name,
-                            std::string text, boost::filesystem::path path,
+                            std::string text, std::filesystem::path path,
                             std::pair<std::string, std::string> filter,
                             std::function<bool (const std::string&)> string_validator)
 {
@@ -1232,7 +1129,7 @@ void OptionsWnd::FileOption(GG::ListBox* page, int indentation_level, std::strin
 }
 
 void OptionsWnd::FileOption(GG::ListBox* page, int indentation_level, std::string option_name,
-                            std::string text, boost::filesystem::path path,
+                            std::string text, std::filesystem::path path,
                             std::vector<std::pair<std::string, std::string>> filters,
                             std::function<bool (const std::string&)> string_validator)
 {
@@ -1298,7 +1195,7 @@ void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
 
     // compile list of resolutions available on this system
 
-    auto resolutions = GG::GUI::GetGUI()->GetSupportedResolutions();
+    auto resolutions = GetApp().GetSupportedResolutions();
 
     // find text representation of current fullscreen resolution selection
     int width = GetOptionsDB().Get<int>("video.fullscreen.width");
@@ -1396,8 +1293,7 @@ void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
     row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, apply_button->MinUsableSize().y + LAYOUT_MARGIN + 6,
                                           apply_button, indentation_level);
     page->Insert(row);
-    apply_button->LeftClickedSignal.connect(
-        boost::bind(&GGHumanClientApp::Reinitialize, GGHumanClientApp::GetApp()));
+    apply_button->LeftClickedSignal.connect([]() { GetApp().Reinitialize(); });
 
     drop_list->SelChangedSignal.connect(
         [drop_list](GG::ListBox::iterator it) {
@@ -1406,12 +1302,13 @@ void OptionsWnd::ResolutionOption(GG::ListBox* page, int indentation_level) {
             const auto& drop_list_row = *it;
             if (!drop_list_row)
                 return;
-            int w, h;
-            namespace phx = boost::phoenix;
+            const auto& row_name = drop_list_row->Name();
+            int w = 0, h = 0;
+            using boost::phoenix::ref;
             namespace qi = boost::spirit::qi;
             qi::parse(
-                drop_list_row->Name().begin(), drop_list_row->Name().end(),
-                (qi::int_[phx::ref(w) = qi::_1] >> " x " >> qi::int_[phx::ref(h) = qi::_1])
+                row_name.begin(), row_name.end(),
+                (qi::int_[ref(w) = qi::_1] >> " x " >> qi::int_[ref(h) = qi::_1])
             );
             GetOptionsDB().Set("video.fullscreen.width", w);
             GetOptionsDB().Set("video.fullscreen.height", h);
@@ -1534,5 +1431,5 @@ void OptionsWnd::SoundOptionsFeedback::SoundInitializationFailure(Sound::Initial
         m_effects_button->SetCheck(false);
     if (m_music_button)
         m_music_button->SetCheck(false);
-    ClientUI::MessageBox(UserString(e.what()), false);
+    GetApp().GetUI().MessageBox(UserString(e.what()), false);
 }

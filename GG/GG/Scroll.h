@@ -66,13 +66,13 @@ public:
 
     Pt MinUsableSize() const override;
 
-    std::pair<int, int>  PosnRange() const;         ///< range currently being viewed
-    std::pair<int, int>  ScrollRange() const;       ///< defined possible range of control
-    unsigned int         LineSize() const;          ///< returns the current line size
-    unsigned int         PageSize() const;          ///< returns the current page size
+    std::pair<int, int>  PosnRange() const noexcept { return std::pair<int, int>(m_posn, m_posn + m_page_sz); } ///< range currently being viewed
+    std::pair<int, int>  ScrollRange() const noexcept { return std::pair<int, int>(m_range_min, m_range_max); } ///< defined possible range of control
+    unsigned int         LineSize() const noexcept { return m_line_sz; }
+    unsigned int         PageSize() const noexcept { return m_page_sz; }
 
-    Clr                  InteriorColor() const;     ///< returns the color used to render the interior of the Scroll
-    Orientation          ScrollOrientation() const; ///< returns the orientation of the Scroll
+    Clr                  InteriorColor() const noexcept { return m_int_color; } ///< color used to render the interior of the Scroll
+    Orientation          ScrollOrientation() const noexcept { return m_orientation; }
 
     mutable ScrolledSignalType           ScrolledSignal;           ///< the scrolled signal object for this Scroll
     mutable ScrolledAndStoppedSignalType ScrolledAndStoppedSignal; ///< the scrolled-and-stopped signal object for this Scroll
@@ -130,9 +130,13 @@ private:
     int                     m_range_max;    ///< highest value "
     unsigned int            m_line_sz;      ///< logical units traversed in a line movement (such as a click on either end button)
     unsigned int            m_page_sz;      ///< logical units traversed for a page movement (such as a click in non-tab middle area, or PgUp/PgDn)
+
     std::shared_ptr<Button> m_tab;          ///< the button representing the tab
     std::shared_ptr<Button> m_incr;         ///< the increase button (line down/line right)
     std::shared_ptr<Button> m_decr;         ///< the decrease button (line up/line left)
+    boost::signals2::scoped_connection m_incr_connection;
+    boost::signals2::scoped_connection m_decr_connection;
+
     ScrollRegion            m_initial_depressed_region; ///< the part of the scrollbar originally under cursor in LButtonDown msg
     ScrollRegion            m_depressed_region;         ///< the part of the scrollbar currently being "depressed" by held-down mouse button
     bool                    m_dragging_tab = false;

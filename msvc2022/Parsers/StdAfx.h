@@ -4,12 +4,14 @@
 // We include all external headers used in any of the header files,
 // plus boost headers used in any .cpp files.
 
-// https://hownot2code.com/2016/08/16/stdafx-h/
+// https://hownot2code.wordpress.com/2016/08/16/stdafx-h/
 
 // ----------------
 // includes from .h or .cpp
 
 // Parsers
+#include <fstream>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <set>
@@ -24,9 +26,6 @@
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/phoenix/function/adapt_function.hpp>
 #include <boost/preprocessor/cat.hpp>

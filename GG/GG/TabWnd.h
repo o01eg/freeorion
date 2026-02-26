@@ -29,7 +29,6 @@ class GG_API OverlayWnd : public Wnd
 {
 public:
     OverlayWnd(X x, Y y, X w, Y h, Flags<WndFlag> flags = NO_WND_FLAGS);
-    ~OverlayWnd() = default;
     void CompleteConstruction() override;
 
     Pt MinUsableSize() const override;
@@ -91,25 +90,24 @@ public:
         currently selected). */
     typedef boost::signals2::signal<void (std::size_t)> TabChangedSignalType;
 
-    TabWnd(X x, Y y, X w, Y h, const std::shared_ptr<Font>& font,
-           Clr color, Clr text_color = CLR_BLACK);
+    TabWnd(X x, Y y, X w, Y h, std::shared_ptr<const Font> font, Clr color, Clr text_color = CLR_BLACK);
     void CompleteConstruction() override;
 
     Pt MinUsableSize() const override;
 
     /** Returns true iff NumWnds() == 0. */
-    bool            Empty() const;
+    bool            Empty() const noexcept;
 
     /** Returns the number of tabs currently in this TabWnd. */
-    std::size_t     NumWnds() const;
+    std::size_t     NumWnds() const noexcept;
 
     /** Returns the Wnd currently visible in the TabWnd, or 0 if there is none. */
-    Wnd*            CurrentWnd() const;
+    Wnd*            CurrentWnd() const noexcept;
 
     /** Returns the index into the sequence of Wnds in this TabWnd of the Wnd
         currently shown.  NO_WND is returned if there is no Wnd currently
         visible. */
-    std::size_t     CurrentWndIndex() const;
+    std::size_t     CurrentWndIndex() const noexcept;
 
     /** Adds \a wnd to the sequence of Wnds in this TabWnd, with name \a name.
         \a name can be used later to remove the Wnd (\a name is not checked
@@ -145,9 +143,10 @@ protected:
 private:
     void TabChanged(std::size_t tab_index, bool signal);
 
-    std::shared_ptr<TabBar>     m_tab_bar;
-    std::shared_ptr<OverlayWnd> m_overlay;
-    std::map<std::string, Wnd*> m_named_wnds;
+    std::shared_ptr<TabBar>            m_tab_bar;
+    boost::signals2::scoped_connection m_bar_connection;
+    std::shared_ptr<OverlayWnd>        m_overlay;
+    std::map<std::string, Wnd*>        m_named_wnds;
 };
 
 
@@ -164,30 +163,29 @@ public:
         currently selected). */
     typedef boost::signals2::signal<void (std::size_t)> TabChangedSignalType;
 
-    TabBar(const std::shared_ptr<Font>& font, Clr color, Clr text_color = CLR_BLACK,
+    TabBar(std::shared_ptr<const Font> font, Clr color, Clr text_color = CLR_BLACK,
            Flags<WndFlag> flags = INTERACTIVE);
     void CompleteConstruction() override;
-public:
 
     Pt MinUsableSize() const override;
 
     /** Returns true iff NumWnds() == 0. */
-    bool Empty() const;
+    bool Empty() const noexcept { return !m_tabs || m_tabs->Empty(); }
 
     /** Returns the number of tabs currently in this TabWnd. */
-    std::size_t NumTabs() const;
+    std::size_t NumTabs() const noexcept { return m_tabs ? m_tabs->NumButtons() : 0u; }
 
     /** Returns the index into the sequence of tabs in this TabBar of the tab
         currently selected.  NO_TAB is returned if there is no tab currently
         selected. */
-    std::size_t CurrentTabIndex() const;
+    std::size_t CurrentTabIndex() const noexcept { return m_tabs ? m_tabs->CheckedButton() : 0u; }
 
     /** Returns the color used to render the text in this TabBar. */
-    Clr TextColor() const;
+    Clr TextColor() const noexcept { return m_text_color; }
 
     void MouseWheel(Pt pt, int move, Flags<ModKey> mod_keys) override;
     void SizeMove(Pt ul, Pt lr) override;
-    void Render() override;
+    void Render() noexcept override {};
 
     virtual void DoLayout();
 
@@ -218,10 +216,10 @@ public:
 
 protected:
     /** The default width to use for the left and right buttons. */
-    X ButtonWidth() const;
+    X ButtonWidth() const noexcept;
 
-    const Button*   LeftButton() const;
-    const Button*   RightButton() const;
+    const Button*   LeftButton() const noexcept { return m_left_button.get(); }
+    const Button*   RightButton() const noexcept { return m_right_button.get(); }
 
     bool EventFilter(Wnd* w, const WndEvent& event) override;
 
@@ -241,10 +239,13 @@ private:
     void RecalcLeftRightButton();
 
     std::shared_ptr<RadioButtonGroup>           m_tabs;
+    boost::signals2::scoped_connection          m_tabs_connection;
     std::vector<std::shared_ptr<StateButton>>   m_tab_buttons;
-    std::shared_ptr<Font>                       m_font;
+    std::shared_ptr<const Font>                 m_font;
     std::shared_ptr<Button>                     m_left_button;
+    boost::signals2::scoped_connection          m_left_button_connection;
     std::shared_ptr<Button>                     m_right_button;
+    boost::signals2::scoped_connection          m_right_button_connection;
     std::shared_ptr<Layout>                     m_left_right_button_layout;
     Flags<TextFormat>                           m_format;
     Clr                                         m_text_color;

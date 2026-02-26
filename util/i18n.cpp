@@ -7,7 +7,9 @@
 
 #include <boost/locale.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
+
 #include <atomic>
+#include <shared_mutex>
 
 // define needed on Windows due to conflict with windows.h and std::min and std::max
 #ifndef NOMINMAX
@@ -69,14 +71,14 @@ namespace {
 
 
     // fallback stringtable to look up key in if entry is not found in currently configured stringtable
-    boost::filesystem::path DevDefaultEnglishStringtablePath()
+    std::filesystem::path DevDefaultEnglishStringtablePath()
     { return GetResourceDir() / "stringtables/en.txt"; }
 
     // filename to use as default value for stringtable filename option.
     // based on the system's locale. not necessarily the same as the
     // "dev default" (english) stringtable filename for fallback lookup
     // includes "<resource-dir>/stringtables/" directory part of path
-    boost::filesystem::path GetDefaultStringTableFileName() {
+    std::filesystem::path GetDefaultStringTableFileName() {
         std::string lang;
 
 #if defined(FREEORION_ANDROID)
@@ -100,8 +102,8 @@ namespace {
             DebugLogger() << "Detected locale language: " << lang;
         }
 
-        boost::filesystem::path lang_filename{ lang + ".txt" };
-        boost::filesystem::path default_stringtable_path{ GetResourceDir() / "stringtables" / lang_filename };
+        std::filesystem::path lang_filename{ lang + ".txt" };
+        std::filesystem::path default_stringtable_path{ GetResourceDir() / "stringtables" / lang_filename };
 
         // default to english if locale-derived filename not present
         if (!IsExistingFile(default_stringtable_path)) {
@@ -138,7 +140,7 @@ namespace {
         // or this may have been overridden from one of the config XML files or from
         // a command line argument.
         std::string option_path = GetOptionsDB().Get<std::string>("resource.stringtable.path");
-        boost::filesystem::path stringtable_path = FilenameToPath(option_path);
+        std::filesystem::path stringtable_path = FilenameToPath(option_path);
 
         // verify that option-derived stringtable file exists, with fallbacks
         DebugLogger() << "Stringtable option path: " << option_path;
@@ -242,9 +244,9 @@ namespace {
     }
 
     std::shared_mutex path_LUT_mutex;
-    std::map<boost::filesystem::path, std::string> path_to_string_LUT;
+    std::map<std::filesystem::path, std::string> path_to_string_LUT;
 
-    StringTable& GetStringTable(const boost::filesystem::path& stringtable_path,
+    StringTable& GetStringTable(const std::filesystem::path& stringtable_path,
                                 std::shared_lock<std::shared_mutex>& access_lock)
     {
         {
@@ -278,7 +280,7 @@ const std::locale& GetLocale(std::string_view name) {
         locale_gen.locale_cache_enabled(true);
         try {
             auto retval2 = locale_gen.generate(name_str);
-            std::use_facet<boost::locale::info>(retval2);
+            [[maybe_unused]] const auto& dummy = std::use_facet<boost::locale::info>(retval2);
             return retval2;
         } catch (...) {
             return std::locale::classic();
@@ -420,7 +422,7 @@ bool UserStringExists(const char* str) {
            GetDevDefaultStringTable(stringtable_lock).StringExists(str);
 }
 
-boost::format FlexibleFormat(const std::string &string_to_format) {
+boost::format FlexibleFormat(const std::string& string_to_format) {
     try {
         boost::format retval(string_to_format);
         retval.exceptions(boost::io::no_error_bits);
@@ -438,20 +440,23 @@ const std::string& Language() {
     return GetStringTable(stringtable_lock).Language();
 }
 
-std::string RomanNumber(unsigned int n) {
+std::string RomanNumber(uint16_t n) {
     //letter pattern (N) and the associated values (V)
     static constexpr std::array N = {  "M",  "CM",  "D",  "CD",  "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I" };
     static constexpr std::array V = { 1000u, 900u, 500u,  400u, 100u,  90u, 50u,  40u, 10u,   9u,  5u,   4u,  1u };
-    if (n == 0) return ""; // the romans didn't know there is a zero, read a book about history of the zero if you want to know more
-                           // Roman numbers are written using patterns, you chosse the highest pattern lower that the number
-                           // write it down, and substract it's value until you reach zero.
+    if (n == 0) return ""; // the romans didn't know there is a zero, read a book about
+                           // history of the zero if you want to know more. Roman numbers
+                           // are written using patterns, you chosse the highest pattern
+                           // lower than the number, write it down, and substract its
+                           // value until you reach zero.
 
-    // safety check to avoid very long loops
-    if (n > 10000)
+    // safety check to avoid very long loops and unrepresentable numbers
+    if (n >= 4000)
         return "!";
 
     // start with the highest pattern and reduce the size every time it doesn't fit
     std::string retval;
+    retval.reserve(15); // space for "MMMDCCCLXXXVIII", should fit in SSO
     unsigned int remainder = n; // remainder of the number to be written
     int i = 0;                  // pattern index
     while (remainder > 0) {
@@ -521,21 +526,20 @@ namespace {
     }
 }
 
-std::string DoubleToString(double val, int digits, bool always_show_sign) {
+std::string DoubleToString(double val, uint8_t digits, bool always_show_sign) {
     // minimum digits is 2. Fewer than this and things can't be sensibly displayed.
     // eg. 300 with 2 digits is 0.3k. With 1 digits, it would be unrepresentable.
-    digits = std::max(digits, 2);
+    digits = std::max(digits, uint8_t(2u));
 
     // default result for sentinel value
-    if (val == UNKNOWN_UI_DISPLAY_VALUE)
+    if (val == UNKNOWN_UI_DISPLAY_VALUE) {
         return UserString("UNKNOWN_VALUE_SYMBOL");
-
-    double mag = std::abs(val);
-
-    // early termination if magnitude is 0
-    if (mag == 0.0 || RoundMagnitude(mag, digits + 1) == 0.0) {
-        std::string format = "%1." + std::to_string(digits - 1) + "f"; // TODO: avoid extra string here?
-        return (boost::format(format) % mag).str();
+    } if (std::isnan(val)) {
+        return "";
+    } else if (std::isinf(val)) {
+        return (val > 0) ? (always_show_sign ? "+∞" : "∞") : "-∞";
+    } else if (!std::isfinite(val)) {
+        return "";
     }
 
     std::string text;
@@ -547,6 +551,15 @@ std::string DoubleToString(double val, int digits, bool always_show_sign) {
         text += "-";
     else if (always_show_sign)
         text += "+";
+    double mag = std::abs(val);
+
+    // early termination if magnitude is 0
+    if (mag == 0.0 || RoundMagnitude(mag, digits + 1) == 0.0) {
+        std::string format = "%1." + std::to_string(digits - 1) + "f"; // TODO: avoid extra string here?
+        return text.append((boost::format(format) % mag).str());
+    }
+
+
 
     // if value is effectively 0, avoid unnecessary later processing
     if (effective_sign == 0) {

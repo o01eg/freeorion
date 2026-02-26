@@ -1,18 +1,17 @@
 #ifndef _CheckSums_h_
 #define _CheckSums_h_
 
-#include "Export.h"
-
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <limits.h>
-#include <memory>
 #include <numeric>
 #include <utility>
 #include <stdexcept>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 
 namespace CheckSums {
@@ -61,6 +60,8 @@ namespace CheckSums {
 
     inline constexpr uint32_t CHECKSUM_MODULUS = 10000000U;    // reasonably big number that should be well below UINT_MAX, which is ~4.29x10^9 for 32 bit unsigned int
     static_assert(CHECKSUM_MODULUS < UINT_MAX/4);
+    inline constexpr uint32_t UINT24_MAX = 0xffffff;
+    static_assert(CHECKSUM_MODULUS < UINT24_MAX);
 
 #if !defined(__cpp_lib_constexpr_cmath)
     constexpr double log_base_e_of_10 = 2.30258509299404568401799145;
@@ -85,8 +86,14 @@ namespace CheckSums {
             if (exp == 0) return 1;
             if (exp == 1) return base;
             B accum = 1;
-            while (exp-->0)
-                accum *= base;
+            while (true) {
+                if (exp & 1)
+                    accum *= base;
+                exp >>= 1;
+                if (exp == 0)
+                    break;
+                base *= base;
+            }
             return accum;
         }
     }
@@ -95,19 +102,6 @@ namespace CheckSums {
         requires std::is_floating_point_v<T> && std::is_integral_v<E>
     constexpr T pow(E exp) noexcept
     { return pow(static_cast<T>(natural_log_base), exp); }
-
-    constexpr void InPlaceSort(auto& arr) {
-#if defined(__cpp_lib_constexpr_algorithms)
-        std::sort(arr.begin(), arr.end());
-#else
-        if (!std::is_constant_evaluated()) {
-            std::sort(arr.begin(), arr.end());
-        } else {
-            for (auto it = arr.begin(); it != arr.end(); ++it)
-                std::swap(*it, *std::min_element(it, arr.end()));
-        }
-#endif
-    }
 
     template <typename E = double> requires std::is_floating_point_v<std::decay_t<E>>
     constexpr E PowTaylorSeries(const E exp)
@@ -126,7 +120,6 @@ namespace CheckSums {
             accum *= (exp/n);
             scratch[n] = accum;
         }
-        InPlaceSort(scratch);
 #if defined(__cpp_lib_constexpr_numeric)
         return std::accumulate(scratch.begin(), scratch.end(), E{0});
 #else
@@ -291,6 +284,10 @@ namespace CheckSums {
     constexpr void CheckSumCombine(uint32_t& sum, EnumT t) noexcept
     { CheckSumCombine(sum, static_cast<int>(t) + 10); }
 
+    // nullptr
+    constexpr void CheckSumCombine(uint32_t&, std::nullptr_t) noexcept {}
+
+    // misc
     constexpr void CheckSumCombine(uint32_t& sum, const auto& v)
         requires(!std::is_integral_v<std::decay_t<decltype(v)>> &&
                  !std::is_floating_point_v<std::decay_t<decltype(v)>> &&
@@ -335,12 +332,18 @@ namespace CheckSums {
         CheckSumCombine(sum, sizeof...(Ts));
     }
 
-    template <typename Combinable> requires requires(const Combinable& c, uint32_t& i) { CheckSumCombine(i, c); }
-    [[nodiscard]] constexpr uint32_t GetCheckSum(const Combinable& c)
-        noexcept(noexcept(CheckSumCombine(std::declval<uint32_t&>(), c)))
+    template <typename T>
+    concept Combinable = requires(const T t, uint32_t& i) { CheckSumCombine(i, t); };
+
+    template <typename... Ts>
+    constexpr bool all_noexcept_combinable =
+        (noexcept(CheckSumCombine(std::declval<uint32_t&>(), std::declval<Ts>())) && ...);
+
+    [[nodiscard]] constexpr uint32_t GetCheckSum(const Combinable auto&... cs)
+        noexcept(all_noexcept_combinable<decltype(cs)...>)
     {
         uint32_t retval{0};
-        CheckSumCombine(retval, c);
+        (CheckSumCombine(retval, cs), ...);
         return retval;
     }
 }

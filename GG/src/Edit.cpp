@@ -10,25 +10,30 @@
 #include <GG/DrawUtil.h>
 #include <GG/Edit.h>
 #include <GG/GUI.h>
-#include <GG/utf8/checked.h>
+#include <GG/utf8/utf8.h>
 #include <GG/WndEvent.h>
 
 
 using namespace GG;
 
 namespace {
-    Y HeightFromFont(const std::shared_ptr<Font>& font, unsigned int pixel_margin) noexcept
-    { return font->Height() + 2 * static_cast<int>(pixel_margin); }
+    Y HeightFromFont(const Font* font) noexcept
+    { return (font ? font->Height() : Y0) + 2 * static_cast<int>(GG::Edit::PIXEL_MARGIN); }
+
+    template <typename F>
+    Y HeightFromFont(const F& font) noexcept
+    { return HeightFromFont(font.get()); }
+
+    constexpr auto fmt = FORMAT_LEFT | FORMAT_IGNORETAGS;
 }
 
 ////////////////////////////////////////////////
 // GG::Edit
 ////////////////////////////////////////////////
 
-Edit::Edit(std::string str, std::shared_ptr<Font> font,
-           Clr color, Clr text_color, Clr interior) :
-    TextControl(X0, Y0, X1, HeightFromFont(font, PIXEL_MARGIN), "", font,
-                text_color, FORMAT_LEFT | FORMAT_IGNORETAGS, INTERACTIVE | REPEAT_KEY_PRESS),
+Edit::Edit(std::string str, std::shared_ptr<const Font> font, Clr color, Clr text_color, Clr interior) :
+    TextControl(X0, Y0, X1, HeightFromFont(font), "", font,
+                text_color, fmt, INTERACTIVE | REPEAT_KEY_PRESS),
     m_int_color(interior)
 {
     Edit::SetColor(color);
@@ -41,7 +46,7 @@ Edit::Edit(std::string str, std::shared_ptr<Font> font,
 }
 
 Pt Edit::MinUsableSize() const noexcept
-{ return Pt(X(4 * PIXEL_MARGIN), HeightFromFont(GetFont(), PIXEL_MARGIN)); }
+{ return Pt(X(4 * PIXEL_MARGIN), HeightFromFont(GetFont())); }
 
 std::string_view Edit::SelectedText() const
 {
@@ -62,17 +67,20 @@ void Edit::Render()
 
     BeginScissorClipping(Pt(client_ul.x - 1, client_ul.y), client_lr);
 
-    const auto& font = GetFont();
+    const auto* font = GetFont().get();
+    if (!font)
+        return;
     const auto& line_data = GetLineData();
 
     X first_char_offset = FirstCharOffset();
     Y text_y_pos = ToY(ul.y + ((lr.y - ul.y) - font->Height()) / 2.0);
-    CPSize last_visible_char = LastVisibleChar();
-    const StrSize INDEX_0 = StringIndexOfLineAndGlyph(0, m_first_char_shown, line_data);
-    const StrSize INDEX_END = StringIndexOfLineAndGlyph(0, last_visible_char, line_data);
+    //CPSize last_visible_char = LastVisibleChar();
+    //const StrSize INDEX_0 = StringIndexOfLineAndGlyph(0, m_first_char_shown, line_data);
+    //const StrSize INDEX_END = StringIndexOfLineAndGlyph(0, last_visible_char, line_data);
     Font::RenderState rs{text_color_to_use};
 
-    const auto text_sv = std::string_view(Text()).substr(Value(INDEX_0), Value(INDEX_END - INDEX_0));
+    const Pt font_render_ul{client_ul.x, text_y_pos};
+    const Pt font_render_lr{client_lr.x, text_y_pos + font->Height()};
 
     if (!line_data.empty() && MultiSelected()) {
         const auto& char_data = line_data.front().char_data;
@@ -87,10 +95,11 @@ void Edit::Render()
         FlatRectangle(hilite_ul, hilite_lr, hilite_color_to_use, CLR_ZERO, 0);
 
         // draw text
-        font->RenderText(Pt(client_ul.x, text_y_pos), text_sv, rs);
+        font->RenderText(font_render_ul, font_render_lr, fmt, line_data, rs);
 
     } else { // no selected text
-        font->RenderText(Pt(client_ul.x, text_y_pos), text_sv, rs);
+        // draw text
+        font->RenderText(font_render_ul, font_render_lr, fmt, line_data, rs);
 
         if (GUI::GetGUI()->FocusWnd().get() == this) {
             // if we have focus, draw the caret as a simple vertical line
@@ -255,7 +264,7 @@ std::size_t Edit::NumLines() const noexcept
     return (ldsz > 0) ? (ldsz - 1) : 0;
 }
 
-void Edit::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
+void Edit::LButtonDown(Pt pt, Flags<ModKey>)
 {
     if (Disabled())
         return;
@@ -271,7 +280,7 @@ void Edit::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
         m_cursor_pos = {idx, idx};
 }
 
-void Edit::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
+void Edit::LDrag(Pt pt, Pt, Flags<ModKey>)
 {
     if (Disabled())
         return;
@@ -315,10 +324,10 @@ void Edit::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
     //          << " to cp idx: " << Value(m_cursor_pos.second) << std::endl;
 }
 
-void Edit::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
+void Edit::LButtonUp(Pt, Flags<ModKey>)
 { ClearDoubleButtonDownMode(); }
 
-void Edit::LClick(Pt pt, Flags<ModKey> mod_keys)
+void Edit::LClick(Pt, Flags<ModKey>)
 { ClearDoubleButtonDownMode(); }
 
 void Edit::KeyPress(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys)
@@ -497,9 +506,6 @@ void Edit::TextInput(const std::string& text) {
         AdjustView();
 }
 
-void Edit::GainingFocus()
-{ m_recently_edited = false; }
-
 void Edit::LosingFocus()
 {
     if (m_recently_edited)
@@ -527,9 +533,6 @@ std::pair<CPSize, CPSize> Edit::GetDoubleButtonDownDragWordCPIndices(CPSize cp_i
                                  [cp_index](auto word) { return word.first < cp_index && cp_index < word.second; });
     return (it != words_cp_indices.end()) ? *it : std::pair<CPSize, CPSize>{cp_index, cp_index};
 }
-
-void Edit::ClearDoubleButtonDownMode()
-{ m_in_double_click_mode = false; }
 
 void Edit::ClearSelected()
 {
@@ -606,7 +609,7 @@ void Edit::AdjustView()
 ////////////////////////////////////////////////////////////
 // Free Functions
 ////////////////////////////////////////////////////////////
-void GG::GetTranslatedCodePoint(Key key, uint32_t key_code_point, Flags<ModKey> mod_keys,
+void GG::GetTranslatedCodePoint(Key, uint32_t key_code_point, Flags<ModKey>,
                                 std::string& translated_code_point)
 {
     // only process it if it's a valid code point or a known printable
@@ -630,31 +633,31 @@ CPSize GG::NextWordEdgeFrom(std::string_view text, CPSize from_position, bool se
 
         // start with the leftmost word, traverse words to the right
         // until past the reference point
-        for (const auto& word_range : words) {
-            if (word_range.first > from_position) {
+        for (const auto& [rng_from, rng_to] : words) {
+            if (rng_from > from_position) {
                 // found word is after of the position. can stop
                 // searching and use whatever the last found word's position was
                 break;
 
-            } else if (word_range.first < from_position && word_range.second >= from_position) {
+            } else if (rng_from < from_position && rng_to >= from_position) {
                 // found word starting before and ending at/after the position. can
                 // stop searching and use the start of the found word.
-                retval = word_range.first;
+                retval = rng_from;
                 break;
 
-            } else if (word_range.second < from_position) {
+            } else if (rng_to < from_position) {
                 // found word ending before the position. can use the start
                 // or end of the found word...
-                if (word_range.second < from_position - CP1) {
+                if (rng_to < from_position - CP1) {
                     // there is a gap between the end of the word and the search
                     // reference position. use one past the end of the word
-                    retval = word_range.second + CP1;
+                    retval = rng_to + CP1;
                     // don't break, as there might be later words that are closer to
                     // the search reference position
                 } else {
                     // the end of the word is immediately before the search
                     // reference position. use the start of the word.
-                    retval = word_range.first;
+                    retval = rng_from;
                     // can stop searching since the word is right next to the
                     // search reference position
                     break;
@@ -671,28 +674,29 @@ CPSize GG::NextWordEdgeFrom(std::string_view text, CPSize from_position, bool se
         // start and the rightmost end, traverse the words leftwards
         // until past the reference point
         for (auto rit = words.rbegin(); rit != words.rend(); ++rit) {
-            if (rit->second < from_position) {
+            auto [word_from, word_to] = *rit;
+            if (word_to < from_position) {
                 // found word is before the position. can stop
                 // searching and use whatever the last found word's position was
                 break;
 
-            } else if (rit->first <= from_position && rit->second > from_position) {
+            } else if (word_from <= from_position && word_to > from_position) {
                 // found word starting before/at and ending after the position. can
                 // stop searching and use the end of the found word.
-                retval = rit->second;
+                retval = word_to;
                 break;
 
-            } else if (rit->first > from_position) {
+            } else if (word_from > from_position) {
                 // found word starting after the position. can use the start
                 // or end of the found word...
-                if (rit->first > from_position + CP1) {
+                if (word_from > from_position + CP1) {
                     // there is a gap between the end of the word and the search
                     // reference position. use one before the start of the word
-                    retval = rit->first - CP1;
+                    retval = word_from - CP1;
                 } else {
                     // the start of the word is immediately after the search
                     // reference position. use the end of the word.
-                    retval = rit->second;
+                    retval = word_to;
                     // can stop searching since the word is right next to the
                     // search reference position
                     break;

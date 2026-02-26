@@ -105,7 +105,7 @@ void QueueListBox::Render() {
     ListBox::Render();
     // render drop point line
     if (m_show_drop_point && m_order_issuing_enabled) {
-        auto&& row = m_drop_point == end() ? (--end())->get() : m_drop_point->get();
+        auto row = m_drop_point == end() ? (--end())->get() : m_drop_point->get();
         if (!row)
             return;
         GG::Pt ul = row->UpperLeft(), lr = row->LowerRight();
@@ -218,9 +218,9 @@ void QueueListBox::ItemRightClickedImpl(GG::ListBox::iterator it, GG::Pt pt, GG:
 
     bool disabled = !OrderIssuingEnabled();
 
-    popup->AddMenuItem(GG::MenuItem(UserString("MOVE_UP_QUEUE_ITEM"),   disabled, false, MoveToTopAction(it)));
-    popup->AddMenuItem(GG::MenuItem(UserString("MOVE_DOWN_QUEUE_ITEM"), disabled, false, MoveToBottomAction(it)));
-    popup->AddMenuItem(GG::MenuItem(UserString("DELETE_QUEUE_ITEM"),    disabled, false, DeleteAction(it)));
+    popup->AddMenuItem(UserString("MOVE_UP_QUEUE_ITEM"),   disabled, false, MoveToTopAction(it));
+    popup->AddMenuItem(UserString("MOVE_DOWN_QUEUE_ITEM"), disabled, false, MoveToBottomAction(it));
+    popup->AddMenuItem(UserString("DELETE_QUEUE_ITEM"),    disabled, false, DeleteAction(it));
     popup->Run();
 }
 

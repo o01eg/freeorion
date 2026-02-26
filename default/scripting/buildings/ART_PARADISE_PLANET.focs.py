@@ -26,16 +26,14 @@ try:
 except ModuleNotFoundError:
     pass
 
-BuildingType(  # type: ignore[reportUnboundVariable]
+BuildingType(  # pyrefly: ignore[unbound-name]
     name="BLD_ART_PARADISE_PLANET",
     description="BLD_ART_PARADISE_PLANET_DESC",
     buildcost=(200 * Target.HabitableSize + 300) * BUILDING_COST_MULTIPLIER,
     buildtime=10,
     location=(
         Planet()
-        & ~Contains(IsBuilding(name=["BLD_ART_PLANET"]))
-        & ~Contains(IsBuilding(name=["BLD_ART_FACTORY_PLANET"]))
-        & ~Contains(IsBuilding(name=["BLD_ART_PARADISE_PLANET"]))
+        & ~Contains(IsBuilding(name=["BLD_ART_PLANET", "BLD_ART_FACTORY_PLANET", "BLD_ART_PARADISE_PLANET"]))
         & OwnedBy(empire=Source.Owner)
         & Planet(type=[AsteroidsType, GasGiantType])
         & OwnerHasTech(name="GRO_GAIA_TRANS")

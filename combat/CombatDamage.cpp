@@ -16,8 +16,8 @@
 
 namespace {
     std::vector<float> WeaponDamageCalcImpl(
-        const Ship& ship, bool max, bool include_fighters,
-        bool target_ships, const ScriptingContext& context)
+        const Ship& ship, Combat::MaxWD max, Combat::InclFightersWD include_fighters,
+        Combat::TargetShipsWD target_ships, const ScriptingContext& context)
     {
         std::vector<float> retval;
 
@@ -29,9 +29,9 @@ namespace {
         if (parts.empty())
             return retval;
 
-        MeterType METER = max ?
+        MeterType METER = (max == Combat::MaxWD::MAX) ?
             MeterType::METER_MAX_CAPACITY : MeterType::METER_CAPACITY;
-        MeterType SECONDARY_METER = max ?
+        MeterType SECONDARY_METER = (max == Combat::MaxWD::MAX) ?
             MeterType::METER_MAX_SECONDARY_STAT : MeterType::METER_SECONDARY_STAT;
 
         float fighter_damage = 0.0f;
@@ -39,7 +39,7 @@ namespace {
         int available_fighters = 0;
 
         retval.reserve(parts.size() + 1);
-        int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS");
+        const int num_bouts = GetGameRules().Get<int>("RULE_NUM_COMBAT_ROUNDS");
         // for each weapon part, get its damage meter value
         for (const auto& part_name : parts) {
             const ShipPart* part = GetShipPart(part_name);
@@ -49,25 +49,29 @@ namespace {
 
             // get the attack power for each weapon part.
             if (part_class == ShipPartClass::PC_DIRECT_WEAPON) {
-                if (target_ships)
+                if (target_ships == Combat::TargetShipsWD::TargetShips)
                     retval.push_back(ship.WeaponPartShipDamage(part, context));
                 else
                     retval.push_back(ship.WeaponPartFighterDamage(part, context));
-            } else if (part_class == ShipPartClass::PC_FIGHTER_BAY && include_fighters) {
+            } else if (part_class == ShipPartClass::PC_FIGHTER_BAY &&
+                       include_fighters == Combat::InclFightersWD::WITH)
+            {
                 // launch capacity determined by capacity of bay
                 fighter_launch_capacity += static_cast<int>(ship.CurrentPartMeterValue(METER, part_name));
 
-            } else if (part_class == ShipPartClass::PC_FIGHTER_HANGAR && include_fighters) {
+            } else if (part_class == ShipPartClass::PC_FIGHTER_HANGAR &&
+                       include_fighters == Combat::InclFightersWD::WITH)
+            {
                 // attack strength of a ship's fighters per bout determined by the hangar...
                 // assuming all hangars on a ship are the same part type...
-                if (target_ships && part->TotalShipDamage()) {
+                if (target_ships == Combat::TargetShipsWD::TargetShips && part->TotalShipDamage()) {
                     retval.push_back(part->TotalShipDamage()->Eval(context));
                     // as TotalShipDamage contains the damage from all fighters, do not further include fighter
-                    include_fighters = false;
-                } else if (part->TotalFighterDamage() && !target_ships) {
+                    include_fighters = Combat::InclFightersWD::WITHOUT;
+                } else if (part->TotalFighterDamage() && target_ships == Combat::TargetShipsWD::NoShips) {
                     retval.push_back(part->TotalFighterDamage()->Eval(context));
                     // as TotalFighterDamage contains the damage from all fighters, do not further include fighter
-                    include_fighters = false;
+                    include_fighters = Combat::InclFightersWD::WITHOUT;
                 } else if (part->CombatTargets() && context.effect_target &&
                            part->CombatTargets()->EvalOne(context, context.effect_target))
                 {
@@ -77,13 +81,14 @@ namespace {
                 } else {
                     // target is not of the right type; no damage; stop checking hangars/launch bays
                     fighter_damage = 0.0f;
-                    include_fighters = false;
+                    include_fighters = Combat::InclFightersWD::WITHOUT;
                 }
             }
         }
 
-        if (!include_fighters || fighter_damage <= 0.0f || available_fighters <= 0 || fighter_launch_capacity <= 0)
-            return retval;
+        if ((include_fighters == Combat::InclFightersWD::WITHOUT) ||
+            fighter_damage <= 0.0f || available_fighters <= 0 || fighter_launch_capacity <= 0)
+        { return retval; }
 
         // Calculate fighter damage manually if not
         int fighter_shots = std::min(available_fighters, fighter_launch_capacity);  // how many fighters launched in bout 1
@@ -101,16 +106,15 @@ namespace {
         // how much damage does a fighter shot do?
         fighter_damage = std::max(0.0f, fighter_damage);
 
-        if (target_ships)
+        if (target_ships == Combat::TargetShipsWD::TargetShips)
             retval.push_back(fighter_damage * fighter_shots);
         else
             retval.push_back(static_cast<float>(fighter_shots));
         return retval;
     }
 
-    Ship TempShipForDamageCalcs(const Ship& template_ship, const ScriptingContext& context) {
+    Ship TempShipForDamageCalcs(const Ship& template_ship, const ScriptingContext& context, float shields) {
         // create temporary ship to test targetting condition on...
-        static constexpr float shields = 0.0f;
         static constexpr float structure = 100.0f;
 
         if (template_ship.DesignID() == INVALID_DESIGN_ID)
@@ -131,7 +135,7 @@ namespace {
         return target;
     }
 
-    Fighter TempFighterForDamageCalcs(const Ship& template_ship, const ScriptingContext& context) {
+    Fighter TempFighterForDamageCalcs(const Ship& template_ship) {
         static constexpr auto combat_targets = nullptr;
         Fighter target{ALL_EMPIRES, template_ship.ID(), template_ship.SpeciesName(), 1.0f, combat_targets};
         target.SetID(TEMPORARY_OBJECT_ID);
@@ -140,8 +144,8 @@ namespace {
 }
 
 std::vector<float> Combat::WeaponDamageImpl(
-    const ScriptingContext& context, const Ship& source, float shields,
-    bool max, bool launch_fighters, bool target_ships)
+    const ScriptingContext& context, const Ship& source, float target_shields,
+    MaxWD max, InclFightersWD launch_fighters, TargetShipsWD target_ships)
 {
     if (source.DesignID() == INVALID_DESIGN_ID) {
         if (source.ID() == TEMPORARY_OBJECT_ID) {
@@ -157,20 +161,20 @@ std::vector<float> Combat::WeaponDamageImpl(
     const Universe::EmpireObjectVisibilityTurnMap empire_object_visibility_turns{
         {source.Owner(), {{TEMPORARY_OBJECT_ID, {{Visibility::VIS_FULL_VISIBILITY, context.current_turn}}}}}};
 
-    if (target_ships) {
-        auto temp_ship = TempShipForDamageCalcs(source, context);
+    if (target_ships == Combat::TargetShipsWD::TargetShips) {
+        auto temp_ship = TempShipForDamageCalcs(source, context, target_shields);
         const ScriptingContext temp_ship_context{context, empire_object_vis, empire_object_visibility_turns,
-                                                 ScriptingContext::Source{}, &source,
-                                                 ScriptingContext::Target{}, &temp_ship};
+                                                 ScriptingContext::Source{}, std::addressof(source),
+                                                 ScriptingContext::Target{}, std::addressof(temp_ship)};
 
         return WeaponDamageCalcImpl(source, max, launch_fighters, target_ships, temp_ship_context);
 
     } else {
         // create temporary fighter to test targetting condition on...
-        auto temp_fighter = TempFighterForDamageCalcs(source, context);
+        auto temp_fighter = TempFighterForDamageCalcs(source);
         const ScriptingContext temp_fighter_context{context, empire_object_vis, empire_object_visibility_turns,
-                                                    ScriptingContext::Source{}, &source,
-                                                    ScriptingContext::Target{}, &temp_fighter};
+                                                    ScriptingContext::Source{}, std::addressof(source),
+                                                    ScriptingContext::Target{}, std::addressof(temp_fighter)};
 
         return WeaponDamageCalcImpl(source, max, launch_fighters, target_ships, temp_fighter_context);
     }
@@ -193,10 +197,10 @@ std::map<int, Combat::FighterBoutInfo> Combat::ResolveFighterBouts(
         {ship->Owner(), {{TEMPORARY_OBJECT_ID, Visibility::VIS_FULL_VISIBILITY}}}};
     Universe::EmpireObjectVisibilityTurnMap empire_object_visibility_turns{
         {ship->Owner(), {{TEMPORARY_OBJECT_ID, {{Visibility::VIS_FULL_VISIBILITY, context.current_turn}}}}}};
-    auto temp_ship = TempShipForDamageCalcs(*ship, context);
+    auto temp_ship = TempShipForDamageCalcs(*ship, context, 0.0f);
     ScriptingContext ship_target_context{context, empire_object_vis, empire_object_visibility_turns,
                                          ScriptingContext::Source{}, ship.get(),
-                                         ScriptingContext::Target{}, &temp_ship};
+                                         ScriptingContext::Target{}, std::addressof(temp_ship)};
 
     for (int bout = 1; bout <= target_bout; ++bout) {
         ship_target_context.combat_bout = bout;

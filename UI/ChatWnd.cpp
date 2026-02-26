@@ -21,7 +21,7 @@
 #include "../util/OptionsDB.h"
 
 #include <GG/GUI.h>
-#include <GG/utf8/checked.h>
+#include <GG/utf8/utf8.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
@@ -76,7 +76,7 @@ namespace {
 
 class MessageWndEdit : public CUIEdit {
 public:
-    MessageWndEdit();
+    MessageWndEdit() : CUIEdit("") {}
 
     void KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) override;
     bool AutoComplete() override;   //!< Autocomplete current word
@@ -98,19 +98,15 @@ private:
     std::set<std::string>       m_game_words;
 
     // Repeated autocomplete variables
-     std::vector<std::string>   m_auto_complete_choices;
-     unsigned int               m_repeated_tab_count = 0;
-     std::string                m_last_line_read;
-     std::string                m_last_game_word;
+    std::vector<std::string>    m_auto_complete_choices;
+    unsigned int                m_repeated_tab_count = 0;
+    std::string                 m_last_line_read;
+    std::string                 m_last_game_word;
 };
 
 ////////////////////
 // MessageWndEdit //
 ////////////////////
-MessageWndEdit::MessageWndEdit() :
-    CUIEdit("")
-{}
-
 void MessageWndEdit::KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
     switch (key) {
     case GG::Key::GGK_RETURN:
@@ -130,10 +126,10 @@ void MessageWndEdit::KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG
 }
 
 void MessageWndEdit::FindGameWords() {
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
+    const auto& context = GetApp().GetContext();
 
      // add player and empire names
-    for (const auto& empire : Empires() | range_values) {
+    for (const auto& empire : context.Empires() | range_values) {
         m_game_words.insert(empire->Name());
         m_game_words.insert(empire->PlayerName());
     }
@@ -159,7 +155,7 @@ void MessageWndEdit::FindGameWords() {
             m_game_words.insert(UserString(special_name));
     }
      // add species names
-    for (const auto& name : context.species | range_keys) {
+    for (const auto& name : context.species.AllSpecies() | range_keys) {
         if (!name.empty())
             m_game_words.insert(UserString(name));
     }
@@ -385,8 +381,7 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text,
         wrapped_text.append(UserString("MESSAGES_WHISPER"));
     wrapped_text.append(": ")
                 .append(filtered_message)
-                .append("</pre>").append("<reset>"); // ensure message doesn't leave text state in preformatted mode or with any other tags applied
-    static_assert(GG::Font::PRE_TAG == "pre");
+                .append("<reset>"); // ensure message doesn't leave text state with any other tags
     static_assert(GG::Font::RESET_TAG == "reset");
 
     TraceLogger() << "HandlePlayerChatMessage sender: " << player_name
@@ -398,16 +393,16 @@ void MessageWnd::HandlePlayerChatMessage(const std::string& text,
     wrapped_text.append("\n");
 
     *m_display += wrapped_text;
-    m_display_show_time = GG::GUI::GetGUI()->Ticks();
 
-    if (const ClientApp* app = ClientApp::GetApp()) {
-        // if client empire is target of message, show message window
-        const auto& players = app->Players();
-        const auto it = players.find(app->PlayerID());
-        if (it == players.end() || it->second.name != player_name) {
-            Flash();
-            Show();
-        }
+    const auto& app = GetApp();
+    m_display_show_time = app.Ticks();
+
+    // if client empire is target of message, show message window
+    const auto& players = app.Players();
+    const auto it = players.find(app.PlayerID());
+    if (it == players.end() || it->second.name != player_name) {
+        Flash();
+        Show();
     }
 }
 
@@ -437,29 +432,23 @@ void MessageWnd::HandleTurnPhaseUpdate(Message::TurnProgressPhase phase_id, bool
         *m_display += boost::str(FlexibleFormat(UserString("PLAYING_GAME")) % phase_str) + "\n";
     else
         *m_display += phase_str + "\n";
-    m_display_show_time = GG::GUI::GetGUI()->Ticks();
+    m_display_show_time = GetApp().Ticks();
 }
 
 void MessageWnd::HandleGameStatusUpdate(const std::string& text) {
     *m_display += (text + "\n");
-    m_display_show_time = GG::GUI::GetGUI()->Ticks();
+    m_display_show_time = GetApp().Ticks();
 }
 
 void MessageWnd::HandleLogMessage(const std::string& text) {
     *m_display += (text + "\n");
-    m_display_show_time = GG::GUI::GetGUI()->Ticks();
+    m_display_show_time = GetApp().Ticks();
 }
 
 void MessageWnd::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {
-    const ClientApp* app = ClientApp::GetApp();
-    if (!app) {
-        ErrorLogger() << "MessageWnd::HandleDiplomaticStatusChange couldn't get client app!";
-        return;
-    }
-
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
-
-    int client_empire_id = app->EmpireID();
+    auto& app = GetApp();
+    const auto& context = app.GetContext();
+    const int client_empire_id = app.EmpireID();
     DiplomaticStatus status = context.ContextDiploStatus(empire1_id, empire2_id);
     std::string text;
 
@@ -487,7 +476,7 @@ void MessageWnd::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {
     }
 
     *m_display += text + "\n";
-    m_display_show_time = GG::GUI::GetGUI()->Ticks();
+    m_display_show_time = app.Ticks();
 
     // if client empire is target of diplomatic status change, show message window
     if (empire2_id == client_empire_id) {
@@ -497,40 +486,24 @@ void MessageWnd::HandleDiplomaticStatusChange(int empire1_id, int empire2_id) {
 }
 
 void MessageWnd::Clear()
-{ m_display->Clear(); }
+{ if (m_display) m_display->Clear(); }
 
 void MessageWnd::OpenForInput() {
-    GG::GUI::GetGUI()->SetFocusWnd(m_edit);
-    m_display_show_time = GG::GUI::GetGUI()->Ticks();
+    GetApp().SetFocusWnd(m_edit);
+    m_display_show_time = GetApp().Ticks();
 }
 
 void MessageWnd::SetChatText(std::string chat_text)
-{ m_display->SetText(std::move(chat_text)); }
+{ if (m_display) m_display->SetText(std::move(chat_text)); }
 
 namespace {
-    void SendChatMessage(const std::string& text, std::set<int> recipients, bool pm) {
-        const ClientApp* app = ClientApp::GetApp();
-        if (!app) {
-            ErrorLogger() << "ChatWnd.cpp SendChatMessage couldn't get client app!";
-            return;
-        }
-        ClientNetworking& net = GGHumanClientApp::GetApp()->Networking();
-        net.SendMessage(PlayerChatMessage(text, recipients, pm));
-    }
-
-    int ExtractPlayerID(const std::string& text) {
-        const ClientApp* app = ClientApp::GetApp();
-        if (!app) {
-            ErrorLogger() << "ChatWnd.cpp ExtractPlayerID couldn't get client app!";
-            return Networking::INVALID_PLAYER_ID;
-        }
+    int ExtractPlayerID(const std::string& text, const ClientApp& app) {
         std::string::size_type space_pos = text.find_first_of(' ');
         if (space_pos == std::string::npos)
             return Networking::INVALID_PLAYER_ID;
         const std::string player_name = boost::trim_copy(text.substr(0, space_pos));
-        const auto& players = app->Players();
 
-        for (auto& [player_id, player_info] : players) {
+        for (auto& [player_id, player_info] : app.Players()) {
             if (boost::iequals(player_info.name, player_name))
                 return player_id;
         }
@@ -561,32 +534,33 @@ void MessageWnd::HandleTextCommand(const std::string& text) {
     if (space_pos != std::string::npos)
         params = boost::trim_copy(text.substr(space_pos, std::string::npos));
 
-    ClientUI* client_ui = ClientUI::GetClientUI();
-    if (!client_ui)
-        return;
+    auto& app = GetApp();
+    auto& ui = app.GetUI();
 
     // execute command matching understood syntax
     if (boost::iequals(command, "zoom") && !params.empty()) {
-        client_ui->ZoomToObject(params) || client_ui->ZoomToContent(params, true);   // params came from chat, so will be localized, so should be reverse looked up to find internal name from human-readable name for zooming to content
+        // params came from chat, so will be localized, so should be reverse looked up
+        // to find internal name from human-readable name for zooming to content
+        if (ui.ZoomToObject(params, app.GetContext(), app.EmpireID()))
+            return;
+        ui.ZoomToContent(params, true);
     }
     else if (boost::iequals(command, "pedia")) {
         if (params.empty())
-            client_ui->ZoomToEncyclopediaEntry(UserStringNop("ENC_INDEX"));
+            ui.ZoomToEncyclopediaEntry(UserStringNop("ENC_INDEX"));
         else
-            client_ui->ZoomToContent(params, true);
+            ui.ZoomToContent(params, true);
     }
     else if (boost::iequals(command, "help")) {
         *m_display += UserString("MESSAGES_HELP_COMMAND") + "\n";
-        m_display_show_time = GG::GUI::GetGUI()->Ticks();
+        m_display_show_time = app.Ticks();
     }
     else if (boost::iequals(command, "pm")) {
-        const int player_id = ExtractPlayerID(params);
+        const int player_id = ExtractPlayerID(params, app);
         const std::string message = ExtractMessage(params);
 
         if (player_id != Networking::INVALID_PLAYER_ID) {
-            std::set<int> recipient;
-            recipient.insert(player_id);
-            SendChatMessage(message, recipient, true);
+            app.Networking().SendMessage(PlayerChatMessage(message, std::set<int>{player_id}, true));
         } else {
             *m_display += UserString("MESSAGES_INVALID") + "\n";
         }
@@ -598,15 +572,16 @@ void MessageWnd::MessageEntered() {
     if (trimmed_text.empty())
         return;
 
-    m_display_show_time = GG::GUI::GetGUI()->Ticks();
-    bool pm = false;
+    auto& app = GetApp();
+    m_display_show_time = static_cast<int>(app.Ticks());
+
 
     // update history
     if (m_history.size() == 1 || m_history[1] != trimmed_text) {
-        m_history[0] = trimmed_text;
-        m_history.push_front("");
+        m_history.front() = trimmed_text;
+        m_history.emplace_front();
     } else {
-        m_history[0].clear();
+        m_history.front().clear();
     }
     while (12 < static_cast<int>(m_history.size()) + 1)
         m_history.pop_back();
@@ -615,14 +590,16 @@ void MessageWnd::MessageEntered() {
     // if message starts with / treat it as a command
     if (trimmed_text[0] == '/') {
         HandleTextCommand(trimmed_text);
+
     } else {
         // otherwise, treat message as chat and send to recipients
+        bool pm = false;
         std::set<int> recipients;
-        if (PlayerListWnd* player_list_wnd = ClientUI::GetClientUI()->GetPlayerListWnd().get()) {
+        if (const auto* player_list_wnd = app.GetUI().GetPlayerListWnd().get()) {
             recipients = player_list_wnd->SelectedPlayerIDs();
             pm = !(player_list_wnd->SelectedPlayerIDs().empty());
         }
-        SendChatMessage(trimmed_text, recipients, pm);
+        app.Networking().SendMessage(PlayerChatMessage(trimmed_text, std::move(recipients), pm));
     }
 
     m_edit->Clear();

@@ -129,10 +129,8 @@ void Hotkey::SetFromString(const std::string& str) {
 }
 
 void Hotkey::AddOptions(OptionsDB& db) {
-    for (const auto& entry : hotkeys) {
-        const Hotkey& hotkey = entry.second;
+    for (const auto& hotkey : hotkeys | range_values)
         db.Add(hotkey.m_name + ".hotkey", hotkey.GetDescription(), hotkey.ToString());
-    }
 }
 
 static void ReplaceInString(std::string& str, const std::string& what,
@@ -145,7 +143,7 @@ static void ReplaceInString(std::string& str, const std::string& what,
         return;                 // Nothing to do
     do {
         auto t = str.find(what, lst);
-        if(t == std::string::npos)
+        if (t == std::string::npos)
             return;
         str.replace(t, l1, replacement);
         t += l2;
@@ -290,6 +288,7 @@ void HotkeyManager::RebuildShortcuts() {
 
     // Now, build up again all the shortcuts
     GG::GUI* gui = GG::GUI::GetGUI();
+    if (!gui) return;
     for (auto& entry : m_connections) {
         const Hotkey& hk = Hotkey::NamedHotkey(entry.first);
 
@@ -308,8 +307,11 @@ void HotkeyManager::AddConditionalConnection(const std::string& name,
 bool HotkeyManager::ProcessNamedShortcut(const std::string& name, GG::Key key,
                                          GG::Flags<GG::ModKey> mod)
 {
+    GG::GUI* gui = GG::GUI::GetGUI();
+    if (!gui) return false;
+
     // reject unsafe-for-typing key combinations while typing
-    if (GG::GUI::GetGUI()->FocusWndAcceptsTypingInput() && !::IsTypingSafe(key, mod))
+    if (gui->FocusWndAcceptsTypingInput() && !::IsTypingSafe(key, mod))
         return false;
 
     // First update the connection state according to the current status.

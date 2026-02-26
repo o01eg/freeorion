@@ -8,11 +8,11 @@
 //! SPDX-License-Identifier: LGPL-2.1-or-later
 
 #include <GG/Config.h>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <boost/algorithm/string/case_conv.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/fstream.hpp>
 #include <boost/gil/extension/dynamic_image/any_image.hpp>
 #if GG_HAVE_LIBTIFF
 # include <boost/gil/extension/io/tiff_dynamic_io.hpp>
@@ -22,7 +22,7 @@
 #endif
 #include <GG/GLClientAndServerBuffer.h>
 #include <GG/Texture.h>
-#include <GG/utf8/checked.h>
+#include <GG/utf8/utf8.h>
 
 
 using namespace GG;
@@ -133,10 +133,10 @@ void Texture::InitBuffer(GLTexCoordBuffer& tex_coord_buffer, std::array<GLfloat,
     tex_coord_buffer.store(tex_coords[2], tex_coords[3]);
 }
 
-void Texture::Load(const boost::filesystem::path& path, bool mipmap)
+void Texture::Load(const std::filesystem::path& path, bool mipmap)
 {
     namespace gil = boost::gil;
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     if (m_opengl_id)
         Clear();
@@ -145,7 +145,7 @@ void Texture::Load(const boost::filesystem::path& path, bool mipmap)
     // but do the work only if actually throwing error to log
     constexpr auto loggable_path = [](const fs::path& p) {
 #if defined (_WIN32)
-        boost::filesystem::path::string_type path_native = p.native();
+        std::filesystem::path::string_type path_native = p.native();
         std::string filename;
         utf8::utf16to8(path_native.begin(), path_native.end(), std::back_inserter(filename));
         return filename;
@@ -194,14 +194,14 @@ void Texture::Load(const boost::filesystem::path& path, bool mipmap)
         // using ifstream version instead of file name version of read_image goes around unicode paths translation issues
 #if GG_HAVE_LIBPNG
         if (extension == ".png") {
-            boost::filesystem::ifstream in(path, std::ios::binary);
+            std::ifstream in(path, std::ios::binary);
             gil::read_image(in, image, gil::image_read_settings<gil::png_tag>());
         }
         else
 #endif
 #if GG_HAVE_LIBTIFF
         if (extension == ".tif" || extension == ".tiff") {
-            boost::filesystem::ifstream in(path, std::ios::binary);
+            std::ifstream in(path, std::ios::binary);
             gil::read_image(in, image, gil::image_read_settings<gil::tiff_tag>());
         }
         else
@@ -213,7 +213,7 @@ void Texture::Load(const boost::filesystem::path& path, bool mipmap)
 #if GG_HAVE_LIBPNG
         if (extension == ".png") {
             gil::rgba8_image_t rgba_image;
-            boost::filesystem::ifstream in(path, std::ios::binary);
+            std::ifstream in(path, std::ios::binary);
             gil::read_and_convert_image(in, rgba_image, gil::image_read_settings<gil::png_tag>());
             image = std::move(rgba_image);
         }
@@ -221,7 +221,7 @@ void Texture::Load(const boost::filesystem::path& path, bool mipmap)
 #if GG_HAVE_LIBTIFF
         if (extension == ".tif" || extension == ".tiff") {
             gil::rgba8_image_t rgba_image;
-            boost::filesystem::ifstream in(path, std::ios::binary);
+            std::ifstream in(path, std::ios::binary);
             gil::read_and_convert_image(in, rgba_image, gil::image_read_settings<gil::tiff_tag>());
             image = std::move(rgba_image);
         }
@@ -234,15 +234,15 @@ void Texture::Load(const boost::filesystem::path& path, bool mipmap)
     m_type = GL_UNSIGNED_BYTE;
 
 #if BOOST_VERSION >= 107400
-#define IF_IMAGE_TYPE_IS(image_prefix)                                  \
-    if (boost::variant2::get_if<image_prefix ## _image_t>(&image)) {    \
-        m_bytes_pp = sizeof(image_prefix ## _pixel_t);                  \
-        image_data = interleaved_view_get_raw_data(                     \
-            const_view(boost::variant2::get<image_prefix ## _image_t>(image))); \
+#define IF_IMAGE_TYPE_IS(image_prefix)                                              \
+    if (boost::variant2::get_if<image_prefix ## _image_t>(std::addressof(image))) { \
+        m_bytes_pp = sizeof(image_prefix ## _pixel_t);                              \
+        image_data = interleaved_view_get_raw_data(                                 \
+            const_view(boost::variant2::get<image_prefix ## _image_t>(image)));     \
     }
 #elif BOOST_VERSION >= 107000
 #define IF_IMAGE_TYPE_IS(image_prefix)                                  \
-    if (boost::get<image_prefix ## _image_t>(&image)) {                 \
+    if (boost::get<image_prefix ## _image_t>(std::addressof(image))) {  \
         m_bytes_pp = sizeof(image_prefix ## _pixel_t);                  \
         image_data = interleaved_view_get_raw_data(                     \
             const_view(boost::get<image_prefix ## _image_t>(image)));   \
@@ -446,7 +446,7 @@ SubTexture::SubTexture(const SubTexture& rhs)
 
 SubTexture& SubTexture::operator=(const SubTexture& rhs)
 {
-    if (this != &rhs) {
+    if (this != std::addressof(rhs)) {
         m_texture = rhs.m_texture;
         m_width = rhs.m_width;
         m_height = rhs.m_height;
@@ -460,7 +460,7 @@ SubTexture& SubTexture::operator=(const SubTexture& rhs)
 
 SubTexture& SubTexture::operator=(SubTexture&& rhs) noexcept
 {
-    if (this != &rhs) {
+    if (this != std::addressof(rhs)) {
         m_texture = std::move(rhs.m_texture);
         m_width = rhs.m_width;
         m_height = rhs.m_height;
@@ -492,38 +492,36 @@ void SubTexture::Clear()
 ///////////////////////////////////////
 // class GG::TextureManager
 ///////////////////////////////////////
-TextureManager::TextureManager()
-{}
+void TextureManager::StoreTexture(Texture* texture, std::string texture_name)
+{ StoreTexture(std::shared_ptr<Texture>(texture), std::move(texture_name)); }
 
-std::map<std::string_view, std::shared_ptr<const Texture>> TextureManager::Textures() const
+void TextureManager::StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name)
 {
     std::scoped_lock lock(m_texture_access_guard);
-    return {m_textures.begin(), m_textures.end()};
+    m_textures.insert_or_assign(std::move(texture_name), std::move(texture));
 }
 
-std::shared_ptr<Texture> TextureManager::StoreTexture(Texture* texture, std::string texture_name)
-{ return StoreTexture(std::shared_ptr<Texture>(texture), std::move(texture_name)); }
-
-std::shared_ptr<Texture> TextureManager::StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name)
+std::shared_ptr<Texture> TextureManager::GetTexture(const std::filesystem::path& path, bool mipmap)
 {
     std::scoped_lock lock(m_texture_access_guard);
-    m_textures[std::move(texture_name)] = texture;
-    return texture;
-}
 
-std::shared_ptr<Texture> TextureManager::GetTexture(const boost::filesystem::path& path, bool mipmap)
-{
-    std::scoped_lock lock(m_texture_access_guard);
     auto it = m_textures.find(path.generic_string());
-    if (it == m_textures.end()) { // if no such texture was found, attempt to load it now, using name as the filename
-        //std::cout << "TextureManager::GetTexture storing new texture under name: " << path.generic_string();
-        return LoadTexture(path, mipmap);
-    } else { // otherwise, just return the found texture
+    if (it != m_textures.end())
         return it->second;
-    }
+
+    // if no such texture was found, attempt to load it now, using name as the filename
+    //std::cout << "TextureManager::GetTexture storing new texture under name: " << path.generic_string();
+    return LoadTexture(path, mipmap);
 }
 
-void TextureManager::FreeTexture(const boost::filesystem::path& path)
+std::shared_ptr<Texture> TextureManager::GetTextureByName(const std::string& texture_name) const
+{
+    std::scoped_lock lock(m_texture_access_guard);
+    auto it = m_textures.find(texture_name);
+    return it == m_textures.end() ? nullptr : it->second;
+}
+
+void TextureManager::FreeTexture(const std::filesystem::path& path)
 { FreeTexture(path.generic_string()); }
 
 void TextureManager::FreeTexture(const std::string& name)
@@ -534,13 +532,13 @@ void TextureManager::FreeTexture(const std::string& name)
         m_textures.erase(it);
 }
 
-std::shared_ptr<Texture> TextureManager::LoadTexture(const boost::filesystem::path& path, bool mipmap)
+std::shared_ptr<Texture> TextureManager::LoadTexture(const std::filesystem::path& path, bool mipmap)
 {
     // only called from other TextureManager functions that should already have locked m_texture_access_guard
     auto temp = std::make_shared<Texture>();
     temp->Load(path, mipmap);
-    m_textures[path.generic_string()] = temp;
-    return temp;
+    auto it = m_textures.insert_or_assign(path.generic_string(), std::move(temp)).first;
+    return it->second;
 }
 
 TextureManager& GG::GetTextureManager()

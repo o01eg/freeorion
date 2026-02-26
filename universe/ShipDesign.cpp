@@ -109,7 +109,7 @@ ShipDesign::ShipDesign(const boost::optional<std::invalid_argument>& should_thro
                        int designed_on_turn, int designed_by_empire,
                        std::string hull, std::vector<std::string> parts,
                        std::string icon, std::string model,
-                       bool name_desc_in_stringtable, bool monster,
+                       bool name_desc_in_stringtable, Monster monster,
                        boost::uuids::uuid uuid) :
     m_name(std::move(name)),
     m_description(std::move(description)),
@@ -120,7 +120,7 @@ ShipDesign::ShipDesign(const boost::optional<std::invalid_argument>& should_thro
     m_parts(std::move(parts)),
     m_icon(std::move(icon)),
     m_3D_model(std::move(model)),
-    m_is_monster(monster),
+    m_is_monster(static_cast<bool>(monster)),
     m_name_desc_in_stringtable(name_desc_in_stringtable)
 {
     // Either force a valid design and log about it or just throw std::invalid_argument
@@ -133,8 +133,148 @@ ShipDesign::ShipDesign(const ParsedShipDesign& design) :
                design.m_designed_on_turn, design.m_designed_by_empire,
                design.m_hull, design.m_parts,
                design.m_icon, design.m_3D_model, design.m_name_desc_in_stringtable,
-               design.m_is_monster, design.m_uuid)
+               design.m_is_monster ? Monster::MONSTER : Monster::NOTMONSTER, design.m_uuid)
 {}
+
+namespace {
+    auto GetSubstringsFor(const std::string_view sv, const auto& tags) {
+        std::vector<std::string_view> retval;
+        if (sv.empty() || tags.empty())
+            return retval;
+        retval.reserve(tags.size());
+
+        for (const auto& tag : tags) {
+            if (tag.empty()) continue;
+            auto tag_offset = sv.find(tag);
+            if (tag_offset != std::string::npos)
+                retval.push_back(sv.substr(tag_offset, tag.size()));
+        }
+
+        return retval;
+    }
+}
+
+ShipDesign::ShipDesign(const ShipDesign& rhs) :
+    m_id(rhs.m_id),
+    m_name(rhs.m_name),
+    m_description(rhs.m_description),
+    m_uuid(rhs.m_uuid),
+    m_designed_on_turn(rhs.m_designed_on_turn),
+    m_designed_by_empire(rhs.m_designed_by_empire),
+    m_hull(rhs.m_hull),
+    m_parts(rhs.m_parts),
+    m_icon(rhs.m_icon),
+    m_3D_model(rhs.m_3D_model),
+
+    m_tags_concatenated(rhs.m_tags_concatenated),
+    m_tags(GetSubstringsFor(m_tags_concatenated, rhs.m_tags)),
+
+    m_detection(rhs.m_detection),
+    m_colony_capacity(rhs.m_colony_capacity),
+    m_troop_capacity(rhs.m_troop_capacity),
+    m_stealth(rhs.m_stealth),
+    m_fuel(rhs.m_fuel),
+    m_shields(rhs.m_shields),
+    m_structure(rhs.m_structure),
+    m_speed(rhs.m_speed),
+    m_research_generation(rhs.m_research_generation),
+    m_industry_generation(rhs.m_industry_generation),
+    m_influence_generation(rhs.m_influence_generation),
+    m_num_ship_parts(rhs.m_num_ship_parts),
+    m_num_part_classes(rhs.m_num_part_classes),
+    m_is_production_location(rhs.m_is_production_location),
+    m_producible(rhs.m_producible),
+    m_has_direct_weapons(rhs.m_has_direct_weapons),
+    m_has_fighters(rhs.m_has_fighters),
+    m_is_armed(rhs.m_is_armed),
+    m_can_bombard(rhs.m_can_bombard),
+
+    m_is_monster(rhs.m_is_monster),
+    m_name_desc_in_stringtable(rhs.m_name_desc_in_stringtable)
+{}
+
+ShipDesign::ShipDesign(ShipDesign&& rhs) :
+    m_id(rhs.m_id),
+    m_name(std::move(rhs.m_name)),
+    m_description(std::move(rhs.m_description)),
+    m_uuid(std::move(rhs.m_uuid)),
+    m_designed_on_turn(rhs.m_designed_on_turn),
+    m_designed_by_empire(rhs.m_designed_by_empire),
+    m_hull(std::move(rhs.m_hull)),
+    m_parts(std::move(rhs.m_parts)),
+    m_icon(std::move(rhs.m_icon)),
+    m_3D_model(std::move(rhs.m_3D_model)),
+
+    m_tags_concatenated(rhs.m_tags_concatenated), // copy, not move, so rhs.m_tags is usable below
+    m_tags(GetSubstringsFor(m_tags_concatenated, rhs.m_tags)),
+
+    m_detection(rhs.m_detection),
+    m_colony_capacity(rhs.m_colony_capacity),
+    m_troop_capacity(rhs.m_troop_capacity),
+    m_stealth(rhs.m_stealth),
+    m_fuel(rhs.m_fuel),
+    m_shields(rhs.m_shields),
+    m_structure(rhs.m_structure),
+    m_speed(rhs.m_speed),
+    m_research_generation(rhs.m_research_generation),
+    m_industry_generation(rhs.m_industry_generation),
+    m_influence_generation(rhs.m_influence_generation),
+    m_num_ship_parts(std::move(rhs.m_num_ship_parts)),
+    m_num_part_classes(std::move(rhs.m_num_part_classes)),
+    m_is_production_location(rhs.m_is_production_location),
+    m_producible(rhs.m_producible),
+    m_has_direct_weapons(rhs.m_has_direct_weapons),
+    m_has_fighters(rhs.m_has_fighters),
+    m_is_armed(rhs.m_is_armed),
+    m_can_bombard(rhs.m_can_bombard),
+
+    m_is_monster(rhs.m_is_monster),
+    m_name_desc_in_stringtable(rhs.m_name_desc_in_stringtable)
+{}
+
+ShipDesign& ShipDesign::operator=(ShipDesign&& rhs) {
+    if (this == std::addressof(rhs))
+        return *this;
+
+    m_id = rhs.m_id;
+    m_name = rhs.m_name;
+    m_description = rhs.m_description;
+    m_uuid = rhs.m_uuid;
+    m_designed_on_turn = m_designed_on_turn;
+    m_designed_by_empire = m_designed_by_empire;
+    m_hull = rhs.m_hull;
+    m_parts = rhs.m_parts;
+    m_icon = rhs.m_icon;
+    m_3D_model = rhs.m_3D_model;
+
+    m_tags_concatenated = rhs.m_tags_concatenated;
+    m_tags = GetSubstringsFor(m_tags_concatenated, rhs.m_tags);
+
+    m_detection = rhs.m_detection;
+    m_colony_capacity = rhs.m_colony_capacity;
+    m_troop_capacity = rhs.m_troop_capacity;
+    m_stealth = rhs.m_stealth;
+    m_fuel = rhs.m_fuel;
+    m_shields = rhs.m_shields;
+    m_structure = rhs.m_structure;
+    m_speed = rhs.m_speed;
+    m_research_generation = rhs.m_research_generation;
+    m_industry_generation = rhs.m_industry_generation;
+    m_influence_generation = rhs.m_influence_generation;
+    m_num_ship_parts = rhs.m_num_ship_parts;
+    m_num_part_classes = rhs.m_num_part_classes;
+    m_is_production_location = rhs.m_is_production_location;
+    m_producible = rhs.m_producible;
+    m_has_direct_weapons = rhs.m_has_direct_weapons;
+    m_has_fighters = rhs.m_has_fighters;
+    m_is_armed = rhs.m_is_armed;
+    m_can_bombard = rhs.m_can_bombard;
+
+    m_is_monster = rhs.m_is_monster;
+    m_name_desc_in_stringtable = rhs.m_name_desc_in_stringtable;
+
+    return *this;
+}
 
 const std::string& ShipDesign::Name(bool stringtable_lookup) const {
     if (m_name_desc_in_stringtable && stringtable_lookup)
@@ -503,9 +643,7 @@ ShipDesign::MaybeInvalidDesign(std::string hull, std::vector<std::string> parts,
         if (!ship_part)
             continue; // shouldn't happen...
         const auto& part_exclusions = ship_part->Exclusions();
-        if (std::any_of(part_exclusions.begin(), part_exclusions.end(),
-                        [&hull](const auto& x) { return hull == x; }))
-        {
+        if (range_contains(part_exclusions, hull)) {
             is_valid = false;
             if (produce_log)
                 WarnLogger() << "Invalid ShipDesign part \"" << part_name << "\" excludes hull \""
@@ -532,7 +670,7 @@ ShipDesign::MaybeInvalidDesign(std::string hull, std::vector<std::string> parts,
                 }
             } else {
                 // part excludes another part if both are present
-                if (std::any_of(parts.begin(), parts.end(), [&x](const auto& p) { return x == p; })) {
+                if (range_contains(parts, x)) {
                     is_valid = false;
                     if (produce_log)
                         WarnLogger() << "Invalid ShipDesign part \"" << part_name << "\" excludes other part \""
@@ -587,7 +725,7 @@ void ShipDesign::BuildStatCaches() {
         return;
     }
 
-    std::vector<std::string_view> tags(hull->Tags().begin(), hull->Tags().end());
+    std::vector<std::string_view> tags{hull->Tags()}; // copy
 
     m_producible =      hull->Producible();
     m_detection =       hull->Detection();
@@ -619,7 +757,7 @@ void ShipDesign::BuildStatCaches() {
         if (!part->Producible())
             m_producible = false;
 
-        ShipPartClass part_class = part->Class();
+        const ShipPartClass part_class = part->Class();
 
         switch (part_class) {
         case ShipPartClass::PC_DIRECT_WEAPON:
@@ -691,19 +829,22 @@ void ShipDesign::BuildStatCaches() {
     // collect unique tags
     std::stable_sort(tags.begin(), tags.end());
     auto last = std::unique(tags.begin(), tags.end());
+    tags.erase(last, tags.end());
 
     // compile concatenated tags into contiguous storage
-    std::size_t tags_sz = std::transform_reduce(tags.begin(), tags.end(), 0u, std::plus{},
-                                                [](const auto& tag) { return tag.size(); });
+    std::size_t tags_sz = std::transform_reduce(tags.begin(), tags.end(), std::size_t{0}, std::plus{},
+                                                [](const auto& tag) noexcept { return tag.size(); });
+
+    m_tags_concatenated.clear();
     m_tags_concatenated.reserve(tags_sz);
     m_tags.clear();
     m_tags.reserve(tags.size());
 
-    std::for_each(tags.begin(), last, [this](auto str) {
+    for (const auto& tag : tags) {
         auto next_start = m_tags_concatenated.size();
-        m_tags_concatenated.append(str);
+        m_tags_concatenated.append(tag);
         m_tags.push_back(std::string_view{m_tags_concatenated}.substr(next_start));
-    });
+    }
 }
 
 std::string ShipDesign::Dump(uint8_t ntabs) const {
@@ -757,7 +898,7 @@ uint32_t ShipDesign::GetCheckSum() const {
 /////////////////////////////////////
 namespace {
     void AddDesignToUniverse(Universe& universe, std::unordered_map<std::string, int>& design_generic_ids,
-                             const std::unique_ptr<ShipDesign>& design, bool monster)
+                             const std::unique_ptr<ShipDesign>& design, bool)
     {
         if (!design)
             return;
@@ -833,8 +974,11 @@ uint32_t PredefinedShipDesignManager::GetCheckSum() const {
     auto build_checksum = [&retval, this](const std::vector<boost::uuids::uuid>& ordering){
         for (auto const& uuid : ordering) {
             auto it = m_designs.find(uuid);
-            if (it != m_designs.end())
-                CheckSums::CheckSumCombine(retval, std::pair(it->second->Name(false), *it->second));
+            if (it != m_designs.end() && it->second) {
+                CheckSums::CheckSumCombine(retval, it->second->Name(false));
+                CheckSums::CheckSumCombine(retval, *it->second);
+                CheckSums::CheckSumCombine(retval, 2u);
+            }
         }
         CheckSums::CheckSumCombine(retval, ordering.size());
     };
@@ -942,7 +1086,7 @@ PredefinedShipDesignManager& GetPredefinedShipDesignManager()
 std::tuple<
     bool,
     std::unordered_map<boost::uuids::uuid,
-                       std::pair<std::unique_ptr<ShipDesign>, boost::filesystem::path>,
+                       std::pair<std::unique_ptr<ShipDesign>, std::filesystem::path>,
                        boost::hash<boost::uuids::uuid>>,
     std::vector<boost::uuids::uuid>>
 LoadShipDesignsAndManifestOrderFromParseResults(
@@ -950,7 +1094,7 @@ LoadShipDesignsAndManifestOrderFromParseResults(
 {
     std::unordered_map<boost::uuids::uuid,
                        std::pair<std::unique_ptr<ShipDesign>,
-                                 boost::filesystem::path>,
+                                 std::filesystem::path>,
                        boost::hash<boost::uuids::uuid>> saved_designs;
 
     auto& designs_and_paths = designs_paths_and_ordering.first;
@@ -1007,10 +1151,7 @@ LoadShipDesignsAndManifestOrderFromParseResults(
         std::vector<std::pair<std::string_view, boost::uuids::uuid>> names_and_missing_uuids;
         names_and_missing_uuids.reserve(saved_designs.size());
 
-        const auto in_ordering = [&ordering](const auto& uuid) {
-            return std::any_of(ordering.begin(), ordering.end(),
-                               [uuid](const auto uuid_in_order) noexcept { return uuid == uuid_in_order; });
-        };
+        const auto in_ordering = [&ordering](const auto& uuid) { return range_contains(ordering, uuid); };
 
         for (auto& [uuid, design_and_filename] : saved_designs) {
             if (!in_ordering(uuid)) // using range_filter above may cause an internal compiler error in MSVC

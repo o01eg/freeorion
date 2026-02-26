@@ -56,7 +56,10 @@ namespace {
             }
         }
 
-        EmpireAffiliationType affiliation = EmpireAffiliationType::AFFIL_SELF;
+        EmpireAffiliationType affiliation = EmpireAffiliationType::AFFIL_ANY;
+        if (kw.has_key("empire")) {
+            affiliation = EmpireAffiliationType::AFFIL_SELF;
+        }
         if (kw.has_key("affiliation")) {
             affiliation = py::extract<enum_wrapper<EmpireAffiliationType>>(kw["affiliation"])().value;
         }
@@ -258,6 +261,15 @@ namespace {
         return effect_wrapper(std::make_shared<Effect::SetOwner>(std::move(empire)));
     }
 
+    effect_wrapper insert_set_empire_capital(const boost::python::tuple& args, const boost::python::dict& kw) {
+        if (kw.has_key("empire")) {
+            auto empire = pyobject_to_vref<int>(kw["empire"]);
+            return effect_wrapper(std::make_shared<Effect::SetEmpireCapital>(std::move(empire)));
+        }
+
+        return effect_wrapper(std::make_shared<Effect::SetEmpireCapital>());
+    }
+
     effect_wrapper insert_set_star_type_(const boost::python::tuple& args, const boost::python::dict& kw) {
         std::unique_ptr<ValueRef::ValueRef< ::StarType>> star_type;
         auto star_type_arg = py::extract<value_ref_wrapper< ::StarType>>(kw["type"]);
@@ -287,6 +299,26 @@ namespace {
             auto target = py::extract<condition_wrapper>(kw["target"])();
             return effect_wrapper(std::make_shared<Effect::MoveTowards>(std::move(speed),
                 ValueRef::CloneUnique(target.condition)));
+        } else if (kw.has_key("x") && kw.has_key("y")) {
+            std::unique_ptr<ValueRef::ValueRef<double>> x;
+            auto x_args = boost::python::extract<value_ref_wrapper<double>>(kw["x"]);
+            if (x_args.check()) {
+                x = ValueRef::CloneUnique(x_args().value_ref);
+            } else {
+                x = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["x"])());
+            }
+
+            std::unique_ptr<ValueRef::ValueRef<double>> y;
+            auto y_args = boost::python::extract<value_ref_wrapper<double>>(kw["y"]);
+            if (y_args.check()) {
+                y = ValueRef::CloneUnique(y_args().value_ref);
+            } else {
+                y = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["y"])());
+            }
+
+            return effect_wrapper(std::make_shared<Effect::MoveTowards>(std::move(speed),
+                std::move(x),
+                std::move(y)));
         }
 
         throw std::runtime_error(std::string("Not implemented in ") + __func__);
@@ -344,6 +376,18 @@ namespace {
             affiliation,
             std::move(empire),
             std::move(condition)));
+    }
+
+    effect_wrapper insert_add_starlanes_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        auto endpoint = ValueRef::CloneUnique(py::extract<condition_wrapper>(kw["endpoint"])().condition);
+
+        return effect_wrapper(std::make_shared<Effect::AddStarlanes>(std::move(endpoint)));
+    }
+
+    effect_wrapper insert_remove_starlanes_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        auto endpoint = ValueRef::CloneUnique(py::extract<condition_wrapper>(kw["endpoint"])().condition);
+
+        return effect_wrapper(std::make_shared<Effect::RemoveStarlanes>(std::move(endpoint)));
     }
 
     effect_wrapper insert_give_empire_item_(UnlockableItemType item, const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -669,7 +713,7 @@ void RegisterGlobalsEffects(py::dict& globals) {
     globals["Item"] = py::raw_function(insert_item_);
 
     globals["Destroy"] = effect_wrapper(std::make_shared<Effect::Destroy>());
-    globals["NoEffect"] = effect_wrapper(std::make_shared<Effect::NoOp>());
+    globals["NoOpEffect"] = effect_wrapper(std::make_shared<Effect::NoOp>());
 
     globals["GenerateSitRepMessage"] = py::raw_function(insert_generate_sit_rep_message_);
     globals["Conditional"] = py::raw_function(insert_conditional_);
@@ -742,6 +786,7 @@ void RegisterGlobalsEffects(py::dict& globals) {
     }
 
     globals["SetEmpireStockpile"] = py::raw_function(insert_set_empire_stockpile);
+    globals["SetEmpireCapital"] = py::raw_function(insert_set_empire_capital);
     globals["SetOwner"] = py::raw_function(insert_set_owner_);
     globals["SetStarType"] = py::raw_function(insert_set_star_type_);
     globals["MoveTo"] = py::raw_function(insert_move_to_);
@@ -749,6 +794,8 @@ void RegisterGlobalsEffects(py::dict& globals) {
     globals["SetPlanetSize"] = py::raw_function(insert_set_planet_size_);
     globals["SetPlanetType"] = py::raw_function(insert_set_planet_type_);
     globals["SetVisibility"] = py::raw_function(insert_set_visibility_);
+    globals["AddStarlanes"] = py::raw_function(insert_add_starlanes_);
+    globals["RemoveStarlanes"] = py::raw_function(insert_remove_starlanes_);
 
     // give_empire_unlockable_item_enum_grammar
     for (const auto& uit : std::initializer_list<std::pair<const char*, UnlockableItemType>>{

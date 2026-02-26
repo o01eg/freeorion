@@ -172,19 +172,34 @@ namespace {
         );
     }
 
-    std::unique_ptr<ValueRef::Variable<std::string>> DistanceToSelected(UniverseObjectType uot) {
-        const char* prop = nullptr;
+    std::string SelectedForObjectType(UniverseObjectType uot) {
         if (uot == UniverseObjectType::OBJ_SYSTEM)
-            prop = "SelectedSystemID";
+            return "SelectedSystemID";
         else if (uot == UniverseObjectType::OBJ_FLEET)
-            prop = "SelectedFleetID";
+            return "SelectedFleetID";
         else
-            throw std::invalid_argument("DistanceToSelected pass unsupported UniverseObjectType");
+            throw std::invalid_argument("SelectedForObjectType passed unsupported UniverseObjectType");
+    }
 
+    std::unique_ptr<ValueRef::Variable<std::string>> DistanceToSelected(UniverseObjectType uot) {
         return StringCastedComplexValueRef<double>(
             "DirectDistanceBetween",
             std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "ID"),
-            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, prop));
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, SelectedForObjectType(uot)));
+    }
+
+    std::unique_ptr<ValueRef::Variable<std::string>> ShortestPathDistanceToSelected(UniverseObjectType uot) {
+        return StringCastedComplexValueRef<double>(
+            "ShortestPathDistance",
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "ID"),
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, SelectedForObjectType(uot)));
+    }
+
+    std::unique_ptr<ValueRef::Variable<std::string>> JumpsToSelected(UniverseObjectType uot) {
+        return StringCastedComplexValueRef<int>(
+            "JumpsBetween",
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::SOURCE_REFERENCE, "ID"),
+            std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, SelectedForObjectType(uot)));
     }
 
     std::unique_ptr<ValueRef::Variable<std::string>> SystemSupplyRangeValueRef(bool propagated = false) {
@@ -290,32 +305,39 @@ namespace {
                               GetSpeciesManager().NumSpecies() + 65); // roughly enough as of this writing
 
             // General
-            col_types[{UserStringNop("NAME"),                        ""}] = StringValueRef("Name");
-            col_types[{UserStringNop("OBJECT_TYPE"),                 ""}] = UserStringValueRef("TypeName");
-            col_types[{UserStringNop("ID"),                          ""}] = StringCastedValueRef<int>("ID");
-            col_types[{UserStringNop("VISIBILITY"),                  ""}] = VisibilityToThisClientEmpire();
-            col_types[{UserStringNop("LAST_VISIBILITY_TURN"),        ""}] = LastTurnVisibileToThisClientEmpire();
-            col_types[{UserStringNop("CREATION_TURN"),               ""}] = StringCastedValueRef<int>("CreationTurn");
-            col_types[{UserStringNop("AGE"),                         ""}] = StringCastedValueRef<int>("Age");
-            col_types[{UserStringNop("SYSTEM"),                      ""}] = ObjectNameValueRef("SystemID");
-            col_types[{UserStringNop("STAR_TYPE"),                   ""}] = UserStringCastedValueRef<StarType>("StarType");
-            col_types[{UserStringNop("BUILDING_TYPE"),               ""}] = UserStringValueRef("BuildingType");
-            col_types[{UserStringNop("LAST_TURN_BATTLE_HERE"),       ""}] = StringCastedValueRef<int>("LastTurnBattleHere");
-            col_types[{UserStringNop("NUM_SPECIALS"),                ""}] = StringCastedValueRef<int>("NumSpecials");
-            col_types[{UserStringNop("SPECIALS"),                    ""}] = UserStringVecValueRef("Specials");
-            col_types[{UserStringNop("TAGS"),                        ""}] = UserStringVecValueRef("Tags");
-            col_types[{UserStringNop("X"),                           ""}] = StringCastedValueRef<double>("X");
-            col_types[{UserStringNop("Y"),                           ""}] = StringCastedValueRef<double>("Y");
-            col_types[{UserStringNop("DISTANCE_TO_SELECTED_SYSTEM"), ""}] = DistanceToSelected(UniverseObjectType::OBJ_SYSTEM);
-            col_types[{UserStringNop("DISTANCE_TO_SELECTED_FLEET"),  ""}] = DistanceToSelected(UniverseObjectType::OBJ_FLEET);
+            col_types[{UserStringNop("NAME"),                       ""}] = StringValueRef("Name");
+            col_types[{UserStringNop("OBJECT_TYPE"),                ""}] = UserStringValueRef("TypeName");
+            col_types[{UserStringNop("ID"),                         ""}] = StringCastedValueRef<int>("ID");
+            col_types[{UserStringNop("VISIBILITY"),                 ""}] = VisibilityToThisClientEmpire();
+            col_types[{UserStringNop("LAST_VISIBILITY_TURN"),       ""}] = LastTurnVisibileToThisClientEmpire();
+            col_types[{UserStringNop("CREATION_TURN"),              ""}] = StringCastedValueRef<int>("CreationTurn");
+            col_types[{UserStringNop("AGE"),                        ""}] = StringCastedValueRef<int>("Age");
+            col_types[{UserStringNop("BUILDING_TYPE"),              ""}] = UserStringValueRef("BuildingType");
+            col_types[{UserStringNop("LAST_TURN_BATTLE_HERE"),      ""}] = StringCastedValueRef<int>("LastTurnBattleHere");
+            col_types[{UserStringNop("NUM_SPECIALS"),               ""}] = StringCastedValueRef<int>("NumSpecials");
+            col_types[{UserStringNop("SPECIALS"),                   ""}] = UserStringVecValueRef("Specials");
+            col_types[{UserStringNop("TAGS"),                       ""}] = UserStringVecValueRef("Tags");
 
             // empire
-            col_types[{UserStringNop("SUPPLYING_EMPIRE"),       ""}] =  EmpireNameValueRef("SupplyingEmpire");
-            col_types[{UserStringNop("SYSTEM_SUPPLY_RANGE"),    ""}] =  SystemSupplyRangeValueRef(false);
-            col_types[{UserStringNop("PROPAGATED_SUPPLY_RANGE"),""}] =  SystemSupplyRangeValueRef(true);
-            col_types[{UserStringNop("PROPAGATED_SUPPLY_DISTANCE"),""}]=SystemSupplyDistanceValueRef();
-            col_types[{UserStringNop("OWNER"),                  ""}] =  EmpireNameValueRef("Owner");
-            col_types[{UserStringNop("PRODUCED_BY"),            ""}] =  EmpireNameValueRef("ProducedByEmpireID");
+            col_types[{UserStringNop("SUPPLYING_EMPIRE"),           UserStringNop("EMPIRE_SUPPLY_SUBMENU")}] = EmpireNameValueRef("SupplyingEmpire");
+            col_types[{UserStringNop("SYSTEM_SUPPLY_RANGE"),        UserStringNop("EMPIRE_SUPPLY_SUBMENU")}] = SystemSupplyRangeValueRef(false);
+            col_types[{UserStringNop("PROPAGATED_SUPPLY_RANGE"),    UserStringNop("EMPIRE_SUPPLY_SUBMENU")}] = SystemSupplyRangeValueRef(true);
+            col_types[{UserStringNop("PROPAGATED_SUPPLY_DISTANCE"), UserStringNop("EMPIRE_SUPPLY_SUBMENU")}] = SystemSupplyDistanceValueRef();
+            col_types[{UserStringNop("OWNER"),                      UserStringNop("EMPIRE_SUPPLY_SUBMENU")}] = EmpireNameValueRef("Owner");
+            col_types[{UserStringNop("PRODUCED_BY"),                UserStringNop("EMPIRE_SUPPLY_SUBMENU")}] = EmpireNameValueRef("ProducedByEmpireID");
+
+            // position / system
+            col_types[{UserStringNop("X"),                                        UserStringNop("POSITION_SUBMENU")}] = StringCastedValueRef<double>("X");
+            col_types[{UserStringNop("Y"),                                        UserStringNop("POSITION_SUBMENU")}] = StringCastedValueRef<double>("Y");
+            col_types[{UserStringNop("DISTANCE_TO_SELECTED_SYSTEM"),              UserStringNop("POSITION_SUBMENU")}] = DistanceToSelected(UniverseObjectType::OBJ_SYSTEM);
+            col_types[{UserStringNop("DISTANCE_TO_SELECTED_FLEET"),               UserStringNop("POSITION_SUBMENU")}] = DistanceToSelected(UniverseObjectType::OBJ_FLEET);
+            col_types[{UserStringNop("SHORTEST_PATH_DISTANCE_TO_SELECTED_SYSTEM"),UserStringNop("POSITION_SUBMENU")}] = ShortestPathDistanceToSelected(UniverseObjectType::OBJ_SYSTEM);
+            col_types[{UserStringNop("SHORTEST_PATH_DISTANCE_TO_SELECTED_FLEET"), UserStringNop("POSITION_SUBMENU")}] = ShortestPathDistanceToSelected(UniverseObjectType::OBJ_FLEET);
+            col_types[{UserStringNop("JUMPS_TO_SELECTED_SYSTEM"),                 UserStringNop("POSITION_SUBMENU")}] = JumpsToSelected(UniverseObjectType::OBJ_SYSTEM);
+            col_types[{UserStringNop("JUMPS_TO_SELECTED_FLEET"),                  UserStringNop("POSITION_SUBMENU")}] = JumpsToSelected(UniverseObjectType::OBJ_FLEET);
+            col_types[{UserStringNop("SYSTEM"),                                   UserStringNop("POSITION_SUBMENU")}] = ObjectNameValueRef("SystemID");
+            col_types[{UserStringNop("STAR_TYPE"),                                UserStringNop("POSITION_SUBMENU")}] = UserStringCastedValueRef<StarType>("StarType");
+            col_types[{UserStringNop("NEAREST_SYSTEM"),                           UserStringNop("POSITION_SUBMENU")}] = ObjectNameValueRef("NearestSystemID");
 
             // planet
             col_types[{UserStringNop("SPECIES"),                    UserStringNop("PLANETS_SUBMENU")}]= ObjectTypeFilteredRef<std::string>({UniverseObjectType::OBJ_PLANET, UniverseObjectType::OBJ_SHIP}, UserStringValueRef("Species"));
@@ -352,21 +374,20 @@ namespace {
             col_types[{UserStringNop("NEXT_SYSTEM"),                UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("NextSystemID");
             col_types[{UserStringNop("PREV_SYSTEM"),                UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("PreviousSystemID");
             col_types[{UserStringNop("ARRIVAL_STARLANE"),           UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("ArrivalStarlaneID");
-            col_types[{UserStringNop("NEAREST_SYSTEM"),             UserStringNop("FLEETS_SUBMENU")}] = ObjectNameValueRef("NearestSystemID");
             col_types[{UserStringNop("HULL"),                       UserStringNop("FLEETS_SUBMENU")}] = UserStringValueRef("Hull");
             col_types[{UserStringNop("PARTS"),                      UserStringNop("FLEETS_SUBMENU")}] = UserStringVecValueRef("Parts");
-            col_types[{UserStringNop("DAMAGE_STRUCTURE_PER_BATTLE"), UserStringNop("FLEETS_SUBMENU")}] = StringCastedValueRef<double>("DamageStructurePerBattleMax");
-            col_types[{UserStringNop("DESTROY_FIGHTERS_PER_BATTLE"), UserStringNop("FLEETS_SUBMENU")}] = StringCastedValueRef<double>("DestroyFightersPerBattleMax");
+            col_types[{UserStringNop("DAMAGE_STRUCTURE_PER_BATTLE"),UserStringNop("FLEETS_SUBMENU")}] = StringCastedValueRef<double>("DamageStructurePerBattleMax");
+            col_types[{UserStringNop("DESTROY_FIGHTERS_PER_BATTLE"),UserStringNop("FLEETS_SUBMENU")}] = StringCastedValueRef<double>("DestroyFightersPerBattleMax");
             col_types[{UserStringNop("PRODUCTION_COST"),            UserStringNop("FLEETS_SUBMENU")}] = DesignCostValueRef();
 
             // planet environments species
-            for (const auto& entry : GetSpeciesManager())
-                col_types[{entry.first,                             UserStringNop("PLANET_ENVIRONMENTS_SUBMENU")}] = PlanetEnvForSpecies(entry.first);
+            for (const auto& name : GetSpeciesManager().AllSpecies() | range_keys)
+                col_types[{name,                                    UserStringNop("PLANET_ENVIRONMENTS_SUBMENU")}] = PlanetEnvForSpecies(name);
 
             // all meters
             for (MeterType meter = MeterType(0); meter <= MeterType::METER_SPEED;  // the meter(s) after MeterType::METER_SPEED are part-specific
                  meter = MeterType(int(meter) + 1))
-            { col_types[{to_string(meter),                        UserStringNop("METERS_SUBMENU")}] = StringCastedImmediateValueRef(std::string{ValueRef::MeterToName(meter)}); }
+            { col_types[{to_string(meter),                        UserStringNop("METERS_SUBMENU")}] = StringCastedImmediateValueRef(std::string{MeterToName(meter)}); }
 
             DebugLogger() << "col_types.size(): " << col_types.size();
             return col_types;
@@ -504,7 +525,7 @@ namespace {
             return PRODUCEDBYEMPIRE_CONDITION;
         else if (dynamic_cast<const Condition::ExploredByEmpire* const>(condition))
             return EXPLOREDBYEMPIRE_CONDITION;
-        else if (dynamic_cast<const Condition::ContainedBy* const>(condition))
+        else if (dynamic_cast<const Condition::ContainedBy<>* const>(condition))
             return CONTAINEDBY_CONDITION;
         else if (dynamic_cast<const Condition::InOrIsSystem* const>(condition))
             return INSYSTEM_CONDITION;
@@ -762,7 +783,7 @@ public:
             std::vector<std::unique_ptr<Condition::Condition>> operands2;
             operands2.emplace_back(std::make_unique<Condition::Type>(std::make_unique<ValueRef::Constant<UniverseObjectType>>(UniverseObjectType::OBJ_SYSTEM)));
             operands2.emplace_back(std::make_unique<Condition::Contains<Condition::PlanetType<::PlanetType, 1>>>(PlanetType::PT_ASTEROIDS));
-            operands1.emplace_back(std::make_unique<Condition::ContainedBy>(std::make_unique<Condition::And>(std::move(operands2))));
+            operands1.emplace_back(std::make_unique<Condition::ContainedBy<Condition::And>>(std::move(operands2)));
             std::unique_ptr<Condition::Condition> this_cond = std::make_unique<Condition::And>(std::move(operands1));
             object_list_cond_description_map[this_cond->Description()] = ASTWITHPTYPE_CONDITION;
             return this_cond;
@@ -777,7 +798,7 @@ public:
             std::vector<std::unique_ptr<Condition::Condition>> operands2;
             operands2.emplace_back(std::make_unique<Condition::Type>(std::make_unique<ValueRef::Constant<UniverseObjectType>>(UniverseObjectType::OBJ_SYSTEM)));
             operands2.emplace_back(std::make_unique<Condition::Contains<Condition::PlanetType<::PlanetType, 1>>>(PlanetType::PT_GASGIANT));
-            operands1.emplace_back(std::make_unique<Condition::ContainedBy>(std::make_unique<Condition::And>(std::move(operands2))));
+            operands1.emplace_back(std::make_unique<Condition::ContainedBy<Condition::And>>(std::move(operands2)));
             std::unique_ptr<Condition::Condition> this_cond = std::make_unique<Condition::And>(std::move(operands1));
             object_list_cond_description_map[this_cond->Description()] = GGWITHPTYPE_CONDITION;
             return this_cond;
@@ -896,7 +917,7 @@ private:
         GG::X param_widget_left = DropListWidth() + PAD;
         GG::Y param_widget_top = GG::Y0;
 
-        const ScriptingContext& context = GGHumanClientApp::GetApp()->GetContext();
+        const ScriptingContext& context = GetApp().GetContext();
         const ObjectMap& objects = context.ContextObjects();
 
 
@@ -928,10 +949,8 @@ private:
             auto row_it = m_string_drop->Insert(GG::Wnd::Create<StringRow>("", GG::Y(ClientUI::Pts())));
             m_string_drop->Select(row_it);
 
-            for (const auto& entry : GetSpeciesManager()) { // TODO: range_values
-                const std::string& species_name = entry.first;
-                m_string_drop->Insert(GG::Wnd::Create<StringRow>(species_name, GG::Y(ClientUI::Pts())));
-            }
+            for (const auto& sp_name : GetSpeciesManager().AllSpecies() | range_keys)
+                m_string_drop->Insert(GG::Wnd::Create<StringRow>(sp_name, GG::Y(ClientUI::Pts())));
 
         } else if (condition_key == HASSPECIAL_CONDITION) {
             // droplist of valid specials
@@ -1113,11 +1132,9 @@ private:
             param_widget_top += m_string_drop->Height();
 
             // add rows for empire names
-            for (const auto& entry : context.Empires()) { // TODO: range_values
-                const std::string& empire_name = entry.second->Name();
-                m_string_drop->Insert(GG::Wnd::Create<StringRow>(
-                    empire_name, GG::Y(ClientUI::Pts()), false));
-            }
+            static constexpr auto to_name = [](const auto& e) -> const auto& { return e->Name(); };
+            for (const auto& empire_name : context.Empires() | range_values | range_transform(to_name))
+                m_string_drop->Insert(GG::Wnd::Create<StringRow>(empire_name, GG::Y(ClientUI::Pts()), false));
             if (!m_string_drop->Empty())
                 m_string_drop->Select(0);
         }
@@ -1350,12 +1367,11 @@ void FilterDialog::UpdateVisFilterFromVisibilityButton(VIS_DISPLAY vis) {
     // toggle types for this visibility
 
     // determine if all types are already on for requested visibility
-    bool all_on = std::all_of(m_filter_buttons.begin(), m_filter_buttons.end(),
-                              [this, vis](const auto& uot_vis_buttons) {
-                                  const UniverseObjectType uot = uot_vis_buttons.first;
-                                  const auto it = m_vis_filters.find(uot);
-                                  return it != m_vis_filters.end() && it->second.contains(vis);
-                              });
+    bool all_on = range_all_of(m_filter_buttons, [this, vis](const auto& uot_vis_buttons) {
+        const UniverseObjectType uot = uot_vis_buttons.first;
+        const auto it = m_vis_filters.find(uot);
+        return it != m_vis_filters.end() && it->second.contains(vis);
+    });
 
     // if all on, turn all off. otherwise, turn all on
     for (const auto uot : m_filter_buttons | range_keys) {
@@ -1371,18 +1387,21 @@ void FilterDialog::UpdateVisFilterFromVisibilityButton(VIS_DISPLAY vis) {
 
 
 namespace {
-    auto ObjectTextures(std::shared_ptr<const UniverseObject> obj) {
+    auto ObjectTextures(const auto& obj) {
         std::vector<std::shared_ptr<GG::Texture>> retval;
         retval.reserve(4);
+
+        auto& app = GetApp();
+        auto& ui = GetApp().GetUI();
 
         if (obj->ObjectType() == UniverseObjectType::OBJ_SHIP) {
             auto* ship = static_cast<const Ship*>(obj.get());
             if (ship) {
-                if (const ShipDesign* design = GetUniverse().GetShipDesign(ship->DesignID()))
-                    retval.push_back(ClientUI::ShipDesignIcon(design->ID()));
+                if (const ShipDesign* design = app.GetContext().ContextUniverse().GetShipDesign(ship->DesignID()))
+                    retval.push_back(ui.ShipDesignIcon(design->ID()));
             }
             if (retval.empty())
-                retval.push_back(ClientUI::ShipDesignIcon(INVALID_OBJECT_ID));  // default icon
+                retval.push_back(ui.ShipDesignIcon(INVALID_OBJECT_ID));  // default icon
 
         } else if (obj->ObjectType() == UniverseObjectType::OBJ_FLEET) {
             if (auto* fleet = static_cast<const Fleet*>(obj.get())) {
@@ -1397,31 +1416,28 @@ namespace {
         } else if (obj->ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
             if (auto* system = static_cast<const System*>(obj.get())) {
                 StarType star_type = system->GetStarType();
-                ClientUI* ui = ClientUI::GetClientUI();
-                auto disc_texture = ui->GetModuloTexture(
-                    ClientUI::ArtDir() / "stars", ClientUI::StarTypeFilePrefix(star_type), system->ID());
-                if (disc_texture)
-                    retval.push_back(std::move(disc_texture));
-                auto halo_texture = ui->GetModuloTexture(
-                    ClientUI::ArtDir() / "stars", ClientUI::HaloStarTypeFilePrefix(star_type), system->ID());
-                if (halo_texture)
-                    retval.push_back(std::move(halo_texture));
+                if (auto disc_texture = ui.GetModuloTexture(
+                    ClientUI::ArtDir() / "stars", ClientUI::StarTypeFilePrefix(star_type), system->ID()))
+                { retval.push_back(std::move(disc_texture)); }
+                if (auto halo_texture = ui.GetModuloTexture(
+                    ClientUI::ArtDir() / "stars", ClientUI::HaloStarTypeFilePrefix(star_type), system->ID()))
+                { retval.push_back(std::move(halo_texture)); }
             }
         } else if (obj->ObjectType() == UniverseObjectType::OBJ_PLANET) {
             if (auto* planet = static_cast<const Planet*>(obj.get()))
-                retval.push_back(ClientUI::PlanetIcon(planet->Type()));
+                retval.push_back(ui.PlanetIcon(planet->Type()));
 
         } else if (obj->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
             if (auto* building = static_cast<const Building*>(obj.get()))
-                retval.push_back(ClientUI::BuildingIcon(building->BuildingTypeName()));
+                retval.push_back(ui.BuildingIcon(building->BuildingTypeName()));
 
         } else if (obj->ObjectType() == UniverseObjectType::OBJ_FIELD) {
             if (auto* field = static_cast<const Field*>(obj.get()))
-                retval.push_back(ClientUI::FieldTexture(field->FieldTypeName()));
+                retval.push_back(ui.FieldTexture(field->FieldTypeName()));
 
         } // UniverseObjectType::OBJ_FIGHTER shouldn't exist outside of combat, so ignored here
         if (retval.empty())
-            retval.push_back(ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "generic_object.png", true));
+            retval.push_back(ui.GetTexture(ClientUI::ArtDir() / "icons" / "generic_object.png", true));
         return retval;
     }
 
@@ -1456,16 +1472,14 @@ public:
 
     [[nodiscard]] const std::string& SortKey(std::size_t column) const {
         const auto get_column_sort_key = [this, column]() -> std::string {
-            const auto* ref = GetColumnValueRef(column);
-            if (!ref)
-                return {};
-            const ScriptingContext& context = ClientApp::GetApp()->GetContext();
-            if (const auto* source = context.ContextObjects().getRaw(m_object_id)) {
-                const ScriptingContext source_context{context, ScriptingContext::Source{}, source};
-                return ref->Eval(source_context);
-            } else {
-                return EMPTY_STRING;
+            if (const auto* ref = GetColumnValueRef(column)) {
+                const auto& context = GetApp().GetContext();
+                if (const auto* source = context.ContextObjects().getRaw(m_object_id)) {
+                    const ScriptingContext source_context{context, ScriptingContext::Source{}, source};
+                    return ref->Eval(source_context);
+                }
             }
+            return EMPTY_STRING;
         };
 
         try {
@@ -1561,38 +1575,42 @@ private:
             return;
         m_initialized = true;
 
-        GG::Flags<GG::GraphicStyle> style = GG::GRAPHIC_CENTER | GG::GRAPHIC_VCENTER |
-                                            GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE;
+        static constexpr GG::Flags<GG::GraphicStyle> style = GG::GRAPHIC_CENTER | GG::GRAPHIC_VCENTER |
+                                                             GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE;
 
         DetachChildAndReset(m_dot);
         DetachChildAndReset(m_expand_button);
         DetachChildAndReset(m_icon);
 
+        auto& app = GetApp();
+        auto& ui = app.GetUI();
+        const auto& objects = app.GetContext().ContextObjects();
+
         if (m_has_contents) {
-            boost::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
+            std::filesystem::path button_texture_dir = ClientUI::ArtDir() / "icons" / "buttons";
 
             if (m_expanded) {
                 m_expand_button = Wnd::Create<CUIButton>(
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusnormal.png"     , true)),
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusclicked.png"    , true)),
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "minusmouseover.png"  , true)));
+                    GG::SubTexture(ui.GetTexture(button_texture_dir / "minusnormal.png"     , true)),
+                    GG::SubTexture(ui.GetTexture(button_texture_dir / "minusclicked.png"    , true)),
+                    GG::SubTexture(ui.GetTexture(button_texture_dir / "minusmouseover.png"  , true)));
             } else {
                 m_expand_button = Wnd::Create<CUIButton>(
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusnormal.png"   , true)),
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusclicked.png"  , true)),
-                    GG::SubTexture(ClientUI::GetTexture(button_texture_dir / "plusmouseover.png", true)));
+                    GG::SubTexture(ui.GetTexture(button_texture_dir / "plusnormal.png"   , true)),
+                    GG::SubTexture(ui.GetTexture(button_texture_dir / "plusclicked.png"  , true)),
+                    GG::SubTexture(ui.GetTexture(button_texture_dir / "plusmouseover.png", true)));
             }
 
             AttachChild(m_expand_button);
             m_expand_button->LeftPressedSignal.connect(
                 boost::bind(&ObjectPanel::ExpandCollapseButtonPressed, this));
         } else {
-            m_dot = GG::Wnd::Create<GG::StaticGraphic>(ClientUI::GetTexture(
-                ClientUI::ArtDir() / "icons" / "dot.png", true), style);
+            m_dot = GG::Wnd::Create<GG::StaticGraphic>(
+                ui.GetTexture(ClientUI::ArtDir() / "icons" / "dot.png", true), style);
             AttachChild(m_dot);
         }
 
-        auto textures = ObjectTextures(Objects().get(m_object_id));
+        auto textures = ObjectTextures(objects.get(m_object_id));
         auto tx_size = textures.size();
 
         m_icon = GG::Wnd::Create<MultiTextureStaticGraphic>(
@@ -1813,6 +1831,8 @@ private:
         GG::MenuItem planets_submenu(UserString("PLANETS_SUBMENU"),         false, false);
         GG::MenuItem env_submenu(UserString("PLANET_ENVIRONMENTS_SUBMENU"), false, false);
         GG::MenuItem fleets_submenu(UserString("FLEETS_SUBMENU"),           false, false);
+        GG::MenuItem empire_submenu(UserString("EMPIRE_SUPPLY_SUBMENU"),    false, false);
+        GG::MenuItem position_submenu(UserString("POSITION_SUBMENU"),       false, false);
 
         for (auto [new_column_type, submenu] : available_column_types | range_keys) {
             const bool check = (current_column_type == new_column_type);
@@ -1835,11 +1855,17 @@ private:
                 env_submenu.next_level.emplace_back(menu_label, false, check, col_action);
             else if (submenu == "FLEETS_SUBMENU")
                 fleets_submenu.next_level.emplace_back(menu_label, false, check, col_action);
+            else if (submenu == "EMPIRE_SUPPLY_SUBMENU")
+                empire_submenu.next_level.emplace_back(menu_label, false, check, col_action);
+            else if (submenu == "POSITION_SUBMENU")
+                position_submenu.next_level.emplace_back(menu_label, false, check, col_action);
         }
         popup->AddMenuItem(std::move(meters_submenu));
         popup->AddMenuItem(std::move(planets_submenu));
         popup->AddMenuItem(std::move(env_submenu));
         popup->AddMenuItem(std::move(fleets_submenu));
+        popup->AddMenuItem(std::move(empire_submenu));
+        popup->AddMenuItem(std::move(position_submenu));
 
         popup->Run();
     }
@@ -2025,11 +2051,10 @@ public:
         m_header_row = GG::Wnd::Create<ObjectHeaderRow>(GG::X1, ListRowHeight());
         SetColHeaders(m_header_row); // Gives ownership
 
-        m_header_row->ColumnsChangedSignal.connect(
-            boost::bind(&ObjectListBox::Refresh, this));
+        m_header_row->ColumnsChangedSignal.connect([this]() { Refresh(GetApp().GetContext()); });
         m_header_row->ColumnHeaderLeftClickSignal.connect(
             boost::bind(&ObjectListBox::SortingClicked, this, boost::placeholders::_1));
-        m_obj_deleted_connection = GetUniverse().UniverseObjectDeleteSignal.connect(
+        m_obj_deleted_connection = GetApp().GetContext().ContextUniverse().UniverseObjectDeleteSignal.connect(
             boost::bind(&ObjectListBox::UniverseObjectDeleted, this, boost::placeholders::_1));
     }
 
@@ -2069,7 +2094,7 @@ public:
         } else {
             m_collapsed_objects.insert(object_id);
         }
-        Refresh();
+        Refresh(GetApp().GetContext());
     }
 
     void ExpandObject(int object_id = INVALID_OBJECT_ID) {
@@ -2077,7 +2102,7 @@ public:
             m_collapsed_objects.clear();
         else
             m_collapsed_objects.erase(object_id);
-        Refresh();
+        Refresh(GetApp().GetContext());
     }
 
     bool ObjectCollapsed(int object_id) const
@@ -2088,14 +2113,14 @@ public:
 
     void SetFilterCondition(std::unique_ptr<Condition::Condition>&& condition) {
         m_filter_condition = std::move(condition);
-        Refresh();
+        Refresh(GetApp().GetContext());
     }
 
     void SetVisibilityFilters(auto&& vis) {
         if constexpr (requires { vis != m_visibilities; }) {
             if (vis != m_visibilities) {
                 m_visibilities = std::forward<decltype(vis)>(vis);
-                Refresh();
+                Refresh(GetApp().GetContext());
             }
         } else {
             decltype(m_visibilities) new_vis;
@@ -2104,9 +2129,22 @@ public:
 
             if (new_vis != m_visibilities) {
                 m_visibilities = std::move(new_vis);
-                Refresh();
+                Refresh(GetApp().GetContext());
             }
         }
+    }
+
+    void SetVisAndConFilters(auto&& vis, std::unique_ptr<Condition::Condition>&& condition) {
+        if constexpr (requires { vis != m_visibilities; }) {
+            if (vis != m_visibilities) 
+                m_visibilities = std::forward<decltype(vis)>(vis);
+        } else {
+            m_visibilities.clear();
+            for (auto& [uot, vis_set] : vis)
+                m_visibilities[uot].insert(vis_set.begin(), vis_set.end());
+        }
+
+        SetFilterCondition(std::move(condition)); // always does Refresh
     }
 
     void ClearContents() {
@@ -2126,18 +2164,18 @@ public:
         if (!obj)
             return false;
 
-        if (m_filter_condition && !m_filter_condition->EvalOne(context, obj))
-            return false;
-
         const auto it = m_visibilities.find(obj->ObjectType());
         if (it == m_visibilities.end())
             return false;
 
         const int object_id = obj->ID();
-        const int client_empire_id = GGHumanClientApp::GetApp()->EmpireID();
+        const int client_empire_id = GetApp().EmpireID();
 
         if (context.ContextUniverse().EmpireKnownDestroyedObjectIDs(client_empire_id).contains(object_id))
             return it->second.contains(VIS_DISPLAY::SHOW_DESTROYED);
+
+        if (m_filter_condition && !m_filter_condition->EvalOne(context, obj))
+            return false;
 
         if (assume_visible_without_checking ||
             client_empire_id == ALL_EMPIRES ||
@@ -2147,7 +2185,7 @@ public:
         return it->second.contains(VIS_DISPLAY::SHOW_PREVIOUSLY_VISIBLE);
     }
 
-    void Refresh() {
+    void Refresh(const ScriptingContext& context) {
         SectionedScopedTimer timer("ObjectListBox::Refresh");
         const std::size_t first_visible_queue_row = std::distance(this->begin(), this->FirstRowShown());
         ClearContents();
@@ -2164,7 +2202,6 @@ public:
         std::map<int, std::vector<std::shared_ptr<const Building>>> planet_buildings;
         std::map<int, std::vector<std::shared_ptr<const Field>>>    system_fields;
 
-        const ScriptingContext& context = GGHumanClientApp::GetApp()->GetContext();
         const ObjectMap& objects{context.ContextObjects()};
 
         // TODO: set up predicate for ObjectShown and pass to objects.find instead of objects.all
@@ -2390,7 +2427,7 @@ public:
 
             // Sorting and nesting don't really work well together. The user may have turned sorting off
             // to get nesting to work. So let's rebuild the world to make sure nesting works again.
-            Refresh();
+            Refresh(GetApp().GetContext());
             //std::cout << "col -1 : set style to no sort" << std::endl;
 
         } else if (!GetColumnName(clicked_column).empty()) { // empty columns are not sort-worthy
@@ -2512,8 +2549,9 @@ private:
     void ObjectStateChanged(int object_id) {
         if (object_id == INVALID_OBJECT_ID)
             return;
-        auto obj = Objects().get(object_id);
-        DebugLogger() << "ObjectListBox::ObjectStateChanged: " << obj->Name();
+        const auto& app = GetApp();
+        const auto& context = app.GetContext();
+        auto obj = context.ContextObjects().get(object_id);
         if (!obj)
             return;
 
@@ -2521,7 +2559,7 @@ private:
         if (type == UniverseObjectType::OBJ_SHIP || type == UniverseObjectType::OBJ_BUILDING)
             UpdateObjectPanel(object_id);
         else if (type == UniverseObjectType::OBJ_FLEET || type == UniverseObjectType::OBJ_PLANET || type == UniverseObjectType::OBJ_SYSTEM)
-            Refresh();
+            Refresh(context);
     }
 
     void UniverseObjectDeleted(const std::shared_ptr<const UniverseObject>& obj)
@@ -2603,8 +2641,8 @@ void ObjectListWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
         DoLayout();
 }
 
-void ObjectListWnd::Refresh()
-{ m_list_box->Refresh(); }
+void ObjectListWnd::Refresh(const ScriptingContext& context)
+{ m_list_box->Refresh(context); }
 
 void ObjectListWnd::ObjectSelectionChanged(const GG::ListBox::SelectionSet& rows) {
     // mark as selected all ObjectPanel that are in \a rows and mark as not
@@ -2641,7 +2679,9 @@ void ObjectListWnd::ObjectDoubleClicked(GG::ListBox::iterator it, GG::Pt pt,
     int object_id = ObjectInRow(it);
     if (object_id != INVALID_OBJECT_ID)
         ObjectDoubleClickedSignal(object_id);
-    ClientUI::GetClientUI()->ZoomToObject(object_id);
+
+    auto& app = GetApp();
+    app.GetUI().ZoomToObject(object_id, app.GetContext(), app.EmpireID());
 }
 
 std::set<int> ObjectListWnd::SelectedObjectIDs() const {
@@ -2672,23 +2712,21 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
     int object_id = ObjectInRow(it);
     if (object_id == INVALID_OBJECT_ID)
         return;
-    GGHumanClientApp* app = GGHumanClientApp::GetApp();
-    ClientNetworking& net = app->Networking();
-    bool moderator = false;
-    if (app->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
-        moderator = true;
+    auto& app = GetApp();
+    auto& net = app.Networking();
+    const bool moderator = Networking::is_mod(app);
 
     // Right click on an unselected row should automatically select it
     m_list_box->SelectRow(it, true);
 
     auto dump_action = [this, object_id]() { ObjectDumpSignal(object_id); };
-    auto suitability_action = [object_id]() { ClientUI::GetClientUI()->ZoomToPlanetPedia(object_id); };
+    auto suitability_action = [object_id]() { auto& app = GetApp(); app.GetUI().ZoomToPlanetPedia(object_id, app.GetContext().ContextObjects()); };
 
     // Refresh and clean up common to focus and production changes.
     auto focus_ship_building_common_action = [this]() {
         auto sel_ids = SelectedObjectIDs();
-        Refresh();
-        SetSelectedObjects(sel_ids);
+        Refresh(GetApp().GetContext());
+        SetSelectedObjects(std::move(sel_ids));
         ObjectSelectionChanged(m_list_box->Selections());
     };
 
@@ -2697,7 +2735,7 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
     // create popup menu with object commands in it
     popup->AddMenuItem(UserString("DUMP"), false, false, dump_action);
 
-    ScriptingContext& context = app->GetContext();
+    auto& context = app.GetContext();
     auto obj = context.ContextObjects().get(object_id);
     //DebugLogger() << "ObjectListBox::ObjectStateChanged: " << obj->Name();
     if (!obj)
@@ -2710,9 +2748,9 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
     int ship_menuitem_id = MENUITEM_SET_SHIP_BASE;
     int bld_menuitem_id = MENUITEM_SET_BUILDING_BASE;
     std::map<std::string, int> all_foci, avail_blds;    // counts of how many planets can use each focus or can produce each building type
-    std::map<int, int> avail_designs;                   // count of how many planets can produce each ship design
+    std::map<int, int> avail_designs_planet_counts;     // count of how many planets can produce each ship design
     UniverseObjectType type = obj->ObjectType();
-    auto cur_empire = context.GetEmpire(app->EmpireID());
+    auto cur_empire = context.GetEmpire(app.EmpireID());
 
     if (type == UniverseObjectType::OBJ_PLANET) {
         popup->AddMenuItem(UserString("SP_PLANET_SUITABILITY"), false, false, suitability_action);
@@ -2723,14 +2761,14 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
                 continue;
 
             auto one_planet = context.ContextObjects().getRaw<const Planet>(row->ObjectID());
-            if (one_planet && one_planet->OwnedBy(app->EmpireID())) {
+            if (one_planet && one_planet->OwnedBy(app.EmpireID())) {
                 for (const auto& planet_focus : one_planet->AvailableFoci(context))
                     all_foci[std::string{planet_focus}]++;
 
-                for (int ship_design_id : cur_empire->AvailableShipDesigns(GetUniverse())) {
+                for (int ship_design_id : cur_empire->AvailableShipDesigns(context.ContextUniverse())) {
                     if (cur_empire->ProducibleItem(BuildType::BT_SHIP, ship_design_id,
                                                    row->ObjectID(), context))
-                    { avail_designs[ship_design_id]++; }
+                    { avail_designs_planet_counts[ship_design_id]++; }
                 }
 
                 for (const auto& building_type : cur_empire->AvailableBuildingTypes()) {
@@ -2743,17 +2781,19 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
             }
         }
 
-        auto& orders{app->Orders()};
-        const int app_empire_id{app->EmpireID()};
+        const int app_empire_id{app.EmpireID()};
 
-        GG::MenuItem focusMenuItem(UserString("MENUITEM_SET_FOCUS"), false, false/*, no action*/);
+        GG::MenuItem focus_menu_item(UserString("MENUITEM_SET_FOCUS"), false, false/*, no action*/);
         for (auto& [focus_name, count_of_planets_that_have_focus_available] : all_foci) {
             menuitem_id++;
             auto focus_action = [focus{focus_name}, empire_id{app_empire_id},
-                                 &orders, &context, lb{m_list_box},
-                                 &focus_ship_building_common_action]()
+                                 lb{m_list_box}, &focus_ship_building_common_action]()
             {
+                auto& app = GetApp();
+                auto& context = GetApp().GetContext();
                 auto& objs = context.ContextObjects();
+                auto& orders = app.Orders();
+
                 for (const auto& selection : lb->Selections()) {
                     ObjectRow* row = dynamic_cast<ObjectRow*>(selection->get());
                     if (!row)
@@ -2770,41 +2810,46 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
                 focus_ship_building_common_action();
             };
 
-            std::string out;
-            out.reserve(50); // guesstimate
-            out.append(UserString(focus_name)).append(" (")
-               .append(std::to_string(count_of_planets_that_have_focus_available)).append(")");
-            focusMenuItem.next_level.emplace_back(std::move(out), false, false, focus_action);
+            std::string out = UserString(focus_name) + " (" +
+                std::to_string(count_of_planets_that_have_focus_available) + ")";
+            focus_menu_item.next_level.emplace_back(std::move(out), false, false, focus_action);
         }
         if (menuitem_id > MENUITEM_SET_FOCUS_BASE)
-            popup->AddMenuItem(std::move(focusMenuItem));
+            popup->AddMenuItem(std::move(focus_menu_item));
 
         GG::MenuItem ship_menu_item_top(UserString("MENUITEM_ENQUEUE_SHIPDESIGN_TO_TOP_OF_QUEUE"), false, false);
         GG::MenuItem ship_menu_item(UserString("MENUITEM_ENQUEUE_SHIPDESIGN"), false, false);
-        for (auto design_it = avail_designs.begin();
-             design_it != avail_designs.end() && ship_menuitem_id < MENUITEM_SET_BUILDING_BASE; ++design_it)
+        for (auto design_it = avail_designs_planet_counts.begin();
+             design_it != avail_designs_planet_counts.end() && ship_menuitem_id < MENUITEM_SET_BUILDING_BASE;
+             ++design_it)
         {
             ship_menuitem_id++;
+            const auto design_id = design_it->first;
 
-            auto produce_ship_action = [this, design_it, app, cur_empire, &context,
-                                        &focus_ship_building_common_action](int pos)
-            {
-                int ship_design = design_it->first;
-                bool needs_queue_update(false);
+            auto produce_ship_action = [this, design_id, &focus_ship_building_common_action](int pos) {
+                bool needs_queue_update = false;
+
+                auto& app = GetApp();
+                auto& context = app.GetContext();
+                const auto empire_id = app.EmpireID();
+                const auto cur_empire = context.GetEmpire(empire_id);
+
                 for (const auto& entry : m_list_box->Selections()) {
                     ObjectRow* row = dynamic_cast<ObjectRow*>(entry->get());
                     if (!row)
                         continue;
-                    auto one_planet = context.ContextObjects().get<Planet>(row->ObjectID());
-                    if (!one_planet || !one_planet->OwnedBy(app->EmpireID()) ||
-                        !cur_empire->ProducibleItem(BuildType::BT_SHIP, ship_design,
+                    {
+                        auto one_planet = context.ContextObjects().get<Planet>(row->ObjectID());
+                        if (!one_planet || !one_planet->OwnedBy(app.EmpireID()) ||
+                            !cur_empire->ProducibleItem(BuildType::BT_SHIP, design_id,
                                                     row->ObjectID(), context))
-                    { continue; }
+                        { continue; }
+                    }
 
-                    app->Orders().IssueOrder<ProductionQueueOrder>(
+                    app.Orders().IssueOrder<ProductionQueueOrder>(
                         context,
-                        ProductionQueueOrder::ProdQueueOrderAction::PLACE_IN_QUEUE, app->EmpireID(),
-                        ProductionQueue::ProductionItem{BuildType::BT_SHIP, ship_design,
+                        ProductionQueueOrder::ProdQueueOrderAction::PLACE_IN_QUEUE, empire_id,
+                        ProductionQueue::ProductionItem{BuildType::BT_SHIP, design_id,
                         context.ContextUniverse()}, 1, row->ObjectID(), pos);
                     needs_queue_update = true;
                 }
@@ -2816,10 +2861,13 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
             auto produce_ship_action_top = std::bind(produce_ship_action, 0);
             auto produce_ship_action_bottom = std::bind(produce_ship_action, -1);
 
-            std::stringstream out;
-            out << context.ContextUniverse().GetShipDesign(design_it->first)->Name() << " (" << design_it->second << ")";
-            ship_menu_item_top.next_level.emplace_back(out.str(), false, false, produce_ship_action_top);
-            ship_menu_item.next_level.emplace_back(out.str(), false, false, produce_ship_action_bottom);
+            const auto design = context.ContextUniverse().GetShipDesign(design_id);
+            if (!design) continue;
+            const auto planet_count_for_design = design_it->second;
+
+            std::string out = design->Name() + " (" + std::to_string(planet_count_for_design) + ")";
+            ship_menu_item_top.next_level.emplace_back(out, false, false, produce_ship_action_top);
+            ship_menu_item.next_level.emplace_back(std::move(out), false, false, produce_ship_action_bottom);
         }
 
         if (ship_menuitem_id > MENUITEM_SET_SHIP_BASE) {
@@ -2832,29 +2880,32 @@ void ObjectListWnd::ObjectRightClicked(GG::ListBox::iterator it, GG::Pt pt, GG::
         for (auto& entry : avail_blds) {
             bld_menuitem_id++;
 
-            auto produce_building_action = [this, entry, app, cur_empire, &context,
-                                            &focus_ship_building_common_action](int pos)
+            auto produce_building_action = [this, building_type_name{entry.first},
+                &focus_ship_building_common_action](int pos)
             {
-                const auto& building_type_name = entry.first;
                 bool needs_queue_update(false);
-                const ObjectMap& objects{context.ContextObjects()};
+                auto& app = GetApp();
+                auto& context = app.GetContext();
+                const auto& objects = context.ContextObjects();
+                const auto cur_empire = context.GetEmpire(app.EmpireID());
 
                 for (const auto& selection : m_list_box->Selections()) {
-                    auto row = dynamic_cast<ObjectRow *>(selection->get());
+                    auto row = dynamic_cast<const ObjectRow*>(selection->get());
                     if (!row)
                         continue;
 
                     auto one_planet = objects.get<Planet>(row->ObjectID());
-                    if (!one_planet || !one_planet->OwnedBy(app->EmpireID())
-                        || !cur_empire->EnqueuableItem(BuildType::BT_BUILDING, building_type_name,
-                                                       row->ObjectID(), context)
+                    if (!one_planet || !one_planet->OwnedBy(app.EmpireID()))
+                        continue;
+                    if (!cur_empire->EnqueuableItem(BuildType::BT_BUILDING, building_type_name,
+                                                    row->ObjectID(), context)
                         || !cur_empire->ProducibleItem(BuildType::BT_BUILDING, building_type_name,
                                                        row->ObjectID(), context))
                     { continue; }
 
-                    app->Orders().IssueOrder<ProductionQueueOrder>(
+                    app.Orders().IssueOrder<ProductionQueueOrder>(
                         context,
-                        ProductionQueueOrder::ProdQueueOrderAction::PLACE_IN_QUEUE, app->EmpireID(),
+                        ProductionQueueOrder::ProdQueueOrderAction::PLACE_IN_QUEUE, app.EmpireID(),
                         ProductionQueue::ProductionItem{BuildType::BT_BUILDING, building_type_name},
                         1, row->ObjectID(), pos); // TODO: pass bld_item with move?
 
@@ -2908,10 +2959,8 @@ void ObjectListWnd::FilterClicked() {
                                              m_list_box->FilterCondition());
     dlg->Run();
 
-    if (dlg->ChangesAccepted()) {
-        m_list_box->SetVisibilityFilters(dlg->GetVisibilityFilters());
-        m_list_box->SetFilterCondition(dlg->GetConditionFilter());
-    }
+    if (dlg->ChangesAccepted())
+        m_list_box->SetVisAndConFilters(dlg->GetVisibilityFilters(), dlg->GetConditionFilter());
 }
 
 void ObjectListWnd::CollapseExpandClicked() {

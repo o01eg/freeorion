@@ -20,6 +20,7 @@
 #include "../util/OptionsDB.h"
 #include "../universe/Building.h"
 #include "../universe/BuildingType.h"
+#include "../universe/Field.h"
 #include "../universe/Fleet.h"
 #include "../universe/Planet.h"
 #include "../universe/System.h"
@@ -37,7 +38,7 @@
 #include "../client/human/GGHumanClientApp.h"
 
 #include <GG/Clr.h>
-#include <GG/utf8/checked.h>
+#include <GG/utf8/utf8.h>
 #include <GG/dialogs/ThreeButtonDlg.h>
 #include <GG/GUI.h>
 #include <GG/RichText/ImageBlock.h>
@@ -47,14 +48,15 @@
 #include <boost/phoenix/operator.hpp>
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/date_time/posix_time/posix_time_io.hpp>
 #include <boost/date_time/c_local_time_adjustor.hpp>
 
-#include <string>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <string>
+
 #include <boost/locale/formatting.hpp>
 #include <boost/locale/date_time.hpp>
 
@@ -68,7 +70,7 @@ bool TextureFileNameCompare(const std::shared_ptr<GG::Texture>& t1,
                             const std::shared_ptr<GG::Texture>& t2)
 { return t1 && t2 && t1->Path() < t2->Path(); }
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 
 fs::path    ClientUI::ArtDir()                  { return GetResourceDir() / "data" / "art"; }
@@ -149,7 +151,7 @@ std::shared_ptr<GG::Texture> ClientUI::PlanetIcon(PlanetType planet_type) {
     default:
         break;
     }
-    return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "planet" / icon_filename.data(), true);
+    return GetTexture(ClientUI::ArtDir() / "icons" / "planet" / icon_filename.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::PlanetSizeIcon(PlanetSize planet_size) {
@@ -172,7 +174,7 @@ std::shared_ptr<GG::Texture> ClientUI::PlanetSizeIcon(PlanetSize planet_size) {
     default:
         break;
     }
-    return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "planet" / icon_filename.data(), true);
+    return GetTexture(ClientUI::ArtDir() / "icons" / "planet" / icon_filename.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::MeterIcon(MeterType meter_type) {
@@ -232,9 +234,9 @@ std::shared_ptr<GG::Texture> ClientUI::MeterIcon(MeterType meter_type) {
     case MeterType::METER_SPEED:
         icon_filename = "speed.png";        break;
     default:
-        return ClientUI::GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", true); break;
+        return GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", true); break;
     }
-    return ClientUI::GetTexture(ClientUI::ArtDir() / "icons" / "meter" / icon_filename.data(), true);
+    return GetTexture(ClientUI::ArtDir() / "icons" / "meter" / icon_filename.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::BuildingIcon(std::string_view building_type_name) {
@@ -243,15 +245,15 @@ std::shared_ptr<GG::Texture> ClientUI::BuildingIcon(std::string_view building_ty
     if (building_type)
         graphic_name = building_type->Icon();
     if (graphic_name.empty())
-        return ClientUI::GetTexture(ArtDir() / "icons" / "building" / "generic_building.png", true);
-    return ClientUI::GetTexture(ArtDir() / graphic_name.data(), true);
+        return GetTexture(ArtDir() / "icons" / "building" / "generic_building.png", true);
+    return GetTexture(ArtDir() / graphic_name.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::CategoryIcon(std::string_view category_name) {
     if (const TechCategory* category = GetTechCategory(category_name))
-        return ClientUI::GetTexture(ArtDir() / "icons" / "tech" / "categories" / category->graphic, true);
+        return GetTexture(ArtDir() / "icons" / "tech" / "categories" / category->graphic, true);
     else
-        return ClientUI::GetTexture(ClientUI::ArtDir() / "", true);
+        return GetTexture(ClientUI::ArtDir() / "", true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::TechIcon(std::string_view tech_name) {
@@ -262,7 +264,7 @@ std::shared_ptr<GG::Texture> ClientUI::TechIcon(std::string_view tech_name) {
         if (texture_name.empty())
             return CategoryIcon(tech->Category());
     }
-    return ClientUI::GetTexture(ArtDir() / texture_name.data(), true);
+    return GetTexture(ArtDir() / texture_name.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::PolicyIcon(std::string_view policy_name) {
@@ -270,7 +272,7 @@ std::shared_ptr<GG::Texture> ClientUI::PolicyIcon(std::string_view policy_name) 
     std::string_view texture_name = "";
     if (policy)
         texture_name = policy->Graphic();
-    return ClientUI::GetTexture(ArtDir() / texture_name.data(), true);
+    return GetTexture(ArtDir() / texture_name.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::SpecialIcon(std::string_view special_name) {
@@ -279,17 +281,17 @@ std::shared_ptr<GG::Texture> ClientUI::SpecialIcon(std::string_view special_name
     if (special)
         texture_name = special->Graphic();
     if (texture_name.empty())
-        return ClientUI::GetTexture(ArtDir() / "icons" / "specials_huge" / "generic_special.png", true);
-    return ClientUI::GetTexture(ArtDir() / texture_name.data(), true);
+        return GetTexture(ArtDir() / "icons" / "specials_huge" / "generic_special.png", true);
+    return GetTexture(ArtDir() / texture_name.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::SpeciesIcon(std::string_view species_name) {
     std::string_view texture_name = "";
-    if (const Species* species = ClientApp::GetApp()->GetSpeciesManager().GetSpecies(species_name))
+    if (const Species* species = m_app.GetSpeciesManager().GetSpecies(species_name))
         texture_name = species->Graphic();
     if (texture_name.empty())
-        return ClientUI::GetTexture(ArtDir() / "icons" / "meter" / "pop.png", true);
-    return ClientUI::GetTexture(ArtDir() / texture_name.data(), true);
+        return GetTexture(ArtDir() / "icons" / "meter" / "pop.png", true);
+    return GetTexture(ArtDir() / texture_name.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::FieldTexture(std::string_view field_type_name) {
@@ -298,8 +300,8 @@ std::shared_ptr<GG::Texture> ClientUI::FieldTexture(std::string_view field_type_
     if (type)
         texture_name = type->Graphic();
     if (texture_name.empty())
-        return ClientUI::GetTexture(ArtDir() / "fields" / "ion_storm.png", true);
-    return ClientUI::GetTexture(ArtDir() / texture_name.data(), true);
+        return GetTexture(ArtDir() / "fields" / "ion_storm.png", true);
+    return GetTexture(ArtDir() / texture_name.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::PartIcon(std::string_view part_name) {
@@ -308,8 +310,8 @@ std::shared_ptr<GG::Texture> ClientUI::PartIcon(std::string_view part_name) {
     if (part)
         texture_name = part->Icon();
     if (texture_name.empty())
-        return ClientUI::GetTexture(ArtDir() / "icons" / "ship_parts" / "generic_part.png", true);
-    return ClientUI::GetTexture(ArtDir() / texture_name.data(), false);
+        return GetTexture(ArtDir() / "icons" / "ship_parts" / "generic_part.png", true);
+    return GetTexture(ArtDir() / texture_name.data(), false);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::HullTexture(std::string_view hull_name) {
@@ -321,8 +323,8 @@ std::shared_ptr<GG::Texture> ClientUI::HullTexture(std::string_view hull_name) {
             texture_name = hull->Icon();
     }
     if (texture_name.empty())
-        return ClientUI::GetTexture(ArtDir() / "hulls_design" / "generic_hull.png", true);
-    return ClientUI::GetTexture(ArtDir() / texture_name.data(), true);
+        return GetTexture(ArtDir() / "hulls_design" / "generic_hull.png", true);
+    return GetTexture(ArtDir() / texture_name.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::HullIcon(std::string_view hull_name) {
@@ -334,18 +336,17 @@ std::shared_ptr<GG::Texture> ClientUI::HullIcon(std::string_view hull_name) {
             texture_name = hull->Graphic();
     }
     if (texture_name.empty())
-        return ClientUI::GetTexture(ArtDir() / "icons" / "ship_hulls"/ "generic_hull.png", true);
-    return ClientUI::GetTexture(ArtDir() / texture_name.data(), true);
+        return GetTexture(ArtDir() / "icons" / "ship_hulls"/ "generic_hull.png", true);
+    return GetTexture(ArtDir() / texture_name.data(), true);
 }
 
 std::shared_ptr<GG::Texture> ClientUI::ShipDesignIcon(int design_id) {
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
-    if (const ShipDesign* design = context.ContextUniverse().GetShipDesign(design_id)) {
+    if (const ShipDesign* design = m_app.GetContext().ContextUniverse().GetShipDesign(design_id)) {
         std::string_view icon_name = design->Icon();
         if (icon_name.empty())
             return ClientUI::HullIcon(design->Hull());
         else
-            return ClientUI::GetTexture(ArtDir() / icon_name.data(), true);
+            return GetTexture(ArtDir() / icon_name.data(), true);
     }
     return ClientUI::HullTexture("");
 }
@@ -406,8 +407,6 @@ std::string_view ClientUI::StarTypeFilePrefix(StarType star_type) noexcept
 std::string_view ClientUI::HaloStarTypeFilePrefix(StarType star_type) noexcept
 { return HaloPrefix(star_type); }
 
-constinit ClientUI* ClientUI::s_the_UI = nullptr;
-
 std::ostream& operator<< (std::ostream& os, const GG::UnicodeCharset& chset) {
     os << chset.m_script_name << " " << chset.m_first_char << " " << chset.m_last_char << "\n";
     return os;
@@ -427,7 +426,7 @@ namespace {
             {
                 std::string file_name = GetOptionsDB().Get<std::string>("resource.stringtable.path");
                 std::string stringtable_str;
-                boost::filesystem::ifstream ifs(FilenameToPath(file_name));
+                std::ifstream ifs(FilenameToPath(file_name));
                 while (ifs) {
                     std::string line;
                     std::getline(ifs, line);
@@ -443,7 +442,7 @@ namespace {
                 DebugLogger() << "Non-default stringtable!";
                 std::string file_name = GetOptionsDB().GetDefault<std::string>("resource.stringtable.path");
                 std::string stringtable_str;
-                boost::filesystem::ifstream ifs(FilenameToPath(file_name));
+                std::ifstream ifs(FilenameToPath(file_name));
                 while (ifs) {
                     std::string line;
                     std::getline(ifs, line);
@@ -559,11 +558,6 @@ namespace {
         db.Add("ui.fleet.multiple.enabled",                             UserStringNop("OPTIONS_DB_UI_MULTIPLE_FLEET_WINDOWS"),      false);
         db.Add("ui.quickclose.enabled",                                 UserStringNop("OPTIONS_DB_UI_WINDOW_QUICKCLOSE"),           true);
         db.Add("ui.reposition.auto.enabled",                            UserStringNop("OPTIONS_DB_UI_AUTO_REPOSITION_WINDOWS"),     true);
-
-        // UI behavior, hidden options
-        // currently lacking an options page widget, so can only be user-adjusted by manually editing config file or specifying on command line
-        db.Add("ui.design.pedia.title.dynamic.enabled",                 UserStringNop("OPTIONS_DB_DESIGN_PEDIA_DYNAMIC"),           false);
-        db.Add("ui.map.fleet.eta.shown",                                UserStringNop("OPTIONS_DB_SHOW_FLEET_ETA"),                 true);
         db.Add("ui.name.id.shown",                                      UserStringNop("OPTIONS_DB_SHOW_IDS_AFTER_NAMES"),           false);
 
         // Other
@@ -585,42 +579,34 @@ namespace {
 ////////////////////////////////////////////////
 // ClientUI
 ////////////////////////////////////////////////
-ClientUI::ClientUI() :
+ClientUI::ClientUI(GGHumanClientApp& app) :
+    m_app(app),
     m_ship_designs(std::make_unique<ShipDesignManager>())
 {
-    s_the_UI = this;
-    Hotkey::ReadFromOptions(GetOptionsDB());
+    auto& db = GetOptionsDB();
+
+    Hotkey::ReadFromOptions(db);
 
     // Remove all window properties if asked to
-    if (GetOptionsDB().Get<bool>("window-reset"))
+    if (db.Get<bool>("window-reset"))
         CUIWnd::InvalidateUnusedOptions();
 
-    InitializeWindows();
+    db.OptionChangedSignal("video.fullscreen.width").connect(boost::bind(&ClientUI::HandleSizeChange, this, true));
+    db.OptionChangedSignal("video.fullscreen.height").connect(boost::bind(&ClientUI::HandleSizeChange, this, true));
+    db.OptionChangedSignal("video.windowed.width").connect(boost::bind(&ClientUI::HandleSizeChange, this, false));
+    db.OptionChangedSignal("video.windowed.height").connect(boost::bind(&ClientUI::HandleSizeChange, this, false));
 
-    GetOptionsDB().OptionChangedSignal("video.fullscreen.width").connect(
-        boost::bind(&ClientUI::HandleSizeChange, this, true));
-    GetOptionsDB().OptionChangedSignal("video.fullscreen.height").connect(
-        boost::bind(&ClientUI::HandleSizeChange, this, true));
-    GetOptionsDB().OptionChangedSignal("video.windowed.width").connect(
-        boost::bind(&ClientUI::HandleSizeChange, this, false));
-    GetOptionsDB().OptionChangedSignal("video.windowed.height").connect(
-        boost::bind(&ClientUI::HandleSizeChange, this, false));
-    GGHumanClientApp::GetApp()->RepositionWindowsSignal.connect(
-        boost::bind(&ClientUI::InitializeWindows, this));
-    GGHumanClientApp::GetApp()->RepositionWindowsSignal.connect(
-        &CUIWnd::InvalidateUnusedOptions,
-        boost::signals2::at_front);
+    m_app.RepositionWindowsSignal.connect(boost::bind(&ClientUI::InitializeWindows, this));
+    m_app.RepositionWindowsSignal.connect(&CUIWnd::InvalidateUnusedOptions, boost::signals2::at_front);
 
     // Connected at front to make sure CUIWnd::LoadOptions() doesn't overwrite
     // the values we're checking here...
-    GGHumanClientApp::GetApp()->FullscreenSwitchSignal.connect(
-        boost::bind(&ClientUI::HandleFullscreenSwitch, this),
-        boost::signals2::at_front);
+    m_app.FullscreenSwitchSignal.connect(boost::bind(&ClientUI::HandleFullscreenSwitch, this), boost::signals2::at_front);
 
-    GetOptionsDB().OptionChangedSignal("ui.reposition.auto.enabled").connect(
-        []() {
-            if (GetOptionsDB().Get<bool>("ui.reposition.auto.enabled"))
-                GGHumanClientApp::GetApp()->RepositionWindowsSignal();
+    db.OptionChangedSignal("ui.reposition.auto.enabled").connect(
+        [this, &db]() {
+            if (db.Get<bool>("ui.reposition.auto.enabled"))
+                m_app.RepositionWindowsSignal();
         }
     );
 
@@ -628,8 +614,6 @@ ClientUI::ClientUI() :
     GG::ImageBlock::SetDefaultImagePath(ArtDir().string());
 }
 
-ClientUI::~ClientUI()
-{ s_the_UI = nullptr; }
 
 MapWnd* ClientUI::GetMapWnd(bool construct) {
     if (!m_map_wnd && construct)
@@ -644,15 +628,27 @@ std::shared_ptr<MapWnd> ClientUI::GetMapWndShared() {
 }
 
 std::shared_ptr<MessageWnd> ClientUI::GetMessageWnd() {
-    if (!m_message_wnd)
+    if (!m_message_wnd) {
         m_message_wnd = GG::Wnd::Create<MessageWnd>(GG::INTERACTIVE | GG::DRAGABLE | GG::ONTOP | GG::RESIZABLE |
                                                     CLOSABLE | PINABLE, MESSAGE_WND_NAME);
+        if (m_message_wnd) {
+            const GG::Pt message_ul(GG::X0, m_app.AppHeight() - PANEL_HEIGHT);
+            static constexpr GG::Pt message_wh(MESSAGE_PANEL_WIDTH, PANEL_HEIGHT);
+            m_message_wnd->InitSizeMove(message_ul, message_wh);
+        }
+    }
     return m_message_wnd;
 }
 
 std::shared_ptr<PlayerListWnd> ClientUI::GetPlayerListWnd() {
-    if (!m_player_list_wnd)
+    if (!m_player_list_wnd) {
         m_player_list_wnd = GG::Wnd::Create<PlayerListWnd>(PLAYER_LIST_WND_NAME);
+        if (m_player_list_wnd) {
+            const GG::Pt player_list_ul(MESSAGE_PANEL_WIDTH, m_app.AppHeight() - PANEL_HEIGHT);
+            static constexpr GG::Pt player_list_wh(PLAYER_LIST_PANEL_WIDTH, PANEL_HEIGHT);
+            m_player_list_wnd->InitSizeMove(player_list_ul, player_list_ul + player_list_wh);
+        }
+    }
     return m_player_list_wnd;
 }
 
@@ -664,7 +660,7 @@ std::shared_ptr<IntroScreen> ClientUI::GetIntroScreen() {
 
 void ClientUI::ShowIntroScreen() {
     if (m_map_wnd) {
-        GGHumanClientApp::GetApp()->Remove(m_map_wnd);
+        m_app.Remove(m_map_wnd);
         m_map_wnd->RemoveWindows();
         m_map_wnd->Hide();
     }
@@ -672,23 +668,23 @@ void ClientUI::ShowIntroScreen() {
     // Update intro screen Load & Continue buttons if all savegames are deleted.
     GetIntroScreen()->RequirePreRender();
 
-    GGHumanClientApp::GetApp()->Register(GetIntroScreen());
-    GGHumanClientApp::GetApp()->Remove(m_message_wnd);
-    GGHumanClientApp::GetApp()->Remove(m_player_list_wnd);
-    GGHumanClientApp::GetApp()->Remove(m_multiplayer_lobby_wnd);
+    m_app.Register(GetIntroScreen());
+    m_app.Remove(m_message_wnd);
+    m_app.Remove(m_player_list_wnd);
+    m_app.Remove(m_multiplayer_lobby_wnd);
 }
 
 void ClientUI::ShowMultiPlayerLobbyWnd() {
     if (m_map_wnd) {
-        GGHumanClientApp::GetApp()->Remove(m_map_wnd);
+        m_app.Remove(m_map_wnd);
         m_map_wnd->RemoveWindows();
         m_map_wnd->Hide();
     }
 
-    GGHumanClientApp::GetApp()->Register(GetMultiPlayerLobbyWnd());
-    GGHumanClientApp::GetApp()->Remove(m_message_wnd);
-    GGHumanClientApp::GetApp()->Remove(m_player_list_wnd);
-    GGHumanClientApp::GetApp()->Remove(m_intro_screen);
+    m_app.Register(GetMultiPlayerLobbyWnd());
+    m_app.Remove(m_message_wnd);
+    m_app.Remove(m_player_list_wnd);
+    m_app.Remove(m_intro_screen);
 }
 
 std::shared_ptr<MultiPlayerLobbyWnd> ClientUI::GetMultiPlayerLobbyWnd() {
@@ -759,12 +755,11 @@ std::string ClientUI::FormatTimestamp(boost::posix_time::ptime timestamp) {
     return "";
 }
 
-bool ClientUI::ZoomToObject(const std::string& name) {
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
+bool ClientUI::ZoomToObject(const std::string& name, ScriptingContext& context, int client_empire_id) {
     // try first by finding the object by name TODO: use getRaw or find or somesuch
     for (auto obj : context.ContextObjects().allRaw<UniverseObject>())
         if (boost::iequals(obj->Name(), name))
-            return ZoomToObject(obj->ID());
+            return ZoomToObject(obj->ID(), context, client_empire_id);
 
     // try again by converting string to an ID
     try {
@@ -774,71 +769,90 @@ bool ClientUI::ZoomToObject(const std::string& name) {
 #else
         int id = boost::lexical_cast<int>(name);
 #endif
-        return ZoomToObject(id);
+        return ZoomToObject(id, context, client_empire_id);
     } catch (...) {
     }
 
     return false;
 }
 
-bool ClientUI::ZoomToObject(int id) {
-    return ZoomToSystem(id)     || ZoomToPlanet(id) || ZoomToBuilding(id)   ||
-           ZoomToFleet(id)      || ZoomToShip(id)   || ZoomToField(id);
+bool ClientUI::ZoomToObject(int id, ScriptingContext& context, int client_empire_id) {
+    return ZoomToSystem(id, context) ||
+           ZoomToPlanet(id, context) ||
+           ZoomToBuilding(id, context) ||
+           ZoomToFleet(id, context, client_empire_id) ||
+           ZoomToShip(id, context, client_empire_id) ||
+           ZoomToField(id, context.ContextObjects());
 }
 
-bool ClientUI::ZoomToPlanet(int id) {
-    if (auto planet = ClientApp::GetApp()->GetContext().ContextObjects().get<Planet>(id)) {
-        if (auto mapwnd = GetMapWnd(false)) {
-            mapwnd->CenterOnObject(planet->SystemID());
-            mapwnd->SelectSystem(planet->SystemID());
-            mapwnd->SelectPlanet(id);
+bool ClientUI::ZoomToPlanet(int id, ScriptingContext& context) {
+    if (auto mapwnd = GetMapWnd(false)) {
+        if (auto planet = std::as_const(context).ContextObjects().getRaw<Planet>(id)) {
+            mapwnd->CenterOnMapCoord(planet->X(), planet->Y());
+            mapwnd->SelectSystem(planet->SystemID(), context);
+            mapwnd->SelectPlanet(id, context);
+            return true;
         }
-        return true;
     }
     return false;
 }
 
-bool ClientUI::ZoomToPlanetPedia(int id) {
-    if (ClientApp::GetApp()->GetContext().ContextObjects().get<Planet>(id))
-        if (auto mapwnd = GetMapWnd(false))
+bool ClientUI::ZoomToPlanetPedia(int id, const ObjectMap& objects) {
+    if (objects.get<Planet>(id)) {
+        if (auto mapwnd = GetMapWnd(false)) {
             mapwnd->ShowPlanet(id);
-    return false;
-}
-
-bool ClientUI::ZoomToSystem(int id) {
-    if (auto system = ClientApp::GetApp()->GetContext().ContextObjects().get<System>(id)) {
-        ZoomToSystem(system);
-        return true;
+            return true;
+        }
     }
     return false;
 }
 
-bool ClientUI::ZoomToFleet(int id) {
-    if (auto fleet = ClientApp::GetApp()->GetContext().ContextObjects().get<Fleet>(id)) {
-        ZoomToFleet(fleet);
+bool ClientUI::ZoomToSystem(int id, ScriptingContext& context) {
+    const auto* system = std::as_const(context).ContextObjects().getRaw<System>(id);
+    return system && ZoomToSystem(*system, context);
+}
+
+bool ClientUI::ZoomToSystem(const System& system, ScriptingContext& context) {
+    if (auto mapwnd = GetMapWnd(false)) {
+        mapwnd->CenterOnMapCoord(system.X(), system.Y());
+        mapwnd->SelectSystem(std::addressof(system), context);
         return true;
     }
+
     return false;
 }
 
-bool ClientUI::ZoomToShip(int id) {
-    if (auto ship = ClientApp::GetApp()->GetContext().ContextObjects().get<Ship>(id))
-        return ZoomToFleet(ship->FleetID());
+bool ClientUI::ZoomToFleet(int id, const ScriptingContext& context, int client_empire_id) {
+    auto fleet = context.ContextObjects().get<Fleet>(id);
+    if (!fleet) return false;
+
+    if (auto mapwnd = GetMapWnd(false)) {
+        mapwnd->CenterOnObject(*fleet);
+        mapwnd->SelectFleet(id, context, client_empire_id);
+    }
+    if (const auto fleet_wnd = FleetUIManager::GetFleetUIManager().WndForFleetID(id))
+        fleet_wnd->SelectFleet(id, context.ContextObjects());
+    return true;
+}
+
+bool ClientUI::ZoomToShip(int id, const ScriptingContext& context, int client_empire_id) {
+    if (auto ship = context.ContextObjects().get<Ship>(id))
+        return ZoomToFleet(ship->FleetID(), context, client_empire_id);
     return false;
 }
 
-bool ClientUI::ZoomToBuilding(int id) {
-    if (auto building = ClientApp::GetApp()->GetContext().ContextObjects().get<Building>(id)) {
+bool ClientUI::ZoomToBuilding(int id, ScriptingContext& context) {
+    if (auto building = std::as_const(context).ContextObjects().get<Building>(id)) {
         ZoomToBuildingType(building->BuildingTypeName());
-        return ZoomToPlanet(building->PlanetID());
+        return ZoomToPlanet(building->PlanetID(), context);
     }
     return false;
 }
 
-bool ClientUI::ZoomToField(int id) {
-    if (auto field = ClientApp::GetApp()->GetContext().ContextObjects().get<Field>(id))
+bool ClientUI::ZoomToField(int id, const ObjectMap& objects) {
+    if (auto field = objects.get<Field>(id))
         if (auto mapwnd = GetMapWnd(false))
-            mapwnd->CenterOnObject(id);
+            mapwnd->CenterOnObject(*field);
     return false;
 }
 
@@ -850,26 +864,6 @@ bool ClientUI::ZoomToCombatLog(int id) {
     }
     ErrorLogger() << "Unable to find combat log with id " << id;
     return false;
-}
-
-void ClientUI::ZoomToSystem(std::shared_ptr<const System> system) {
-    if (!system)
-        return;
-    if (auto mapwnd = GetMapWnd(false)) {
-        mapwnd->CenterOnObject(system->ID());
-        mapwnd->SelectSystem(system->ID());
-    }
-}
-
-void ClientUI::ZoomToFleet(std::shared_ptr<const Fleet> fleet) {
-    if (!fleet)
-        return;
-    if (auto mapwnd = GetMapWnd(false)) {
-        mapwnd->CenterOnObject(fleet->ID());
-        mapwnd->SelectFleet(fleet->ID());
-    }
-    if (const auto& fleet_wnd = FleetUIManager::GetFleetUIManager().WndForFleetID(fleet->ID()))
-        fleet_wnd->SelectFleet(fleet->ID());
 }
 
 bool ClientUI::ZoomToContent(const std::string& name, bool reverse_lookup) {
@@ -898,7 +892,7 @@ bool ClientUI::ZoomToContent(const std::string& name, bool reverse_lookup) {
                 return ZoomToShipPart(part_name);
         }
 
-        for (const auto& species_name : ClientApp::GetApp()->GetSpeciesManager() | range_keys) {
+        for (const auto& species_name : m_app.GetSpeciesManager().AllSpecies() | range_keys) {
             if (boost::iequals(name, UserString(species_name)))
                 return ZoomToSpecies(species_name);
         }
@@ -965,7 +959,7 @@ bool ClientUI::ZoomToShipPart(std::string part_name) {
 }
 
 bool ClientUI::ZoomToSpecies(std::string species_name) {
-    if (!ClientApp::GetApp()->GetSpeciesManager().GetSpecies(species_name))
+    if (!m_app.GetSpeciesManager().GetSpecies(species_name))
         return false;
     if (auto mapwnd = GetMapWnd(false))
         mapwnd->ShowSpecies(std::move(species_name));
@@ -981,8 +975,8 @@ bool ClientUI::ZoomToFieldType(std::string field_type_name) {
 }
 
 bool ClientUI::ZoomToShipDesign(int design_id) {
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
-    if (!context.ContextUniverse().GetShipDesign(design_id))
+    const auto& universe = m_app.GetContext().ContextUniverse();
+    if (!universe.GetShipDesign(design_id))
         return false;
     if (auto mapwnd = GetMapWnd(false))
         mapwnd->ShowShipDesign(design_id);
@@ -990,7 +984,7 @@ bool ClientUI::ZoomToShipDesign(int design_id) {
 }
 
 bool ClientUI::ZoomToEmpire(int empire_id) {
-    if (!GetEmpire(empire_id))
+    if (!m_app.GetContext().GetEmpire(empire_id))
         return false;
     if (auto mapwnd = GetMapWnd(false))
         mapwnd->ShowEmpire(empire_id);
@@ -1016,27 +1010,24 @@ bool ClientUI::ZoomToEncyclopediaEntry(std::string str) {
 }
 
 void ClientUI::DumpObject(int object_id) {
-    if (auto obj = ClientApp::GetApp()->GetContext().ContextObjects().get(object_id))
-        m_message_wnd->HandleLogMessage(obj->Dump());
+    if (auto msgwnd = GetMessageWnd())
+        if (auto obj = m_app.GetContext().ContextObjects().get(object_id))
+            msgwnd->HandleLogMessage(obj->Dump());
 }
 
-void ClientUI::InitializeWindows() {
-    const GG::Pt message_ul(GG::X0, GG::GUI::GetGUI()->AppHeight() - PANEL_HEIGHT);
-    static constexpr GG::Pt message_wh(MESSAGE_PANEL_WIDTH, PANEL_HEIGHT);
-
-    const GG::Pt player_list_ul(MESSAGE_PANEL_WIDTH, GG::GUI::GetGUI()->AppHeight() - PANEL_HEIGHT);
-    static constexpr GG::Pt player_list_wh(PLAYER_LIST_PANEL_WIDTH, PANEL_HEIGHT);
-
-    GetMessageWnd()->InitSizeMove(message_ul, message_ul + message_wh);
-    GetPlayerListWnd()->InitSizeMove(player_list_ul, player_list_ul + player_list_wh);
-}
+void ClientUI::InitializeWindows() {}
 
 void ClientUI::HandleSizeChange(bool fullscreen) const {
     OptionsDB& db = GetOptionsDB();
 
-    if (db.Get<bool>("ui.reposition.auto.enabled")) {
+    if (m_message_wnd && db.Get<bool>("ui.reposition.auto.enabled")) {
         std::string window_mode = fullscreen ? ".fullscreen" : ".windowed";
         std::string option_name = "ui." + MESSAGE_WND_NAME + window_mode + ".left";
+
+        if (!db.OptionExistsAndHasTypedValue<int>(option_name)) {
+            DebugLogger() << "Skipping messages window reposition";
+            return;
+        }
 
         // Invalidate the message window position so that we know to
         // recalculate positions on the next resize or fullscreen switch...
@@ -1045,6 +1036,9 @@ void ClientUI::HandleSizeChange(bool fullscreen) const {
 }
 
 void ClientUI::HandleFullscreenSwitch() const {
+    if (!m_message_wnd)
+        return;
+
     OptionsDB& db = GetOptionsDB();
 
     std::string window_mode = db.Get<bool>("video.fullscreen.enabled") ? ".fullscreen" : ".windowed";
@@ -1057,10 +1051,10 @@ void ClientUI::HandleFullscreenSwitch() const {
     // the CUIWnd constructor...
     std::string option_name = "ui." + MESSAGE_WND_NAME + window_mode + ".left";
     if (db.Get<int>(option_name) == db.GetDefault<int>(option_name))
-        GGHumanClientApp::GetApp()->RepositionWindowsSignal();
+        m_app.RepositionWindowsSignal();
 }
 
-std::shared_ptr<GG::Texture> ClientUI::GetRandomTexture(const boost::filesystem::path& dir,
+std::shared_ptr<GG::Texture> ClientUI::GetRandomTexture(const std::filesystem::path& dir,
                                                         std::string_view prefix, bool mipmap)
 {
     const auto& prefixed_textures = GetPrefixedTextures(dir, prefix, mipmap);
@@ -1069,7 +1063,7 @@ std::shared_ptr<GG::Texture> ClientUI::GetRandomTexture(const boost::filesystem:
     return prefixed_textures.at(RandInt(0, prefixed_textures.size()));
 }
 
-std::shared_ptr<GG::Texture> ClientUI::GetModuloTexture(const boost::filesystem::path& dir,
+std::shared_ptr<GG::Texture> ClientUI::GetModuloTexture(const std::filesystem::path& dir,
                                                         std::string_view prefix, int n, bool mipmap)
 {
     assert(0 <= n);
@@ -1085,11 +1079,8 @@ void ClientUI::RestoreFromSaveData(const SaveGameUIData& ui_data) {
     m_ship_designs->Load(ui_data);
 }
 
-ClientUI* ClientUI::GetClientUI()
-{ return s_the_UI; }
-
 void ClientUI::MessageBox(const std::string& message, bool play_alert_sound) {
-    auto dlg = GG::GUI::GetGUI()->GetStyleFactory().NewThreeButtonDlg(
+    auto dlg = m_app.GetStyleFactory().NewThreeButtonDlg(
         GG::X(320), GG::Y(200), message, GetFont(Pts()+2),
         WndColor(), WndOuterBorderColor(), CtrlColor(), TextColor(),
         1, UserString("OK"));
@@ -1098,15 +1089,15 @@ void ClientUI::MessageBox(const std::string& message, bool play_alert_sound) {
     dlg->Run();
 }
 
-std::shared_ptr<GG::Texture> ClientUI::GetTexture(const boost::filesystem::path& path, bool mipmap) {
+std::shared_ptr<GG::Texture> ClientUI::GetTexture(const std::filesystem::path& path, bool mipmap) {
     std::shared_ptr<GG::Texture> retval;
     try {
-        retval = GGHumanClientApp::GetApp()->GetTexture(path, mipmap);
+        retval = m_app.GetTexture(path, mipmap);
     } catch (const std::exception& e) {
         ErrorLogger() << "Unable to load texture \"" + path.generic_string() + "\"\n"
             "reason: " << e.what();
         try {
-            retval = GGHumanClientApp::GetApp()->GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", mipmap);
+            retval = m_app.GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", mipmap);
         } catch (...) {
             return retval;
         }
@@ -1114,7 +1105,7 @@ std::shared_ptr<GG::Texture> ClientUI::GetTexture(const boost::filesystem::path&
         ErrorLogger() << "Unable to load texture \"" + path.generic_string() + "\"\n"
             "reason unknown...?";
         try {
-            retval = GGHumanClientApp::GetApp()->GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", mipmap);
+            retval = m_app.GetTexture(ClientUI::ArtDir() / "misc" / "missing.png", mipmap);
         } catch (...) {
             return retval;
         }
@@ -1126,58 +1117,52 @@ std::shared_ptr<GG::Texture> ClientUI::GetTexture(const boost::filesystem::path&
     return retval;
 }
 
-std::shared_ptr<GG::Font> ClientUI::GetFont(int pts) {
-    const auto& rqcs = RequiredCharsets();
-    auto* gui = GG::GUI::GetGUI();
+std::shared_ptr<const GG::Font> ClientUI::GetFont(int pts) const {
     try {
-       return gui->GetFont(GetOptionsDB().Get<std::string>("ui.font.path"),
-                           pts, rqcs.begin(), rqcs.end());
+       return m_app.GetFont(GetOptionsDB().Get<std::string>("ui.font.path"), // GetFont not actually a member of m_app (but rather static) but . disambiguates with free function GetFont
+                            pts, RequiredCharsets());
     } catch (...) {
         try {
-            return gui->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.path"),
-                                pts, rqcs.begin(), rqcs.end());
+            return m_app.GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.path"),
+                                 pts, RequiredCharsets());
         } catch (...) {
-             return gui->GetStyleFactory().DefaultFont(pts);
+             return m_app.GetStyleFactory().DefaultFont(pts);
         }
     }
 }
 
-std::shared_ptr<GG::Font> ClientUI::GetBoldFont(int pts) {
-    const auto& rqcs = RequiredCharsets();
-    auto* gui = GG::GUI::GetGUI();
+std::shared_ptr<const GG::Font> ClientUI::GetBoldFont(int pts) const {
     try {
-        return gui->GetFont(GetOptionsDB().Get<std::string>("ui.font.bold.path"),
-                            pts, rqcs.begin(), rqcs.end());
+        return m_app.GetFont(GetOptionsDB().Get<std::string>("ui.font.bold.path"),
+                             pts, RequiredCharsets());
     } catch (...) {
         try {
-             return gui->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.bold.path"),
-                                 pts, rqcs.begin(), rqcs.end());
+             return m_app.GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.bold.path"),
+                                  pts, RequiredCharsets());
         } catch (...) {
-             return gui->GetStyleFactory().DefaultFont(pts);
+             return m_app.GetStyleFactory().DefaultFont(pts);
         }
     }
 }
 
-std::shared_ptr<GG::Font> ClientUI::GetTitleFont(int pts) {
-    const auto& rqcs = RequiredCharsets();
-    auto* gui = GG::GUI::GetGUI();
+std::shared_ptr<const GG::Font> ClientUI::GetTitleFont(int pts) const {
     try {
-        return gui->GetFont(GetOptionsDB().Get<std::string>("ui.font.title.path"),
-                            pts, rqcs.begin(), rqcs.end());
+        return m_app.GetFont(GetOptionsDB().Get<std::string>("ui.font.title.path"),
+                             pts, RequiredCharsets());
     } catch (...) {
         try {
-            return gui->GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.title.path"),
-                                pts, rqcs.begin(), rqcs.end());
+            return m_app.GetFont(GetOptionsDB().GetDefault<std::string>("ui.font.title.path"),
+                                 pts, RequiredCharsets());
         } catch (...) {
-             return gui->GetStyleFactory().DefaultFont(pts);
+             return m_app.GetStyleFactory().DefaultFont(pts);
         }
    }
 }
 
 const std::vector<std::shared_ptr<GG::Texture>>& ClientUI::GetPrefixedTextures(
-    const boost::filesystem::path& dir, std::string_view prefix, bool mipmap)
+    const std::filesystem::path& dir, std::string_view prefix, bool mipmap)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
     if (!fs::is_directory(dir)) {
         ErrorLogger() << "GetPrefixedTextures passed invalid dir: " << dir;
         static CONSTEXPR_VEC const std::vector<std::shared_ptr<GG::Texture>> EMPTY_VEC;
@@ -1197,10 +1182,10 @@ const std::vector<std::shared_ptr<GG::Texture>>& ClientUI::GetPrefixedTextures(
             if (fs::exists(*it) &&
                 !fs::is_directory(*it) &&
                 boost::algorithm::starts_with(it->path().filename().string(), prefix))
-            { textures.push_back(ClientUI::GetTexture(*it, mipmap)); }
+            { textures.push_back(m_app.GetTexture(*it, mipmap)); }
         } catch (const fs::filesystem_error& e) {
             // ignore files for which permission is denied, and rethrow other exceptions
-            if (e.code() != boost::system::errc::permission_denied)
+            if (e.code() != std::errc::permission_denied)
                 throw;
         }
     }

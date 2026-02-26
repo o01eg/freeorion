@@ -18,7 +18,18 @@
 ClientAppFixture::ClientAppFixture() :
     m_cookie(boost::uuids::nil_uuid())
 {
-    InitDirs(boost::unit_test::framework::master_test_suite().argv[0]);
+    InitDirs(boost::unit_test::framework::master_test_suite().argv[0], true);
+
+#ifdef FREEORION_MACOSX
+    // On OSX set environment variable DYLD_LIBRARY_PATH to python framework folder
+    // bundled with app, so the dynamic linker uses the bundled python library.
+    // Otherwise the dynamic linker will look for a correct python lib in system
+    // paths, and if it can't find it, throw an error and terminate!
+    // Setting environment variable here, spawned child processes will inherit it.
+    const char* old_library_path = getenv("DYLD_LIBRARY_PATH");
+    const auto library_path = (old_library_path != nullptr) ? (GetPythonHome().string() + ":" + old_library_path) : GetPythonHome().string();
+    setenv("DYLD_LIBRARY_PATH", library_path.c_str(), 1);
+#endif
 
 #ifdef FREEORION_LINUX
     // Dirty hack to output log to console.
@@ -45,16 +56,13 @@ ClientAppFixture::ClientAppFixture() :
 
     GetOptionsDB().Set<std::string>("resource.path", PathToString(GetBinDir() / "default"));
 
-    std::promise<void> barrier;
-    std::future<void> barrier_future = barrier.get_future();
-    std::thread background([this] (auto b) {
+    std::thread background([this] () {
         DebugLogger() << "Started background parser thread";
         PythonCommon python;
         python.Initialize();
-        StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"), std::move(b));
-    }, std::move(barrier));
-    background.detach();
-    barrier_future.wait();
+        StartBackgroundParsing(PythonParser(python, GetResourceDir() / "scripting"));
+    });
+    background.join();
 }
 
 int ClientAppFixture::EffectsProcessingThreads() const
@@ -218,10 +226,9 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
         InfoLogger() << "Extracted GameStart message for turn: " << m_current_turn << " with empire: " << m_empire_id;
 
         m_ai_empires.clear();
-        for (const auto& empire : m_empires) {
-            if (GetEmpireClientType(empire.first) == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
-                m_ai_empires.insert(empire.first);
-        }
+        auto ai_ids_rng = m_empires | range_keys |
+            range_filter([this](auto id) { return Networking::is_ai(GetEmpireClientType(id)); });
+        m_ai_empires.insert(ai_ids_rng.begin(), ai_ids_rng.end());
         m_ai_waiting = m_ai_empires;
 
         m_game_started = true;
@@ -235,8 +242,8 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
         BOOST_TEST_MESSAGE("...ignored message...");
         return true; // ignore
     case Message::MessageType::PLAYER_STATUS: {
-        int about_empire_id;
-        Message::PlayerStatus status;
+        int about_empire_id = ALL_EMPIRES;
+        Message::PlayerStatus status = Message::PlayerStatus::WAITING;
         ExtractPlayerStatusMessageData(msg, status, about_empire_id);
         SetEmpireStatus(about_empire_id, status);
         if (status == Message::PlayerStatus::WAITING)
@@ -304,10 +311,10 @@ bool ClientAppFixture::HandleMessage(Message& msg) {
 void ClientAppFixture::SaveGame() {
     std::string save_filename = boost::io::str(boost::format("FreeOrionTestGame_%04d_%s%s")
                                                % m_current_turn % FilenameTimestamp() % SP_SAVE_FILE_EXTENSION);
-    boost::filesystem::path save_dir_path(GetSaveDir() / "test");
-    boost::filesystem::path save_path(save_dir_path / save_filename);
+    std::filesystem::path save_dir_path(GetSaveDir() / "test");
+    std::filesystem::path save_path(save_dir_path / save_filename);
     if (!exists(save_dir_path))
-        boost::filesystem::create_directories(save_dir_path);
+        std::filesystem::create_directories(save_dir_path);
 
     auto path_string = PathToString(save_path);
     m_save_completed = false;
@@ -320,12 +327,6 @@ void ClientAppFixture::UpdateLobby() {
     m_networking->SendMessage(LobbyUpdateMessage(m_lobby_data));
 }
 
-unsigned int ClientAppFixture::GetLobbyAICount() const {
-    unsigned int res = 0;
-    for (const auto& plr: m_lobby_data.players) {
-        if (plr.second.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
-            ++ res;
-    }
-    return res;
-}
+unsigned int ClientAppFixture::GetLobbyAICount() const
+{ return range_count_if(m_lobby_data.players | range_values, Networking::is_ai); }
 

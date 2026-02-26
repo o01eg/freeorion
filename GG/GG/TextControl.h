@@ -55,10 +55,38 @@ class GG_API TextControl : public Control
 public:
     using Wnd::SetMinSize;
 
+    [[nodiscard]] constexpr Flags<TextFormat> ValidateFormat(Flags<TextFormat> format) noexcept
+    {
+        int dup_ct = 0;   // duplication count
+        if (format & FORMAT_LEFT) ++dup_ct;
+        if (format & FORMAT_RIGHT) ++dup_ct;
+        if (format & FORMAT_CENTER) ++dup_ct;
+        if (dup_ct != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_CENTER by default
+            format &= ~(FORMAT_RIGHT | FORMAT_LEFT);
+            format |= FORMAT_CENTER;
+        }
+        dup_ct = 0;
+        if (format & FORMAT_TOP) ++dup_ct;
+        if (format & FORMAT_BOTTOM) ++dup_ct;
+        if (format & FORMAT_VCENTER) ++dup_ct;
+        if (dup_ct != 1) {   // exactly one must be picked; when none or multiples are picked, use FORMAT_VCENTER by default
+            format &= ~(FORMAT_TOP | FORMAT_BOTTOM);
+            format |= FORMAT_VCENTER;
+        }
+        if ((format & FORMAT_WORDBREAK) && (format & FORMAT_LINEWRAP))   // only one of these can be picked; FORMAT_WORDBREAK overrides FORMAT_LINEWRAP
+            format &= ~FORMAT_LINEWRAP;
+        return format;
+    }
+
     TextControl(X x, Y y, X w, Y h, std::string str,
-                std::shared_ptr<Font> font,
+                std::shared_ptr<const Font> font,
                 Clr color = CLR_BLACK, Flags<TextFormat> format = FORMAT_NONE,
-                Flags<WndFlag> flags = NO_WND_FLAGS);
+                Flags<WndFlag> flags = NO_WND_FLAGS) :
+        Control(x, y, w, h, flags),
+        m_format(ValidateFormat(format)),
+        m_text_color(color),
+        m_font(std::move(font))
+    { TextControl::SetText(std::move(str)); }
 
     /** Fast constructor.
 
@@ -68,9 +96,14 @@ public:
      constructor.*/
     TextControl(X x, Y y, X w, Y h, std::string str,
                 std::vector<Font::TextElement> text_elements,
-                std::shared_ptr<Font> font,
+                std::shared_ptr<const Font> font,
                 Clr color = CLR_BLACK, Flags<TextFormat> format = FORMAT_NONE,
-                Flags<WndFlag> flags = NO_WND_FLAGS);
+                Flags<WndFlag> flags = NO_WND_FLAGS) :
+        Control(x, y, w, h, flags),
+        m_format(ValidateFormat(format)),
+        m_text_color(color),
+        m_font(std::move(font))
+    { TextControl::SetText(std::move(str), std::move(text_elements)); }
 
     /** Copy constructor.
 
@@ -85,9 +118,22 @@ public:
         Since Control does not have a way to access Flags the copy using default
         flags.
     */
-    explicit TextControl(const TextControl& that);
-
-    ~TextControl() = default;
+    explicit TextControl(const TextControl& that) :
+        Control(that.Left(), that.Top(), that.Width(), that.Height()),
+        m_text(that.m_text),
+        m_format(that.m_format),
+        m_text_color(that.m_text_color),
+        m_clip_text(that.m_clip_text),
+        m_set_min_size(that.m_set_min_size),
+        m_text_elements(that.m_text_elements),
+        m_code_points(that.m_code_points),
+        m_font(that.m_font),
+        m_cached_minusable_size_width(that.m_cached_minusable_size_width),
+        m_cached_minusable_size(that.m_cached_minusable_size)
+    {
+        for (auto& elem : m_text_elements)
+            elem.Bind(m_text);
+    }
 
     /** Assignment operator.
 
@@ -98,9 +144,27 @@ public:
         Using the assignment operator is faster than using SetText() with text
         from another TextControl because it avoids the XML parse overhead.
     */
-    TextControl& operator=(const TextControl& that);
+    TextControl& operator=(const TextControl& that)
+    {
+        m_text = that.m_text;
+        m_format = that.m_format;
+        m_text_color = that.m_text_color;
+        m_clip_text = that.m_clip_text;
+        m_set_min_size = that.m_set_min_size;
+        m_text_elements = that.m_text_elements;
+        m_code_points = that.m_code_points;
+        m_font = that.m_font;
+        m_render_cache.clear();
+        m_cached_minusable_size_width = that.m_cached_minusable_size_width;
+        m_cached_minusable_size = that.m_cached_minusable_size;
 
-    Pt MinUsableSize() const noexcept override;
+        for (auto& elem : m_text_elements)
+            elem.Bind(m_text);
+
+        return *this;
+    }
+
+    Pt MinUsableSize() const noexcept override { return m_text_lr - m_text_ul; }
 
     /** Returns the minimum usable size if the text were reflowed into a \a width box.*/
     virtual Pt MinUsableSize(X width) const;
@@ -173,11 +237,11 @@ public:
 
     /** Returns the upper-left corner of the text as it is would be rendered
         if it were not bound to the dimensions of this control. */
-    Pt TextUpperLeft() const noexcept;
+    Pt TextUpperLeft() const noexcept { return UpperLeft() + m_text_ul; }
 
     /** Returns the lower-right corner of the text as it is would be rendered
         if it were not bound to the dimensions of this control. */
-    Pt TextLowerRight() const noexcept;
+    Pt TextLowerRight() const noexcept { return UpperLeft() + m_text_lr; }
 
     void Render() override;
 
@@ -205,38 +269,11 @@ public:
     */
     virtual void SetText(std::string str, std::vector<Font::TextElement> text_elements);
 
-    /** Change TextControl's text to replace the text at templated \p targ_offset with \p new_text.
-
-        This replaces the entire text of the TextElement at offset \p targ_offset and adjusts the
-        string \p text to be consistent even if the \p new_text is longer/shorter than the original
-        TEXT type TextElement.
-
-        This does not reparse the TextControl's text. It is faster than SetText on a new
-        string. It will not find white space in the inserted text.
-
-        \p targ_offset is the zero based offset of the TextElements of type TEXT.  It ignores
-        other types of TextElements such as TAGS, WHITESPACE and NEWLINE, when determining the
-        offset.
-
-        Here is an example of changing a ship name from "oldname" to "New Ship Name":
-
-        original text:             "<i>Ship:<\i> oldname ID:"
-        orignal m_text_elements:   [<OPEN_TAG i>, <TEXT "Ship:">, <CLOSE_TAG i>, <WHITESPACE>, <TEXT oldname>, <WHITESPACE>, <TEXT ID:>]
-
-        ChangeTemplatedText(text, text_elements, "New Ship Name", 1);
-
-        changed text:              "<i>Ship:<\i> New Ship Name ID:"
-        changed m_text_elements:   [<OPEN_TAG i>, <TEXT "Ship:">, <CLOSE_TAG i>, <WHITESPACE>, <TEXT New Ship Name>, <WHITESPACE>, <TEXT ID:>]
-
-    */
-
-    void ChangeTemplatedText(const std::string& new_text, std::size_t targ_offset);
-
     /** Returns the Font used by this TextControl to render its text. */
     const auto& GetFont() const noexcept { return m_font; }
 
     /** Sets the Font used by this TextControl to render its text. */
-    void SetFont(std::shared_ptr<Font> font);
+    void SetFont(std::shared_ptr<const Font> font);
 
     /** Sets the text format; ensures that the flags are sane. */
     void SetTextFormat(Flags<TextFormat> format);
@@ -295,7 +332,7 @@ public:
 
 protected:
     /** Returns the line data for the text in this TextControl. */
-    virtual const Font::LineVec& GetLineData() const noexcept { return m_line_data; }
+    [[nodiscard]] const Font::LineVec& GetLineData() const noexcept { return m_line_data; }
 
     Font::RenderCache m_render_cache;///< Cache much of text rendering.
 
@@ -318,7 +355,7 @@ private:
     std::vector<Font::TextElement> m_text_elements;
     Font::LineVec                  m_line_data;
     CPSize                         m_code_points{0};
-    std::shared_ptr<Font>          m_font;
+    std::shared_ptr<const Font>    m_font;
     Pt                             m_text_ul;     ///< stored relative to the control's UpperLeft()
     Pt                             m_text_lr;     ///< stored relative to the control's UpperLeft()
 

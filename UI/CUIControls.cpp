@@ -14,7 +14,7 @@
 #include "../Empire/Empire.h"
 #include "TextBrowseWnd.h"
 
-#include <GG/utf8/checked.h>
+#include <GG/utf8/utf8.h>
 #include <GG/dialogs/ColorDlg.h>
 #include <GG/GUI.h>
 #include <GG/Layout.h>
@@ -60,30 +60,31 @@ namespace {
 // class CUILabel
 ///////////////////////////////////////
 CUILabel::CUILabel(std::string str,
+                   const ClientUI& ui,
                    GG::Flags<GG::TextFormat> format, GG::Flags<GG::WndFlag> flags,
-                   std::shared_ptr<GG::Font> font,
                    GG::X x, GG::Y y, GG::X w, GG::Y h) :
-    TextControl(x, y, w, h, std::move(str), std::move(font), ClientUI::TextColor(), format, flags)
+    TextControl(x, y, w, h, std::move(str), ui.GetFont(), ui.TextColor(), format, flags)
 { SetName("CUILabel no elements"); }
+
+CUILabel::CUILabel(std::string str, GG::Flags<GG::TextFormat> format,
+                   GG::Flags<GG::WndFlag> flags,GG::X x, GG::Y y, GG::X w, GG::Y h) :
+    CUILabel(std::move(str), GetApp().GetUI(), format, flags, x, y, w, h)
+{}
 
 CUILabel::CUILabel(std::string str,
-                   GG::Flags<GG::TextFormat> format, GG::Flags<GG::WndFlag> flags,
-                   GG::X x, GG::Y y, GG::X w, GG::Y h) :
-    TextControl(x, y, w, h, std::move(str), ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
-{ SetName("CUILabel no elements"); }
-
-CUILabel::CUILabel(std::string str, std::vector<GG::Font::TextElement> text_elements,
+                   std::vector<GG::Font::TextElement> text_elements,
+                   const ClientUI& ui,
                    GG::Flags<GG::TextFormat> format, GG::Flags<GG::WndFlag> flags,
                    GG::X x, GG::Y y, GG::X w, GG::Y h) :
     TextControl(x, y, w, h, std::move(str), std::move(text_elements),
-                ClientUI::GetFont(), ClientUI::TextColor(), format, flags)
+                ui.GetFont(), ui.TextColor(), format, flags)
 { SetName("CUILabel from elements"); }
 
 void CUILabel::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    auto copy_wnd_action = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
+    auto copy_wnd_action = [this]() { GetApp().CopyWndText(this); };
     // create popup menu
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_COPY"), false, false, copy_wnd_action));
+    popup->AddMenuItem(UserString("HOTKEY_COPY"), false, false, copy_wnd_action);
     popup->Run();
 }
 
@@ -95,17 +96,23 @@ namespace {
     constexpr int CUIBUTTON_ANGLE_OFFSET = 5;
 }
 
-CUIButton::CUIButton(std::string str) :
-    Button(std::move(str), ClientUI::GetFont(), ClientUI::CtrlColor(),
-           ClientUI::TextColor(), GG::INTERACTIVE)
+CUIButton::CUIButton(std::string str, std::shared_ptr<const GG::Font> font, GG::Clr ctrl_clr, GG::Clr text_clr) :
+    Button(std::move(str), std::move(font), ctrl_clr, text_clr, GG::INTERACTIVE)
 {
     SetName("CUIButton " + this->m_label->Text());
     LeftClickedSignal.connect(-1, &PlayButtonClickSound);
 }
 
-CUIButton::CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed,
-                     GG::SubTexture rollover) :
-    Button("", ClientUI::GetFont(), GG::CLR_WHITE, GG::CLR_ZERO, GG::INTERACTIVE)
+CUIButton::CUIButton(std::string str, const ClientUI& ui) :
+    CUIButton(std::move(str), ui.GetFont(), ui.CtrlColor(), ui.TextColor())
+{}
+
+CUIButton::CUIButton(std::string str) :
+    CUIButton(std::move(str), GetApp().GetUI())
+{}
+
+CUIButton::CUIButton(GG::SubTexture unpressed, GG::SubTexture pressed, GG::SubTexture rollover) :
+    Button("", nullptr, GG::CLR_WHITE, GG::CLR_ZERO, GG::INTERACTIVE)
 {
     SetName("CUIButton SubTextures");
     SetColor(GG::CLR_WHITE);
@@ -124,7 +131,7 @@ void CUIButton::MouseEnter(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
          PlayButtonRolloverSound();
 }
 
-GG::Pt CUIButton::MinUsableSize() const {
+GG::Pt CUIButton::MinUsableSize() const noexcept {
     GG::Pt result = GG::Button::MinUsableSize();
     static constexpr int CUIBUTTON_HPADDING = 10;
     static constexpr int CUIBUTTON_VPADDING = 3;
@@ -585,7 +592,7 @@ void CUIIconButtonRepresenter::Render(const GG::StateButton& button) const {
 ///////////////////////////////////////
 CUIStateButton::CUIStateButton(std::string str, GG::Flags<GG::TextFormat> format,
                                std::shared_ptr<GG::StateButtonRepresenter> representer) :
-    StateButton(std::move(str), ClientUI::GetFont(), format,
+    StateButton(std::move(str), GetApp().GetUI().GetFont(), format,
                 ClientUI::StateButtonColor(), std::move(representer), ClientUI::TextColor())
 { SetName("CUIStateButton"); }
 
@@ -607,8 +614,8 @@ void CUISpin<double>::SetEditTextFromValue()
 ///////////////////////////////////////
 // class CUITabBar
 ///////////////////////////////////////
-CUITabBar::CUITabBar(const std::shared_ptr<GG::Font>& font, GG::Clr color, GG::Clr text_color) :
-    GG::TabBar(font, color, text_color)
+CUITabBar::CUITabBar(std::shared_ptr<const GG::Font> font, GG::Clr color, GG::Clr text_color) :
+    GG::TabBar(std::move(font), color, text_color)
 { SetName("CUITabBar"); }
 
 void CUITabBar::DistinguishCurrentTab(const std::vector<GG::StateButton*>& tab_buttons) {
@@ -667,7 +674,7 @@ void CUIScroll::ScrollTab::Render() {
 
 void CUIScroll::ScrollTab::LButtonUp(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     m_being_dragged = false;
-    if (!InWindow(GG::GUI::GetGUI()->MousePosition()))
+    if (!InWindow(GetApp().MousePosition()))
         m_mouse_here = false;
 }
 
@@ -792,7 +799,7 @@ void CUIDropDownList::Render() {
     GG::Pt ul = UpperLeft();
     GG::Clr lb_color = LB()->Color();
     GG::Clr border_color = Disabled() ? DisabledColor(lb_color) : lb_color;
-    if (GG::GUI::GetGUI()->FocusWnd().get() == this)
+    if (GetApp().FocusWnd().get() == this)
         border_color = GG::LightenClr(border_color);
     GG::Clr interior_color = Disabled() ? DisabledColor(InteriorColor()) : InteriorColor();
 
@@ -879,7 +886,7 @@ void CUIDropDownList::EnableDropArrow()
 // class CUIEdit
 ///////////////////////////////////////
 CUIEdit::CUIEdit(std::string str) :
-    Edit(std::move(str), ClientUI::GetFont(), ClientUI::CtrlBorderColor(),
+    Edit(std::move(str), GetApp().GetUI().GetFont(), ClientUI::CtrlBorderColor(),
          ClientUI::TextColor(), ClientUI::CtrlColor())
 {}
 
@@ -896,20 +903,20 @@ void CUIEdit::CompleteConstruction() {
 }
 
 void CUIEdit::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    auto hotkey_cut_action        = [this]() { GG::GUI::GetGUI()->CutWndText(this); };
-    auto hotkey_copy_action       = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
-    auto hotkey_paste_action      = [this]() { GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText()); };
-    auto hotkey_select_all_action = [this]() { GG::GUI::GetGUI()->WndSelectAll(this); };
-    auto hotkey_deselect_action   = [this]() { GG::GUI::GetGUI()->WndDeselect(this); };
+    auto hotkey_cut_action        = [this]() { GetApp().CutWndText(this); };
+    auto hotkey_copy_action       = [this]() { GetApp().CopyWndText(this); };
+    auto hotkey_paste_action      = [this]() { GetApp().PasteWndText(this, GetApp().ClipboardText()); };
+    auto hotkey_select_all_action = [this]() { GetApp().WndSelectAll(this); };
+    auto hotkey_deselect_action   = [this]() { GetApp().WndDeselect(this); };
 
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_CUT"),        this->Disabled(), false, hotkey_cut_action));
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_COPY"),       false,            false, hotkey_copy_action));
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_PASTE"),      this->Disabled(), false, hotkey_paste_action));
-    popup->AddMenuItem(GG::MenuItem(true)); // separator
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_SELECT_ALL"), this->Disabled(), false, hotkey_select_all_action));
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_DESELECT"),   this->Disabled(), false, hotkey_deselect_action));
+    popup->AddMenuItem(UserString("HOTKEY_CUT"),        this->Disabled(), false, hotkey_cut_action);
+    popup->AddMenuItem(UserString("HOTKEY_COPY"),       false,            false, hotkey_copy_action);
+    popup->AddMenuItem(UserString("HOTKEY_PASTE"),      this->Disabled(), false, hotkey_paste_action);
+    popup->AddMenuItem(GG::MenuItem::menu_separator);
+    popup->AddMenuItem(UserString("HOTKEY_SELECT_ALL"), this->Disabled(), false, hotkey_select_all_action);
+    popup->AddMenuItem(UserString("HOTKEY_DESELECT"),   this->Disabled(), false, hotkey_deselect_action);
     popup->Run();
 
     // todo: italicize, underline, or colour selected text
@@ -928,10 +935,10 @@ void CUIEdit::KeyPress(GG::Key key, uint32_t key_code_point,
     //bool numlock_on = mod_keys & GG::MOD_KEY_NUM;
 
     if (key == GG::Key::GGK_DELETE && shift_down) {
-        GG::GUI::GetGUI()->CutWndText(this);
+        GetApp().CutWndText(this);
 
     } else if (key == GG::Key::GGK_INSERT && shift_down) {
-        GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText());
+        GetApp().PasteWndText(this, GetApp().ClipboardText());
 
     // todo: italicize, underline selected text with ctrl-i or ctrl-u
     // ... though maybe better with a hotkey?
@@ -944,7 +951,7 @@ void CUIEdit::KeyPress(GG::Key key, uint32_t key_code_point,
 void CUIEdit::AcceptPastedText(const std::string& text) {
     std::string text_copy;
     std::copy_if(text.begin(), text.end(), std::back_inserter(text_copy),
-                 [this](char c){ return m_disallowed_chars.find(c) == std::string::npos; });
+                 [this](char c) noexcept { return m_disallowed_chars.find(c) == std::string::npos; });
     GG::Edit::AcceptPastedText(text_copy);
 }
 
@@ -961,7 +968,7 @@ void CUIEdit::LosingFocus() {
 void CUIEdit::Render() {
     GG::Clr color = Color();
     GG::Clr border_color = Disabled() ? DisabledColor(color) : color;
-    if (GG::GUI::GetGUI()->FocusWnd().get() == this)
+    if (GetApp().FocusWnd().get() == this)
         border_color = GG::LightenClr(border_color);
     GG::Clr int_color_to_use = Disabled() ? DisabledColor(InteriorColor()) : InteriorColor();
 
@@ -992,17 +999,17 @@ CensoredCUIEdit::CensoredCUIEdit(std::string str, char display_placeholder) :
 }
 
 void CensoredCUIEdit::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    auto hotkey_paste_action      = [this]() { GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText()); };
-    auto hotkey_select_all_action = [this]() { GG::GUI::GetGUI()->WndSelectAll(this); };
-    auto hotkey_deselect_action   = [this]() { GG::GUI::GetGUI()->WndDeselect(this); };
+    auto hotkey_paste_action      = [this]() { GetApp().PasteWndText(this, GetApp().ClipboardText()); };
+    auto hotkey_select_all_action = [this]() { GetApp().WndSelectAll(this); };
+    auto hotkey_deselect_action   = [this]() { GetApp().WndDeselect(this); };
 
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
     // omits copy command from base CUIEdit
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_PASTE"),      this->Disabled(), false, hotkey_paste_action));
-    popup->AddMenuItem(GG::MenuItem(true)); // separator
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_SELECT_ALL"), this->Disabled(), false, hotkey_select_all_action));
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_DESELECT"),   this->Disabled(), false, hotkey_deselect_action));
+    popup->AddMenuItem(UserString("HOTKEY_PASTE"),      this->Disabled(), false, hotkey_paste_action);
+    popup->AddMenuItem(GG::MenuItem::menu_separator);
+    popup->AddMenuItem(UserString("HOTKEY_SELECT_ALL"), this->Disabled(), false, hotkey_select_all_action);
+    popup->AddMenuItem(UserString("HOTKEY_DESELECT"),   this->Disabled(), false, hotkey_deselect_action);
     popup->Run();
 }
 
@@ -1087,7 +1094,7 @@ void CensoredCUIEdit::ClearSelected() {
 // class CUIMultiEdit
 ///////////////////////////////////////
 CUIMultiEdit::CUIMultiEdit(std::string str, GG::Flags<GG::MultiEditStyle> style) :
-    MultiEdit(std::move(str), ClientUI::GetFont(), ClientUI::CtrlBorderColor(), style,
+    MultiEdit(std::move(str), GetApp().GetUI().GetFont(), ClientUI::CtrlBorderColor(), style,
               ClientUI::TextColor(), ClientUI::CtrlColor())
 {}
 
@@ -1102,7 +1109,7 @@ void CUIMultiEdit::CompleteConstruction() {
 void CUIMultiEdit::Render() {
     GG::Clr color = Color();
     GG::Clr border_color =      Disabled()  ?   DisabledColor(color)            :   color;
-    if (GG::GUI::GetGUI()->FocusWnd().get() == this)
+    if (GetApp().FocusWnd().get() == this)
         border_color = GG::LightenClr(border_color);
     GG::Clr int_color_to_use =  Disabled()  ?   DisabledColor(InteriorColor())  :   InteriorColor();
 
@@ -1116,22 +1123,22 @@ void CUIMultiEdit::Render() {
 }
 
 void CUIMultiEdit::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    auto hotkey_cut_action        = [this]() { GG::GUI::GetGUI()->CutWndText(this); };
-    auto hotkey_copy_action       = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
-    auto hotkey_paste_action      = [this]() { GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText()); };
-    auto hotkey_select_all_action = [this]() { GG::GUI::GetGUI()->WndSelectAll(this); };
-    auto hotkey_deselect_action   = [this]() { GG::GUI::GetGUI()->WndDeselect(this); };
+    auto hotkey_cut_action        = [this]() { GetApp().CutWndText(this); };
+    auto hotkey_copy_action       = [this]() { GetApp().CopyWndText(this); };
+    auto hotkey_paste_action      = [this]() { GetApp().PasteWndText(this, GetApp().ClipboardText()); };
+    auto hotkey_select_all_action = [this]() { GetApp().WndSelectAll(this); };
+    auto hotkey_deselect_action   = [this]() { GetApp().WndDeselect(this); };
 
     // create popup menu
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
     if (!(this->Style() & GG::MULTI_READ_ONLY))
-        popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_CUT"),    this->Disabled(), false, hotkey_cut_action));
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_COPY"),       false,            false, hotkey_copy_action));
+        popup->AddMenuItem(UserString("HOTKEY_CUT"),    this->Disabled(), false, hotkey_cut_action);
+    popup->AddMenuItem(UserString("HOTKEY_COPY"),       false,            false, hotkey_copy_action);
     if (!(this->Style() & GG::MULTI_READ_ONLY))
-        popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_PASTE"),  this->Disabled(), false, hotkey_paste_action));
-    popup->AddMenuItem(GG::MenuItem(true)); // separator
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_SELECT_ALL"), this->Disabled(), false, hotkey_select_all_action));
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_DESELECT"),   this->Disabled(), false, hotkey_deselect_action));
+        popup->AddMenuItem(UserString("HOTKEY_PASTE"),  this->Disabled(), false, hotkey_paste_action);
+    popup->AddMenuItem(GG::MenuItem::menu_separator);
+    popup->AddMenuItem(UserString("HOTKEY_SELECT_ALL"), this->Disabled(), false, hotkey_select_all_action);
+    popup->AddMenuItem(UserString("HOTKEY_DESELECT"),   this->Disabled(), false, hotkey_deselect_action);
     popup->Run();
     // todo: italicize, underline, or colour selected text
 }
@@ -1161,10 +1168,10 @@ void CUILinkTextMultiEdit::CompleteConstruction() {
     SetName("CUILinkTextMultiEdit: " + m_raw_text.substr(0, 16));
 }
 
-GG::Pt CUILinkTextMultiEdit::TextUpperLeft() const
+GG::Pt CUILinkTextMultiEdit::TextUpperLeft() const noexcept
 { return CUIMultiEdit::TextUpperLeft() - ScrollPosition() + GG::Pt(GG::X(5), GG::Y(5)); }
 
-GG::Pt CUILinkTextMultiEdit::TextLowerRight() const
+GG::Pt CUILinkTextMultiEdit::TextLowerRight() const noexcept
 { return CUIMultiEdit::TextLowerRight() - ScrollPosition() + GG::Pt(GG::X(5), GG::Y(5)); }
 
 void CUILinkTextMultiEdit::Render() {
@@ -1179,26 +1186,26 @@ void CUILinkTextMultiEdit::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
 
 void CUILinkTextMultiEdit::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     auto rclick_action = [this, pt, mod_keys]() { TextLinker::RClick_(pt, mod_keys); };
-    auto hotkey_cut_action        = [this]() { GG::GUI::GetGUI()->CutWndText(this); };
-    auto hotkey_copy_action       = [this]() { GG::GUI::GetGUI()->CopyWndText(this); };
-    auto hotkey_paste_action      = [this]() { GG::GUI::GetGUI()->PasteWndText(this, GG::GUI::GetGUI()->ClipboardText()); };
-    auto hotkey_select_all_action = [this]() { GG::GUI::GetGUI()->WndSelectAll(this); };
-    auto hotkey_deselect_action   = [this]() { GG::GUI::GetGUI()->WndDeselect(this); };
+    auto hotkey_cut_action        = [this]() { GetApp().CutWndText(this); };
+    auto hotkey_copy_action       = [this]() { GetApp().CopyWndText(this); };
+    auto hotkey_paste_action      = [this]() { GetApp().PasteWndText(this, GetApp().ClipboardText()); };
+    auto hotkey_select_all_action = [this]() { GetApp().WndSelectAll(this); };
+    auto hotkey_deselect_action   = [this]() { GetApp().WndDeselect(this); };
 
     // create popup menu
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
     if (GetLinkUnderPt(pt) != -1) {
-        popup->AddMenuItem(GG::MenuItem(UserString("OPEN"),          false,            false, rclick_action));
-        popup->AddMenuItem(GG::MenuItem(true)); // separator
+        popup->AddMenuItem(UserString("OPEN"),          false,            false, rclick_action);
+        popup->AddMenuItem(GG::MenuItem::menu_separator);
     }
     if (!(this->Style() & GG::MULTI_READ_ONLY))
-        popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_CUT"),    this->Disabled(), false, hotkey_cut_action));
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_COPY"),       false,            false, hotkey_copy_action));
+        popup->AddMenuItem(UserString("HOTKEY_CUT"),    this->Disabled(), false, hotkey_cut_action);
+    popup->AddMenuItem(UserString("HOTKEY_COPY"),       false,            false, hotkey_copy_action);
     if (!(this->Style() & GG::MULTI_READ_ONLY))
-        popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_PASTE"),  this->Disabled(), false, hotkey_paste_action));
-    popup->AddMenuItem(GG::MenuItem(true)); // separator
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_SELECT_ALL"), this->Disabled(), false, hotkey_select_all_action));
-    popup->AddMenuItem(GG::MenuItem(UserString("HOTKEY_DESELECT"),   this->Disabled(), false, hotkey_deselect_action));
+        popup->AddMenuItem(UserString("HOTKEY_PASTE"),  this->Disabled(), false, hotkey_paste_action);
+    popup->AddMenuItem(GG::MenuItem::menu_separator);
+    popup->AddMenuItem(UserString("HOTKEY_SELECT_ALL"), this->Disabled(), false, hotkey_select_all_action);
+    popup->AddMenuItem(UserString("HOTKEY_DESELECT"),   this->Disabled(), false, hotkey_deselect_action);
     popup->Run();
 
     // todo: italicize, underline, or colour selected text
@@ -1288,27 +1295,17 @@ namespace {
     constexpr int STAT_ICON_PAD = 2;    // horizontal or vertical space between icon and label
 }
 
-StatisticIcon::StatisticIcon(std::shared_ptr<GG::Texture> texture, GG::X w, GG::Y h) :
-    GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE)
-{ m_icon = GG::Wnd::Create<GG::StaticGraphic>(std::move(texture), GG::GRAPHIC_FITGRAPHIC); }
-
-StatisticIcon::StatisticIcon(std::shared_ptr<GG::Texture> texture,
-                             double value, int digits, bool showsign,
-                             GG::X w, GG::Y h) :
-    GG::Control(GG::X0, GG::Y0, w, h, GG::INTERACTIVE),
-    m_values({std::tuple<double, int, bool>{value, digits, showsign}, {0.0, 0, false}})
-{ m_icon = GG::Wnd::Create<GG::StaticGraphic>(std::move(texture), GG::GRAPHIC_FITGRAPHIC); }
-
 void StatisticIcon::CompleteConstruction() {
     GG::Control::CompleteConstruction();
 
     SetName("StatisticIcon");
     SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
 
-    AttachChild(m_icon);    // created in constructor to forward texture
+    AttachChild(m_icon); // created in constructor to forward texture
 
     const auto format = (Value(Width()) >= Value(Height())) ? GG::FORMAT_LEFT : GG::FORMAT_BOTTOM;
-    m_text = GG::Wnd::Create<CUILabel>("    ", format, GG::NO_WND_FLAGS);
+    m_text = GG::Wnd::Create<GG::TextControl>(GG::X0, GG::Y0, GG::X1, GG::Y1, "    ", m_font,
+                                              ClientUI::TextColor(), format, GG::NO_WND_FLAGS);
     AttachChild(m_text);
 
     RequirePreRender();
@@ -1320,64 +1317,67 @@ void StatisticIcon::PreRender() {
 }
 
 double StatisticIcon::GetValue(std::size_t index) const {
-    if (index < 0u || (!m_have_two && index > 0) || (m_have_two && index > 1)) {
+    if (index >= static_cast<std::size_t>(m_values_shown)) [[unlikely]] {
         ErrorLogger() << "StatisticIcon::GetValue passed index out of range index:" << index;
         return 0.0;
     }
-    return std::get<0>(m_values[index]);
+    return (index == 0) ? m_value0 : m_value1;
 }
 
 void StatisticIcon::SetValue(double value, std::size_t index) {
     if (index > 1u) {
-        ErrorLogger() << "StatisticIcon::SetValue passed index out of range index:" << index;
+        ErrorLogger() << "StatisticIcon::SetValue passed index out of range index: " << index;
         return;
-    }
-    const auto& font = ClientUI::GetFont();
-    if (!font) {
-        ErrorLogger() << "StatisticIcon::SetValue couldn't get a font";
+    } else if (index >= 2) {
+        ErrorLogger() << "StatisticIcon::SetValue tried to set too-high index " << index;
         return;
-    }
-
-    auto& [value0, precision0, show_sign0] = m_values[0];
-    auto& [value1, precision1, show_sign1] = m_values[1];
-
-    auto& valuei = index == 0 ? value0 : value1;
-    if (value != valuei) {
-        RequirePreRender();
+    } else if (m_values_shown == NumValuesDisplayed::ZERO) {
+        ErrorLogger() << "StatisticIcon::SetValue called on icon not showing any values?";
+        return;
+    } else if (!m_font)  {
+        ErrorLogger() << "StatisticIcon::SetValue has no font";
+        return;
+    } else [[likely]] {
+        auto& valuei = (index == 0) ? m_value0 : m_value1;
         valuei = value;
     }
 
-    const bool had_two = m_have_two;
-    if (index == 1)
-        m_have_two = true;
-    if (had_two != m_have_two)
-        RequirePreRender();
+    RequirePreRender();
 
     // Compute text elements
-    GG::Font::TextAndElementsAssembler text_elements(*font, 120, 8); // usually 63 chars enough, but might have bigger numbers and don't want to guess from precision...
+    GG::Font::TextAndElementsAssembler text_elements(*m_font, 120, 8); // usually 63 chars enough, but might have bigger numbers and don't want to guess from precision...
 
+    static constexpr auto colour_for_sign = [](int sign)
+    { return (sign > 0) ? ClientUI::StatIncrColor() : (sign < 0) ? ClientUI::StatDecrColor() : ClientUI::TextColor(); };
+
+    const auto clr0 = [this]() {
+        switch (m_indicate_change0) {
+        case IndicateChangeColour::INDICATE_SELF:      return colour_for_sign(EffectiveSign(m_value0)); break;
+        case IndicateChangeColour::INDICATE_FOR_OTHER: return colour_for_sign(EffectiveSign(m_value1)); break;
+        default:                                       return ClientUI::TextColor();
+        }
+    }();
     text_elements
-        .AddOpenTag(ClientUI::TextColor())
-        .AddText(DoubleToString(value0, precision0, show_sign0))
+        .AddOpenTag(clr0)
+        .AddText(DoubleToString(m_value0, m_digits, m_show_sign0 == ShowSign::SHOW_ALWAYS))
         .AddCloseTag("rgba");
 
-    if (m_have_two) {
-        const auto effective_sign = EffectiveSign(value1);
-        const auto clr = (effective_sign == -1) ? ClientUI::StatDecrColor() :
-            (effective_sign == 1) ? ClientUI::StatIncrColor() :
-            ClientUI::TextColor();
 
+    if (m_values_shown >= NumValuesDisplayed::TWO) {
+        const auto clr1 = [this]() {
+            switch (m_indicate_change1) {
+            case IndicateChangeColour::INDICATE_SELF:      return colour_for_sign(EffectiveSign(m_value1)); break;
+            case IndicateChangeColour::INDICATE_FOR_OTHER: return colour_for_sign(EffectiveSign(m_value0)); break;
+            default:                                       return ClientUI::TextColor();
+            }
+        }();
         text_elements
             .AddText(" ")
-            .AddOpenTag(clr);
-
-        if (effective_sign != -1)
-            text_elements.AddText("+");
-
-        text_elements
-            .AddText(DoubleToString(value1, precision1, show_sign1))
+            .AddOpenTag(clr1)
+            .AddText(DoubleToString(m_value1, m_digits, m_show_sign1 == ShowSign::SHOW_ALWAYS))
             .AddCloseTag("rgba");
     }
+
 
     auto [text, elements] = text_elements.Extract();
     m_text->SetText(std::move(text), std::move(elements));
@@ -1401,15 +1401,13 @@ void StatisticIcon::RButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
 void StatisticIcon::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    if (Disabled())
-        return;
-    LeftClickedSignal(pt);
+    if (!Disabled())
+        LeftClickedSignal(pt);
 }
 
 void StatisticIcon::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    if (Disabled())
-        return;
-    RightClickedSignal(pt);
+    if (!Disabled())
+        RightClickedSignal(pt);
 }
 
 void StatisticIcon::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys)
@@ -1438,9 +1436,6 @@ void StatisticIcon::DoLayout() {
     m_icon->SizeMove(GG::Pt0,
                      GG::Pt(GG::X(icon_dim), GG::Y(icon_dim)));
 
-    if (m_values.empty())
-        return;
-
     GG::Pt text_ul;
     if (Value(Width()) >= Value(Height())) {
         text_ul.x = GG::X(icon_dim + STAT_ICON_PAD);
@@ -1452,14 +1447,14 @@ void StatisticIcon::DoLayout() {
     m_text->SizeMove(text_ul, {Width(), Height()});
 }
 
-GG::Pt StatisticIcon::MinUsableSize() const {
+GG::Pt StatisticIcon::MinUsableSize() const noexcept {
     if (!m_icon)
         return GG::Pt(GG::X1, GG::Y1);
 
-    if (m_values.empty() || !m_text)
+    if (!m_text)
         return m_icon->Size();
 
-    if (Value(Width()) >= Value(Height()))
+    else if (Value(Width()) >= Value(Height()))
         return GG::Pt(m_text->RelativeUpperLeft().x + m_text->Width(),
                       std::max(m_icon->RelativeLowerRight().y, m_text->Height()));
     else
@@ -1470,10 +1465,6 @@ GG::Pt StatisticIcon::MinUsableSize() const {
 ///////////////////////////////////////
 // class CUIToolBar
 ///////////////////////////////////////
-CUIToolBar::CUIToolBar() :
-    GG::Control(GG::X0, GG::Y0, GG::X1, GG::Y1, GG::ONTOP | GG::INTERACTIVE)
-{}
-
 bool CUIToolBar::InWindow(GG::Pt pt) const {
     for (auto& wnd : Children())
         if (wnd->InWindow(pt))
@@ -1507,7 +1498,7 @@ namespace {
             const std::string& species_name = species.Name();
             GG::Wnd::SetName(species_name);
             Init(species_name, UserString(species_name), species.GameplayDescription(), w, h,
-                 ClientUI::SpeciesIcon(species_name));
+                 GetApp().GetUI().SpeciesIcon(species_name));
         };
 
         SpeciesRow(std::string species_name, std::string localized_name, std::string species_desc,
@@ -1566,10 +1557,10 @@ SpeciesSelector::SpeciesSelector(const std::string& preselect_species, GG::X w, 
         [this](GG::DropDownList::iterator it) {
             SpeciesChangedSignal((it == this->end() || !(*it)) ? EMPTY_STRING : (*it)->Name()); });
 
-    const SpeciesManager& sm = GGHumanClientApp::GetApp()->GetSpeciesManager();
-    for (auto it = sm.playable_begin(); it != sm.playable_end(); ++it) {
-        auto row_it = Insert(GG::Wnd::Create<SpeciesRow>(it->second, w, h - 4));
-        if (it->first == preselect_species)
+    const SpeciesManager& sm = GetApp().GetSpeciesManager();
+    for (const auto& [name, species] : sm.AllSpecies() | range_filter(SpeciesManager::is_playable)) {
+        auto row_it = Insert(GG::Wnd::Create<SpeciesRow>(species, w, h - 4));
+        if (name == preselect_species)
             Select(row_it);
     }
 
@@ -1577,7 +1568,7 @@ SpeciesSelector::SpeciesSelector(const std::string& preselect_species, GG::X w, 
         // Add an option for random selection
         auto rand_species_it = Insert(GG::Wnd::Create<SpeciesRow>(
             "RANDOM", UserString("GSETUP_RANDOM"), UserString("GSETUP_SPECIES_RANDOM_DESC"), w, h - 4,
-            ClientUI::GetTexture(ClientUI::ArtDir() / "icons/unknown.png")));
+            GetApp().GetUI().GetTexture(ClientUI::ArtDir() / "icons/unknown.png")));
 
         if (preselect_species == "RANDOM")
             Select(rand_species_it);
@@ -1719,9 +1710,10 @@ void ColorSelector::SizeMove(GG::Pt ul, GG::Pt lr) {
 }
 
 void ColorSelector::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
-    GG::X x = std::min(pt.x, GG::GUI::GetGUI()->AppWidth() - 315);    // 315 is width of ColorDlg from GG::ColorDlg:::ColorDlg
-    GG::Y y = std::min(pt.y, GG::GUI::GetGUI()->AppHeight() - 300);   // 300 is height of ColorDlg from GG::ColorDlg:::ColorDlg
-    auto dlg = GG::Wnd::Create<GG::ColorDlg>(x, y, Color(), ClientUI::GetFont(),
+    const auto& app = GetApp();
+    GG::X x = std::min(pt.x, app.AppWidth() - GG::ColorDlg::DEFAULT_WIDTH);
+    GG::Y y = std::min(pt.y, app.AppHeight() - GG::ColorDlg::DEFAULT_HEIGHT);
+    auto dlg = GG::Wnd::Create<GG::ColorDlg>(x, y, Color(), app.GetUI().GetFont(),
                                              ClientUI::CtrlColor(), ClientUI::CtrlBorderColor(),
                                              ClientUI::TextColor());
     dlg->Run();
@@ -1739,7 +1731,7 @@ void ColorSelector::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     };
 
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
-    popup->AddMenuItem(GG::MenuItem(UserString("RESET"), false, false, reset_color_action));
+    popup->AddMenuItem(UserString("RESET"), false, false, reset_color_action);
     popup->Run();
 }
 
@@ -1749,7 +1741,7 @@ void ColorSelector::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
 ///////////////////////////////////////
 FileDlg::FileDlg(const std::string& directory, const std::string& filename, bool save, bool multi,
                  std::vector<std::pair<std::string, std::string>> types) :
-    GG::FileDlg(directory, filename, save, multi, ClientUI::GetFont(),
+    GG::FileDlg(directory, filename, save, multi, GetApp().GetUI().GetFont(),
                 ClientUI::CtrlColor(), ClientUI::CtrlBorderColor(), ClientUI::TextColor()),
     m_init_file_filters(std::move(types))
 {}
@@ -1773,7 +1765,6 @@ ResourceInfoPanel::ResourceInfoPanel(std::string title, std::string point_units_
            config_name, false),
     m_units_str(std::move(point_units_str)),
     m_title_str(std::move(title)),
-    m_empire_id(ALL_EMPIRES),
     m_empire_column_label(GG::Wnd::Create<CUILabel>(UserString("EMPIRE"), GG::FORMAT_LEFT)),
     m_local_column_label(GG::Wnd::Create<CUILabel>("", GG::FORMAT_LEFT)),
     m_total_points_label(GG::Wnd::Create<CUILabel>(UserString("PRODUCTION_INFO_TOTAL_PS_LABEL"), GG::FORMAT_RIGHT)),
@@ -1914,8 +1905,7 @@ void ResourceInfoPanel::SetEmpireID(int empire_id) {
     int old_empire_id = m_empire_id;
     m_empire_id = empire_id;
     if (old_empire_id != m_empire_id) {
-        const ScriptingContext& context = IApp::GetApp()->GetContext();
-        auto empire = context.GetEmpire(m_empire_id);
+        const auto empire = GetApp().GetContext().GetEmpire(m_empire_id);
         const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
         // let a subsequent SetLocalPointsCost call re-set the title to include location info if necessary
         SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
@@ -1930,8 +1920,7 @@ void ResourceInfoPanel::ClearLocalInfo() {
     DetachChild(m_local_stockpile_use);
     DetachChild(m_local_stockpile_use_P_label);
 
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
-    auto empire = context.GetEmpire(m_empire_id);
+    const auto empire = GetApp().GetContext().GetEmpire(m_empire_id);
     const auto& empire_name{empire ? empire->Name() : EMPTY_STRING};
     SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_INFO_EMPIRE")) % m_title_str % empire_name));
 
@@ -2192,34 +2181,32 @@ void MultiTurnProgressBar::Render() {
 //////////////////////////////////////////////////
 FPSIndicator::FPSIndicator() :
     GG::TextControl(GG::X0, GG::Y0, GG::X1, GG::Y1, "",
-                    ClientUI::GetFont(), ClientUI::TextColor(), GG::FORMAT_NOWRAP, GG::ONTOP)
+                    GetApp().GetUI().GetFont(), ClientUI::TextColor(), GG::FORMAT_NOWRAP, GG::ONTOP)
 {
     SetResetMinSize(true);
     GetOptionsDB().OptionChangedSignal("video.fps.shown").connect(
         boost::bind(&FPSIndicator::UpdateEnabled, this));
     UpdateEnabled();
-    RequirePreRender();
+    UpdateTextWithFPS();
 }
 
-void FPSIndicator::PreRender() {
-    GG::Wnd::PreRender();
-    m_displayed_FPS = static_cast<int>(GG::GUI::GetGUI()->FPS());
-    if (m_enabled)
-        SetText(boost::io::str(FlexibleFormat(UserString("MAP_INDICATOR_FPS")) % m_displayed_FPS));
+void FPSIndicator::UpdateTextWithFPS(int fps) {
+    const auto& font = this->GetFont();
+    if (!font)
+        return;
+    // Keep the ss width uniform (3) to prevent re-layout when size changes cause ChildSizeOrMinSizeOrMaxSizeChanged()
+    std::stringstream ss;
+    ss << std::setw(3) << std::right << std::to_string(fps);
+    auto str = boost::io::str(FlexibleFormat(UserString("MAP_INDICATOR_FPS")) % ss.str());
+    auto [text, elems] = GG::Font::TextAndElementsAssembler{*font}.AddText(std::move(str)).Extract();
+    SetText(std::move(text), std::move(elems));
 }
 
 void FPSIndicator::Render() {
-    if (m_enabled) {
-        int new_FPS = static_cast<int>(GG::GUI::GetGUI()->FPS());
-        if (m_displayed_FPS != new_FPS) {
-            m_displayed_FPS = new_FPS;
-            // Keep the ss width uniform (2) to prevent re-layout when size changes cause ChildSizeOrMinSizeOrMaxSizeChanged()
-            std::stringstream ss;
-            ss << std::setw(2) << std::right << std::to_string(m_displayed_FPS);
-            ChangeTemplatedText(ss.str(), 0);
-        }
-        TextControl::Render();
-    }
+    if (!m_enabled)
+        return;
+    UpdateTextWithFPS(static_cast<int>(GetApp().FPS()));
+    TextControl::Render();
 }
 
 void FPSIndicator::UpdateEnabled() {
@@ -2374,7 +2361,7 @@ void RotatingGraphic::Render() {
     glBindTexture(GL_TEXTURE_2D, texture->OpenGLId());
 
 
-    const int ticks = GG::GUI::GetGUI()->Ticks();     // in ms
+    const int ticks = GetApp().Ticks();     // in ms
     const float minutes = ticks / 1000.0f / 60.0f;
 
     // rotate around centre of rendered area
@@ -2434,7 +2421,7 @@ void RotatingGraphic::Render() {
 ////////////////////////////////////////////////
 
 CUIPopupMenu::CUIPopupMenu(GG::X x, GG::Y y) :
-    GG::PopupMenu(x, y, ClientUI::GetFont(), ClientUI::TextColor(), ClientUI::WndOuterBorderColor(),
+    GG::PopupMenu(x, y, GetApp().GetUI().GetFont(), ClientUI::TextColor(), ClientUI::WndOuterBorderColor(),
                   ClientUI::WndColor(), ClientUI::EditHiliteColor())
 {}
 

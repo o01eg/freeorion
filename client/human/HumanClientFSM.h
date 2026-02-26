@@ -1,7 +1,7 @@
 #ifndef _HumanClientFSM_h_
 #define _HumanClientFSM_h_
 
-#include "../ClientFSMEvents.h"
+#include "ClientFSMEvents.h"
 #include "../../util/Logger.h"
 
 #include <boost/statechart/custom_reaction.hpp>
@@ -91,9 +91,9 @@ class MultiPlayerLobbyWnd;
 struct HumanClientFSM : boost::statechart::state_machine<HumanClientFSM, IntroMenu> {
     typedef boost::statechart::state_machine<HumanClientFSM, IntroMenu> Base;
 
-    HumanClientFSM(GGHumanClientApp &human_client);
+    HumanClientFSM(GGHumanClientApp& human_client);
 
-    void unconsumed_event(const boost::statechart::event_base &event);
+    void unconsumed_event(const boost::statechart::event_base& event);
 
     GGHumanClientApp& m_client;
 
@@ -112,7 +112,8 @@ struct IntroMenu : boost::statechart::state<IntroMenu, HumanClientFSM> {
         boost::statechart::custom_reaction<JoinMPGameRequested>,
         boost::statechart::custom_reaction<StartQuittingGame>,
         boost::statechart::custom_reaction<Disconnection>,
-        boost::statechart::custom_reaction<EndGame>
+        boost::statechart::custom_reaction<EndGame>,
+        boost::statechart::custom_reaction<ParserCompleted>
     > reactions;
 
     IntroMenu(my_context ctx);
@@ -124,6 +125,7 @@ struct IntroMenu : boost::statechart::state<IntroMenu, HumanClientFSM> {
     boost::statechart::result react(const StartQuittingGame& msg);
     boost::statechart::result react(const EndGame&);
     boost::statechart::result react(const Disconnection&);
+    boost::statechart::result react(const ParserCompleted&);
 
     CLIENT_ACCESSOR
 };

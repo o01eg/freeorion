@@ -13,20 +13,6 @@
 
 using namespace GG;
 
-RichTextTag::RichTextTag(std::string tag_, std::string params_string_, std::string content_) :
-    tag(std::move(tag_)),
-    tag_params(std::move(params_string_)),
-    content(std::move(content_))
-{}
-
-RichTextTag::RichTextTag(std::string_view tag_, std::string params_string_, std::string content_) :
-    RichTextTag(std::string{tag_}, std::move(params_string_), std::move(content_))
-{}
-
-std::string RichTextTag::ToString() const
-{ return "<" + tag + (tag_params.length() != 0 ? " " + tag_params : "") + ">" + content + "</" + tag + ">"; }
-
-
 /**
 * @brief The private parser implementation.
 */
@@ -38,7 +24,7 @@ namespace ParseTagsImpl {
     // Helper. Return true if str is a prefix of the string (start..end) or vice versa.
     bool StartsWith(const std::string::const_iterator start,
                     const std::string::const_iterator end,
-                    const std::string& str) noexcept
+                    std::string_view str) noexcept
     {
         auto current = start;
         auto str_current = str.begin();
@@ -55,7 +41,10 @@ namespace ParseTagsImpl {
         return true;
     }
 
-    /** @brief Parses until finds an end tag for \a tag.
+    constexpr std::string_view reset_tag{"<reset>"};
+    static_assert(reset_tag.substr(1u, 5u) == Font::RESET_TAG);
+
+    /** @brief Parses until an end tag for \a tag
       * @return The position just after the end tag. Throws if not found. */
     std::basic_string<char>::const_iterator FinishTag(
         std::string tag,
@@ -73,6 +62,7 @@ namespace ParseTagsImpl {
             std::string error = "Error parsing rich text tags: expected end tag:" + tag + " got end of string.";
             throw std::runtime_error(error);
         }
+
         // ParseTagsImpl should have dropped us off just before the end of our tag.
         const std::string end_tag = "</" + tag + ">";
 
@@ -82,18 +72,30 @@ namespace ParseTagsImpl {
                 tags->emplace_back(std::move(tag), std::move(parameters), std::string(start, current));
 
             // Continue after the tag.
-            return current + end_tag.length();
+            return std::next(current, end_tag.length());
 
-        } else {
-            // The end tag eas not the expected end tag.
-            std::string rest_prefix(current, std::min(current + 20, end));
+        } else if (StartsWith(current, end, reset_tag)) {
+            if (tags)
+                tags->emplace_back(std::move(tag), "", std::string(start, current));
+
+            // Continue without advancing, as a reset tag closes all open tags, not just the inner-most tag
+            return current;
+
+        } else [[unlikely]] {
+            // The end tag was not the expected end tag.
+            const auto end_or_20_later_offset =
+                std::min<decltype(std::distance(current, end))>(std::distance(current, end), 20);
+            std::string rest_prefix(current, std::next(current, end_or_20_later_offset));
             // The rest prefix is likely to be a wrong end tag, but no worries, the rendering
             // tag interpreter ignores unpaired end tags so it will display fine.
-            std::string error = "Error parsing rich text tags: expected end tag:" + tag +
-                " got: \"" + rest_prefix + "...\"";
+            std::string error = "Error parsing rich text tags: expected end tag: </" + tag +
+                "> but instead got: \"" + rest_prefix + "...\"";
             throw std::runtime_error(error);
         }
     }
+
+    auto ToSV(std::pair<std::string::const_iterator, std::string::const_iterator> its)
+    { return std::string_view{std::addressof(*its.first), static_cast<std::size_t>(std::distance(its.first, its.second))}; };
 
     //! Parses tags until the first unmatched close tag, or the end.
     //! \return The position before the first unmatched closing tag or the end.
@@ -105,7 +107,8 @@ namespace ParseTagsImpl {
         boost::match_results<std::string::const_iterator> match;
         boost::match_flag_type flags = boost::match_default;
 
-        // The regular expression for matching begin and end tags. Also extracts parameters from start tags.
+        // The regular expression for matching begin and end tags.
+        // Also extracts parameters from start tags.
         typedef boost::basic_regex<char, boost::regex_traits<char>> regex;
         const static regex tag("<(?<begin_tag>\\w+)( "
                                 "(?<params>[^>]+))?>|</"
@@ -117,20 +120,26 @@ namespace ParseTagsImpl {
             const boost::ssub_match& begin_match = match["begin_tag"];
             const boost::ssub_match& end_match = match["end_tag"];
 
-            if (begin_match.matched) {
+            if (end_match.matched) {
+                //std::cout << "end: " << std::string_view{end_match.first, end_match.second} << std::endl;
+                // An end tag encountered. Stop parsing here.
+                return std::next(current, match.position());
+
+            } else if (begin_match.matched) {
+                const auto match_start = std::next(current, match.position());
+
+                //std::cout << "beg: " << std::string_view{begin_match.first, begin_match.second} << std::endl;
                 // A new tag begins. Finish current plaintext tag if it is non-empty.
-                if (tags && current != current + match.position()) {
-                    tags->emplace_back(RichText::PLAINTEXT_TAG, "",
-                                       std::string(current, current + match.position()));
-                }
+                if (tags && current != match_start)
+                    tags->emplace_back(RichText::PLAINTEXT_TAG, "", std::string(current, match_start));
+
+                // new tag is actually a reset tag. abort up the call chain to excape all open tags
+                if (!tags && ToSV(begin_match) == Font::RESET_TAG) [[unlikely]]
+                    return match_start;
 
                 // Recurse to the next nesting level.
-                current = FinishTag(begin_match, match["params"],
-                                    current + match.position() + match.length(), end, tags);
-
-            } else if (end_match.matched) {
-                // An end tag encountered. Stop parsing here.
-                return current + match.position();
+                auto match_end = std::next(match_start, match.length());
+                current = FinishTag(begin_match, match["params"], match_end, end, tags);
 
             } else {
                 // This really shouldn't happen.
@@ -181,7 +190,7 @@ std::vector<RichTextTag> TagParser::ParseTags(const std::string& text, std::set<
 
     try {
         // Parse all text into tags.
-        ParseTagsImpl::ParseTagsImpl(text.begin(), text.end(), &tags);
+        ParseTagsImpl::ParseTagsImpl(text.begin(), text.end(), std::addressof(tags));
     } catch (const std::exception& ex) {
         // If an error was encountered, display it in the text box.
         tags.clear();

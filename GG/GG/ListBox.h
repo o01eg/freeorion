@@ -17,9 +17,9 @@
 
 
 #include <memory>
+#include <optional>
 #include <set>
 #include <unordered_set>
-#include <boost/optional/optional.hpp>
 #include <GG/AlignmentFlags.h>
 #include <GG/ClrConstants.h>
 #include <GG/Control.h>
@@ -115,7 +115,6 @@ public:
 
         Row() : Row(ListBox::DEFAULT_ROW_WIDTH, ListBox::DEFAULT_ROW_HEIGHT) {}
         Row(X w, Y h);
-        ~Row() = default;
 
         void CompleteConstruction() override;
 
@@ -204,8 +203,7 @@ public:
     static constexpr Y DEFAULT_ROW_HEIGHT{22};
     static constexpr unsigned int BORDER_THICK = 2; ///< the thickness with which to render the border of the control
 
-    ListBox(Clr color, Clr interior = CLR_ZERO);
-    ~ListBox() = default;
+    explicit ListBox(Clr color, Clr interior = CLR_ZERO);
     void CompleteConstruction() override;
 
     Pt MinUsableSize() const noexcept override;
@@ -509,13 +507,12 @@ private:
 
     /** Return a pair of optional X and/or Y dimensions of the scollable area iff vscroll and/or
         hscroll are required. If scrollbars are needed, the scrollable extent will be larger than the
-        client size.  If a scrollbar is not required in some dimension return boost::none
+        client size.  If a scrollbar is not required in some dimension return std::nullopt
         for that dimension. \p maybe_client_size might contain a precalculated client size.
 
         This is a private function that is a component of AdjustScrolls. */
-    std::pair<boost::optional<X>, boost::optional<Y>>
-        CheckIfScrollsRequired(std::pair<bool, bool> force_scrolls = {false, false},
-                               const boost::optional<Pt>& maybe_client_size = boost::none) const;
+    std::pair<std::optional<X>, std::optional<Y>>
+        CheckIfScrollsRequired(std::pair<bool, bool> force_scrolls, Pt client_size) const;
 
     /** Add vscroll and/or hscroll if \p required_total_extents the x andor y dimension exists. The
         value of \p required_total_extents is the full x and y dimensions of the underlying ListBox
@@ -524,8 +521,8 @@ private:
         contain a precalculated client size as calculated in ClientSizeExcludingScrolls.
 
         This is a private function that is a component of AdjustScrolls. */
-    std::pair<bool, bool> AddOrRemoveScrolls(const std::pair<boost::optional<X>, boost::optional<Y>>& required_total_extents,
-                                             const boost::optional<Pt>& maybe_client_size = boost::none);
+    std::pair<bool, bool> AddOrRemoveScrolls(
+        std::pair<std::optional<X>, std::optional<Y>> required_total_extents, Pt client_size);
 
     /// m_rows is mutable to enable returning end() from const functions in constant time.
     mutable std::list<std::shared_ptr<Row>> m_rows;             ///< line item data
@@ -534,6 +531,8 @@ private:
     std::shared_ptr<Scroll> m_hscroll;          ///< horizontal scroll bar at bottom
     unsigned int            m_vscroll_wheel_scroll_increment = 0;
     unsigned int            m_hscroll_wheel_scroll_increment = 0;
+    boost::signals2::scoped_connection m_vscroll_connection;
+    boost::signals2::scoped_connection m_hscroll_connection;
 
     iterator        m_caret = m_rows.end();             ///< the item currently selected, or the last item selected by the user 
     SelectionSet    m_selections;                       ///< vector of indexes of selected items
@@ -564,8 +563,8 @@ private:
     using sort_func_t = std::function<bool (const Row&, const Row&, std::size_t)>;
     sort_func_t             m_sort_cmp;                 ///< the predicate used to sort the values in the m_sort_col column of two rows
 
-    /** Set to boost::none to allow all types.  Otherwise each string is an allowed type.*/
-    boost::optional<std::unordered_set<std::string>> m_allowed_drop_types = boost::none;
+    /** Set to std::nullopt to allow all types.  Otherwise each string is an allowed type.*/
+    std::optional<std::unordered_set<std::string>> m_allowed_drop_types = std::nullopt;
 
     Timer           m_auto_scroll_timer{250};
     unsigned int    m_auto_scroll_margin = 8;

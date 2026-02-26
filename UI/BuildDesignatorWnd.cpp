@@ -156,8 +156,10 @@ namespace {
                 return;
             m_initialized = true;
 
-            const ScriptingContext& context = IApp::GetApp()->GetContext();
+            auto& app = GetApp();
+            const ScriptingContext& context = app.GetContext();
             auto empire = context.GetEmpire(m_empire_id);
+            auto& ui = app.GetUI();
 
             std::shared_ptr<GG::Texture>                texture;
             std::string                                 name_text;
@@ -167,27 +169,27 @@ namespace {
 
             switch (m_item.build_type) {
             case BuildType::BT_BUILDING: {
-                texture = ClientUI::BuildingIcon(m_item.name);
+                texture = ui.BuildingIcon(m_item.name);
                 desc_text = UserString("BT_BUILDING");
                 name_text = UserString(m_item.name);
                 break;
             }
             case BuildType::BT_SHIP: {
-                texture = ClientUI::ShipDesignIcon(m_item.design_id);
+                texture = ui.ShipDesignIcon(m_item.design_id);
                 desc_text = UserString("BT_SHIP");
                 if (const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_item.design_id))
                     name_text = design->Name(true);
                 break;
             }
             case BuildType::BT_STOCKPILE: {
-                texture = ClientUI::MeterIcon(MeterType::METER_STOCKPILE);
+                texture = ui.MeterIcon(MeterType::METER_STOCKPILE);
                 desc_text = UserString("BT_STOCKPILE");
                 name_text = UserString(m_item.name);
                 break;
             }
             default:
                 ErrorLogger() << "ProductionItemPanel::Init got invalid item type";
-                texture = ClientUI::GetTexture("");
+                texture = ui.GetTexture("");
             }
 
             float local_pp_output = 0.0f;
@@ -217,10 +219,10 @@ namespace {
 
             m_icon = GG::Wnd::Create<GG::StaticGraphic>(
                 std::move(texture), GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE);
-            m_name = GG::Wnd::Create<CUILabel>(std::move(name_text), GG::FORMAT_LEFT);
-            //m_cost = GG::Wnd::Create<CUILabel>(cost_text);
-            m_time = GG::Wnd::Create<CUILabel>(std::move(time_text));
-            m_desc = GG::Wnd::Create<CUILabel>(std::move(desc_text), GG::FORMAT_LEFT);
+            m_name = GG::Wnd::Create<CUILabel>(std::move(name_text), ui, GG::FORMAT_LEFT);
+            //m_cost = GG::Wnd::Create<CUILabel>(cost_text, ui);
+            m_time = GG::Wnd::Create<CUILabel>(std::move(time_text), ui);
+            m_desc = GG::Wnd::Create<CUILabel>(std::move(desc_text), ui, GG::FORMAT_LEFT);
 
             AttachChild(m_icon);
             AttachChild(m_name);
@@ -246,14 +248,15 @@ namespace {
                                                        int empire_id, bool only_failed_conditions)
     {
         std::vector<const Condition::Condition*> enqueue_conditions;
-        Condition::EmpireHasBuildingTypeAvailable bld_avail_cond(building_name);
-        enqueue_conditions.push_back(&bld_avail_cond);
+        enqueue_conditions.reserve(3);
+        const Condition::EmpireHasBuildingTypeAvailable bld_avail_cond(building_name);
+        enqueue_conditions.push_back(std::addressof(bld_avail_cond));
         if (const BuildingType* building_type = GetBuildingType(building_name)) {
             enqueue_conditions.push_back(building_type->EnqueueLocation());
             enqueue_conditions.push_back(building_type->Location());
         }
 
-        const ScriptingContext& context = IApp::GetApp()->GetContext();
+        const ScriptingContext& context = GetApp().GetContext();
         const auto& objects = context.ContextObjects();
         const auto empire = context.GetEmpire(empire_id);
         const ScriptingContext source_context(context, ScriptingContext::Source{},
@@ -279,10 +282,10 @@ namespace {
 
         std::vector<const Condition::Condition*> location_conditions;
         location_conditions.reserve(4);
-        location_conditions.push_back(&can_prod_ship_cond);
-        location_conditions.push_back(&ship_avail_cond);
+        location_conditions.push_back(std::addressof(can_prod_ship_cond));
+        location_conditions.push_back(std::addressof(ship_avail_cond));
 
-        const ScriptingContext& context = IApp::GetApp()->GetContext();
+        const ScriptingContext& context = GetApp().GetContext();
         const Universe& universe = context.ContextUniverse();
 
         if (const ShipDesign* ship_design = universe.GetShipDesign(ship_design_id)) {
@@ -335,11 +338,13 @@ namespace {
         void PreRender() override {
             GG::Wnd::PreRender();
 
+            auto& app = GetApp();
+
             SetChildClippingMode(ChildClippingMode::ClipToClient);
-            auto [icon, main_text] = [this]() -> std::pair<std::shared_ptr<GG::Texture>, std::string> {
+            auto [icon, main_text] = [this, &app]() -> std::pair<std::shared_ptr<GG::Texture>, std::string> {
                 switch (m_item.build_type) {
                 case BuildType::BT_BUILDING:  return PreRenderBuilding();  break;
-                case BuildType::BT_SHIP:      return PreRenderDesign();    break;
+                case BuildType::BT_SHIP:      return PreRenderDesign(app.GetContext(), app.GetUI()); break;
                 case BuildType::BT_STOCKPILE: return PreRenderStockpile(); break;
                 default: return {nullptr, EMPTY_STRING};
                 }
@@ -362,13 +367,14 @@ namespace {
 
             const GG::Y ROW_HEIGHT{IconTextBrowseWndRowHeight()};
 
-            m_title_text_label = GG::Wnd::Create<CUILabel>(title, GG::FORMAT_LEFT);
+            m_title_text_label = GG::Wnd::Create<CUILabel>(title, app.GetUI(), GG::FORMAT_LEFT);
             m_title_text_label->MoveTo(GG::Pt(m_icon->Width() + GG::X(EDGE_PAD), GG::Y0));
             m_title_text_label->Resize(GG::Pt(ICON_BROWSE_TEXT_WIDTH, ROW_HEIGHT));
-            m_title_text_label->SetFont(ClientUI::GetBoldFont());
+            m_title_text_label->SetFont(app.GetUI().GetBoldFont());
 
 
             m_main_text_label = GG::Wnd::Create<CUILabel>(ValueRefLinkText(std::move(main_text), false),
+                                                          app.GetUI(),
                                                           GG::FORMAT_LEFT | GG::FORMAT_TOP | GG::FORMAT_WORDBREAK);
             m_main_text_label->MoveTo(GG::Pt(m_icon->Width() + GG::X(EDGE_PAD), ROW_HEIGHT));
             m_main_text_label->Resize(GG::Pt(ICON_BROWSE_TEXT_WIDTH, ICON_BROWSE_ICON_HEIGHT));
@@ -403,7 +409,8 @@ namespace {
         }
 
         std::pair<std::shared_ptr<GG::Texture>, std::string> PreRenderBuilding() {
-            const ScriptingContext& context = IApp::GetApp()->GetContext();
+            auto& app = GetApp();
+            const auto& context = app.GetContext();
             auto [obj, candidate_name] = GetObjName(context);
             auto [local_pp_output, stockpile, stockpile_limit_per_turn] = GetOutputStockpile(context);
 
@@ -417,7 +424,7 @@ namespace {
                 // if location object is available, or cost and time are invariation to location, can safely evaluate cost and time
                 const float total_cost = building_type->ProductionCost(m_empire_id, m_candidate_object_id, context);
                 const int minimum_production_time =
-                    std::max(1, building_type->ProductionTime( m_empire_id, m_candidate_object_id, context));
+                    std::max(1, building_type->ProductionTime(m_empire_id, m_candidate_object_id, context));
 
                 if (obj) {
                     // if location object is available, can evaluate production time at that location
@@ -477,11 +484,12 @@ namespace {
                 }
             }
 
-            return std::pair{ClientUI::BuildingIcon(m_item.name), std::move(main_text)};
+            return {app.GetUI().BuildingIcon(m_item.name), std::move(main_text)};
         }
 
-        std::pair<std::shared_ptr<GG::Texture>, std::string> PreRenderDesign() {
-            const ScriptingContext& context = IApp::GetApp()->GetContext();
+        std::pair<std::shared_ptr<GG::Texture>, std::string> PreRenderDesign(
+            const ScriptingContext& context, ClientUI& ui)
+        {
             auto [obj, candidate_name] = GetObjName(context);
             auto [local_pp_output, stockpile, stockpile_limit_per_turn] = GetOutputStockpile(context);
 
@@ -573,11 +581,11 @@ namespace {
                     main_text += ("\n\n" + failed_cond_loc + ":\n" + location_condition_failed_text);
                 }
 
-            return std::pair{ClientUI::ShipDesignIcon(m_item.design_id), std::move(main_text)};
+            return {ui.ShipDesignIcon(m_item.design_id), std::move(main_text)};
         }
 
         std::pair<std::shared_ptr<GG::Texture>, std::string> PreRenderStockpile()
-        { return std::pair{ClientUI::MeterIcon(MeterType::METER_STOCKPILE), UserString("PROJECT_BT_STOCKPILE_DESC")}; }
+        { return std::pair{GetApp().GetUI().MeterIcon(MeterType::METER_STOCKPILE), UserString("PROJECT_BT_STOCKPILE_DESC")}; }
 
         std::shared_ptr<GG::StaticGraphic>     m_icon;
         std::shared_ptr<GG::Label>             m_title_text_label;
@@ -605,15 +613,12 @@ namespace {
 
             ScopedTimer timer("ProductionItemRow: " + item.name);
 
-            if (m_item.build_type == BuildType::BT_SHIP) {
-                SetDragDropDataType(std::to_string(m_item.design_id));
-            } else {
-                SetDragDropDataType(m_item.name);
-            }
+            SetDragDropDataType((m_item.build_type == BuildType::BT_SHIP) ?
+                                std::to_string(m_item.design_id) : m_item.name);
 
             m_panel = GG::Wnd::Create<ProductionItemPanel>(w, h, m_item, empire_id, location_id);
 
-            const ScriptingContext& context = IApp::GetApp()->GetContext();
+            const ScriptingContext& context = GetApp().GetContext();
             if (auto empire = context.GetEmpire(empire_id)) {
                 if (!empire->ProducibleItem(m_item, location_id, context)) {
                     this->Disable(true);
@@ -877,7 +882,7 @@ void BuildDesignatorWnd::BuildSelector::SetEmpireID(int empire_id, bool refresh_
         // ensure signal connection set up properly, without actually
         // repopulating the list, as would be dine in Refresh()
         m_empire_ship_designs_changed_connection.disconnect();
-        const ScriptingContext& context = GGHumanClientApp::GetApp()->GetContext();
+        const ScriptingContext& context = GetApp().GetContext();
         if (auto empire = context.GetEmpire(m_empire_id))
             m_empire_ship_designs_changed_connection = empire->ShipDesignsChangedSignal.connect(
                 [this]() { Refresh(); }, boost::signals2::at_front);
@@ -886,7 +891,7 @@ void BuildDesignatorWnd::BuildSelector::SetEmpireID(int empire_id, bool refresh_
 
 void BuildDesignatorWnd::BuildSelector::Refresh() {
     ScopedTimer timer("BuildDesignatorWnd::BuildSelector::Refresh()");
-    const ScriptingContext& context = GGHumanClientApp::GetApp()->GetContext();
+    const ScriptingContext& context = GetApp().GetContext();
 
     if (auto prod_loc = context.ContextObjects().get(this->m_production_location))
         this->SetName(boost::io::str(FlexibleFormat(UserString("PRODUCTION_WND_BUILD_ITEMS_TITLE_LOCATION")) % prod_loc->Name()));
@@ -967,7 +972,7 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
     if (build_type != BuildType::BT_STOCKPILE)
         throw std::invalid_argument("BuildableItemVisible was passed an invalid build type without id");
 
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
+    const ScriptingContext& context = GetApp().GetContext();
     if (auto empire = context.GetEmpire(m_empire_id))
         return empire->ProducibleItem(build_type, m_production_location, context);
     return true;
@@ -984,7 +989,7 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
     if (!building_type || !building_type->Producible())
         return false;
 
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
+    const ScriptingContext& context = GetApp().GetContext();
     auto empire = context.GetEmpire(m_empire_id);
     if (!empire)
         return true;
@@ -1009,13 +1014,12 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
     if (!m_build_types_shown.contains(build_type))
         return false;
 
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
-
+    const ScriptingContext& context = GetApp().GetContext();
     const ShipDesign* design = context.ContextUniverse().GetShipDesign(design_id);
     if (!design || !design->Producible())
         return false;
 
-    const auto& empire = context.GetEmpire(m_empire_id);
+    const auto empire = context.GetEmpire(m_empire_id);
     if (!empire)
         return true;
 
@@ -1029,8 +1033,9 @@ bool BuildDesignatorWnd::BuildSelector::BuildableItemVisible(BuildType build_typ
 }
 
 void BuildDesignatorWnd::BuildSelector::PopulateList() {
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
-    const Universe& universe{context.ContextUniverse()};
+    auto& app = GetApp();
+    const auto& context = app.GetContext();
+    const Universe& universe = context.ContextUniverse();
     auto empire = context.GetEmpire(m_empire_id);
     if (!empire)
         return;
@@ -1045,7 +1050,6 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
 
     m_buildable_items->Clear(); // the list of items to be populated
 
-    auto default_font = ClientUI::GetFont();
     const GG::Pt row_size = m_buildable_items->ListRowSize();
 
     timer.EnterSection("fixed projects");
@@ -1078,7 +1082,7 @@ void BuildDesignatorWnd::BuildSelector::PopulateList() {
         // get ids of designs to show... for specific empire, or for all empires
         std::vector<int> design_ids;
         if (empire) {
-            design_ids = ClientUI::GetClientUI()->GetShipDesignManager()->DisplayedDesigns()->OrderedIDs();
+            design_ids = app.GetUI().GetShipDesignManager()->DisplayedDesigns()->OrderedIDs();
         } else {
             design_ids.reserve(universe.ShipDesigns().size());
             std::transform(universe.ShipDesigns().begin(), universe.ShipDesigns().end(),
@@ -1148,7 +1152,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemLeftClicked(GG::ListBox::iterat
         DisplayBuildingTypeSignal(building_type);
 
     } else if (build_type == BuildType::BT_SHIP) {
-        const ShipDesign* design = IApp::GetApp()->GetContext().ContextUniverse().GetShipDesign(item.design_id);
+        const ShipDesign* design = GetApp().GetContext().ContextUniverse().GetShipDesign(item.design_id);
         if (!design) {
             ErrorLogger() << "BuildDesignatorWnd::BuildSelector::BuildItemSelected unable to find design with id " << item.design_id;
             return;
@@ -1179,7 +1183,7 @@ void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::itera
     if (item.build_type == BuildType::BT_BUILDING) {
         item_name = item.name;
     } else if (item.build_type == BuildType::BT_SHIP) {
-        item_name = IApp::GetApp()->GetContext().ContextUniverse().GetShipDesign(item.design_id)->Name(false);
+        item_name = GetApp().GetContext().ContextUniverse().GetShipDesign(item.design_id)->Name(false);
     } else if (item.build_type == BuildType::BT_STOCKPILE) {
         item_name = UserStringNop("PROJECT_BT_STOCKPILE");
     } else {
@@ -1197,15 +1201,15 @@ void BuildDesignatorWnd::BuildSelector::BuildItemRightClicked(GG::ListBox::itera
     auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
     if (!((*it)->Disabled())) {
-        popup->AddMenuItem(GG::MenuItem(UserString("PRODUCTION_DETAIL_ADD_TO_QUEUE"),   false, false, add_bottom_queue_action));
-        popup->AddMenuItem(GG::MenuItem(UserString("PRODUCTION_DETAIL_ADD_TO_TOP_OF_QUEUE"),  false, false, add_top_queue_action));
+        popup->AddMenuItem(UserString("PRODUCTION_DETAIL_ADD_TO_QUEUE"), false, false, add_bottom_queue_action);
+        popup->AddMenuItem(UserString("PRODUCTION_DETAIL_ADD_TO_TOP_OF_QUEUE"), false, false, add_top_queue_action);
     }
 
     if (UserStringExists(item_name))
         item_name = UserString(item_name);
 
     std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) % item_name);
-    popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false, pedia_lookup_action));
+    popup->AddMenuItem(std::move(popup_label), false, false, pedia_lookup_action);
     popup->Run();
 }
 
@@ -1227,7 +1231,7 @@ void BuildDesignatorWnd::CompleteConstruction() {
     m_side_panel = GG::Wnd::Create<SidePanel>(PROD_SIDEPANEL_WND_NAME);
     m_build_selector = GG::Wnd::Create<BuildSelector>(PROD_SELECTOR_WND_NAME);
     InitializeWindows();
-    GGHumanClientApp::GetApp()->RepositionWindowsSignal.connect([this]() { InitializeWindows(); });
+    GetApp().RepositionWindowsSignal.connect([this]() { InitializeWindows(); });
 
     m_side_panel->EnableSelection();
 
@@ -1272,7 +1276,7 @@ void BuildDesignatorWnd::CompleteConstruction() {
     MoveChildUp(m_enc_detail_panel.get());
     MoveChildUp(m_build_selector.get());
 
-    Clear(GGHumanClientApp::GetApp()->GetContext().ContextObjects());
+    Clear(GetApp().GetContext().ContextObjects());
 }
 
 const std::set<BuildType>& BuildDesignatorWnd::GetBuildTypesShown() const noexcept
@@ -1303,27 +1307,27 @@ void BuildDesignatorWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
 void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
     SetBuild(queue_idx);
 
-    auto* app = GGHumanClientApp::GetApp();
-    const ScriptingContext& context = app->GetContext();
-    const ObjectMap& objects = context.ContextObjects();
-    int empire_id = app->EmpireID();
+    auto& app = GetApp();
+    auto& context = app.GetContext();
+    const auto& objects = context.ContextObjects();
+    const int empire_id = app.EmpireID();
 
-    auto empire = context.GetEmpire(empire_id);
+    auto empire = std::as_const(context).GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "BuildDesignatorWnd::CenterOnBuild couldn't get empire with id " << empire_id;
         return;
     }
 
-    const ProductionQueue& queue = empire->GetProductionQueue();
+    const auto& queue = empire->GetProductionQueue();
     if (0 <= queue_idx && queue_idx < static_cast<int>(queue.size())) {
-        int location_id = queue[queue_idx].location;
+        const int location_id = queue[queue_idx].location;
         if (auto build_location = objects.get(location_id)) {
             // centre map on system of build location
-            int system_id = build_location->SystemID();
-            if (auto map = ClientUI::GetClientUI()->GetMapWnd(false)) {
-                map->CenterOnObject(system_id);
+            const int system_id = build_location->SystemID();
+            if (auto map = app.GetUI().GetMapWnd(false)) {
+                map->CenterOnObject(system_id, objects);
                 if (open) {
-                    map->SelectSystem(system_id);
+                    map->SelectSystem(system_id, context);
                     SelectPlanet(location_id, objects);
                 }
             }
@@ -1332,10 +1336,11 @@ void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
 }
 
 void BuildDesignatorWnd::SetBuild(int queue_idx) {
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
+    auto& app = GetApp();
+    const auto& context = app.GetContext();
+    const int empire_id = app.EmpireID();
+    const auto empire = context.GetEmpire(empire_id);
 
-    int empire_id = GGHumanClientApp::GetApp()->EmpireID();
-    auto empire = context.GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "BuildDesignatorWnd::SetBuild couldn't get empire with id " << empire_id;
         return;
@@ -1369,7 +1374,7 @@ void BuildDesignatorWnd::SelectSystem(int system_id, const ObjectMap& objects) {
 
     if (system_id != INVALID_OBJECT_ID) {
         // set sidepanel's system and autoselect a suitable planet
-        SidePanel::SetSystem(system_id);
+        SidePanel::SetSystem(system_id, objects);
         SelectDefaultPlanet(objects);
     }
 }
@@ -1382,7 +1387,7 @@ void BuildDesignatorWnd::SelectPlanet(int planet_id, const ObjectMap& objects) {
 }
 
 void BuildDesignatorWnd::Refresh() {
-    m_build_selector->SetEmpireID(GGHumanClientApp::GetApp()->EmpireID(), false);
+    m_build_selector->SetEmpireID(GetApp().EmpireID(), false);
     Update();
 }
 
@@ -1422,7 +1427,7 @@ void BuildDesignatorWnd::Reset(const ObjectMap& objects) {
 }
 
 void BuildDesignatorWnd::Clear(const ObjectMap& objects) {
-    SidePanel::SetSystem(INVALID_OBJECT_ID);
+    SidePanel::SetSystem(INVALID_OBJECT_ID, objects);
     Reset(objects);
     m_system_default_planets.clear();
 }
@@ -1572,11 +1577,10 @@ bool BuildDesignatorWnd::PediaVisible()
 int BuildDesignatorWnd::BuildLocation() const
 { return m_side_panel->SelectedPlanetID(); }
 
-void BuildDesignatorWnd::BuildItemRequested(ProductionQueue::ProductionItem item,
-                                            int num_to_build, int pos)
-{
-    const ScriptingContext& context = IApp::GetApp()->GetContext();
-    auto empire = context.GetEmpire(GGHumanClientApp::GetApp()->EmpireID());
+void BuildDesignatorWnd::BuildItemRequested(ProductionQueue::ProductionItem item, int num_to_build, int pos) {
+    const auto& app = GetApp();
+    const auto& context = app.GetContext();
+    auto empire = context.GetEmpire(app.EmpireID());
     if (empire && empire->EnqueuableItem(item, BuildLocation(), context))
         AddBuildToQueueSignal(std::move(item), num_to_build, BuildLocation(), pos);
 }

@@ -26,6 +26,20 @@ FO_ENUM(
     ((NUM_STAR_TYPES))
 )
 
+[[nodiscard]] constexpr std::string_view DumpEnum(StarType value) noexcept {
+    switch (value) {
+    case StarType::STAR_BLUE:    return "Blue";
+    case StarType::STAR_WHITE:   return "White";
+    case StarType::STAR_YELLOW:  return "Yellow";
+    case StarType::STAR_ORANGE:  return "Orange";
+    case StarType::STAR_RED:     return "Red";
+    case StarType::STAR_NEUTRON: return "Neutron";
+    case StarType::STAR_BLACK:   return "BlackHole";
+    case StarType::STAR_NONE:    return "NoStar";
+    default:                     return "Unknown";
+    }
+}
+
 
 /** contains UniverseObjects and connections to other systems (starlanes and
    wormholes).  All systems are UniversObjects contained within the universe,
@@ -42,12 +56,12 @@ class FO_COMMON_API System final : public UniverseObject {
 public:
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
 
-    using UniverseObject::IDSet;
-    [[nodiscard]] const IDSet& ContainedObjectIDs() const noexcept override { return m_objects; }
+    [[nodiscard]] std::span<const int> ContainedObjectIDs() const override { return ToSpan(m_objects); }
 
-    [[nodiscard]] bool Contains(int object_id) const override;
+    [[nodiscard]] bool Contains(int object_id) const override
+    { return object_id != INVALID_OBJECT_ID && m_objects.contains(object_id); }
 
-    [[nodiscard]] bool ContainedBy(int object_id) const noexcept override { return false; }
+    [[nodiscard]] bool ContainedBy(int) const noexcept override { return false; }
 
     /** returns the name to display for players for this system.  While all
       * systems may have a proper name assigned, if they contain no planets or
@@ -103,7 +117,7 @@ public:
         UniverseObject::SetID(id);
     }
 
-    void SetOwner(int id) override {} // no-op for systems
+    void SetOwner(int) override {} // no-op for systems
 
     void ResetTargetMaxUnpairedMeters() override;
 

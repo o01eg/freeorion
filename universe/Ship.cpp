@@ -107,7 +107,7 @@ std::shared_ptr<UniverseObject> Ship::Clone(const Universe& universe, int empire
 }
 
 void Ship::Copy(const UniverseObject& copied_object, const Universe& universe, int empire_id) {
-    if (&copied_object == this)
+    if (std::addressof(copied_object) == this)
         return;
 
     if (copied_object.ObjectType() != UniverseObjectType::OBJ_SHIP) {
@@ -119,7 +119,7 @@ void Ship::Copy(const UniverseObject& copied_object, const Universe& universe, i
 }
 
 void Ship::Copy(const Ship& copied_ship, const Universe& universe, int empire_id) {
-    if (&copied_ship == this)
+    if (std::addressof(copied_ship) == this)
         return;
 
     const int copied_object_id = copied_ship.ID();
@@ -378,21 +378,21 @@ const std::string& Ship::PublicName(int empire_id) const {
 
 const Meter* Ship::GetPartMeter(MeterType type, const std::string& part_name) const {
     const Meter* retval = nullptr;
-    const auto it = std::find_if(m_part_meters.begin(), m_part_meters.end(),
-                                 [type, &part_name](const auto& name_type)
-                                 { return name_type.first.first == part_name && name_type.first.second == type; });
+    const auto it = range_find_if(m_part_meters,
+                                  [type, &part_name](const auto& name_type)
+                                  { return name_type.first.first == part_name && name_type.first.second == type; });
     if (it != m_part_meters.end())
-        retval = &it->second;
+        retval = std::addressof(it->second);
     return retval;
 }
 
 Meter* Ship::GetPartMeter(MeterType type, const std::string& part_name) {
     Meter* retval = nullptr;
-    const auto it = std::find_if(m_part_meters.begin(), m_part_meters.end(),
-                                 [type, &part_name](const auto& name_type)
-                                 { return name_type.first.first == part_name && name_type.first.second == type; });
+    const auto it = range_find_if(m_part_meters,
+                                  [type, &part_name](const auto& name_type)
+                                  { return name_type.first.first == part_name && name_type.first.second == type; });
     if (it != m_part_meters.end())
-        retval = &it->second;
+        retval = std::addressof(it->second);
     return retval;
 }
 
@@ -522,24 +522,21 @@ float Ship::TotalWeaponsShipDamage(const ScriptingContext& context, float shield
 std::vector<float> Ship::AllWeaponsFighterDamage(const ScriptingContext& context,
                                                  bool launch_fighters) const
 {
-    return Combat::WeaponDamageImpl(context, *this, /*target_shield_DR*/0, /*max meters*/false,
-                                    launch_fighters, /*target_ships*/false);
+    return Combat::WeaponDamageImpl(context, *this, /*target_shield_DR*/0.0f, Combat::MaxWD::CURRENT,
+                                    Combat::InclFightersWD{launch_fighters}, Combat::TargetShipsWD::NoShips);
 }
 
 std::vector<float> Ship::AllWeaponsShipDamage(const ScriptingContext& context, float shield_DR,
                                               bool launch_fighters) const
-{ return Combat::WeaponDamageImpl(context, *this, shield_DR, false, launch_fighters, true); }
-
-std::vector<float> Ship::AllWeaponsMaxShipDamage(const ScriptingContext& context, float shield_DR,
-                                                 bool launch_fighters) const
 {
-    std::vector<float> retval;
+    return Combat::WeaponDamageImpl(context, *this, shield_DR, Combat::MaxWD::CURRENT,
+                                    Combat::InclFightersWD{launch_fighters}, Combat::TargetShipsWD::TargetShips);
+}
 
-    const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_design_id);
-    if (!design)
-        return retval;
-
-    return Combat::WeaponDamageImpl(context, *this, shield_DR, true, launch_fighters);
+std::vector<float> Ship::AllWeaponsMaxShipDamage(const ScriptingContext& context, float shield_DR, bool) const {
+    if (context.ContextUniverse().GetShipDesign(m_design_id))
+        return Combat::WeaponDamageImpl(context, *this, shield_DR, Combat::MaxWD::MAX, Combat::InclFightersWD::WITH);
+    return {};
 }
 
 std::size_t Ship::SizeInMemory() const {
@@ -768,9 +765,13 @@ std::string NewMonsterName() {
         monster_names.push_back(UserString("MONSTER"));
 
     // select name randomly from list
-    int monster_name_index = RandInt(0, static_cast<int>(monster_names.size()) - 1);
-    std::string result = monster_names[monster_name_index];
-    if (monster_names_used[result]++)
-        result += " " + RomanNumber(monster_names_used[result]);
+    std::size_t monster_name_index = static_cast<std::size_t>(
+        RandInt(0, static_cast<int>(monster_names.size()) - 1));
+    auto result{monster_names[monster_name_index]};
+    auto& count = monster_names_used[result];
+    if (count++)
+        result += " " + RomanNumber(count);
     return result;
 }
+
+static_assert([]() { uint8_t i = 0; return i++; }() == 0);

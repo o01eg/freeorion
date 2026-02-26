@@ -54,7 +54,7 @@ namespace {
         using ServerList = std::vector<std::pair<boost::asio::ip::address, std::string>>;
 
         ServerDiscoverer(boost::asio::io_context& io_context) :
-            m_io_context(&io_context),
+            m_io_context(std::addressof(io_context)),
             m_timer(io_context),
             m_socket(io_context)
         {}
@@ -209,6 +209,8 @@ public:
     void SetHostPlayerID(int host_player_id) noexcept { m_host_player_id = host_player_id; }
 
     Networking::AuthRoles& AuthorizationRoles() noexcept { return m_roles; }
+
+    boost::asio::io_context& IoContext() noexcept { return m_io_context; }
 
 private:
     void HandleException(const boost::system::system_error& error);
@@ -391,7 +393,7 @@ bool ClientNetworking::Impl::ConnectToServer(const ClientNetworking* const self,
         }
         else {
             TraceLogger(network) << "ClientNetworking::Impl::ConnectToServer() - Could not connect";
-            if(!expect_timeout)
+            if (!expect_timeout)
                 InfoLogger(network) << "ConnectToServer() : failed to connect to server.";
         };
 
@@ -800,8 +802,11 @@ void ClientNetworking::SetPlayerID(int player_id)
 void ClientNetworking::SetHostPlayerID(int host_player_id) noexcept
 { return m_impl->SetHostPlayerID(host_player_id); }
 
-Networking::AuthRoles& ClientNetworking::AuthorizationRoles()
+Networking::AuthRoles& ClientNetworking::AuthorizationRoles() noexcept
 { return m_impl->AuthorizationRoles(); }
+
+boost::asio::io_context& ClientNetworking::IoContext() noexcept
+{ return m_impl->IoContext(); }
 
 void ClientNetworking::SendMessage(Message message)
 { m_impl->SendMessage(std::move(message)); }

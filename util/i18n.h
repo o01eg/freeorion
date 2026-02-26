@@ -1,10 +1,10 @@
 #ifndef _I18N_h_
 #define _I18N_h_
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <map>
-#include <shared_mutex>
 
 #include <boost/format.hpp>
 #include <boost/unordered_map.hpp>
@@ -49,13 +49,18 @@ FO_COMMON_API void FlushLoadedStringTables();
 /** Wraps boost::format such that it won't crash if passed the wrong number of arguments */
 [[nodiscard]] FO_COMMON_API boost::format FlexibleFormat(const std::string& string_to_format);
 
-/** Returns the stringified form of \a n as a roman number.  "Only" defined for 1 <= n <= 3999, as we can't display the
-    symbol for 5000. */
-[[nodiscard]] FO_COMMON_API std::string RomanNumber(unsigned int n);
+/** Returns the stringified form of \a n as a roman number.  "Only" defined for 1 <= n <= 3999,
+  * as we can't display the symbol for 5000. */
+[[nodiscard]] FO_COMMON_API std::string RomanNumber(uint16_t n);
+[[nodiscard]] inline std::string RomanNumber(auto n) {
+    if constexpr (std::is_signed_v<decltype(n)>)
+        n = (n >= 0 ? n : -n);
+    return RomanNumber(static_cast<uint16_t>(n));
+}
 
-/** Converts double to string with \a digits digits.  Represents large numbers
-  * with SI prefixes. */
-[[nodiscard]] FO_COMMON_API std::string DoubleToString(double val, int digits, bool always_show_sign);
+/** Converts double to string with \a digits digits.
+  * Represents large numbers with SI prefixes. */
+[[nodiscard]] FO_COMMON_API std::string DoubleToString(double val, uint8_t digits, bool always_show_sign);
 
 /** Returns sign of value, accounting for SMALL_UI_DISPLAY_VALUE: +1 for
   * positive values and -1 for negative values if their absolute value is
@@ -77,14 +82,14 @@ template<typename HeaderContainer, typename ListContainer>
     const std::string& empty_header_template,
     const std::string& dual_header_template)
 {
-    const std::string& header_template{[&, sz{words.size()}]() {
+    auto& header_template = [&, sz{words.size()}]() -> auto& {
         switch (sz) {
         case 0: return empty_header_template; break;
         case 1: return single_header_template; break;
         case 2: return dual_header_template; break;
         default: return plural_header_template; break;
         }
-    }()};
+    }();
     boost::format header_fmt = FlexibleFormat(header_template) % std::to_string(words.size());
     for (const auto& word : header_words)
         header_fmt % word;

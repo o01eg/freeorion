@@ -1,6 +1,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include "ClientAppFixture.h"
+#include "client/ClientNetworking.h"
 #include "Empire/Empire.h"
 #include "universe/Planet.h"
 #include "util/Directories.h"
@@ -95,15 +96,6 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
 
         BOOST_TEST_MESSAGE(SERVER_CLIENT_EXE);
 
-#ifdef FREEORION_MACOSX
-        // On OSX set environment variable DYLD_LIBRARY_PATH to python framework folder
-        // bundled with app, so the dynamic linker uses the bundled python library.
-        // Otherwise the dynamic linker will look for a correct python lib in system
-        // paths, and if it can't find it, throw an error and terminate!
-        // Setting environment variable here, spawned child processes will inherit it.
-        setenv("DYLD_LIBRARY_PATH", GetPythonHome().string().c_str(), 1);
-#endif
-
         std::vector<std::string> args {
             "\"" + SERVER_CLIENT_EXE + "\"",
             "--hostless",
@@ -120,7 +112,7 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
         args.push_back("/proc/self/fd/1");
 #endif
 
-        server = Process(SERVER_CLIENT_EXE, args);
+        server = Process(m_networking->IoContext(), SERVER_CLIENT_EXE, args);
 
         BOOST_TEST_MESSAGE("Server started.");
     }
@@ -215,7 +207,7 @@ BOOST_AUTO_TEST_CASE(hostless_server) {
                 // check home planet meters
                 bool found_planet = false;
 
-                auto is_owned = [this](const UniverseObject* obj) { return obj->OwnedBy(m_empire_id); };
+                auto is_owned = [eid=m_empire_id](const UniverseObject* obj) { return obj && obj->OwnedBy(eid); };
 
                 for (const auto* planet : m_universe.Objects().findRaw<const Planet>(is_owned)) {
                     BOOST_REQUIRE_LT(0.0, planet->GetMeter(MeterType::METER_POPULATION)->Current());

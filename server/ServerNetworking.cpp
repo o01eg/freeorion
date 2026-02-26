@@ -78,7 +78,7 @@ void ServerNetworking::DiscoveryServer::HandleReceive(boost::system::error_code 
     }
 
     auto message = std::string(m_recv_buffer.begin(), m_recv_buffer.end());
-    message.erase(std::find(message.begin(), message.end(), '\0'), message.end());
+    message.erase(range_find(message, '\0'), message.end());
     boost::trim(message);
 
     if (message == DISCOVERY_QUESTION) {
@@ -93,7 +93,7 @@ void ServerNetworking::DiscoveryServer::HandleReceive(boost::system::error_code 
     DebugLogger(network) << "DiscoveryServer evaluating FOCS expression: " << message;
     std::string reply;
     try {
-        const ScriptingContext& context = ServerApp::GetApp()->GetContext();
+        const auto& context = GetApp().GetContext();
         if (parse::int_free_variable(message)) {
             auto value_ref = std::make_unique<ValueRef::Variable<int>>(ValueRef::ReferenceType::NON_OBJECT_REFERENCE, message);
             reply = std::to_string(value_ref->Eval(context));
@@ -222,7 +222,7 @@ void PlayerConnection::SendMessage(const Message& message, int empire_id, int tu
                                              message, empire_id, turn));
 }
 
-bool PlayerConnection::IsEstablished() const noexcept {
+bool PlayerConnection::IsEstablishedNamedValidClient() const noexcept {
     return (m_ID != INVALID_PLAYER_ID && !m_player_name.empty()
             && m_client_type != Networking::ClientType::INVALID_CLIENT_TYPE);
 }
@@ -263,7 +263,7 @@ void PlayerConnection::EstablishPlayer(int id, std::string player_name, Networki
                          << client_type << ", " << client_version_string << ")";
 
     // ensure that this connection isn't already established
-    if (IsEstablished()) {
+    if (IsEstablishedNamedValidClient()) {
         ErrorLogger(network) << "PlayerConnection::EstablishPlayer attempting to re-establish an already established connection.";
         return;
     }
@@ -575,57 +575,24 @@ ServerNetworking::ServerNetworking(boost::asio::io_context& io_context,
     m_disconnected_callback(disconnected_callback)
 { Init(); }
 
-std::size_t ServerNetworking::NumEstablishedPlayers() const
-{ return std::distance(established_begin(), established_end()); }
-
-ServerNetworking::const_established_iterator ServerNetworking::GetPlayer(int id) const
-{ return std::find_if(established_begin(), established_end(),
-                      [id](const auto& player_con) noexcept { return player_con->PlayerID() == id; });
-}
-
-ServerNetworking::const_established_iterator ServerNetworking::established_begin() const {
-    return const_established_iterator(is_established_player,
-                                      m_player_connections.begin(),
-                                      m_player_connections.end());
-}
-
-ServerNetworking::const_established_iterator ServerNetworking::established_end() const {
-    return const_established_iterator(is_established_player,
-                                      m_player_connections.end(),
-                                      m_player_connections.end());
-}
-
 int ServerNetworking::NewPlayerID() const {
-    int biggest_current_player_id(0);
-    for (const PlayerConnectionPtr& player : m_player_connections) {
-        const int player_id = player->PlayerID();
-        if (player_id != INVALID_PLAYER_ID && player_id > biggest_current_player_id)
-            biggest_current_player_id = player_id;
-    }
-    return biggest_current_player_id + 1;
+    static constexpr auto to_id = [](const auto& pc) noexcept { return pc->PlayerID(); };
+    static constexpr auto is_valid = [](const auto id) noexcept { return id != INVALID_PLAYER_ID; };
+    auto ids_rng = m_player_connections | range_transform(to_id) | range_filter(is_valid);
+    return range_empty(ids_rng) ? 0 : (*range_max_element(ids_rng) + 1);
 }
 
-bool ServerNetworking::PlayerIsHost(int player_id) const noexcept {
-    if (player_id == Networking::INVALID_PLAYER_ID)
-        return false;
-    return player_id == m_host_player_id;
-}
+bool ServerNetworking::PlayerIsHost(int player_id) const noexcept
+{ return player_id != Networking::INVALID_PLAYER_ID && player_id == m_host_player_id; }
 
-bool ServerNetworking::ModeratorsInGame() const noexcept {
-    for (const PlayerConnectionPtr& player : m_player_connections) {
-        if (player->GetClientType() == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
-            return true;
-    }
-    return false;
-}
+bool ServerNetworking::ModeratorsInGame() const noexcept
+{ return range_any_of(m_player_connections, Networking::is_mod); }
 
 bool ServerNetworking::IsAvailableNameInCookies(const std::string& player_name) const {
     boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-    for (const auto& cookie : m_cookies) {
-        if (cookie.second.expired >= now && cookie.second.player_name == player_name)
-            return false;
-    }
-    return true;
+    auto is_unexpired_with_name = [&player_name, now](const auto& cookie) noexcept
+    { return cookie.expired >= now && cookie.player_name == player_name; };
+    return range_none_of(m_cookies | range_values, is_unexpired_with_name);
 }
 
 bool ServerNetworking::CheckCookie(boost::uuids::uuid cookie,
@@ -649,17 +616,16 @@ bool ServerNetworking::CheckCookie(boost::uuids::uuid cookie,
 }
 
 void ServerNetworking::SendMessageAll(const Message& message) {
-    for (auto player_it = established_begin(); player_it != established_end(); ++player_it)
-        (*player_it)->SendMessage(message);
+    for (auto& player : EstablishedPlayerConnections())
+        player->SendMessage(message);
 }
 
 void ServerNetworking::Disconnect(int id) {
-    const established_iterator it = GetPlayer(id);
-    if (it == established_end()) {
+    const auto player = GetPlayer(id);
+    if (!player) {
         ErrorLogger(network) << "ServerNetworking::Disconnect couldn't find player with id " << id << " to disconnect.  aborting";
         return;
     }
-    const PlayerConnectionPtr player = *it;
     if (player->PlayerID() != id) {
         ErrorLogger(network) << "ServerNetworking::Disconnect got PlayerConnectionPtr with inconsistent player id (" << player->PlayerID() << ") to what was requested (" << id << ")";
         return;
@@ -679,23 +645,6 @@ void ServerNetworking::DisconnectAll() {
         DisconnectImpl(pcon);
 }
 
-ServerNetworking::established_iterator ServerNetworking::GetPlayer(int id) {
-    return std::find_if(established_begin(), established_end(),
-                      [id](const auto& player_con) noexcept { return player_con->PlayerID() == id; });
-}
-
-ServerNetworking::established_iterator ServerNetworking::established_begin() {
-    return established_iterator(is_established_player,
-                                m_player_connections.begin(),
-                                m_player_connections.end());
-}
-
-ServerNetworking::established_iterator ServerNetworking::established_end() {
-    return established_iterator(is_established_player,
-                                m_player_connections.end(),
-                                m_player_connections.end());
-}
-
 void ServerNetworking::HandleNextEvent() {
     if (!m_event_queue.empty()) {
         auto f = std::move(m_event_queue.front());
@@ -708,13 +657,13 @@ boost::uuids::uuid ServerNetworking::GenerateCookie(std::string player_name,
                                                     Networking::AuthRoles roles,
                                                     bool authenticated)
 {
-    boost::uuids::uuid cookie = boost::uuids::random_generator()();
+    auto cookie = boost::uuids::random_generator()();
+    auto expiry = boost::posix_time::second_clock::local_time() +
+        boost::posix_time::minutes(GetOptionsDB().Get<int>("network.server.cookies.expire-minutes"));
     m_cookies.erase(cookie); // remove previous cookie if exists
-    m_cookies.emplace(cookie, CookieData(std::move(player_name),
-                                         boost::posix_time::second_clock::local_time() +
-                                             boost::posix_time::minutes(GetOptionsDB().Get<int>("network.server.cookies.expire-minutes")),
-                                         roles,
-                                         authenticated));
+    m_cookies.emplace(std::piecewise_construct,
+                      std::forward_as_tuple(cookie),
+                      std::forward_as_tuple(std::move(player_name), expiry, roles, authenticated));
     return cookie;
 }
 
@@ -733,13 +682,13 @@ void ServerNetworking::CleanupCookies() {
     std::unordered_set<boost::uuids::uuid, boost::hash<boost::uuids::uuid>> to_delete;
     boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
     // clean up expired cookies
-    for (const auto& cookie : m_cookies) {
-        if (cookie.second.expired < now)
-            to_delete.insert(cookie.first);
+    for (const auto& [cookie, data] : m_cookies) {
+        if (data.expired < now)
+            to_delete.insert(cookie);
     }
     // don't clean up cookies from active connections
-    for (auto it = established_begin(); it != established_end(); ++it)
-        to_delete.erase((*it)->Cookie());
+    for (auto& player : EstablishedPlayerConnections())
+        to_delete.erase(player->Cookie());
 
     for (const auto& cookie : to_delete)
         m_cookies.erase(cookie);

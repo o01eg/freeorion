@@ -18,7 +18,7 @@
 #define _GG_Texture_h_
 
 
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <GG/Base.h>
 #include <GG/Exception.h>
 #include <mutex>
@@ -98,7 +98,7 @@ public:
     /** Frees any currently-held memory and loads a texture from file \a
         path.  \throw GG::Texture::BadFile Throws if the texture creation
         fails. */
-    void Load(const boost::filesystem::path& path, bool mipmap = false);
+    void Load(const std::filesystem::path& path, bool mipmap = false);
 
     /** Frees any currently-held memory and creates a texture from supplied
         array \a image.  \throw GG::Texture::Exception Throws applicable
@@ -130,7 +130,7 @@ private:
                          unsigned int bytes_per_pixel, bool mipmap);
     [[nodiscard]] std::vector<uint8_t> GetRawBytes();
 
-    boost::filesystem::path m_path;     ///< file path from which this Texture was constructed
+    std::filesystem::path m_path;     ///< file path from which this Texture was constructed
 
     unsigned int m_bytes_pp = 0;
     X            m_width = GG::X0;
@@ -154,7 +154,7 @@ private:
 
 /** \brief This class is a convenient way to store the info needed to use a
     portion of an OpenGL texture. */
-class GG_API SubTexture
+class GG_API SubTexture final
 {
 public:
     SubTexture() = default;
@@ -173,8 +173,6 @@ public:
 
     SubTexture& operator=(const SubTexture& rhs);
     SubTexture& operator=(SubTexture&& rhs) noexcept;
-
-    virtual ~SubTexture() = default;
 
     bool                    Empty() const noexcept { return !m_texture; }           ///< true if this object has no associated GG::Texture
     std::array<GLfloat, 4>  TexCoords() const noexcept { return m_tex_coords; }     ///< texture coordinates to use when blitting this sub-texture
@@ -222,29 +220,33 @@ private:
 class GG_API TextureManager
 {
 public:
-    std::map<std::string_view, std::shared_ptr<const Texture>> Textures() const;
+    const auto& Textures() const noexcept { return m_textures; }
 
     /** Stores a pre-existing GG::Texture in the manager's texture pool, and
         returns a shared_ptr to it. \warning Calling code <b>must not</b>
         delete \a texture; \a texture becomes the property of the manager,
         which will eventually delete it. */
-    std::shared_ptr<Texture> StoreTexture(Texture* texture, std::string texture_name);
+    void StoreTexture(Texture* texture, std::string texture_name);
 
     /** Stores a pre-existing GG::Texture in the manager's texture pool, and
         returns a shared_ptr to it. \warning Calling code <b>must not</b>
         delete \a texture; \a texture becomes the property of the manager,
         which will eventually delete it. */
-    std::shared_ptr<Texture> StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name);
+    void StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name);
 
     /** Returns a shared_ptr to the texture created from image file \a path.
         If the texture is not present in the manager's pool, it will be loaded
         from disk. */
-    std::shared_ptr<Texture> GetTexture(const boost::filesystem::path& path, bool mipmap = false);
+    std::shared_ptr<Texture> GetTexture(const std::filesystem::path& path, bool mipmap = false);
+
+    /** Returns a shared_ptr to the texture created/stored with name \a texture_name
+        or nullptr if not present in the manager's pool. */
+    std::shared_ptr<Texture> GetTextureByName(const std::string& texture_name) const;
 
     /** Removes the manager's shared_ptr to the texture created from image
         file \a path, if it exists.  \note Due to shared_ptr semantics, the
         texture may not be deleted until much later. */
-    void                     FreeTexture(const boost::filesystem::path& path);
+    void                     FreeTexture(const std::filesystem::path& path);
 
     /** Removes the manager's shared_ptr to the texture stored with the name
         \a name, if it exists.  \note Due to shared_ptr semantics, the
@@ -252,8 +254,8 @@ public:
     void                     FreeTexture(const std::string& name);
 
 private:
-    TextureManager();
-    std::shared_ptr<Texture> LoadTexture(const boost::filesystem::path& path, bool mipmap);
+    TextureManager() = default;
+    std::shared_ptr<Texture> LoadTexture(const std::filesystem::path& path, bool mipmap);
 
     /** Indexed by string, not path, because some textures may be stored by a
         name and not loaded from a path. */

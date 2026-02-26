@@ -72,7 +72,9 @@ void FreeOrionNode::_register_methods() {
 
     register_method("new_single_player_game", &FreeOrionNode::new_single_player_game);
     register_method("network_thread", &FreeOrionNode::network_thread);
+    register_method("parsing_thread", &FreeOrionNode::parsing_thread);
     register_method("start_network_thread", &FreeOrionNode::start_network_thread);
+    register_method("start_parsing_thread", &FreeOrionNode::start_parsing_thread);
     register_method("get_version", &FreeOrionNode::get_version);
     register_method("is_server_connected", &FreeOrionNode::is_server_connected);
     register_method("connect_to_server", &FreeOrionNode::connect_to_server);
@@ -83,6 +85,7 @@ void FreeOrionNode::_register_methods() {
     register_method("send_chat_message", &FreeOrionNode::send_chat_message);
     register_method("options_commit", &FreeOrionNode::options_commit);
     register_method("options_set", &FreeOrionNode::options_set);
+    register_method("get_user_data_dir", &FreeOrionNode::get_user_data_dir);
 
     godot::register_signal<FreeOrionNode>("ping", "message", GODOT_VARIANT_TYPE_STRING);
     godot::register_signal<FreeOrionNode>("error", "problem", GODOT_VARIANT_TYPE_STRING, "fatal", GODOT_VARIANT_TYPE_BOOL);
@@ -91,6 +94,7 @@ void FreeOrionNode::_register_methods() {
     godot::register_signal<FreeOrionNode>("start_game", "is_new_game", GODOT_VARIANT_TYPE_BOOL);
     // ToDo: implement timestamps
     godot::register_signal<FreeOrionNode>("chat_message", "text", GODOT_VARIANT_TYPE_STRING, "player_name", GODOT_VARIANT_TYPE_STRING, "text_color", GODOT_VARIANT_TYPE_COLOR, "pm", GODOT_VARIANT_TYPE_BOOL);
+    godot::register_signal<FreeOrionNode>("parsing_completed");
 }
 
 FreeOrionNode::FreeOrionNode()
@@ -141,18 +145,18 @@ void FreeOrionNode::_init() {
     // gracefully by resetting it to the standard path into the
     // application bundle.  This may happen if a previous installed
     // version of FreeOrion was residing in a different directory.
-    if (!boost::filesystem::exists(GetResourceDir()) ||
-        !boost::filesystem::exists(GetResourceDir() / "credits.xml") ||
-        !boost::filesystem::exists(GetResourceDir() / "data" / "art" / "misc" / "missing.png"))
+    if (!std::filesystem::exists(GetResourceDir()) ||
+        !std::filesystem::exists(GetResourceDir() / "credits.xml") ||
+        !std::filesystem::exists(GetResourceDir() / "data" / "art" / "misc" / "missing.png"))
     {
         DebugLogger() << "Resources directory " << PathToString(GetResourceDir()) << " from config.xml missing or does not contain expected files. Resetting to default.";
 
-        GetOptionsDB().Set<std::string>("resource.path", PathToString(boost::filesystem::canonical("../default"))); // Temporary default for Godot client prototype development
+        GetOptionsDB().Set<std::string>("resource.path", PathToString(std::filesystem::canonical("../default"))); // Temporary default for Godot client prototype development
 
         // double-check that resetting actually fixed things...
-        if (!boost::filesystem::exists(GetResourceDir()) ||
-            !boost::filesystem::exists(GetResourceDir() / "credits.xml") ||
-            !boost::filesystem::exists(GetResourceDir() / "data" / "art" / "misc" / "missing.png"))
+        if (!std::filesystem::exists(GetResourceDir()) ||
+            !std::filesystem::exists(GetResourceDir() / "credits.xml") ||
+            !std::filesystem::exists(GetResourceDir() / "data" / "art" / "misc" / "missing.png"))
         {
             DebugLogger() << "Default Resources directory missing or does not contain expected files. Cannot start game.";
             throw std::runtime_error("Unable to load game resources at default location: " +
@@ -162,6 +166,9 @@ void FreeOrionNode::_init() {
 #endif
 
     m_app = std::make_unique<GodotClientApp>();
+
+    m_parsing_thread = godot::Ref<godot::Thread>();
+    m_parsing_thread.instance();
 
     m_network_thread = godot::Ref<godot::Thread>();
     m_network_thread.instance();
@@ -361,8 +368,19 @@ void FreeOrionNode::network_thread() {
     DebugLogger() << "FreeOrionNode::network_thread(): Freeorion networking stopped";
 }
 
+void FreeOrionNode::parsing_thread() {
+    DebugLogger() << "FreeOrionNode::parsing_thread(): Freeorion parsing started";
+    m_app->StartParsingContent();
+    emit_signal("parsing_completed");
+    DebugLogger() << "FreeOrionNode::parsing_thread(): Freeorion parsing stopped";
+}
+
 void FreeOrionNode::start_network_thread() {
-    m_network_thread->start(this, "network_thread");   
+    m_network_thread->start(this, "network_thread");
+}
+
+void FreeOrionNode::start_parsing_thread() {
+    m_parsing_thread->start(this, "parsing_thread");
 }
 
 void FreeOrionNode::new_single_player_game() {
@@ -432,5 +450,9 @@ void FreeOrionNode::options_set(godot::String option, godot::Variant value) {
     default:
         ErrorLogger() << "Unsupported option " << option8 << " type " << value.get_type();
     }
+}
+
+godot::String FreeOrionNode::get_user_data_dir() const {
+    return godot::String(GetUserDataDir().native().c_str());
 }
 

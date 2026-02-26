@@ -4,7 +4,7 @@
 #include "Export.h"
 #include "Logger.h"
 
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <boost/optional/optional.hpp>
 
 #include <future>
@@ -120,7 +120,7 @@ namespace Pending {
 
     /** Return a Pending<T> constructed with \p parser and \p path*/
     template <typename Func>
-    [[nodiscard]] auto StartAsyncParsing(const Func& parser, const boost::filesystem::path& path)
+    [[nodiscard]] auto StartAsyncParsing(const Func& parser, const std::filesystem::path& path)
         -> Pending<decltype(parser(path))>
     {
         return Pending<decltype(parser(path))>(
@@ -129,88 +129,30 @@ namespace Pending {
 
     /** Return a Pending<T> constructed with \p parser, \p arg1, and \p path*/
     template <typename Func, typename Arg1>
-    [[nodiscard]] auto ParseSynchronously(const Func& parser, const Arg1& arg1, const boost::filesystem::path& path)
-        -> Pending<decltype(parser(arg1, path))>
+    [[nodiscard]] auto ParseSynchronously(const Func& parser, const Arg1& arg1, const std::filesystem::path& path)
+        -> Pending<decltype(parser(arg1, path, std::declval<bool&>()))>
     {
-        auto result = parser(arg1, path);
-        auto promise = std::promise<decltype(parser(arg1, path))>();
-        promise.set_value(std::move(result));
-        return Pending<decltype(parser(arg1, path))>(promise.get_future(), path.filename().string());
-    }
-
-    /** Return a Pending<T> constructed with \p parser, \p arg1, and \p path*/
-    template <typename Func, typename Arg1>
-    [[nodiscard]] auto ParseSynchronously(const Func& parser, const Arg1& arg1, const boost::filesystem::path& path,
-                            std::promise<void>&& barrier)
-        -> Pending<decltype(parser(arg1, path))>
-    {
-        auto result = parser(arg1, path);
-        auto promise = std::promise<decltype(parser(arg1, path))>();
-        promise.set_value(std::move(result));
-        barrier.set_value();
-        return Pending<decltype(parser(arg1, path))>(promise.get_future(), path.filename().string());
-    }
-
-    /** Helper struct for use with std::async. operator() evaluates \a _parser
-      * on \a path and then flags \a barrier to indicate that the \a _parser
-      * call is finished. */
-    template <typename Func>
-    struct Parsing {
-        Func parser;
-        std::promise<void> barrier;
-
-        Parsing(Func _parser, std::promise<void>&& _barrier) :
-            parser(_parser),
-            barrier(std::move(_barrier))
-        { }
-
-        auto operator()(const boost::filesystem::path& path)
-            -> decltype(parser(path))
-        {
-            auto ret = parser(path);
-            barrier.set_value();
-            return ret;
-        }
-    };
-
-    /** Return a Pending<T> constructed with \p parser and \p path
-     * and notify \p barrier*/
-    template <typename Func>
-    [[nodiscard]] auto StartAsyncParsing(Func parser, const boost::filesystem::path& path, std::promise<void>&& barrier)
-        -> Pending<decltype(parser(path))>
-    {
-        return Pending<decltype(parser(path))>(
-            std::async(std::launch::async,
-                       Parsing<Func>(parser, std::move(barrier)),
-                       path),
-            path.filename().string());
+        bool success = true;
+        auto result = parser(arg1, path, success);
+        auto promise = std::promise<decltype(parser(arg1, path, std::declval<bool&>()))>();
+        if (success)
+            promise.set_value(std::move(result));
+        else
+            promise.set_exception(std::make_exception_ptr(std::runtime_error(path.string())));
+        return Pending<decltype(parser(arg1, path, std::declval<bool&>()))>(promise.get_future(), path.filename().string());
     }
 
     /** Return a Pending<T> constructed with \p parser and \p path which
       * executes the parser in the calling thread and stores the result
       * before returning. */
     template <typename Func>
-    [[nodiscard]] auto ParseSynchronously(const Func& parser, const boost::filesystem::path& path)
+    [[nodiscard]] auto ParseSynchronously(const Func& parser, const std::filesystem::path& path)
         -> Pending<decltype(parser(path))>
     {
         auto retval = std::async(std::launch::deferred, parser, path);
         retval.wait();
         return Pending<decltype(parser(path))>(std::move(retval), path.filename().string());
     }
-
-    /** Return a Pending<T> constructed with \p parser and \p path and notify \p barrier which
-      * executes the parser in the calling thread and stores the result
-      * before returning. */
-    template <typename Func>
-    [[nodiscard]] auto ParseSynchronously(const Func& parser, const boost::filesystem::path& path, std::promise<void>&& barrier)
-        -> Pending<decltype(parser(path))>
-    {
-        auto retval = std::async(std::launch::deferred, parser, path);
-        retval.wait();
-        barrier.set_value();
-        return Pending<decltype(parser(path))>(std::move(retval), path.filename().string());
-    }
-
 }
 
 

@@ -19,22 +19,18 @@ namespace {
     // Margin between text and row edge.
     GG::Y PlayerRowMargin()
     { return GG::Y(GG::ListBox::DEFAULT_MARGIN + std::max(CUIEdit::PIXEL_MARGIN, GG::ListBox::DEFAULT_MARGIN)); }
-    GG::Y PlayerFontHeight()
-    { return ClientUI::GetFont(ClientUI::Pts())->Height(); }
-    GG::Y PlayerRowHeight()
-    { return PlayerFontHeight() + 2 * PlayerRowMargin(); }
+    GG::Y PlayerFontHeight(const ClientUI& ui)
+    { return ui.GetFont(ClientUI::Pts())->Height(); }
+    GG::Y PlayerRowHeight(const ClientUI& ui)
+    { return PlayerFontHeight(ui) + 2 * PlayerRowMargin(); }
     GG::X PlayerReadyBrowseWidth()
     { return GG::X(ClientUI::Pts() * 11); }
 
-    const std::shared_ptr<GG::Texture> GetReadyTexture(bool ready) {
-        if (ready)
-            return ClientUI::GetTexture(ClientUI::ArtDir() / "icons/ready.png");
-        return ClientUI::GetTexture(ClientUI::ArtDir() / "icons/not_ready.png");
-    }
+    auto GetReadyTexture(bool ready, ClientUI& ui)
+    { return ui.GetTexture(ClientUI::ArtDir() / (ready ? "icons/ready.png" : "icons/not_ready.png")); }
 
-    const std::shared_ptr<GG::Texture> GetHostTexture() {
-        return ClientUI::GetTexture(ClientUI::ArtDir() / "icons/host.png");
-    }
+    auto GetHostTexture(ClientUI& ui)
+    { return ui.GetTexture(ClientUI::ArtDir() / "icons/host.png"); }
 
     constexpr GG::X EMPIRE_NAME_WIDTH{150};
     constexpr GG::X BROWSE_BTN_WIDTH{50};
@@ -46,10 +42,10 @@ namespace {
     // players or the host.
     struct PlayerRow : GG::ListBox::Row {
         PlayerRow() :
-            GG::ListBox::Row(GG::X{90}, PlayerRowHeight())
+            GG::ListBox::Row(GG::X{90}, PlayerRowHeight(GetApp().GetUI()))
         {}
         PlayerRow(const PlayerSetupData& player_data, int player_id) :
-            GG::ListBox::Row(GG::X{90}, PlayerRowHeight()),
+            GG::ListBox::Row(GG::X{90}, PlayerRowHeight(GetApp().GetUI())),
             m_player_data(player_data),
             m_player_id(player_id)
         {}
@@ -134,7 +130,7 @@ namespace {
             Resize(GG::Pt(w, type_row_height));
             SetColWidth(0, CUIDropDownList::DisplayedRowWidth());
 
-            if (client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
+            if (Networking::is_ai(client_type)) {
                 if (disabled) {
                     // For AI players on non-hosts, have "AI" shown (disabled)
                     Insert(GG::Wnd::Create<TypeRow>(w, type_row_height, Networking::ClientType::CLIENT_TYPE_AI_PLAYER));      // static "AI" display
@@ -145,10 +141,7 @@ namespace {
                     Insert(GG::Wnd::Create<TypeRow>(w, type_row_height, Networking::ClientType::INVALID_CLIENT_TYPE, true));  // "Drop" option
                     Select(0);
                 }
-            } else if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER ||
-                       client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER ||
-                       client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
-            {
+            } else if (Networking::is_human(client_type) || Networking::is_mod_or_obs(client_type)) {
                 if (disabled) {
                     // For human players on other players non-host, have "AI" or "Observer" indicator (disabled)
                     Insert(GG::Wnd::Create<TypeRow>(w, type_row_height, client_type));
@@ -159,33 +152,33 @@ namespace {
                     int row_observer_type = -1;
                     int row_moderator_type = -1;
                     int row_number = 0;
-                    if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER ||
-                        ClientApp::GetApp()->Networking().HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER))
+                    if (Networking::is_human(client_type) ||
+                        GetApp().Networking().HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_PLAYER))
                     {
                         Insert(GG::Wnd::Create<TypeRow>(w, type_row_height, Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER));   // "Human" display / option
                         row_player_type = (row_number++);
                     }
 
-                    if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER ||
-                        ClientApp::GetApp()->Networking().HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_OBSERVER))
+                    if (Networking::is_obs(client_type) ||
+                        GetApp().Networking().HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_OBSERVER))
                     {
                         Insert(GG::Wnd::Create<TypeRow>(w, type_row_height, Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER)); // "Observer" display / option
                         row_observer_type = (row_number++);
                     }
 
-                    if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR ||
-                        ClientApp::GetApp()->Networking().HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_MODERATOR))
+                    if (Networking::is_mod(client_type) ||
+                        GetApp().Networking().HasAuthRole(Networking::RoleType::ROLE_CLIENT_TYPE_MODERATOR))
                     {
                         Insert(GG::Wnd::Create<TypeRow>(w, type_row_height, Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR));// "Moderator" display / option
                         row_moderator_type = (row_number++);
                     }
                     Insert(GG::Wnd::Create<TypeRow>(w, type_row_height, Networking::ClientType::INVALID_CLIENT_TYPE, true));  // "Drop" option
 
-                    if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER)
+                    if (Networking::is_human(client_type))
                         Select(row_player_type);
-                    else if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER)
+                    else if (Networking::is_obs(client_type))
                         Select(row_observer_type);
-                    else if (client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
+                    else if (Networking::is_mod(client_type))
                         Select(row_moderator_type);
                     else
                         Select(row_number);
@@ -238,9 +231,12 @@ namespace {
 
             using boost::placeholders::_1;
 
+            auto& app = GetApp();
+            auto& ui = app.GetUI();
+
             // human / AI / observer indicator / selector
             auto type_drop = GG::Wnd::Create<TypeSelector>(
-                GG::X(90), PlayerRowHeight(), m_player_data.client_type, m_initial_disabled);
+                GG::X(90), PlayerRowHeight(ui), m_player_data.client_type, m_initial_disabled);
             push_back(type_drop);
             if (m_initial_disabled)
                 type_drop->Disable();
@@ -251,26 +247,25 @@ namespace {
             // player name text
             push_back(GG::Wnd::Create<CUILabel>(m_player_data.player_name));
 
-            if (m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER ||
-                m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR) {
+            if (Networking::is_mod_or_obs(m_player_data)) {
                 // observers don't need to pick an empire or species
-                push_back(GG::Wnd::Create<CUILabel>(""));
-                push_back(GG::Wnd::Create<CUILabel>(""));
-                push_back(GG::Wnd::Create<CUILabel>(""));
-                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetReadyTexture(m_player_data.player_ready),
+                push_back(GG::Wnd::Create<CUILabel>("", ui));
+                push_back(GG::Wnd::Create<CUILabel>("", ui));
+                push_back(GG::Wnd::Create<CUILabel>("", ui));
+                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetReadyTexture(m_player_data.player_ready, ui),
                                                              GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE, GG::INTERACTIVE));
-                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight()));
+                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight(ui)));
                 at(5)->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
                 at(5)->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
                     m_player_data.player_ready ? UserString("READY_BN") : UserString("NOT_READY_BN"),
                     "", PlayerReadyBrowseWidth()));
-                if (GGHumanClientApp::GetApp()->Networking().PlayerIsHost(m_player_id)) {
-                    push_back(GG::Wnd::Create<GG::StaticGraphic>(GetHostTexture(),
+                if (app.Networking().PlayerIsHost(m_player_id)) {
+                    push_back(GG::Wnd::Create<GG::StaticGraphic>(GetHostTexture(ui),
                                                                  GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE, GG::INTERACTIVE));
                 } else {
-                    push_back(GG::Wnd::Create<CUILabel>(""));
+                    push_back(GG::Wnd::Create<CUILabel>("", ui));
                 }
-                at(6)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight()));
+                at(6)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight(ui)));
 
                 return;
             }
@@ -284,11 +279,10 @@ namespace {
             if (m_initial_disabled)
                 edit->Disable();
             else
-                edit->FocusUpdateSignal.connect(
-                    boost::bind(&NewGamePlayerRow::EmpireNameChanged, this, _1));
+                edit->FocusUpdateSignal.connect(boost::bind(&NewGamePlayerRow::EmpireNameChanged, this, _1));
 
             // empire colour selector
-            auto color_selector = GG::Wnd::Create<EmpireColorSelector>(PlayerFontHeight() + PlayerRowMargin());
+            auto color_selector = GG::Wnd::Create<EmpireColorSelector>(PlayerFontHeight(ui) + PlayerRowMargin());
             color_selector->SelectColor(m_player_data.empire_color);
             push_back(color_selector);
             if (m_initial_disabled)
@@ -298,7 +292,8 @@ namespace {
                     boost::bind(&NewGamePlayerRow::ColorChanged, this, _1));
 
             // species selector
-            auto species_selector = GG::Wnd::Create<SpeciesSelector>(m_player_data.starting_species_name, EMPIRE_NAME_WIDTH, PlayerRowHeight());
+            auto species_selector = GG::Wnd::Create<SpeciesSelector>(
+                m_player_data.starting_species_name, EMPIRE_NAME_WIDTH, PlayerRowHeight(ui));
             push_back(species_selector);
             if (m_initial_disabled)
                 species_selector->Disable();
@@ -307,13 +302,13 @@ namespace {
                     boost::bind(&NewGamePlayerRow::SpeciesChanged, this, _1));
 
             // ready state
-            if (m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
-                push_back(GG::Wnd::Create<CUILabel>(""));
-                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight()));
+            if (Networking::is_ai(m_player_data)) {
+                push_back(GG::Wnd::Create<CUILabel>("", ui));
+                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight(ui)));
             } else {
-                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetReadyTexture(m_player_data.player_ready),
+                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetReadyTexture(m_player_data.player_ready, ui),
                                                              GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE, GG::INTERACTIVE));
-                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight()));
+                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight(ui)));
                 at(5)->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
                 at(5)->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
                     m_player_data.player_ready ? UserString("READY_BN") : UserString("NOT_READY_BN"),
@@ -321,13 +316,13 @@ namespace {
             }
 
             // host
-            if (GGHumanClientApp::GetApp()->Networking().PlayerIsHost(m_player_id)) {
-                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetHostTexture(),
+            if (app.Networking().PlayerIsHost(m_player_id)) {
+                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetHostTexture(ui),
                                                              GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE, GG::INTERACTIVE));
             } else {
-                push_back(GG::Wnd::Create<CUILabel>(""));
+                push_back(GG::Wnd::Create<CUILabel>("", ui));
             }
-            at(6)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight()));
+            at(6)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight(ui)));
         }
 
     private:
@@ -365,8 +360,10 @@ namespace {
 
             using boost::placeholders::_1;
 
+            auto& ui = GetApp().GetUI();
+
             // human / AI / observer indicator / selector
-            auto type_drop = GG::Wnd::Create<TypeSelector>(GG::X(90), PlayerRowHeight(),
+            auto type_drop = GG::Wnd::Create<TypeSelector>(GG::X(90), PlayerRowHeight(ui),
                                                            m_player_data.client_type, m_initial_disabled);
             push_back(type_drop);
             if (m_initial_disabled)
@@ -379,7 +376,7 @@ namespace {
 
             // droplist to select empire
             m_empire_list = GG::Wnd::Create<CUIDropDownList>(6);
-            m_empire_list->Resize(GG::Pt(EMPIRE_NAME_WIDTH, PlayerRowHeight()));
+            m_empire_list->Resize(GG::Pt(EMPIRE_NAME_WIDTH, PlayerRowHeight(ui)));
             m_empire_list->SetStyle(GG::LIST_NOSORT);
             auto save_game_empire_it = m_save_game_empire_data.end();
             for (auto it = m_save_game_empire_data.begin(); it != m_save_game_empire_data.end(); ++it) {
@@ -410,7 +407,7 @@ namespace {
             push_back(m_empire_list);
 
             // empire colour selector (disabled, so acts as colour indicator)
-            m_color_selector = GG::Wnd::Create<EmpireColorSelector>(PlayerFontHeight() + PlayerRowMargin());
+            m_color_selector = GG::Wnd::Create<EmpireColorSelector>(PlayerFontHeight(ui) + PlayerRowMargin());
             m_color_selector->SelectColor(m_player_data.empire_color);
             push_back(m_color_selector);
 
@@ -426,27 +423,27 @@ namespace {
                     boost::bind(&LoadGamePlayerRow::EmpireChanged, this, _1));
 
             // ready state
-            if (m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER) {
+            if (Networking::is_ai(m_player_data)) {
                 push_back(GG::Wnd::Create<CUILabel>(""));
-                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight()));
+                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight(ui)));
             } else {
-                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetReadyTexture(m_player_data.player_ready),
+                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetReadyTexture(m_player_data.player_ready, ui),
                                                              GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE, GG::INTERACTIVE));
                 at(5)->SetBrowseModeTime(GetOptionsDB().Get<int>("ui.tooltip.delay"));
                 at(5)->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
                     m_player_data.player_ready ? UserString("READY_BN") : UserString("NOT_READY_BN"),
                     "", PlayerReadyBrowseWidth()));
-                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight()));
+                at(5)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight(ui)));
             }
 
             // host
-            if (GGHumanClientApp::GetApp()->Networking().PlayerIsHost(m_player_id)) {
-                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetHostTexture(),
+            if (GetApp().Networking().PlayerIsHost(m_player_id)) {
+                push_back(GG::Wnd::Create<GG::StaticGraphic>(GetHostTexture(ui),
                                                              GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE, GG::INTERACTIVE));
             } else {
                 push_back(GG::Wnd::Create<CUILabel>(""));
             }
-            at(6)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight()));
+            at(6)->SetMinSize(GG::Pt(GG::X(ClientUI::Pts()), PlayerFontHeight(ui)));
         }
 
     private:
@@ -511,26 +508,28 @@ namespace {
         void CompleteConstruction() override {
             PlayerRow::CompleteConstruction();
 
+            auto& ui = GetApp().GetUI();
+
             auto type_drop = GG::Wnd::Create<TypeSelector>(
-                GG::X(90), PlayerRowHeight(), Networking::ClientType::INVALID_CLIENT_TYPE, m_initial_disabled);
+                GG::X(90), PlayerRowHeight(ui), Networking::ClientType::INVALID_CLIENT_TYPE, m_initial_disabled);
             push_back(type_drop);
             type_drop->TypeChangedSignal.connect(
                 boost::bind(&LoadGameEmpireRow::PlayerTypeChanged, this, boost::placeholders::_1));
             // player name text
-            push_back(GG::Wnd::Create<CUILabel>(""));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
             // empire name
-            push_back(GG::Wnd::Create<CUILabel>(m_save_game_empire_data.empire_name));
+            push_back(GG::Wnd::Create<CUILabel>(m_save_game_empire_data.empire_name, ui));
             // empire colour selector (disabled, so acts as colour indicator)
-            m_color_selector = GG::Wnd::Create<EmpireColorSelector>(PlayerFontHeight() + PlayerRowMargin());
+            m_color_selector = GG::Wnd::Create<EmpireColorSelector>(PlayerFontHeight(ui) + PlayerRowMargin());
             m_color_selector->SelectColor(m_save_game_empire_data.color);
             m_color_selector->Disable();
             push_back(m_color_selector);
             // original empire player name from saved game
-            push_back(GG::Wnd::Create<CUILabel>(m_save_game_empire_data.player_name));
+            push_back(GG::Wnd::Create<CUILabel>(m_save_game_empire_data.player_name, ui));
             // ready state
-            push_back(GG::Wnd::Create<CUILabel>(""));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
             // host
-            push_back(GG::Wnd::Create<CUILabel>(""));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
         }
     private:
         void PlayerTypeChanged(Networking::ClientType type) {
@@ -548,25 +547,26 @@ namespace {
 
     // Row for indicating that an AI client should be added to the game
     struct EmptyPlayerRow : PlayerRow {
-        EmptyPlayerRow() :
-            PlayerRow()
-        {}
+        EmptyPlayerRow() = default;
 
         void CompleteConstruction() override {
             PlayerRow::CompleteConstruction();
 
+            auto& ui = GetApp().GetUI();
+
             auto type_drop = GG::Wnd::Create<TypeSelector>(
-                GG::X(90), PlayerRowHeight(), Networking::ClientType::INVALID_CLIENT_TYPE, false);
+                GG::X(90), PlayerRowHeight(ui), Networking::ClientType::INVALID_CLIENT_TYPE, false);
             push_back(type_drop);
             type_drop->TypeChangedSignal.connect(
                 boost::bind(&EmptyPlayerRow::PlayerTypeChanged, this, boost::placeholders::_1));
+
             // extra entries to make layout consistent
-            push_back(GG::Wnd::Create<CUILabel>(""));
-            push_back(GG::Wnd::Create<CUILabel>(""));
-            push_back(GG::Wnd::Create<CUILabel>(""));
-            push_back(GG::Wnd::Create<CUILabel>(""));
-            push_back(GG::Wnd::Create<CUILabel>(""));
-            push_back(GG::Wnd::Create<CUILabel>(""));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
+            push_back(GG::Wnd::Create<CUILabel>("", ui));
         }
     private:
         void PlayerTypeChanged(Networking::ClientType type) {
@@ -634,8 +634,10 @@ void MultiPlayerLobbyWnd::CompleteConstruction() {
 
     m_preview_image = GG::Wnd::Create<GG::StaticGraphic>(std::make_shared<GG::Texture>(), GG::GRAPHIC_FITGRAPHIC);
 
+    auto& ui = GetApp().GetUI();
+
     m_players_lb_headers = GG::Wnd::Create<PlayerLabelRow>();
-    m_players_lb_headers->SetMinSize(GG::Pt(GG::X0, PlayerRowHeight() + PlayerFontHeight()));
+    m_players_lb_headers->SetMinSize(GG::Pt(GG::X0, PlayerRowHeight(ui) + PlayerFontHeight(ui)));
 
     TraceLogger() << "MultiPlayerLobbyWnd::CompleteConstruction creating players list box";
     m_players_lb = GG::Wnd::Create<CUIListBox>();
@@ -699,30 +701,31 @@ void MultiPlayerLobbyWnd::CompleteConstruction() {
 }
 
 MultiPlayerLobbyWnd::PlayerLabelRow::PlayerLabelRow(GG::X width) :
-    GG::ListBox::Row(width, PlayerRowHeight())
+    GG::ListBox::Row(width, PlayerRowHeight(GetApp().GetUI()))
 {}
 
 void MultiPlayerLobbyWnd::PlayerLabelRow::CompleteConstruction() {
-
     GG::ListBox::Row::CompleteConstruction();
 
-    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_TYPES"), GG::FORMAT_BOTTOM));
-    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_NAMES"), GG::FORMAT_BOTTOM));
-    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_EMPIRES"), GG::FORMAT_BOTTOM));
-    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_COLOURS"), GG::FORMAT_BOTTOM | GG::FORMAT_WORDBREAK));
-    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_ORIGINAL_NAMES"), GG::FORMAT_BOTTOM | GG::FORMAT_WORDBREAK));
-    push_back(GG::Wnd::Create<GG::StaticGraphic>(GetReadyTexture(true), GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE));
-    push_back(GG::Wnd::Create<GG::StaticGraphic>(GetHostTexture(), GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE));
+    auto& ui = GetApp().GetUI();
+
+    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_TYPES"), ui, GG::FORMAT_BOTTOM));
+    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_NAMES"), ui, GG::FORMAT_BOTTOM));
+    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_EMPIRES"), ui, GG::FORMAT_BOTTOM));
+    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_COLOURS"), ui, GG::FORMAT_BOTTOM | GG::FORMAT_WORDBREAK));
+    push_back(GG::Wnd::Create<CUILabel>(UserString("MULTIPLAYER_PLAYER_LIST_ORIGINAL_NAMES"), ui, GG::FORMAT_BOTTOM | GG::FORMAT_WORDBREAK));
+    push_back(GG::Wnd::Create<GG::StaticGraphic>(GetReadyTexture(true, ui), GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE));
+    push_back(GG::Wnd::Create<GG::StaticGraphic>(GetHostTexture(ui), GG::GRAPHIC_CENTER | GG::GRAPHIC_FITGRAPHIC | GG::GRAPHIC_PROPSCALE));
     // restrict height of ready state icon
-    at(5)->SetMaxSize(GG::Pt(GG::X(400), PlayerFontHeight()));
-    at(6)->SetMaxSize(GG::Pt(GG::X(400), PlayerFontHeight()));
+    at(5)->SetMaxSize(GG::Pt(GG::X(400), PlayerFontHeight(ui)));
+    at(6)->SetMaxSize(GG::Pt(GG::X(400), PlayerFontHeight(ui)));
     std::vector<GG::X> col_widths = PlayerRowColWidths(Width());
     unsigned int i = 0;
     for (auto& control : m_cells) {
         control->SetChildClippingMode(ChildClippingMode::ClipToWindow);
         if (GG::TextControl* tc = dynamic_cast<GG::TextControl*>(control.get()))
-            tc->SetFont(ClientUI::GetBoldFont());
-        control->Resize(GG::Pt(col_widths[i], PlayerRowHeight() + PlayerFontHeight()));
+            tc->SetFont(ui.GetBoldFont());
+        control->Resize(GG::Pt(col_widths[i], PlayerRowHeight(ui) + PlayerFontHeight(ui)));
         ++i;
     }
     SetColWidths(col_widths);
@@ -757,8 +760,8 @@ void MultiPlayerLobbyWnd::SizeMove(GG::Pt ul, GG::Pt lr) {
 }
 
 GG::Rect MultiPlayerLobbyWnd::CalculatePosition() const {
-    GG::Pt new_ul((GG::GUI::GetGUI()->AppWidth() - LOBBY_WND_WIDTH) / 2,
-                  (GG::GUI::GetGUI()->AppHeight() - LOBBY_WND_HEIGHT) / 2);
+    GG::Pt new_ul((GetApp().AppWidth() - LOBBY_WND_WIDTH) / 2,
+                  (GetApp().AppHeight() - LOBBY_WND_HEIGHT) / 2);
     GG::Pt new_sz(LOBBY_WND_WIDTH, LOBBY_WND_HEIGHT);
     return GG::Rect(new_ul, new_ul + new_sz);
 }
@@ -785,23 +788,25 @@ void MultiPlayerLobbyWnd::KeyPress(GG::Key key, uint32_t key_code_point, GG::Fla
     }
 }
 
-void MultiPlayerLobbyWnd::ChatMessage(int player_id, const boost::posix_time::ptime& timestamp, const std::string& msg) {
+void MultiPlayerLobbyWnd::ChatMessage(int player_id, const boost::posix_time::ptime& timestamp,
+                                      const std::string& msg)
+{
     // look up player name by ID
     std::string player_name{UserString("PLAYER") + " " + std::to_string(player_id)};
-    GG::Clr text_color{ClientUI::GetClientUI()->TextColor()};
+    GG::Clr text_color{ClientUI::TextColor()};
     if (player_id != Networking::INVALID_PLAYER_ID) {
-        for (auto& entry : m_lobby_data.players) {
-            if (entry.first != player_id || entry.first == Networking::INVALID_PLAYER_ID)
+        for (auto& [lobby_player_id, psd] : m_lobby_data.players) {
+            if (lobby_player_id != player_id || lobby_player_id == Networking::INVALID_PLAYER_ID)
                 continue;
-            player_name = entry.second.player_name;
-            text_color = entry.second.empire_color;
+            player_name = psd.player_name;
+            text_color = psd.empire_color;
         }
     } else {
         // It's a server message. Don't set player name.
         player_name.clear();
     }
 
-    m_chat_wnd->HandlePlayerChatMessage(msg, player_name, text_color, timestamp, GGHumanClientApp::GetApp()->PlayerID(), false);  // no pm messages for MP lobby yet
+    m_chat_wnd->HandlePlayerChatMessage(msg, player_name, text_color, timestamp, GetApp().PlayerID(), false);  // no pm messages for MP lobby yet
 }
 
 void MultiPlayerLobbyWnd::ChatMessage(const std::string& message_text,
@@ -810,21 +815,21 @@ void MultiPlayerLobbyWnd::ChatMessage(const std::string& message_text,
                                       const boost::posix_time::ptime& timestamp)
 {
     m_chat_wnd->HandlePlayerChatMessage(message_text, player_name, text_color, timestamp,
-                                        GGHumanClientApp::GetApp()->PlayerID(), false);
+                                        GetApp().PlayerID(), false);
 }
 
 void MultiPlayerLobbyWnd::TurnPhaseUpdate(Message::TurnProgressPhase phase_id)
 { m_chat_wnd->HandleTurnPhaseUpdate(phase_id, true); }
 
 namespace {
-    void LogPlayerSetupData(const std::list<std::pair<int, PlayerSetupData>>& psd) {
+    void LogPlayerSetupData(const std::list<std::pair<int, PlayerSetupData>>& psds) {
         DebugLogger() << "PlayerSetupData:";
-        for (const std::pair<int, PlayerSetupData>& entry : psd)
-            DebugLogger() << std::to_string(entry.first) << " : "
-                                   << entry.second.player_name << ", "
-                                   << entry.second.client_type << ", "
-                                   << entry.second.starting_species_name
-                                   << (entry.second.player_ready ? ", Ready" : "");
+        for (const auto& [player_id, psd] : psds)
+            DebugLogger() << std::to_string(player_id) << " : "
+                          << psd.player_name << ", "
+                          << psd.client_type << ", "
+                          << psd.starting_species_name
+                          << (psd.player_ready ? ", Ready" : "");
     }
 }
 
@@ -956,7 +961,7 @@ void MultiPlayerLobbyWnd::GalaxySetupPanelChanged() {
 }
 
 void MultiPlayerLobbyWnd::SaveGameBrowse() {
-    m_lobby_data.save_game = GGHumanClientApp::GetApp()->SelectLoadFile();
+    m_lobby_data.save_game = GetApp().SelectLoadFile();
     m_lobby_data.save_game_empire_data.clear();
     PopulatePlayerList();
     SendUpdate();
@@ -980,13 +985,13 @@ void MultiPlayerLobbyWnd::PlayerDataChangedLocally() {
 
         if (const EmptyPlayerRow* empty_row = dynamic_cast<const EmptyPlayerRow*>(player_row)) {
             // empty rows that have been changed to Add AI need to be sent so the server knows to add an AI player.
-            if (empty_row->m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
+            if (Networking::is_ai(empty_row->m_player_data))
                 m_lobby_data.players.emplace_back(Networking::INVALID_PLAYER_ID, player_row->m_player_data);
 
             // empty rows that are still showing no player don't need to be sent to the server.
 
         } else if (const LoadGameEmpireRow* empire_row = dynamic_cast<const LoadGameEmpireRow*>(player_row)) {
-            if (empire_row->m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
+            if (Networking::is_ai(empire_row->m_player_data))
                 m_lobby_data.players.emplace_back(Networking::INVALID_PLAYER_ID, empire_row->m_player_data);
 
         } else if (player_row) {
@@ -1021,8 +1026,8 @@ bool MultiPlayerLobbyWnd::PopulatePlayerList() {
         if (m_lobby_data.new_game) {
             bool immutable_row =
                 !HasAuthRole(Networking::RoleType::ROLE_HOST) &&
-                data_player_id != GGHumanClientApp::GetApp()->PlayerID() &&
-                !(psd.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER &&
+                data_player_id != GetApp().PlayerID() &&
+                !(Networking::is_ai(psd) &&
                   HasAuthRole(Networking::RoleType::ROLE_GALAXY_SETUP));// host can modify any player's row.  non-hosts can only modify their own row.  As of SVN 4026 this is not enforced on the server, but should be.
             auto row = GG::Wnd::Create<NewGamePlayerRow>(psd, data_player_id, immutable_row);
             m_players_lb->Insert(row);
@@ -1032,8 +1037,8 @@ bool MultiPlayerLobbyWnd::PopulatePlayerList() {
         } else {
             bool immutable_row =
                 (!HasAuthRole(Networking::RoleType::ROLE_HOST) &&
-                    (data_player_id != GGHumanClientApp::GetApp()->PlayerID()) &&
-                    !(psd.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER &&
+                    (data_player_id != GetApp().PlayerID()) &&
+                    !(Networking::is_ai(psd) &&
                         HasAuthRole(Networking::RoleType::ROLE_GALAXY_SETUP)))
                 || m_lobby_data.save_game_empire_data.empty();
             auto row = GG::Wnd::Create<LoadGamePlayerRow>(psd, data_player_id,
@@ -1055,12 +1060,10 @@ bool MultiPlayerLobbyWnd::PopulatePlayerList() {
         }
 
         // checks for ready button
-        if (data_player_id == GGHumanClientApp::GetApp()->PlayerID())
+        if (data_player_id == GetApp().PlayerID())
             is_client_ready = psd.player_ready;
-        else if (psd.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER ||
-            psd.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER ||
-            psd.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
-        { is_other_ready = is_other_ready && psd.player_ready; }
+        else if (Networking::is_human(psd) || Networking::is_mod_or_obs(psd))
+            is_other_ready = is_other_ready && psd.player_ready;
     }
 
     // add rows for unassigned empires and adds "Add AI" to assign AI to empire
@@ -1136,8 +1139,8 @@ bool MultiPlayerLobbyWnd::PopulatePlayerList() {
 }
 
 void MultiPlayerLobbyWnd::SendUpdate() const {
-    if (GGHumanClientApp::GetApp()->PlayerID() != Networking::INVALID_PLAYER_ID)
-        GGHumanClientApp::GetApp()->Networking().SendMessage(LobbyUpdateMessage(m_lobby_data));
+    if (GetApp().PlayerID() != Networking::INVALID_PLAYER_ID)
+        GetApp().Networking().SendMessage(LobbyUpdateMessage(m_lobby_data));
 }
 
 bool MultiPlayerLobbyWnd::PlayerDataAcceptable() const {
@@ -1152,9 +1155,7 @@ bool MultiPlayerLobbyWnd::PlayerDataAcceptable() const {
         if (!pprow)
             continue;
         const auto& prow{*pprow};
-        if (prow.m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_PLAYER ||
-            prow.m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_AI_PLAYER)
-        {
+        if (Networking::is_ai_or_human(prow.m_player_data)) {
             num_players_excluding_observers++;
 
             // all non-observers must have unique non-blank names and colours
@@ -1170,9 +1171,7 @@ bool MultiPlayerLobbyWnd::PlayerDataAcceptable() const {
                 std::get<2>(prow.m_player_data.empire_color) << 8 |
                 std::get<3>(prow.m_player_data.empire_color);
             empire_colors.insert(color_as_uint);
-        } else if (prow.m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_OBSERVER ||
-                   prow.m_player_data.client_type == Networking::ClientType::CLIENT_TYPE_HUMAN_MODERATOR)
-        {
+        } else if (Networking::is_mod_or_obs(prow.m_player_data)) {
             // do nothing special for this player
         } else {
             if (dynamic_cast<const EmptyPlayerRow*>(row.get())) {
@@ -1194,11 +1193,11 @@ bool MultiPlayerLobbyWnd::CanStart() const
 { return PlayerDataAcceptable(); }
 
 bool MultiPlayerLobbyWnd::HasAuthRole(Networking::RoleType role) const
-{ return ClientApp::GetApp()->Networking().HasAuthRole(role); }
+{ return GetApp().Networking().HasAuthRole(role); }
 
 void MultiPlayerLobbyWnd::ReadyClicked() {
     for (std::pair<int, PlayerSetupData>& entry : m_lobby_data.players) {
-        if (entry.first == GGHumanClientApp::GetApp()->PlayerID()) {
+        if (entry.first == GetApp().PlayerID()) {
             entry.second.player_ready = (! entry.second.player_ready);
         }
     }
@@ -1209,7 +1208,7 @@ void MultiPlayerLobbyWnd::ReadyClicked() {
 }
 
 void MultiPlayerLobbyWnd::CancelClicked()
-{ GGHumanClientApp::GetApp()->CancelMultiplayerGameFromLobby(); }
+{ GetApp().CancelMultiplayerGameFromLobby(); }
 
 void MultiPlayerLobbyWnd::AnyCanEdit(bool checked) {
     if (HasAuthRole(Networking::RoleType::ROLE_HOST)) {

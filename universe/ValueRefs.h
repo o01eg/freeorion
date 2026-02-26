@@ -31,22 +31,112 @@
 class UniverseObject;
 
 namespace ValueRef {
+#if defined(FREEORION_ANDROID)
+template <class From, class To>
+concept convertible_to = 
+    std::is_convertible<From, To>::value &&
+    requires { static_cast<To>(std::declval<From>()); };
+#else
+using std::convertible_to;
+#endif
+
+// puts arguments into a vector
+template <typename out_t, convertible_to<out_t> ...Args>
+[[nodiscard]] CONSTEXPR_VEC auto Vectorize(Args&&... args) {
+    std::vector<out_t> out;
+    out.reserve(sizeof...(args));
+
+    const auto push = [&out](auto&& arg) {
+        if constexpr (requires { arg == nullptr; }) {
+            if (arg == nullptr)
+                return;
+        }
+        out.push_back(std::forward<decltype(arg)>(arg));
+    };
+
+    (push(std::forward<Args>(args)), ...);
+
+    return out;
+}
+
+// determines if the argument(s) is / are all root candidate invariant, local candidate invarient,
+// target invariant, source invariant, and constant expressions, and packs that into an array
+constexpr std::array<bool, 5> RefsRTSLICE(const auto& operands) {
+    if constexpr (requires { *operands; operands->TargetInvariant(); }) {
+        return {!operands || operands->RootCandidateInvariant(),
+                !operands || operands->TargetInvariant(),
+                !operands || operands->SourceInvariant(),
+                !operands || operands->LocalCandidateInvariant(),
+                !operands || operands->ConstantExpr()
+        };
+
+    } else if constexpr (requires { operands.TargetInvariant(); }) {
+        return {operands.RootCandidateInvariant(),
+                operands.TargetInvariant(),
+                operands.SourceInvariant(),
+                operands.LocalCandidateInvairant(),
+                operands.ConstantExpr()};
+
+    } else if constexpr (requires { operands.begin(); (*operands.begin()).TargetInvariant(); }) {
+        return {std::all_of(operands.begin(), operands.end(), [](auto& e){ return e.RootCandidateInvariant(); }),
+                std::all_of(operands.begin(), operands.end(), [](auto& e){ return e.TargetInvariant(); }),
+                std::all_of(operands.begin(), operands.end(), [](auto& e){ return e.SourceInvariant(); }),
+                std::all_of(operands.begin(), operands.end(), [](auto& e){ return e.LocalCandidateInvariant(); }),
+                std::all_of(operands.begin(), operands.end(), [](auto& e){ return e.ConstantExpr(); })
+        };
+
+    } else if constexpr (requires { operands.begin(); (*operands.begin())->TargetInvariant(); }) {
+        return {std::all_of(operands.begin(), operands.end(), [](auto& e){ return !e || e->RootCandidateInvariant(); }),
+                std::all_of(operands.begin(), operands.end(), [](auto& e){ return !e || e->TargetInvariant(); }),
+                std::all_of(operands.begin(), operands.end(), [](auto& e){ return !e || e->SourceInvariant(); }),
+                std::all_of(operands.begin(), operands.end(), [](auto& e){ return !e || e->LocalCandidateInvariant(); }),
+                std::all_of(operands.begin(), operands.end(), [](auto& e){ return !e || e->ConstantExpr(); })
+        };
+
+    } else if constexpr (std::is_same_v<std::decay_t<decltype(operands)>, std::nullptr_t>) {
+        return {true, true, true, true, true};
+
+    } else {
+        throw "unrecognized type?";
+    }
+}
+
+// ands together invariance properties of multiple operand arguments
+constexpr std::array<bool, 5> RefsRTSLICE(const auto&... operands) requires (sizeof...(operands) > 1) {
+    std::array<bool, 5> retval{true, true, true, true, true};
+    const auto get_and_cerlts = [&retval](const auto& op) {
+        const auto op_cerltsi = RefsRTSLICE(op);
+        retval = {retval[0] && op_cerltsi[0], retval[1] && op_cerltsi[1], retval[2] && op_cerltsi[2],
+                  retval[3] && op_cerltsi[3], retval[4] && op_cerltsi[4]};
+        };
+    (get_and_cerlts(operands), ...);
+    return retval;
+}
+
+
 /** the constant value leaf ValueRef class. */
-template <typename T>
+template <typename T> requires(std::is_nothrow_move_constructible_v<T>)
 struct FO_COMMON_API Constant final : public ValueRef<T>
 {
-    template <typename TT> requires (std::is_convertible_v<TT, T>)
-    [[nodiscard]] constexpr explicit Constant(TT&& value) noexcept(noexcept(std::string{}) && noexcept(T{std::declval<TT>()})) :
-        ValueRef<T>(true, true, true, true, true),
-        m_value(std::forward<TT>(value))
-    {
-        static_assert(std::is_nothrow_move_constructible_v<T>);
-    }
+    [[nodiscard]] constexpr explicit Constant(T value)
+        noexcept(noexcept(std::string{}) &&
+                 noexcept(CheckSums::GetCheckSum("ValueRef::Constant", value))) :
+        ValueRef<T>(true, true, true, true, true, CheckSums::GetCheckSum("ValueRef::Constant", value)),
+        m_value(std::move(value))
+    {}
 
-    [[nodiscard]] constexpr explicit Constant(const Constant& value)
-        noexcept(noexcept(std::string{}) && noexcept(T{std::declval<const T>()})) :
-        ValueRef<T>(value),
-        m_value(value.m_value)
+    template <typename TT> requires (std::is_convertible_v<TT, T>)
+    [[nodiscard]] constexpr explicit Constant(TT&& value)
+        noexcept(noexcept(std::string{}) &&
+                 noexcept(T(std::forward<TT>(value))) &&
+                 noexcept(CheckSums::GetCheckSum("ValueRef::Constant", std::declval<T>()))) :
+        Constant(T(std::forward<TT>(value)))
+    {}
+
+    [[nodiscard]] constexpr explicit Constant(const Constant& rhs)
+        noexcept(noexcept(std::string{}) && noexcept(T(rhs.m_value))) :
+        ValueRef<T>(rhs),
+        m_value(rhs.m_value)
     {}
 
 #if defined(__GNUC__) && (__GNUC__ < 13)
@@ -54,13 +144,13 @@ struct FO_COMMON_API Constant final : public ValueRef<T>
 #endif
 
     [[nodiscard]] constexpr bool operator==(const ValueRef<T>& rhs) const noexcept override {
-        if (&rhs == this)
+        if (std::addressof(rhs) == this)
             return true;
         const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
         return rhs_p && *this == *rhs_p;
     }
     [[nodiscard]] constexpr bool operator==(const Constant& rhs) const noexcept {
-        if (&rhs == this)
+        if (std::addressof(rhs) == this)
             return true;
         if (!this->ValueRefBase::operator==(static_cast<const ValueRefBase&>(rhs)))
             return false;
@@ -78,8 +168,6 @@ struct FO_COMMON_API Constant final : public ValueRef<T>
 
     [[nodiscard]] constexpr T Value() const noexcept(noexcept(T{std::declval<const T>()})) { return m_value; };
 
-    [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept override;
-
     [[nodiscard]] std::unique_ptr<ValueRef<T>> Clone() const override
     { return std::make_unique<Constant>(m_value); }
 
@@ -90,14 +178,11 @@ private:
 template <>
 struct FO_COMMON_API Constant<std::string> final : public ValueRef<std::string>
 {
-    template <typename S> requires (std::is_convertible_v<S, std::string>)
-    constexpr explicit Constant(S&& value)
-        noexcept(noexcept(std::string{}) && noexcept(std::string{std::declval<S>()})) :
-        ValueRef<std::string>(true, true, true, true, true),
-        m_value(std::forward<S>(value))
-    {
-        static_assert(std::is_nothrow_move_constructible_v<std::string>);
-    }
+    CONSTEXPR_STRING explicit Constant(std::string value)
+        noexcept(std::is_nothrow_move_constructible_v<std::string>) :
+        ValueRef<std::string>(true, true, true, true, true, CheckSums::GetCheckSum("ValueRef::Constant<string>", value)),
+        m_value(std::move(value))
+    {}
 
 #if defined(__GNUC__) && (__GNUC__ == 12)
     // must be __GNUC__ > 11 for ~basic_string to be constexpr (and thus also ~Constant<string>
@@ -106,7 +191,7 @@ struct FO_COMMON_API Constant<std::string> final : public ValueRef<std::string>
 #endif
 
     [[nodiscard]] constexpr bool operator==(const ValueRef<std::string>& rhs) const override {
-        if (&rhs == this)
+        if (std::addressof(rhs) == this)
             return true;
         const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
         if (!rhs_p)
@@ -159,20 +244,6 @@ struct FO_COMMON_API Constant<std::string> final : public ValueRef<std::string>
     }
 
     [[nodiscard]] CONSTEXPR_STRING const auto& Value() const noexcept { return m_value; };
-    [[nodiscard]] CONSTEXPR_STRING uint32_t GetCheckSum() const override {
-        uint32_t retval{0};
-
-        CheckSums::CheckSumCombine(retval, "ValueRef::Constant<string>");
-        CheckSums::CheckSumCombine(retval, m_value);
-#if defined(__cpp_lib_is_constant_evaluated) && (!defined(__clang_major__) || (__clang_major__ >= 14))
-        if (!std::is_constant_evaluated())
-            [type_id_name{typeid(*this).name()}, this, retval]() {
-                TraceLogger() << "GetCheckSum(Constant<std::string>): " << type_id_name
-                              << " value: " << Description() << " retval: " << retval;
-            }();
-#endif
-        return retval;
-    }
 
     [[nodiscard]] std::unique_ptr<ValueRef<std::string>> Clone() const override {
         auto retval = std::make_unique<Constant>(m_value);
@@ -187,14 +258,221 @@ private:
 
 enum class ValueToReturn : bool { Initial = false, Immediate = true };
 
+FO_ENUM_BIG(
+    (Property),
+    ((MeterType, -2))
+    ((Unknown, -1))
+    ((None, 0))
+    ((Age))
+    ((ArrivalStarlaneID))
+    ((ArrivedOnTurn))
+    ((AvailableFoci))
+    ((BuildingType))
+    ((BuildingTypeCost))
+    ((BuildingTypesOwned))
+    ((BuildingTypesProduced))
+    ((BuildingTypesScrapped))
+    ((ClockwiseNextPlanetType))
+    ((CombatBout))
+    ((ContainerID))
+    ((CounterClockwiseNextPlanetType))
+    ((CreationTurn))
+    ((CurrentTurn))
+    ((CumulativeTurnsPolicyAdopted))
+    ((DamageStructurePerBattleMax))
+    ((DefaultFocus))
+    ((DesignID))
+    ((DestroyFightersPerBattleMax))
+    ((DirectDistanceBetween))
+    ((DistanceFromOriginalType))
+    ((EmpireAdoptedPolices))
+    ((EmpireAnnexationCost))
+    ((EmpireAvailablePolices))
+    ((EmpireMeterValue))
+    ((EmpireObjectVisibility))
+    ((EmpireObjectVisibilityTurn))
+    ((EmpireShipsDestroyed))
+    ((EmpireStockpile))
+    ((ETA))
+    ((FieldType))
+    ((FinalDestinationID))
+    ((FleetID))
+    ((Focus))
+    ((GalaxyAge))
+    ((GalaxyMaxAIAggression))
+    ((GalaxyMonsterFrequency))
+    ((GalaxyNativeFrequency))
+    ((GalaxyPlanetDensity))
+    ((GalaxySeed))
+    ((GalaxyShape))
+    ((GalaxySize))
+    ((GalaxySpecialFrequency))
+    ((GalaxyStarlaneFrequency))
+    ((GameRule))
+    ((HabitableSize))
+    ((HighestCostEnqueuedTech))
+    ((HighestCostResearchableTech))
+    ((HighestCostTransferrableTech))
+    ((Hull))
+    ((HullFuel))
+    ((HullSpeed))
+    ((HullStealth))
+    ((HullStructure))
+    ((ID))
+    ((JumpsBetween))
+    ((JumpsBetweenByEmpireSupplyConnections))
+    ((LaunchedFrom))
+    ((LastColonizedByEmpire))
+    ((LastInvadedByEmpire))
+    ((LastTurnActiveInBattle))
+    ((LastTurnAnnexed))
+    ((LastTurnAttackedByShip))
+    ((LastTurnBattleHere))
+    ((LastTurnColonized))
+    ((LastTurnConquered))
+    ((LastTurnMoveOrdered))
+    ((LastTurnResupplied))
+    ((LatestTurnPolicyAdopted))
+    ((LeastHappySpecies))
+    ((LowestCostEnqueuedTech))
+    ((LowestCostResearchableTech))
+    ((LowestCostTransferrableTech))
+    ((MostHappySpecies))
+    ((MostPopulousSpecies))
+    ((MostSpentEnqueuedTech))
+    ((MostSpentResearchableTech))
+    ((MostSpentTransferrableTech))
+    ((Name))
+    ((NearestSystemID))
+    ((NextBetterPlanetType))
+    ((NextBestPlanetType))
+    ((NextCloserToOriginalPlanetType))
+    ((NextLargerPlanetSize))
+    ((NextOlderStarType))
+    ((NextSmallerPlanetSize))
+    ((NextSystemID))
+    ((NextYoungerStarType))
+    ((NumPartClassesInShipDesign))
+    ((NumPoliciesAdopted))
+    ((NumShips))
+    ((NumSpecials))
+    ((NumStarlanes))
+    ((ObjectType))
+    ((OrderedColonizePlanetID))
+    ((OrderedGivenToEmpire))
+    ((Orbit))
+    ((OriginalType))
+    ((OutpostsOwned))
+    ((Owner))
+    ((OwnerBeforeLastConquered))
+    ((OwnerLeastExpensiveEnqueuedTech))
+    ((OwnerMostExpensiveEnqueuedTech))
+    ((OwnerMostRPCostLeftEnqueuedTech))
+    ((OwnerMostRPSpentEnqueuedTech))
+    ((OwnerName))
+    ((OwnerTopPriorityEnqueuedTech))
+    ((PartCapacity))
+    ((PartOfClassInShipDesign))
+    ((PartSecondaryStat))
+    ((Parts))
+    ((PartsInShipDesign))
+    ((PlanetEnvironment))
+    ((PlanetEnvironmentForSpecies))
+    ((PlanetID))
+    ((PlanetSize))
+    ((PlanetType))
+    ((PlanetTypeDifference))
+    ((PreviousSystemID))
+    ((PreviousToFinalDestinationID))
+    ((ProducedByEmpireID))
+    ((PropagatedSupplyDistance))
+    ((PropagatedSupplyRange))
+    ((PropagatedSystemSupplyDistance))
+    ((PropagatedSystemSupplyRange))
+    ((RandomColonizableSpecies))
+    ((RandomCompleteTech))
+    ((RandomControlledSpecies))
+    ((RandomEnqueuedTech))
+    ((RandomResearchableTech))
+    ((RandomTransferrableTech))
+    ((SelectedFleetID))
+    ((SelectedPlanetID))
+    ((SelectedSystemID))
+    ((ShipDesignCost))
+    ((ShipDesignsDestroyed))
+    ((ShipDesignsInProduction))
+    ((ShipDesignsLost))
+    ((ShipDesignsOwned))
+    ((ShipDesignsProduced))
+    ((ShipDesignsScrapped))
+    ((ShipPartMeter))
+    ((ShipPartsOwned))
+    ((ShortestPath))
+    ((ShortestPathDistance))
+    ((SizeAsDouble))
+    ((SlotsInHull))
+    ((SlotsInShipDesign))
+    ((SpecialAddedOnTurn))
+    ((SpecialCapacity))
+    ((Specials))
+    ((Species))
+    ((SpeciesColoniesOwned))
+    ((SpeciesContentOpinion))
+    ((SpeciesEmpireOpinion))
+    ((SpeciesEmpireTargetOpinion))
+    ((SpeciesPlanetsBombed))
+    ((SpeciesPlanetsDepoped))
+    ((SpeciesPlanetsInvaded))
+    ((SpeciesShipsDestroyed))
+    ((SpeciesShipsLost))
+    ((SpeciesShipsOwned))
+    ((SpeciesShipsProduced))
+    ((SpeciesShipsScrapped))
+    ((SpeciesSpeciesOpinion))
+    ((SpeciesSpeciesTargetOpinion))
+    ((StarType))
+    ((SupplyingEmpire))
+    ((SystemID))
+    ((SystemSupplyRange))
+    ((Tags))
+    ((ThisClientEmpireID))
+    ((TopPriorityEnqueuedTech))
+    ((TopPriorityResearchableTech))
+    ((TopPriorityTransferrableTech))
+    ((TurnPolicyAdopted))
+    ((TurnSystemExplored))
+    ((TurnsSinceAnnexation))
+    ((TurnsSinceColonization))
+    ((TurnsSinceFocusChange))
+    ((TurnsSinceLastConquered))
+    ((TurnsSincePolicyAdopted))
+    ((TurnTechResearched))
+    ((TypeName))
+    ((UniverseCentreX))
+    ((UniverseCentreY))
+    ((UniverseWidth))
+    ((UsedInDesignID))
+    ((X))
+    ((Y))
+)
+
+constexpr Property StringToPropertyWithEmptyNone(std::string_view str) noexcept {
+    static_assert(noexcept(PropertyFromString(std::string_view{}, Property::Unknown)));
+    if (str.empty())
+        return Property::None;
+    if (NameToMeter(str) != MeterType::INVALID_METER_TYPE)
+        return Property::MeterType;
+    return PropertyFromString(str, Property::Unknown);
+}
+
 /** The variable value ValueRef class.  The value returned by this node is
   * taken from the gamestate, most often from the Source or Target objects. */
 template <typename T>
 struct FO_COMMON_API Variable : public ValueRef<T>
 {
-    CONSTEXPR_STRING Variable(ReferenceType ref_type, std::string property_name,
-                              ContainerType container_type = ContainerType::NONE,
-                              ValueToReturn retval_type = ValueToReturn::Initial) noexcept :
+    constexpr Variable(ReferenceType ref_type, Property property, ::MeterType meter_type,
+                       ContainerType container_type = ContainerType::NONE,
+                       ValueToReturn retval_type = ValueToReturn::Initial) :
         ValueRef<T>(false,
                     ref_type != ReferenceType::CONDITION_ROOT_CANDIDATE_REFERENCE,
                     ref_type != ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE,
@@ -202,18 +480,42 @@ struct FO_COMMON_API Variable : public ValueRef<T>
                     ref_type != ReferenceType::SOURCE_REFERENCE,
                     static_cast<bool>(retval_type),
                     ref_type,
-                    container_type),
-        m_property_name(std::move(property_name))
+                    container_type,
+                    CheckSums::GetCheckSum("ValueRef::Variable", GetPropertyAsString(property, meter_type),
+                                           ref_type, container_type, static_cast<bool>(retval_type))),
+        m_property(property),
+        m_meter_type(meter_type)
+    {
+        if (property == Property::Unknown)
+            throw std::invalid_argument("Variable initialized with Property::Unknown");
+        if (property != Property::MeterType && meter_type != ::MeterType::INVALID_METER_TYPE)
+            throw std::invalid_argument("Variable initialized with property other than Property::MeterType with a MeterType other than INVALID_METER_TYPE");
+        if (property == Property::MeterType && meter_type == ::MeterType::INVALID_METER_TYPE)
+            throw std::invalid_argument("Variable initialized with MeterType::INVALID_METER_TYPE without Property::MeterType");
+    }
+
+    constexpr Variable(ReferenceType ref_type, Property property,
+                       ContainerType container_type = ContainerType::NONE,
+                       ValueToReturn retval_type = ValueToReturn::Initial) :
+        Variable(ref_type, property, ::MeterType::INVALID_METER_TYPE, container_type, retval_type)
     {}
 
-    CONSTEXPR_STRING explicit Variable(ReferenceType ref_type, ValueToReturn retval_type = ValueToReturn::Initial) noexcept :
-        ValueRef<T>(false,
-                    ref_type != ReferenceType::CONDITION_ROOT_CANDIDATE_REFERENCE,
-                    ref_type != ReferenceType::CONDITION_LOCAL_CANDIDATE_REFERENCE,
-                    ref_type != ReferenceType::EFFECT_TARGET_REFERENCE && ref_type != ReferenceType::EFFECT_TARGET_VALUE_REFERENCE, // not all effect target values are properties of the target object, eg. empire meters, but most are
-                    ref_type != ReferenceType::SOURCE_REFERENCE,
-                    static_cast<bool>(retval_type),
-                    ref_type)
+    constexpr Variable(ReferenceType ref_type, ::MeterType meter_type,
+                       ContainerType container_type = ContainerType::NONE,
+                       ValueToReturn retval_type = ValueToReturn::Initial) :
+        Variable(ref_type, Property::MeterType, meter_type, container_type, retval_type)
+    {}
+
+
+    constexpr Variable(ReferenceType ref_type, std::string_view property_name,
+                       ContainerType container_type = ContainerType::NONE,
+                       ValueToReturn retval_type = ValueToReturn::Initial) noexcept :
+        Variable(ref_type, StringToPropertyWithEmptyNone(property_name), NameToMeter(property_name),
+                 container_type, retval_type)
+    {}
+
+    constexpr explicit Variable(ReferenceType ref_type, ValueToReturn retval_type = ValueToReturn::Initial) :
+        Variable(ref_type, Property::None, ContainerType::NONE, retval_type)
     {}
 
 #if defined(__GNUC__) && (__GNUC__ == 12)
@@ -223,52 +525,126 @@ struct FO_COMMON_API Variable : public ValueRef<T>
 #endif
 
     [[nodiscard]] constexpr bool operator==(const ValueRef<T>& rhs) const override {
-        if (&rhs == this)
+        if (std::addressof(rhs) == this)
             return true;
         const auto* rhs_p = dynamic_cast<decltype(this)>(&rhs);
         return rhs_p && *rhs_p == *this;
     }
     [[nodiscard]] constexpr bool operator==(const Variable<T>& rhs) const noexcept {
-        if (&rhs == this)
+        if (std::addressof(rhs) == this)
             return true;
         if (!this->ValueRefBase::operator==(static_cast<const ValueRefBase&>(rhs)))
             return false;
-        return this->m_container_type == rhs.m_container_type && m_property_name == rhs.m_property_name;
+        return m_property == rhs.m_property && m_meter_type == rhs.m_meter_type;
     }
 
     [[nodiscard]] T Eval(const ScriptingContext& context) const override;
     [[nodiscard]] std::string Description() const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
-    [[nodiscard]] constexpr auto& PropertyName() const noexcept { return m_property_name; }
+    [[nodiscard]] constexpr auto Property() const noexcept { return m_property; }
+    [[nodiscard]] constexpr auto MeterType() const noexcept { return m_meter_type; }
     [[nodiscard]] constexpr auto GetContainerType() const noexcept { return this->m_container_type; }
-    [[nodiscard]] constexpr bool ReturnImmediateValue() const noexcept { return this->m_return_immediate_value; }
-
-    [[nodiscard]] CONSTEXPR_STRING uint32_t GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<ValueRef<T>> Clone() const override {
-        return std::make_unique<Variable<T>>(this->m_ref_type, m_property_name, this->m_container_type,
+        return std::make_unique<Variable<T>>(this->m_ref_type, this->m_property, this->m_meter_type, this->m_container_type,
                                              this->m_return_immediate_value ? ValueToReturn::Immediate : ValueToReturn::Initial);
     }
 
+    [[nodiscard]] static constexpr std::string_view GetPropertyAsString(::ValueRef::Property property,
+                                                                        ::MeterType meter_type) noexcept
+    {
+        if (property == ::ValueRef::Property::MeterType) {
+            if (meter_type == ::MeterType::INVALID_METER_TYPE)
+                return "";
+            else
+                return MeterToName(meter_type);
+        } else if (property == ::ValueRef::Property::None || property == ::ValueRef::Property::Unknown) {
+            return "";
+        } else {
+            return to_string(property);
+        }
+    }
+
+    [[nodiscard]] constexpr std::string_view GetPropertyAsString() const noexcept
+    { return GetPropertyAsString(m_property, m_meter_type); }
+
 protected:
-    constexpr Variable(bool root_inv, bool local_inv, bool target_inv, bool source_inv, StatisticType stat_type) :
-        ValueRef<T>(false, root_inv, local_inv, target_inv, source_inv, stat_type)
+    constexpr Variable(bool root_inv, bool target_inv, bool source_inv,
+                       StatisticType stat_type, uint32_t checksum) :
+        ValueRef<T>(false, root_inv, true, target_inv, source_inv, stat_type, checksum)
     {}
 
-    const std::string m_property_name;
+    constexpr Variable(std::array<bool, 3> rtsi, StatisticType stat_type, uint32_t checksum) :
+        Variable(rtsi[0], rtsi[1], rtsi[2], stat_type, checksum)
+    {}
+
+    constexpr Variable(bool root_inv, bool target_inv, bool source_inv, bool local_inv,
+                       ReferenceType ref_type, uint32_t checksum) :
+        ValueRef<T>(false, root_inv, local_inv, target_inv, source_inv, ref_type, checksum)
+    {}
+
+    constexpr Variable(std::array<bool, 4> rtsli, ReferenceType ref_type, uint32_t checksum) :
+        Variable(rtsli[0], rtsli[1], rtsli[2], rtsli[3], ref_type, checksum)
+    {}
+
+    constexpr Variable(std::string_view property_name, ValueToReturn return_immediate, uint32_t checksum) :
+        ValueRef<T>(false, false, false, false, false, static_cast<bool>(return_immediate),
+                    ReferenceType::INVALID_REFERENCE_TYPE, ContainerType::NONE, checksum),
+        m_property(StringToPropertyWithEmptyNone(property_name)),
+        m_meter_type(NameToMeter(property_name))
+    {}
+
+    constexpr Variable(std::array<bool, 4> rtsli, std::string_view property_name,
+                       ValueToReturn return_immediate, ReferenceType ref_type, uint32_t checksum) :
+        ValueRef<T>(false, rtsli[0], rtsli[3], rtsli[1], rtsli[2], static_cast<bool>(return_immediate),
+                    ref_type, ContainerType::NONE, checksum),
+        m_property(StringToPropertyWithEmptyNone(property_name)),
+        m_meter_type(NameToMeter(property_name))
+    {}
+
+    constexpr Variable(std::array<bool, 5> rtslice, std::string_view property_name,
+                       ValueToReturn return_immediate, ReferenceType ref_type, uint32_t checksum) noexcept :
+        ValueRef<T>(rtslice[4], rtslice[0], rtslice[3], rtslice[1], rtslice[2],
+                    static_cast<bool>(return_immediate), ref_type, ContainerType::NONE, checksum),
+        m_property(StringToPropertyWithEmptyNone(property_name)),
+        m_meter_type(NameToMeter(property_name))
+    {}
+
+    constexpr Variable(std::array<bool, 5> rtslice, ReferenceType ref_type, uint32_t checksum) :
+        ValueRef<T>(rtslice, ref_type, checksum)
+    {}
+
+    constexpr Variable(std::array<bool, 5> rtslice, ReferenceType ref_type, ::ValueRef::Property property,
+                       ::MeterType meter_type, ContainerType container, uint32_t checksum,
+                       ValueToReturn return_immediate = ValueToReturn::Initial) :
+        ValueRef<T>(rtslice[4], rtslice[0], rtslice[3], rtslice[1], rtslice[2],
+                    static_cast<bool>(return_immediate), ref_type, container, checksum),
+        m_property(property),
+        m_meter_type(meter_type)
+    {}
+
+
+    const ::ValueRef::Property m_property = Property::None;
+    const ::MeterType m_meter_type = ::MeterType::INVALID_METER_TYPE;
 };
 
-/** The variable statistic class.   The value returned by this node is
-  * computed from the general gamestate; the value of the indicated
-  * \a property_name is computed for each object that matches
-  * \a sampling_condition and the statistic indicated by \a stat_type is
-  * calculated from them and returned. */
+/** The variable statistic class. The value returned by this node is
+  * computed from the general gamestate: The value of \a value_ref
+  * is evaluated for each object that matches \a sampling_condition
+  * with that object as the local candidate in the context. The
+  * statistic indicated by \a stat_type is calculated from those values. */
 template <typename T, typename V = T>
 struct FO_COMMON_API Statistic final : public Variable<T>
 {
     Statistic(std::unique_ptr<ValueRef<V>>&& value_ref,
               StatisticType stat_type,
-              std::unique_ptr<Condition::Condition>&& sampling_condition);
+              std::unique_ptr<Condition::Condition>&& sampling_condition) :
+        Variable<T>(CalcRTSI(value_ref, sampling_condition), stat_type,
+                    CheckSums::GetCheckSum("ValueRef::Statistic", stat_type, sampling_condition, value_ref)),
+        m_sampling_condition(std::move(sampling_condition)),
+        m_value_ref(std::move(value_ref))
+    {}
+
 
     [[nodiscard]] bool        operator==(const ValueRef<T>& rhs) const override;
     [[nodiscard]] T           Eval(const ScriptingContext& context) const override;
@@ -283,8 +659,6 @@ struct FO_COMMON_API Statistic final : public Variable<T>
 
     [[nodiscard]] const auto* GetValueRef() const noexcept { return m_value_ref.get(); }
 
-    [[nodiscard]] uint32_t GetCheckSum() const override;
-
     [[nodiscard]] std::unique_ptr<ValueRef<T>> Clone() const override {
         return std::make_unique<Statistic<T, V>>(CloneUnique(m_value_ref),
                                                  this->m_stat_type,
@@ -297,6 +671,21 @@ protected:
                                            const Condition::ObjectSet& objects) const;
 
 private:
+    static constexpr std::array<bool, 3> CalcRTSI(const std::unique_ptr<ValueRef<V>>& value_ref,
+                                                  const std::unique_ptr<Condition::Condition>& condition)
+    {
+        const auto ref_rtslice = RefsRTSLICE(value_ref);
+        const auto cond_rtsi = ::Condition::CondsRTSI(condition);
+        return {cond_rtsi[0] && ref_rtslice[0], cond_rtsi[1] && ref_rtslice[1], cond_rtsi[2] && ref_rtslice[2]};
+
+        // don't need to check if sampling condition is LocalCandidateInvariant, as
+        // all conditions aren't, but that refers to their own local candidate.
+        // no condition is explicitly dependent on the parent context's local candidate.
+        // also don't need to check if sub-value-ref is local candidate invariant,
+        // as it is applied to the subcondition matches, not the local candidate of
+        // any containing condition
+    }
+
     const std::unique_ptr<Condition::Condition> m_sampling_condition;
     const std::unique_ptr<ValueRef<V>>          m_value_ref;
 };
@@ -307,8 +696,14 @@ private:
   * in which the given \a sampling_condition matches. */
 struct FO_COMMON_API TotalFighterShots final : public Variable<int>
 {
-    TotalFighterShots(std::unique_ptr<ValueRef<int>>&& carrier_id,
-                      std::unique_ptr<Condition::Condition>&& sampling_condition = nullptr);
+    explicit TotalFighterShots(std::unique_ptr<ValueRef<int>>&& carrier_id,
+                               std::unique_ptr<Condition::Condition>&& sampling_condition = nullptr) :
+        Variable<int>(CalcRTSLI(carrier_id, sampling_condition),
+                      ReferenceType::NON_OBJECT_REFERENCE,
+                      CheckSums::GetCheckSum("ValueRef::TotalFighterShots", carrier_id, sampling_condition)),
+        m_carrier_id(std::move(carrier_id)),
+        m_sampling_condition(std::move(sampling_condition))
+    {}
 
     bool                        operator==(const ValueRef<int>& rhs) const override;
     [[nodiscard]] int           Eval(const ScriptingContext& context) const override;
@@ -318,12 +713,19 @@ struct FO_COMMON_API TotalFighterShots final : public Variable<int>
 
     [[nodiscard]] const auto*   GetSamplingCondition() const noexcept { return m_sampling_condition.get(); }
 
-    [[nodiscard]] uint32_t GetCheckSum() const override;
-
     [[nodiscard]] std::unique_ptr<ValueRef<int>> Clone() const override
     { return std::make_unique<TotalFighterShots>(CloneUnique(m_carrier_id), CloneUnique(m_sampling_condition)); }
 
 private:
+    static constexpr std::array<bool, 4> CalcRTSLI(const std::unique_ptr<ValueRef<int>>& value_ref,
+                                                   const std::unique_ptr<Condition::Condition>& condition)
+    {
+        const auto ref_rtslice = RefsRTSLICE(value_ref);
+        const auto cond_rtsi = Condition::CondsRTSI(condition);
+        return {cond_rtsi[0] && ref_rtslice[0], cond_rtsi[1] && ref_rtslice[1],
+                cond_rtsi[2] && ref_rtslice[2], ref_rtslice[3]};
+    }
+
     const std::unique_ptr<ValueRef<int>>        m_carrier_id;
     const std::unique_ptr<Condition::Condition> m_sampling_condition;
 };
@@ -333,22 +735,25 @@ private:
 template <typename T>
 struct FO_COMMON_API ComplexVariable final : public Variable<T>
 {
-    template<typename S> requires requires(S s) { std::vector<std::string>{s}; }
-    explicit ComplexVariable(S&& variable_name,
+    explicit ComplexVariable(const std::string& variable_name,
                              std::unique_ptr<ValueRef<int>>&& int_ref1 = nullptr,
                              std::unique_ptr<ValueRef<int>>&& int_ref2 = nullptr,
                              std::unique_ptr<ValueRef<int>>&& int_ref3 = nullptr,
                              std::unique_ptr<ValueRef<std::string>>&& string_ref1 = nullptr,
                              std::unique_ptr<ValueRef<std::string>>&& string_ref2 = nullptr,
                              bool return_immediate_value = false) :
-        Variable<T>(ReferenceType::NON_OBJECT_REFERENCE, std::forward<S>(variable_name), ContainerType::NONE,
-                    return_immediate_value ? ValueToReturn::Immediate : ValueToReturn::Initial),
+        Variable<T>(CalcRTSLI(int_ref1, int_ref2, int_ref3, string_ref1, string_ref2),
+                    variable_name, // no move because is passed to checksum calc below
+                    return_immediate_value ? ValueToReturn::Immediate : ValueToReturn::Initial,
+                    ReferenceType::INVALID_REFERENCE_TYPE,
+                    CheckSums::GetCheckSum("ValueRef::ComplexVariable", variable_name, return_immediate_value,
+                                           int_ref1, int_ref2, int_ref3, string_ref1, string_ref2)),
         m_int_ref1(std::move(int_ref1)),
         m_int_ref2(std::move(int_ref2)),
         m_int_ref3(std::move(int_ref3)),
         m_string_ref1(std::move(string_ref1)),
         m_string_ref2(std::move(string_ref2))
-    { InitInvariants(); } // TODO: remove InitInvariants, determine in Variable<T> constructor call
+    {}
 
     explicit ComplexVariable(const ComplexVariable<T>& rhs) :
         Variable<T>(rhs),
@@ -371,13 +776,15 @@ struct FO_COMMON_API ComplexVariable final : public Variable<T>
     [[nodiscard]] const auto* IntRef3() const noexcept { return m_int_ref3.get(); }
     [[nodiscard]] const auto* StringRef1() const noexcept { return m_string_ref1.get(); }
     [[nodiscard]] const auto* StringRef2() const noexcept { return m_string_ref2.get(); }
-    [[nodiscard]] uint32_t    GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<ValueRef<T>> Clone() const override
     { return std::make_unique<ComplexVariable<T>>(*this); }
 
 protected:
-    void InitInvariants();
+    [[nodiscard]] static std::array<bool, 4> CalcRTSLI(const auto& ...ops) {
+        const auto rtslice = RefsRTSLICE(ops...);
+        return {rtslice[0], rtslice[1], rtslice[2], rtslice[3]};
+    }
 
     const std::unique_ptr<ValueRef<int>> m_int_ref1;
     const std::unique_ptr<ValueRef<int>> m_int_ref2;
@@ -386,17 +793,65 @@ protected:
     const std::unique_ptr<ValueRef<std::string>> m_string_ref2;
 };
 
+[[nodiscard]] constexpr auto RefToReferenceType(const auto& ref) {
+    if constexpr (requires { ref.GetReferenceType(); }) {
+        return ref.GetReferenceType();
+    } else if constexpr (requires { ref->GetReferenceType(); }) {
+        if (ref) return ref->GetReferenceType();
+    }
+    return ReferenceType::NON_OBJECT_REFERENCE;
+}
+
+[[nodiscard]] constexpr ::ValueRef::Property RefToProperty(const auto& ref) {
+    if constexpr (requires { ref.Property(); }) {
+        return ref.Property();
+    } else if constexpr (requires { ref->Property(); }) {
+        if (ref) return ref->Property();
+    } else if constexpr (requires { typename std::decay_t<decltype(ref)>::ResultT; }) {
+        using ResultT = typename std::decay_t<decltype(ref)>::ResultT;
+        if (const auto* var_ref = dynamic_cast<const Variable<ResultT>*>(std::addressof(ref)))
+            return var_ref->Property();
+    } else if constexpr (requires { *ref; }) {
+        if (ref) return RefToProperty(*ref);
+    }
+    return ::ValueRef::Property::None;
+}
+
+[[nodiscard]] constexpr ::MeterType RefToMeterType(const auto& ref) {
+    if constexpr (requires { ref.MeterType(); }) {
+        return ref.MeterType();
+    } else if constexpr (requires { ref->MeterType(); }) {
+        if (ref) return ref->MeterType();
+    } else if constexpr (requires { typename std::decay_t<decltype(ref)>::ResultT; }) {
+        using ResultT = typename std::decay_t<decltype(ref)>::ResultT;
+        if (const auto* var_ref = dynamic_cast<const Variable<ResultT>*>(std::addressof(ref)))
+            return var_ref->MeterType();
+    } else if constexpr (requires { *ref; }) {
+        if (ref) return RefToMeterType(*ref);
+    }
+    return ::MeterType::INVALID_METER_TYPE;
+}
+
+[[nodiscard]] constexpr auto RefToContainerType(const auto& ref) {
+    if constexpr (requires { ref.GetContainerType(); })
+        return ref.GetContainerType();
+    else if constexpr (requires { ref->GetContainerType(); })
+        if (ref) return ref->GetContainerType();
+    return ContainerType::NONE;
+}
+
 /** The variable static_cast class.  The value returned by this node is taken
   * from the ctor \a value_ref parameter's FromType value, static_cast to ToType. */
 template <typename FromType, typename ToType>
 struct FO_COMMON_API StaticCast final : public Variable<ToType>
 {
-    template <typename T> requires (std::is_convertible_v<T, std::unique_ptr<Variable<FromType>>>)
-    explicit StaticCast(T&& value_ref);
-
-    template <typename T> requires (std::is_convertible_v<T, std::unique_ptr<ValueRef<FromType>>> &&
-                                    !std::is_convertible_v<T, std::unique_ptr<Variable<FromType>>>)
-    explicit StaticCast(T&& value_ref);
+    explicit StaticCast(auto&& value_ref) requires requires { std::unique_ptr<ValueRef<FromType>>(std::move(value_ref)); } :
+        Variable<ToType>(RefsRTSLICE(value_ref), RefToReferenceType(value_ref), RefToProperty(value_ref),
+                         RefToMeterType(value_ref), RefToContainerType(value_ref),
+                         CheckSums::GetCheckSum("ValueRef::StaticCast", value_ref),
+                         value_ref->ReturnImmediateValue() ? ValueToReturn::Immediate : ValueToReturn::Initial),
+        m_value_ref(std::move(value_ref))
+    {}
 
     [[nodiscard]]             bool operator==(const ValueRef<ToType>& rhs) const override;
     [[nodiscard]] ToType      Eval(const ScriptingContext& context) const override;
@@ -406,8 +861,6 @@ struct FO_COMMON_API StaticCast final : public Variable<ToType>
     void SetTopLevelContent(const std::string& content_name) override;
 
     [[nodiscard]] const auto* GetValueRef() const noexcept { return m_value_ref.get(); }
-
-    [[nodiscard]] uint32_t GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<ValueRef<ToType>> Clone() const override
     { return std::make_unique<StaticCast<FromType, ToType>>(CloneUnique(m_value_ref)); }
@@ -422,7 +875,13 @@ private:
 template <typename FromType>
 struct FO_COMMON_API StringCast final : public Variable<std::string>
 {
-    explicit StringCast(std::unique_ptr<ValueRef<FromType>>&& value_ref);
+    explicit StringCast(std::unique_ptr<ValueRef<FromType>>&& value_ref) :
+        Variable<std::string>(
+            RefsRTSLICE(value_ref), RefToReferenceType(value_ref), RefToProperty(value_ref),
+            RefToMeterType(value_ref), RefToContainerType(value_ref),
+            CheckSums::GetCheckSum("ValueRef::StringCast", value_ref)),
+        m_value_ref(std::move(value_ref))
+    { /* this->m_simple_increment should always be false for this type */ }
 
     [[nodiscard]] bool        operator==(const ValueRef<std::string>& rhs) const override;
     [[nodiscard]] std::string Eval(const ScriptingContext& context) const override;
@@ -432,8 +891,6 @@ struct FO_COMMON_API StringCast final : public Variable<std::string>
     void SetTopLevelContent(const std::string& content_name) override;
 
     [[nodiscard]] const auto* GetValueRef() const noexcept { return m_value_ref.get(); }
-
-    [[nodiscard]] uint32_t GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<ValueRef<std::string>> Clone() const override
     { return std::make_unique<StringCast<FromType>>(CloneUnique(m_value_ref)); }
@@ -446,7 +903,13 @@ private:
   * and returns the UserString equivalent(s). */
 template <typename FromType>
 struct FO_COMMON_API UserStringLookup final : public Variable<std::string> {
-    explicit UserStringLookup(std::unique_ptr<ValueRef<FromType>>&& value_ref);
+    explicit UserStringLookup(std::unique_ptr<ValueRef<FromType>>&& value_ref) :
+        Variable<std::string>(
+            RefsRTSLICE(value_ref), RefToReferenceType(value_ref), RefToProperty(value_ref),
+            RefToMeterType(value_ref), RefToContainerType(value_ref),
+            CheckSums::GetCheckSum("ValueRef::UserStringLookup", value_ref)),
+        m_value_ref(std::move(value_ref))
+    { /* this->m_simple_increment should always be false for this type */ }
 
     [[nodiscard]] bool        operator==(const ValueRef<std::string>& rhs) const override;
     [[nodiscard]] std::string Eval(const ScriptingContext& context) const override;
@@ -456,8 +919,6 @@ struct FO_COMMON_API UserStringLookup final : public Variable<std::string> {
     void SetTopLevelContent(const std::string& content_name) override;
 
     [[nodiscard]] const auto* GetValueRef() const noexcept { return m_value_ref; }
-
-    [[nodiscard]] uint32_t GetCheckSum() const override;
 
     [[nodiscard]] std::unique_ptr<ValueRef<std::string>> Clone() const override
     { return std::make_unique<UserStringLookup<FromType>>(CloneUnique(m_value_ref)); }
@@ -475,7 +936,12 @@ struct FO_COMMON_API NameLookup final : public Variable<std::string> {
         SHIP_DESIGN_NAME
     };
 
-    NameLookup(std::unique_ptr<ValueRef<int>>&& value_ref, LookupType lookup_type);
+    NameLookup(std::unique_ptr<ValueRef<int>>&& value_ref, LookupType lookup_type) :
+        Variable<std::string>(CalcRTSLICE(value_ref), ReferenceType::NON_OBJECT_REFERENCE,
+                              CheckSums::GetCheckSum("ValueRef::NameLookup", value_ref, lookup_type)),
+        m_value_ref(std::move(value_ref)),
+        m_lookup_type(lookup_type)
+    {}
 
     [[nodiscard]] bool        operator==(const ValueRef<std::string>& rhs) const override;
     [[nodiscard]] std::string Eval(const ScriptingContext& context) const override;
@@ -488,12 +954,18 @@ struct FO_COMMON_API NameLookup final : public Variable<std::string> {
 
     [[nodiscard]] LookupType GetLookupType() const noexcept { return m_lookup_type; }
 
-    [[nodiscard]] uint32_t GetCheckSum() const override;
-
     [[nodiscard]] std::unique_ptr<ValueRef<std::string>> Clone() const override
     { return std::make_unique<NameLookup>(CloneUnique(m_value_ref), m_lookup_type); }
 
 private:
+    // not a constant expression if an object ID is provided, since the name of that
+    // object is gamestate and is not known at initialization time and can vary with time.
+    // never a simple increment
+    static std::array<bool, 5> CalcRTSLICE(const auto& value_ref) {
+        auto rtslice = RefsRTSLICE(value_ref);
+        return {rtslice[0], rtslice[1], rtslice[2], rtslice[3], !value_ref};
+    }
+
     const std::unique_ptr<ValueRef<int>> m_value_ref;
     const LookupType m_lookup_type;
 };
@@ -506,19 +978,36 @@ private:
 template <typename T>
 struct FO_COMMON_API Operation final : public ValueRef<T>
 {
-    /** N-ary operation ctor. */
-    Operation(OpType op_type, std::unique_ptr<ValueRef<T>>&& operand1,
-              std::unique_ptr<ValueRef<T>>&& operand2 = nullptr,
-              std::unique_ptr<ValueRef<T>>&& operand3 = nullptr);
+    using uptrref_t = std::unique_ptr<ValueRef<T>>;
+
+    template <convertible_to<uptrref_t> ...Args>
+    explicit Operation(OpType op_type, Args&&... operands) :
+        Operation(op_type, Vectorize<uptrref_t>(std::forward<Args>(operands)...))
+    {}
 
     /* N-ary operation ctor. */
-    Operation(OpType op_type, std::vector<std::unique_ptr<ValueRef<T>>>&& operands);
+    Operation(OpType op_type, std::vector<uptrref_t>&& operands) :
+        ValueRef<T>(CalcRTSLICE(op_type, operands),
+                    IsSimpleIncrement(op_type, operands),
+                    op_type,
+                    CheckSums::GetCheckSum("ValueRef::Operation", op_type, operands)),
+        m_operands(std::move(operands)),
+        m_cached_const_value(this->m_constant_expr ? this->EvalConstantExpr() : T())
+    {
+        if (std::any_of(m_operands.begin(), m_operands.end(), [](const auto& op) noexcept -> bool { return !op; }))
+            throw std::invalid_argument("Operation passed null operand");
+        if (this->m_op_type == OpType::INVALID_OP_TYPE)
+            throw std::invalid_argument("Operation has invalid operation type");
+    }
 
-    explicit Operation(const Operation<T>& rhs);
+    explicit Operation(const Operation<T>& rhs) :
+        ValueRef<T>(rhs),
+        m_operands(CloneUnique(rhs.m_operands)),
+        m_cached_const_value(rhs.m_cached_const_value)
+    {}
 
     [[nodiscard]] bool        operator==(const ValueRef<T>& rhs) const override;
-    [[nodiscard]] T           Eval() const override
-    { return this->m_constant_expr ? m_cached_const_value : Eval(IApp::GetApp()->GetContext()); };
+    [[nodiscard]] T           Eval() const override { return this->m_constant_expr ? m_cached_const_value : Eval(IApp::GetApp()->GetContext()); };
     [[nodiscard]] T           Eval(const ScriptingContext& context) const override;
     [[nodiscard]] std::string Description() const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
@@ -528,9 +1017,7 @@ struct FO_COMMON_API Operation final : public ValueRef<T>
     [[nodiscard]] const auto* RHS() const { return m_operands.size() < 2 ? nullptr : m_operands[1].get(); } // 2nd operand (or nullptr if no 2nd operand exists)
     [[nodiscard]] const std::vector<const ValueRef<T>*> Operands() const; // all operands
 
-    [[nodiscard]] uint32_t GetCheckSum() const override;
-
-    [[nodiscard]] std::unique_ptr<ValueRef<T>> Clone() const override
+    [[nodiscard]] uptrref_t Clone() const override
     { return std::make_unique<Operation<T>>(*this); }
 
     void SetTopLevelContent(const std::string& content_name) override;
@@ -540,9 +1027,18 @@ private:
     Operation& operator=(const Operation<T>& rhs) = delete;
     Operation& operator=(Operation<T>&& rhs) = delete;
 
+    // checks that this->m_constant_expr == true and then evaluates the operands/optype
     [[nodiscard]] T EvalConstantExpr() const;
 
-    [[nodiscard]] static bool IsSimpleIncrement(OpType op_type, const std::vector<std::unique_ptr<ValueRef<T>>>& operands) {
+    // determine if OpType and operands would make an Operantion
+    // root / target / source / local invariant or constant
+    [[nodiscard]] static std::array<bool, 5> CalcRTSLICE(OpType op_type, const std::vector<uptrref_t>& operands) {
+        if (op_type == OpType::RANDOM_UNIFORM || op_type == OpType::RANDOM_PICK || op_type == OpType::NOOP)
+            return {false, false, false, false, false};
+        return RefsRTSLICE(operands);
+    }
+
+    [[nodiscard]] static bool IsSimpleIncrement(OpType op_type, const std::vector<uptrref_t>& operands) {
         if (op_type == OpType::RANDOM_UNIFORM || op_type == OpType::RANDOM_PICK || op_type == OpType::NOOP)
             return false;
 
@@ -562,14 +1058,9 @@ private:
         return lhs && rhs && lhs->GetReferenceType() == ReferenceType::EFFECT_TARGET_VALUE_REFERENCE && rhs->TargetInvariant();
     }
 
-    const std::vector<std::unique_ptr<ValueRef<T>>> m_operands;
-    const T                                         m_cached_const_value = T();
+    const std::vector<uptrref_t> m_operands;
+    const T                      m_cached_const_value = T();
 };
-
-/* Convert between names and MeterType. Names are scripting token, like Population
- * and not the MeterType string representations like METER_POPULATION */
-[[nodiscard]] FO_COMMON_API MeterType        NameToMeter(std::string_view name) noexcept;
-[[nodiscard]] FO_COMMON_API std::string_view MeterToName(MeterType meter) noexcept;
 
 [[nodiscard]] FO_COMMON_API std::string_view PlanetTypeToString(PlanetType type) noexcept;
 [[nodiscard]] FO_COMMON_API std::string_view PlanetEnvironmentToString(PlanetEnvironment env) noexcept;
@@ -650,49 +1141,19 @@ FO_COMMON_API std::string Constant<double>::Dump(uint8_t ntabs) const;
 template <>
 FO_COMMON_API std::string Constant<int>::Dump(uint8_t ntabs) const;
 
-template <typename T>
-constexpr uint32_t Constant<T>::GetCheckSum() const noexcept {
-    uint32_t retval{0};
-    CheckSums::CheckSumCombine(retval, "ValueRef::Constant");
-    CheckSums::CheckSumCombine(retval, m_value);
-#if defined(__cpp_lib_is_constant_evaluated) && (!defined(__clang_major__) || (__clang_major__ >= 14))
-    if (!std::is_constant_evaluated())
-        [type_id_name{typeid(*this).name()}, this, retval]() {
-        TraceLogger() << "GetCheckSum(Constant<T>): " << type_id_name
-            << " value: " << Description() << " retval: " << retval;
-    }();
-#endif
-    return retval;
-}
-
 ///////////////////////////////////////////////////////////
 // Variable                                              //
 ///////////////////////////////////////////////////////////
 template <typename T>
 std::string Variable<T>::Description() const
 {
-    return FormatedDescriptionPropertyNames(this->m_ref_type, m_property_name,
+    return FormatedDescriptionPropertyNames(this->m_ref_type, this->GetPropertyAsString(),
                                             this->m_container_type, this->m_return_immediate_value);
 }
 
 template <typename T>
-std::string Variable<T>::Dump(uint8_t ntabs) const
-{ return ReconstructName(m_property_name, this->m_container_type, this->m_ref_type, this->m_return_immediate_value); }
-
-template <typename T>
-CONSTEXPR_STRING uint32_t Variable<T>::GetCheckSum() const
-{
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "ValueRef::Variable");
-    CheckSums::CheckSumCombine(retval, m_property_name);
-    CheckSums::CheckSumCombine(retval, this->m_ref_type);
-    CheckSums::CheckSumCombine(retval, this->m_container_type);
-    CheckSums::CheckSumCombine(retval, this->m_return_immediate_value);
-    //if (!std::is_constant_evaluated())
-    //    TraceLogger() << "GetCheckSum(Variable<T>): " << typeid(*this).name() << " retval: " << retval;
-    return retval;
-}
+std::string Variable<T>::Dump(uint8_t) const
+{ return ReconstructName(this->GetPropertyAsString(), this->m_container_type, this->m_ref_type, this->m_return_immediate_value); }
 
 template <>
 FO_COMMON_API PlanetSize Variable<PlanetSize>::Eval(const ScriptingContext& context) const;
@@ -729,31 +1190,9 @@ FO_COMMON_API std::vector<std::string> Variable<std::vector<std::string>>::Eval(
 // Statistic                                             //
 ///////////////////////////////////////////////////////////
 template <typename T, typename V>
-Statistic<T, V>::Statistic(std::unique_ptr<ValueRef<V>>&& value_ref, StatisticType stat_type,
-                           std::unique_ptr<Condition::Condition>&& sampling_condition) :
-    Variable<T>((!sampling_condition || sampling_condition->RootCandidateInvariant()) &&
-                    (!value_ref || value_ref->RootCandidateInvariant()),
-                true,
-                (!sampling_condition || sampling_condition->TargetInvariant()) &&
-                    (!value_ref || value_ref->TargetInvariant()),
-                (!sampling_condition || sampling_condition->SourceInvariant()) &&
-                    (!value_ref || value_ref->SourceInvariant()),
-                stat_type),
-    m_sampling_condition(std::move(sampling_condition)),
-    m_value_ref(std::move(value_ref))
-{
-    // don't need to check if sampling condition is LocalCandidateInvariant, as
-    // all conditions aren't, but that refers to their own local candidate.
-    // no condition is explicitly dependent on the parent context's local candidate.
-    // also don't need to check if sub-value-ref is local candidate invariant,
-    // as it is applied to the subcondition matches, not the local candidate of
-    // any containing condition
-}
-
-template <typename T, typename V>
 bool Statistic<T, V>::operator==(const ValueRef<T>& rhs) const
 {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
@@ -811,7 +1250,7 @@ std::string Statistic<T, V>::Description() const
 }
 
 template <typename T, typename V>
-std::string Statistic<T, V>::Dump(uint8_t ntabs) const
+std::string Statistic<T, V>::Dump(uint8_t) const
 {
     std::string retval = "Statistic ";
 
@@ -879,9 +1318,10 @@ namespace {
     };
 
     enum class MinMax : uint8_t { Min, Max, Spread, Mode };
+
     static constexpr auto second_less = [](const auto& p1, const auto& p2)
         noexcept(noexcept(p1.second < p2.second))
-        { return p1.second < p2.second; };
+    { return p1.second < p2.second; };
 
     template <typename T, MinMax min_or_max = MinMax::Min, typename C, typename V = decayed_value_t<C>>
     constexpr T HistoMinMax(C&& opv)
@@ -1235,19 +1675,6 @@ T Statistic<T, V>::Eval(const ScriptingContext& context) const
     return ReduceData<T>(this->m_stat_type, GetObjectPropertyValues(context, condition_matches));
 }
 
-template <typename T, typename V>
-uint32_t Statistic<T, V>::GetCheckSum() const
-{
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "ValueRef::Statistic");
-    CheckSums::CheckSumCombine(retval, this->m_stat_type);
-    CheckSums::CheckSumCombine(retval, m_sampling_condition);
-    CheckSums::CheckSumCombine(retval, m_value_ref);
-    TraceLogger() << "GetCheckSum(Statisic<T>): " << typeid(*this).name() << " retval: " << retval;
-    return retval;
-}
-
 template <>
 FO_COMMON_API std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& context) const;
 
@@ -1261,21 +1688,9 @@ FO_COMMON_API std::string Statistic<std::string, std::string>::Eval(const Script
 // ComplexVariable                                       //
 ///////////////////////////////////////////////////////////
 template <typename T>
-void ComplexVariable<T>::InitInvariants()
-{
-    std::initializer_list<const ValueRefBase*> refs =
-        { m_int_ref1.get(), m_int_ref2.get(), m_int_ref3.get(), m_string_ref1.get(), m_string_ref2.get() };
-    this->m_root_candidate_invariant = std::all_of(refs.begin(), refs.end(), [](const auto& e) { return !e || e->RootCandidateInvariant(); });
-    this->m_local_candidate_invariant = std::all_of(refs.begin(), refs.end(), [](const auto& e) { return !e || e->LocalCandidateInvariant(); });
-    this->m_target_invariant = std::all_of(refs.begin(), refs.end(), [](const auto& e) { return !e || e->TargetInvariant(); });
-    this->m_source_invariant = std::all_of(refs.begin(), refs.end(), [](const auto& e) { return !e || e->SourceInvariant(); });
-    // this->m_constant_expr and this->m_simple_increment should always be false
-}
-
-template <typename T>
 bool ComplexVariable<T>::operator==(const ValueRef<T>& rhs) const
 {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
@@ -1283,7 +1698,9 @@ bool ComplexVariable<T>::operator==(const ValueRef<T>& rhs) const
         return false;
     const ComplexVariable<T>& rhs_ = static_cast<const ComplexVariable<T>&>(rhs);
 
-    if (this->m_property_name != rhs_.m_property_name)
+    if (this->m_property != rhs_.m_property)
+        return false;
+    if (this->m_meter_type != rhs_.m_meter_type)
         return false;
     if (this->m_return_immediate_value != rhs_.m_return_immediate_value)
         return false;
@@ -1335,7 +1752,7 @@ template <typename T>
 std::string ComplexVariable<T>::Description() const
 {
     std::string retval = ComplexVariableDescription(
-        this->m_property_name,
+        this->GetPropertyAsString(),
         m_int_ref1 ? m_int_ref1.get() : nullptr,
         m_int_ref2 ? m_int_ref2.get() : nullptr,
         m_int_ref3 ? m_int_ref3.get() : nullptr,
@@ -1347,9 +1764,9 @@ std::string ComplexVariable<T>::Description() const
 }
 
 template <typename T>
-std::string ComplexVariable<T>::Dump(uint8_t ntabs) const
+std::string ComplexVariable<T>::Dump(uint8_t) const
 {
-    return ComplexVariableDump(this->m_property_name,
+    return ComplexVariableDump(this->GetPropertyAsString(),
                                m_int_ref1 ? m_int_ref1.get() : nullptr,
                                m_int_ref2 ? m_int_ref2.get() : nullptr,
                                m_int_ref3 ? m_int_ref3.get() : nullptr,
@@ -1370,21 +1787,6 @@ void ComplexVariable<T>::SetTopLevelContent(const std::string& content_name)
         m_string_ref1->SetTopLevelContent(content_name);
     if (m_string_ref2)
         m_string_ref2->SetTopLevelContent(content_name);
-}
-
-template <typename T>
-uint32_t ComplexVariable<T>::GetCheckSum() const
-{
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "ValueRef::ComplexVariable");
-    CheckSums::CheckSumCombine(retval, m_int_ref1);
-    CheckSums::CheckSumCombine(retval, m_int_ref2);
-    CheckSums::CheckSumCombine(retval, m_int_ref3);
-    CheckSums::CheckSumCombine(retval, m_string_ref1);
-    CheckSums::CheckSumCombine(retval, m_string_ref2);
-    TraceLogger() << "GetCheckSum(ComplexVariable<T>): " << typeid(*this).name() << " retval: " << retval;
-    return retval;
 }
 
 template <>
@@ -1437,38 +1839,9 @@ FO_COMMON_API std::string ComplexVariable<std::string>::Dump(uint8_t ntabs) cons
 // StaticCast                                            //
 ///////////////////////////////////////////////////////////
 template <typename FromType, typename ToType>
-template <typename T> requires (std::is_convertible_v<T, std::unique_ptr<Variable<FromType>>>)
-StaticCast<FromType, ToType>::StaticCast(T&& value_ref) :
-    Variable<ToType>(value_ref->GetReferenceType(), value_ref->PropertyName()),
-    m_value_ref(std::move(value_ref))
-{
-    this->m_root_candidate_invariant = !m_value_ref || m_value_ref->RootCandidateInvariant();
-    this->m_local_candidate_invariant = !m_value_ref || m_value_ref->LocalCandidateInvariant();
-    this->m_target_invariant = !m_value_ref || m_value_ref->TargetInvariant();
-    this->m_source_invariant = !m_value_ref || m_value_ref->SourceInvariant();
-    this->m_constant_expr = !m_value_ref || m_value_ref->ConstantExpr();
-    // this->m_simple_increment should always be false
-}
-
-template <typename FromType, typename ToType>
-template <typename T> requires(std::is_convertible_v<T, std::unique_ptr<ValueRef<FromType>>> &&
-                               !std::is_convertible_v<T, std::unique_ptr<Variable<FromType>>>)
-StaticCast<FromType, ToType>::StaticCast(T&& value_ref) :
-    Variable<ToType>(ReferenceType::NON_OBJECT_REFERENCE),
-    m_value_ref(std::move(value_ref))
-{
-    this->m_root_candidate_invariant = !m_value_ref || m_value_ref->RootCandidateInvariant();
-    this->m_local_candidate_invariant = !m_value_ref || m_value_ref->LocalCandidateInvariant();
-    this->m_target_invariant = !m_value_ref || m_value_ref->TargetInvariant();
-    this->m_source_invariant = !m_value_ref || m_value_ref->SourceInvariant();
-    this->m_constant_expr = !m_value_ref || m_value_ref->ConstantExpr();
-    // this->m_simple_increment should always be false
-}
-
-template <typename FromType, typename ToType>
 bool StaticCast<FromType, ToType>::operator==(const ValueRef<ToType>& rhs) const
 {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
@@ -1506,56 +1879,14 @@ void StaticCast<FromType, ToType>::SetTopLevelContent(const std::string& content
         m_value_ref->SetTopLevelContent(content_name);
 }
 
-template <typename FromType, typename ToType>
-uint32_t StaticCast<FromType, ToType>::GetCheckSum() const
-{
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "ValueRef::StaticCast");
-    CheckSums::CheckSumCombine(retval, m_value_ref);
-    TraceLogger() << "GetCheckSum(StaticCast<FromType, ToType>): " << typeid(*this).name() << " retval: " << retval;
-    return retval;
-}
-
 
 ///////////////////////////////////////////////////////////
 // StringCast                                            //
 ///////////////////////////////////////////////////////////
 template <typename FromType>
-StringCast<FromType>::StringCast(std::unique_ptr<ValueRef<FromType>>&& value_ref) :
-    Variable<std::string>(
-        [ref{value_ref.get()}]() -> ReferenceType {
-            if (auto var_ref = dynamic_cast<Variable<FromType>*>(ref))
-                return var_ref->GetReferenceType();
-            else
-                return ReferenceType::NON_OBJECT_REFERENCE;
-        }(),
-        [ref{value_ref.get()}]() -> std::string {
-            if (auto var_ref = dynamic_cast<Variable<FromType>*>(ref))
-                return var_ref->PropertyName();
-            else
-                return {};
-        }(),
-        [ref{value_ref.get()}]() -> ContainerType {
-            if (auto var_ref = dynamic_cast<Variable<FromType>*>(ref))
-                return var_ref->GetContainerType();
-            else
-                return ContainerType::NONE;
-        }()),
-    m_value_ref(std::move(value_ref))
-{
-    this->m_root_candidate_invariant = !m_value_ref || m_value_ref->RootCandidateInvariant();
-    this->m_local_candidate_invariant = !m_value_ref || m_value_ref->LocalCandidateInvariant();
-    this->m_target_invariant = !m_value_ref || m_value_ref->TargetInvariant();
-    this->m_source_invariant = !m_value_ref || m_value_ref->SourceInvariant();
-    this->m_constant_expr = !m_value_ref || m_value_ref->ConstantExpr();
-    // this->m_simple_increment should always be false
-}
-
-template <typename FromType>
 bool StringCast<FromType>::operator==(const ValueRef<std::string>& rhs) const
 {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
@@ -1601,17 +1932,6 @@ std::string StringCast<FromType>::Eval(const ScriptingContext& context) const
     }
 }
 
-template <typename FromType>
-uint32_t StringCast<FromType>::GetCheckSum() const
-{
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "ValueRef::StringCast");
-    CheckSums::CheckSumCombine(retval, m_value_ref);
-    TraceLogger() << "GetCheckSum(StringCast<FromType>): " << typeid(*this).name() << " retval: " << retval;
-    return retval;
-}
-
 template <>
 FO_COMMON_API std::string StringCast<double>::Eval(const ScriptingContext& context) const;
 
@@ -1640,39 +1960,8 @@ void StringCast<FromType>::SetTopLevelContent(const std::string& content_name) {
 // UserStringLookup                                      //
 ///////////////////////////////////////////////////////////
 template <typename FromType>
-UserStringLookup<FromType>::UserStringLookup(std::unique_ptr<ValueRef<FromType>>&& value_ref) :
-    Variable<std::string>(
-        [ref{value_ref.get()}]() -> ReferenceType {
-            if (auto var_ref = dynamic_cast<Variable<FromType>*>(ref))
-                return var_ref->GetReferenceType();
-            else
-                return ReferenceType::NON_OBJECT_REFERENCE;
-        }(),
-        [ref{value_ref.get()}]() -> std::string {
-            if (auto var_ref = dynamic_cast<Variable<FromType>*>(ref))
-                return var_ref->PropertyName();
-            else
-                return {};
-        }(),
-        [ref{value_ref.get()}]() -> ContainerType {
-            if (auto var_ref = dynamic_cast<Variable<FromType>*>(ref))
-                return var_ref->GetContainerType();
-            else
-                return ContainerType::NONE;
-        }()),
-    m_value_ref(std::move(value_ref))
-{
-    this->m_root_candidate_invariant = !m_value_ref || m_value_ref->RootCandidateInvariant();
-    this->m_local_candidate_invariant = !m_value_ref || m_value_ref->LocalCandidateInvariant();
-    this->m_target_invariant = !m_value_ref || m_value_ref->TargetInvariant();
-    this->m_source_invariant = !m_value_ref || m_value_ref->SourceInvariant();
-    this->m_constant_expr = !m_value_ref || m_value_ref->ConstantExpr();
-    // this->m_simple_increment should always be false
-}
-
-template <typename FromType>
 bool UserStringLookup<FromType>::operator==(const ValueRef<std::string>& rhs) const {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
@@ -1723,50 +2012,13 @@ void UserStringLookup<FromType>::SetTopLevelContent(const std::string& content_n
         m_value_ref->SetTopLevelContent(content_name);
 }
 
-template <typename FromType>
-uint32_t UserStringLookup<FromType>::GetCheckSum() const
-{
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "ValueRef::UserStringLookup");
-    CheckSums::CheckSumCombine(retval, m_value_ref);
-    TraceLogger() << "GetCheckSum(UserStringLookup<FromType>): " << typeid(*this).name() << " retval: " << retval;
-    return retval;
-}
-
-
 ///////////////////////////////////////////////////////////
 // Operation                                             //
 ///////////////////////////////////////////////////////////
 template <typename T>
-Operation<T>::Operation(OpType op_type,
-                        std::unique_ptr<ValueRef<T>>&& operand1,
-                        std::unique_ptr<ValueRef<T>>&& operand2,
-                        std::unique_ptr<ValueRef<T>>&& operand3) :
-    Operation(op_type, [&operand1, &operand2, &operand3]() {
-                std::remove_const_t<decltype(m_operands)> retval{};
-                retval.reserve((operand1 ? 1u : 0u) + (operand2 ? 1u : 0u) + (operand3 ? 1u : 0u));
-                if (operand1)
-                    retval.push_back(std::move(operand1));
-                if (operand2)
-                    retval.push_back(std::move(operand2));
-                if (operand3)
-                    retval.push_back(std::move(operand3));
-                return retval;
-              }())
-{}
-
-template <typename T>
-Operation<T>::Operation(const Operation<T>& rhs) :
-    ValueRef<T>::ValueRef(rhs),
-    m_operands(CloneUnique(rhs.m_operands)),
-    m_cached_const_value(rhs.m_cached_const_value)
-{}
-
-template <typename T>
 bool Operation<T>::operator==(const ValueRef<T>& rhs) const
 {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
     if (typeid(rhs) != typeid(*this))
         return false;
@@ -1930,11 +2182,12 @@ namespace {
             return val;
         } else {
             const auto trunc_val = static_cast<std::decay_t<T>>(static_cast<int64_t>(val));
-            return (trunc_val == val) ? trunc_val : (val >= 0) ? trunc_val : trunc_val - 1;
+            return (trunc_val == val) ? trunc_val : (val >= 0) ? trunc_val : trunc_val - 1; // round towards -inf not zero
         }
 #endif
     }
 
+    // binary operation returning bool
     constexpr bool ValCompareOp(const auto& lhs, OpType op_type, const auto& rhs) noexcept {
         switch (op_type) {
         case OpType::COMPARE_EQUAL:                 return lhs == rhs;  break;
@@ -1943,7 +2196,7 @@ namespace {
         case OpType::COMPARE_LESS_THAN:             return lhs < rhs;   break;
         case OpType::COMPARE_LESS_THAN_OR_EQUAL:    return lhs <= rhs;  break;
         case OpType::COMPARE_NOT_EQUAL:             return lhs != rhs;  break;
-        default:                                      return false;       break;
+        default:                                    return false;       break;
         }
     }
 
@@ -1953,7 +2206,7 @@ namespace {
     inline constexpr auto vr_rand_double = [](double low, double high)
     { return std::is_constant_evaluated() ? std::max(low, std::min(high, 42.6)) : RandDouble(low, high); };
 
-    auto DoFormat(const std::string& lhs, const std::string& rhs) { // TODO: remove this?
+    [[maybe_unused]] auto DoFormat(const std::string& lhs, const std::string& rhs) {
         // insert string into other string in place of %1% or similar placeholder
         boost::format formatter = FlexibleFormat(lhs);
         formatter % rhs;
@@ -1961,6 +2214,7 @@ namespace {
     }
 }
 
+// apply unary operation to operand: math operations or NoOp
 template <typename T>
     requires std::is_enum_v<std::decay_t<T>> || std::is_arithmetic_v<std::decay_t<T>> ||
              std::is_same_v<std::decay_t<T>, std::string>
@@ -1992,6 +2246,7 @@ constexpr auto OperateData(OpType op_type, T&& val)
     throw std::runtime_error("OperateData evaluated with an unknown or invalid OpType for one operand.");
 }
 
+// apply binary math or logical comparison operation to two operands
 template <typename T>
 constexpr auto OperateData(OpType op_type, T&& lhs, T&& rhs)
 {
@@ -2105,6 +2360,7 @@ constexpr auto OperateData(OpType op_type, T&& lhs, T&& rhs)
     throw std::runtime_error("OperateData evaluated with an unknown or invalid OpType for two operands.");
 }
 
+// apply operation to two operands, supporting discrete randomized results
 template <typename T>
 constexpr auto OperateData(OpType op_type, T&& lhs, T&& rhs, auto rand_int)
     requires requires { {rand_int(0, 1)} -> std::same_as<int>; }
@@ -2127,6 +2383,7 @@ constexpr auto OperateData(OpType op_type, T&& lhs, T&& rhs, auto rand_int)
     return OperateData(op_type, std::forward<T>(lhs), std::forward<T>(rhs));
 }
 
+// apply operation to two operands, supporting discrete randomized results and floating-point uniform random results
 template <typename T>
 constexpr auto OperateData(OpType op_type, T&& lhs, T&& rhs, auto rand_int, auto rand_double)
     requires requires { {rand_int(0, 1)} -> std::same_as<int>; {rand_double(0.1, 1.0)} -> std::same_as<double>; }
@@ -2140,6 +2397,8 @@ constexpr auto OperateData(OpType op_type, T&& lhs, T&& rhs, auto rand_int, auto
     return OperateData(op_type, std::forward<T>(lhs), std::forward<T>(rhs), rand_int);
 }
 
+// apply accumulation or min/max operation to values in a container
+// contained values can be a string, but the container itself should not be a string
 template <typename D>
     requires (requires(D d) { d.begin(); d.end(); d.front(); } && !std::is_same_v<std::decay_t<D>, std::string>)
 constexpr auto OperateData(OpType op_type, D&& data)
@@ -2188,6 +2447,8 @@ constexpr auto OperateData(OpType op_type, D&& data)
     throw std::runtime_error("OperateData evaluated with an unknown or invalid OpType for data array.");
 }
 
+// apply operation to values in a container (which can contain but should not be a string)
+// supporting discrete random picking results
 template <typename D>
     requires (requires(D d) { d.size(); d[std::size_t{0}]; d.begin(); d.end(); d.front(); } &&
               !std::is_same_v<std::decay_t<D>, std::string>)
@@ -2317,7 +2578,7 @@ CONSTEXPR_VEC auto OperateConstantValueRefs(OpType op_type, D&& refs)
 
 template <typename T>
 auto OperateValueRefs(OpType op_type, const std::vector<std::unique_ptr<ValueRef<T>>>& refs,
-                      const ScriptingContext& context, auto rand_int, auto rand_double)
+                      const ScriptingContext& context, auto rand_int, auto)
 {
     if (refs.empty())
         return T();
@@ -2385,49 +2646,6 @@ T Operation<T>::Eval(const ScriptingContext& context) const
     } else {
         return OperateValueRefs<T>(this->m_op_type, m_operands, context, vr_rand_int, vr_rand_double);
     }
-}
-
-template <typename T>
-uint32_t Operation<T>::GetCheckSum() const
-{
-    uint32_t retval{0};
-
-    CheckSums::CheckSumCombine(retval, "ValueRef::Operation");
-    CheckSums::CheckSumCombine(retval, this->m_op_type);
-    CheckSums::CheckSumCombine(retval, m_operands);
-    // derived member values should not be part of checksums
-    // e.g. the invariants and m_cached_const_value
-    TraceLogger() << "GetCheckSum(Operation<T>): " << typeid(*this).name() << " retval: " << retval;
-    return retval;
-}
-
-template <typename T>
-Operation<T>::Operation(OpType op_type, std::vector<std::unique_ptr<ValueRef<T>>>&& operands) :
-    ValueRef<T>(op_type != OpType::RANDOM_UNIFORM && op_type != OpType::RANDOM_PICK && op_type != OpType::NOOP &&
-                std::all_of(operands.begin(), operands.end(),
-                            [](const auto& operand) noexcept { return operand && operand->ConstantExpr(); }),
-                op_type != OpType::RANDOM_UNIFORM && op_type != OpType::RANDOM_PICK && op_type != OpType::NOOP &&
-                std::all_of(operands.begin(), operands.end(),
-                            [](const auto& operand) noexcept { return operand && operand->RootCandidateInvariant(); }),
-                op_type != OpType::RANDOM_UNIFORM && op_type != OpType::RANDOM_PICK && op_type != OpType::NOOP &&
-                std::all_of(operands.begin(), operands.end(),
-                            [](const auto& operand) noexcept { return operand && operand->LocalCandidateInvariant(); }),
-                op_type != OpType::RANDOM_UNIFORM && op_type != OpType::RANDOM_PICK && op_type != OpType::NOOP &&
-                std::all_of(operands.begin(), operands.end(),
-                            [](const auto& operand) noexcept { return operand && operand->TargetInvariant(); }),
-                op_type != OpType::RANDOM_UNIFORM && op_type != OpType::RANDOM_PICK && op_type != OpType::NOOP &&
-                std::all_of(operands.begin(), operands.end(),
-                            [](const auto& operand) noexcept { return operand && operand->SourceInvariant(); }),
-                IsSimpleIncrement(op_type, operands),
-                op_type
-               ),
-    m_operands(std::move(operands)),
-    m_cached_const_value(this->m_constant_expr ? this->EvalConstantExpr() : T())
-{
-    if (std::any_of(m_operands.begin(), m_operands.end(), [](const auto& op) noexcept -> bool { return !op; }))
-        throw std::invalid_argument("Operation passed null operand");
-    if (this->m_op_type == OpType::INVALID_OP_TYPE)
-        throw std::invalid_argument("Operation has invalid operation type");
 }
 
 template <typename T>

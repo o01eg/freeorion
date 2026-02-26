@@ -18,13 +18,13 @@
 #include "GameRules.h"
 #include "Pending.h"
 
-#include <boost/filesystem.hpp>
+#include <fstream>
 
 #include <exception>
 #include <future>
 #include <stdexcept>
 
-extern template TechManager::TechParseTuple parse::techs<TechManager::TechParseTuple>(const PythonParser& parser, const boost::filesystem::path& path);
+extern template TechManager::TechParseTuple parse::techs<TechManager::TechParseTuple>(const PythonParser& parser, const std::filesystem::path& path, bool& success);
 
 IApp* IApp::s_app = nullptr;
 
@@ -48,22 +48,22 @@ int IApp::MAX_AI_PLAYERS() noexcept {
     return max_number_AIs;
 }
 
-void IApp::StartBackgroundParsing(const PythonParser& python, std::promise<void>&& barrier) {
-    namespace fs = boost::filesystem;
+void IApp::StartBackgroundParsing(const PythonParser& python) {
+    namespace fs = std::filesystem;
 
     const auto& rdir = GetResourceDir();
     if (!IsExistingDir(rdir)) {
         ErrorLogger() << "Background parse given non-existant resources directory: " << rdir.string() ;
-        barrier.set_exception(std::make_exception_ptr(std::runtime_error("non-existant resources directory")));
         return;
     }
 
     DebugLogger() << "Start background parsing...";
 
     // named value ref parsing can be done in parallel as the referencing happens after parsing
-    if (IsExistingDir(rdir / "scripting/macros"))
+    if (IsExistingDir(rdir / "scripting/macros")) {
         GetNamedValueRefManager().SetNamedValueRefParse(Pending::ParseSynchronously(parse::named_value_refs, rdir / "scripting/macros"));
-    else
+        GetNamedValueRefManager().SetNamedValueRefPythonParse(Pending::ParseSynchronously(parse::named_value_refs_py, python, rdir / "scripting/macros"));
+    } else
         ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/macros").string();
 
     if (IsExistingDir(rdir / "scripting/buildings"))
@@ -77,12 +77,12 @@ void IApp::StartBackgroundParsing(const PythonParser& python, std::promise<void>
         ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/policies").string();
 
     if (IsExistingDir(rdir / "scripting/encyclopedia"))
-        GetEncyclopedia().SetArticles(Pending::StartAsyncParsing(parse::encyclopedia_articles, rdir / "scripting/encyclopedia"));
+        GetEncyclopedia().SetArticles(Pending::ParseSynchronously(parse::encyclopedia_articles, python, rdir / "scripting/encyclopedia"));
     else
         ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/encyclopedia").string();
 
     if (IsExistingDir(rdir / "scripting/fields"))
-        GetFieldTypeManager().SetFieldTypes(Pending::StartAsyncParsing(parse::fields, rdir / "scripting/fields"));
+        GetFieldTypeManager().SetFieldTypes(Pending::ParseSynchronously(parse::fields, python, rdir / "scripting/fields"));
     else
         ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/fields").string();
 
@@ -122,10 +122,9 @@ void IApp::StartBackgroundParsing(const PythonParser& python, std::promise<void>
         ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/game_rules.focs.py").string();
 
     if (IsExistingDir(rdir / "scripting/techs"))
-        GetTechManager().SetTechs(Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, python, rdir / "scripting/techs", std::move(barrier)));
+        GetTechManager().SetTechs(Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, python, rdir / "scripting/techs"));
     else {
         ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/techs").string();
-        barrier.set_value();
     }
 
     if (IsExistingFile(rdir / "scripting/empire_colors.xml"))

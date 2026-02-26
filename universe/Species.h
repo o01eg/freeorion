@@ -18,6 +18,7 @@
 #include "../util/Enum.h"
 #include "../util/Export.h"
 #include "../util/Pending.h"
+#include "../util/ranges.h"
 
 
 namespace Condition {
@@ -43,6 +44,17 @@ FO_ENUM(
     ((PE_GOOD))
     ((NUM_PLANET_ENVIRONMENTS))
 )
+
+[[nodiscard]] constexpr std::string_view DumpEnum(PlanetEnvironment value) noexcept {
+    switch (value) {
+    case PlanetEnvironment::PE_UNINHABITABLE: return "Uninhabitable";
+    case PlanetEnvironment::PE_HOSTILE:       return "Hostile";
+    case PlanetEnvironment::PE_POOR:          return "Poor";
+    case PlanetEnvironment::PE_ADEQUATE:      return "Adequate";
+    case PlanetEnvironment::PE_GOOD:          return "Good";
+    default:                                  return "?";
+    }
+}
 
 
 /** A setting that a Planet can be assigned to influence what it
@@ -121,7 +133,9 @@ public:
     ~Species();
     Species() = delete;
     Species(const Species&) = delete; // can't shallow copy because likes, dislikes, and tags are stored as string_views into m_tags_concatenated
-    Species(Species&&) = default;
+    Species(Species&&) = delete;
+    Species& operator=(const Species&) = delete;
+    Species& operator=(Species&&) = delete;
 
     [[nodiscard]] bool operator==(const Species& rhs) const;
 
@@ -139,9 +153,10 @@ public:
     [[nodiscard]] const auto&        Foci() const noexcept { return m_foci; }                  ///< focus types this species can use
     [[nodiscard]] const std::string& DefaultFocus() const noexcept { return m_default_focus; } ///< name of the planetary focus this species defaults to. Used for new colonies and uninvaded natives.
     [[nodiscard]] const auto&        PlanetEnvironments() const noexcept { return m_planet_environments; } ///< map from PlanetType to the PlanetEnvironment this Species has on that PlanetType
-    [[nodiscard]] PlanetEnvironment  GetPlanetEnvironment(PlanetType planet_type) const;                   ///< PlanetEnvironment this species has on PlanetType \a planet_type
-    [[nodiscard]] PlanetType         NextBestPlanetType(PlanetType initial_planet_type) const;             ///< best PlanetType for this species from the \a initial_planet_type specified which needs the few steps to reach
-    [[nodiscard]] PlanetType         NextBetterPlanetType(PlanetType initial_planet_type) const;           ///< PlanetType for this species which is a step closer to the best PlanetType than the specified \a initial_planet_type (if such exists)
+    [[nodiscard]] PlanetEnvironment  GetPlanetEnvironment(PlanetType planet_type) const;       ///< PlanetEnvironment this species has on PlanetType \a planet_type
+    [[nodiscard]] PlanetType         NextBestPlanetType(PlanetType initial_planet_type) const; ///< best PlanetType for this species from the \a initial_planet_type specified which needs the few steps to reach
+    [[nodiscard]] PlanetType         NextBetterPlanetType(PlanetType initial_planet_type) const;///< PlanetType for this species which is a step closer to the best PlanetType than the specified \a initial_planet_type (if such exists)
+    [[nodiscard]] PlanetType         BestEnvironmentPlanetType() const noexcept;               ///< preferred planet type for this species, which is determined by ordering based on environment
 
     /** Returns the EffectsGroups that encapsulate the effects that species of
         this type have. */
@@ -225,22 +240,11 @@ private:
 class FO_COMMON_API SpeciesManager {
 public:
     using SpeciesTypeMap = std::map<std::string, const Species, std::less<>>;
-    using iterator = typename SpeciesTypeMap::const_iterator;
-    using const_iterator = iterator;
 
-private:
-    using species_entry_t = typename iterator::value_type;
+    static constexpr auto is_playable = [](const auto& species_entry) noexcept { return species_entry.second.Playable(); };
+    static constexpr auto is_native = [](const auto& species_entry) noexcept { return species_entry.second.Native(); };
 
-    struct FO_COMMON_API PlayableSpecies
-    { bool operator()(const species_entry_t& species_entry) const noexcept { return species_entry.second.Playable(); } };
-
-    struct FO_COMMON_API NativeSpecies
-    { bool operator()(const species_entry_t& species_entry) const noexcept { return species_entry.second.Native(); } };
-
-public:
     using CensusOrder = std::vector<std::string>;
-    using playable_iterator = boost::filter_iterator<PlayableSpecies, iterator>;
-    using native_iterator = boost::filter_iterator<NativeSpecies, iterator>;
 
     SpeciesManager() = default;
     // extracts and moves homeworlds, opinions, populations, and destroyed
@@ -249,43 +253,33 @@ public:
 
     /** returns the species with the name \a name; you should use the
       * free function GetSpecies() instead, mainly to save some typing. */
-    [[nodiscard]] const Species*      GetSpecies(std::string_view name) const;
+    [[nodiscard]] const Species* GetSpecies(std::string_view name) const;
 
-    /** returns the species with name \a without guarding access to
-      * shared state. */
-    [[nodiscard]] const Species*      GetSpeciesUnchecked(std::string_view name) const;
+    /** returns the species with name \a without guarding access to shared state. */
+    [[nodiscard]] const Species* GetSpeciesUnchecked(std::string_view name) const;
 
-    /** iterators for all species */
-    [[nodiscard]] iterator            begin() const;
-    [[nodiscard]] iterator            end() const;
-
-    /** iterators for playble species. */
-    [[nodiscard]] playable_iterator   playable_begin() const;
-    [[nodiscard]] playable_iterator   playable_end() const;
-
-    /** iterators for native species. */
-    [[nodiscard]] native_iterator     native_begin() const;
-    [[nodiscard]] native_iterator     native_end() const;
+    /** species accessors */
+    [[nodiscard]] const SpeciesTypeMap& AllSpecies() const;
 
     /** returns an ordered list of tags that should be considered for census listings. */
-    [[nodiscard]] const CensusOrder&  census_order() const;
+    [[nodiscard]] const CensusOrder& census_order() const;
 
     /** returns true iff this SpeciesManager is empty. */
-    [[nodiscard]] bool                empty() const;
+    [[nodiscard]] bool empty() const { return AllSpecies().empty(); }
 
     /** returns the number of species stored in this manager. */
-    [[nodiscard]] int                 NumSpecies() const;
-    [[nodiscard]] int                 NumPlayableSpecies() const;
-    [[nodiscard]] int                 NumNativeSpecies() const;
+    [[nodiscard]] int NumSpecies() const { return static_cast<int>(AllSpecies().size()); }
+    [[nodiscard]] int NumPlayableSpecies() const { return static_cast<int>(range_count_if(AllSpecies(), is_playable)); } 
+    [[nodiscard]] int NumNativeSpecies() const { return static_cast<int>(range_count_if(AllSpecies(), is_native)); } 
 
     /** returns the name of a species in this manager, or an empty string if
       * this manager is empty. */
-    [[nodiscard]] const std::string&  RandomSpeciesName() const;
+    [[nodiscard]] const std::string& RandomSpeciesName() const;
 
     /** returns the name of a playable species in this manager, or an empty
       * string if there are no playable species. */
-    [[nodiscard]] const std::string&  RandomPlayableSpeciesName() const;
-    [[nodiscard]] const std::string&  SequentialPlayableSpeciesName(int id) const;
+    [[nodiscard]] const std::string& RandomPlayableSpeciesName() const;
+    [[nodiscard]] const std::string& SequentialPlayableSpeciesName(int id) const;
 
     /** returns a map from species name to a set of object IDs that are the
       * homeworld(s) of that species in the current game. */
@@ -346,7 +340,8 @@ public:
     void SetSpeciesShipsDestroyed(std::map<std::string, std::map<std::string, int>> ssd);
 
     /** Sets species types to the value of \p future. */
-    void SetSpeciesTypes(Pending::Pending<std::pair<std::map<std::string, Species>, CensusOrder>>&& future);
+    using PendingT = Pending::Pending<std::pair<SpeciesManager::SpeciesTypeMap, SpeciesManager::CensusOrder>>;
+    void SetSpeciesTypes(PendingT&& future);
 
 private:
     /** sets the homeworld ids of species in this SpeciesManager to those
@@ -357,11 +352,9 @@ private:
     void CheckPendingSpeciesTypes() const;
 
     // these are mutable because they may be updated in CheckPendingSpeciesTypes
-    mutable boost::optional<Pending::Pending<
-        std::pair<std::map<std::string, Species>,
-        SpeciesManager::CensusOrder>>>     m_pending_types;
-    mutable SpeciesManager::SpeciesTypeMap m_species;
-    mutable SpeciesManager::CensusOrder    m_census_order;
+    mutable boost::optional<PendingT>       m_pending_types;
+    mutable SpeciesManager::SpeciesTypeMap  m_species;
+    mutable SpeciesManager::CensusOrder     m_census_order;
 
     template <typename K, typename V>
     using flat_map = boost::container::flat_map<K, V, std::less<>>;

@@ -14,6 +14,13 @@
 #include <GG/TextControl.h>
 #include <GG/WndEvent.h>
 
+#include <utility>
+#if !defined(__cpp_lib_integer_comparison_functions)
+namespace std {
+    constexpr bool cmp_less(std::size_t lhs, int rhs) noexcept { return (rhs > 0) && (lhs < static_cast<std::size_t>(rhs)); }
+}
+#endif
+
 
 using namespace GG;
 
@@ -30,7 +37,7 @@ namespace {
     constexpr X HORIZONTAL_MARGIN{3};
 }
 
-PopupMenu::PopupMenu(X x, Y y, std::shared_ptr<Font> font, Clr text_color,
+PopupMenu::PopupMenu(X x, Y y, std::shared_ptr<const Font> font, Clr text_color,
                      Clr border_color, Clr interior_color, Clr hilite_color) :
     Wnd(X0, Y0, GUI::GetGUI()->AppWidth() - 1, GUI::GetGUI()->AppHeight() - 1, INTERACTIVE | MODAL),
     m_font(std::move(font)),
@@ -42,21 +49,17 @@ PopupMenu::PopupMenu(X x, Y y, std::shared_ptr<Font> font, Clr text_color,
     m_origin(x, y)
 { m_open_levels.resize(1); }
 
-void PopupMenu::AddMenuItem(MenuItem&& menu_item)
-{ m_menu_data.next_level.push_back(std::move(menu_item)); }
-
-void PopupMenu::AddMenuItem(std::string str, bool disable, bool check, std::function<void()> selected_on_close_callback)
-{ m_menu_data.next_level.emplace_back(std::move(str), disable, check, selected_on_close_callback); }
-
 void PopupMenu::Render()
 {
-    if (m_menu_data.next_level.empty())
+    if (m_menu_data.next_level.empty() || !m_font)
         return;
 
     const Pt ul = ClientUpperLeft();
+    const auto [app_w, app_h] = [gui{GUI::GetGUI()}]() { return std::pair{gui->AppWidth(), gui->AppHeight()}; }();
+    const Y lineskip = m_font->Lineskip();
 
     const Y INDICATOR_VERTICAL_MARGIN{3};
-    const Y INDICATOR_HEIGHT = m_font->Lineskip() - 2 * INDICATOR_VERTICAL_MARGIN;
+    const Y INDICATOR_HEIGHT = lineskip - 2 * INDICATOR_VERTICAL_MARGIN;
     const Y CHECK_HEIGHT = INDICATOR_HEIGHT;
     const X CHECK_WIDTH{Value(CHECK_HEIGHT)};
 
@@ -66,9 +69,9 @@ void PopupMenu::Render()
         bool needs_indicator = false;
 
         // get the correct submenu  // TODO: move into a lambda?
-        MenuItem* menu_ptr = &m_menu_data;
+        MenuItem* menu_ptr = std::addressof(m_menu_data);
         for (std::size_t j = 0; j < i; ++j)
-            menu_ptr = &menu_ptr->next_level[m_caret[j]];
+            menu_ptr = std::addressof(menu_ptr->next_level[m_caret[j]]);
         const MenuItem& menu = *menu_ptr;
 
         // determine the total size of the menu, render it, and record its bounding rect
@@ -78,28 +81,28 @@ void PopupMenu::Render()
             if (menu.next_level[j].next_level.size() || menu.next_level[j].checked)
                 needs_indicator = true;
         }
-        Flags<TextFormat> fmt = FORMAT_LEFT | FORMAT_TOP;
-        auto text_elements = m_font->ExpensiveParseFromTextToTextElements(str, fmt);
-        auto lines = m_font->DetermineLines(str, fmt, X0, text_elements);
-        Pt menu_sz = m_font->TextExtent(lines); // get dimensions of text in menu
+        static constexpr Flags<TextFormat> fmt = FORMAT_LEFT | FORMAT_TOP;
+        const auto text_elements = m_font->ExpensiveParseFromTextToTextElements(str, fmt);
+        const auto text_lines = m_font->DetermineLines(str, fmt, X0, text_elements);
+        Pt menu_sz = m_font->TextExtent(text_lines); // get dimensions of text in menu
         menu_sz.x += 2 * HORIZONTAL_MARGIN;
         if (needs_indicator)
             menu_sz.x += CHECK_WIDTH + 2 * HORIZONTAL_MARGIN; // make room for the little arrow
         Rect r(ul.x + next_menu_x_offset, ul.y + next_menu_y_offset,
-                ul.x + next_menu_x_offset + menu_sz.x, ul.y + next_menu_y_offset + menu_sz.y);
-
-        if (r.lr.x > GUI::GetGUI()->AppWidth()) {
-            X offset = r.lr.x - GUI::GetGUI()->AppWidth();
+               ul.x + next_menu_x_offset + menu_sz.x, ul.y + next_menu_y_offset + menu_sz.y);
+        if (r.lr.x > app_w) {
+            X offset = r.lr.x - app_w;
             r.ul.x -= offset;
             r.lr.x -= offset;
         }
-        if (r.lr.y > GUI::GetGUI()->AppHeight()) {
-            Y offset = r.lr.y - GUI::GetGUI()->AppHeight();
+        if (r.lr.y > app_h) {
+            Y offset = r.lr.y - app_h;
             r.ul.y -= offset;
             r.lr.y -= offset;
         }
+
         next_menu_x_offset = menu_sz.x;
-        next_menu_y_offset = static_cast<int>(m_caret[i]) * m_font->Lineskip();
+        next_menu_y_offset = static_cast<int>(m_caret[i]) * lineskip;
         FlatRectangle(r.ul, r.lr, m_int_color, m_border_color, BORDER_THICKNESS);
         m_open_levels[i] = r;
 
@@ -109,8 +112,8 @@ void PopupMenu::Render()
             !menu.next_level[m_caret[i]].disabled)
         {
             Rect tmp_r = r;
-            tmp_r.ul.y += static_cast<int>(m_caret[i]) * m_font->Lineskip();
-            tmp_r.lr.y = tmp_r.ul.y + m_font->Lineskip() + 3;
+            tmp_r.ul.y += static_cast<int>(m_caret[i]) * lineskip;
+            tmp_r.lr.y = tmp_r.ul.y + lineskip + 3;
             tmp_r.ul.x += BORDER_THICKNESS;
             tmp_r.lr.x -= BORDER_THICKNESS;
             if (m_caret[i] == 0)
@@ -130,12 +133,13 @@ void PopupMenu::Render()
             const Clr clr = (menu.next_level[j].disabled) ? DisabledColor(m_text_color) : m_text_color;
 
             if (!menu.next_level[j].separator) {
+                const auto& next_label = menu.next_level[j].label;
                 // TODO cache line data v expensive calculation
-                const auto element_data = m_font->ExpensiveParseFromTextToTextElements(menu.next_level[j].label, fmt);
-                const auto line_data = m_font->DetermineLines(menu.next_level[j].label, fmt, X0, element_data);
+                const auto element_data = m_font->ExpensiveParseFromTextToTextElements(next_label, fmt);
+                const auto line_data = m_font->DetermineLines(next_label, fmt, X0, element_data);
 
                 rs.PushColor(clr);
-                m_font->RenderText(line_rect.ul, line_rect.lr, menu.next_level[j].label, fmt, line_data, rs);
+                m_font->RenderText(line_rect.ul, line_rect.lr, fmt, line_data, rs);
                 rs.PopColor();
 
             } else {
@@ -153,27 +157,26 @@ void PopupMenu::Render()
             // submenu indicator arrow
             if (menu.next_level[j].next_level.size() > 0u) {
                 Triangle(line_rect.lr.x - Value(INDICATOR_HEIGHT/2) - HORIZONTAL_MARGIN,
-                            line_rect.ul.y + INDICATOR_VERTICAL_MARGIN,
-                            line_rect.lr.x - Value(INDICATOR_HEIGHT/2) - HORIZONTAL_MARGIN,
-                            line_rect.ul.y + m_font->Lineskip() - INDICATOR_VERTICAL_MARGIN,
-                            line_rect.lr.x - HORIZONTAL_MARGIN,
-                            line_rect.ul.y + m_font->Lineskip()/2);
-                glEnd();
+                         line_rect.ul.y + INDICATOR_VERTICAL_MARGIN,
+                         line_rect.lr.x - Value(INDICATOR_HEIGHT/2) - HORIZONTAL_MARGIN,
+                         line_rect.ul.y + lineskip - INDICATOR_VERTICAL_MARGIN,
+                         line_rect.lr.x - HORIZONTAL_MARGIN,
+                         line_rect.ul.y + lineskip/2);
                 glEnable(GL_TEXTURE_2D);
             }
-            line_rect.ul.y += m_font->Lineskip();
+
+            line_rect.ul.y += lineskip;
         }
     }
 }
 
-void PopupMenu::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
+void PopupMenu::LButtonUp(Pt, Flags<ModKey>)
 {
     if (m_caret[0] != INVALID_CARET) {
-        MenuItem* menu_ptr = &m_menu_data;
+        MenuItem* menu_ptr = std::addressof(m_menu_data);
         for (std::size_t caret : m_caret) {
-            if (caret != INVALID_CARET) {
-                menu_ptr = &menu_ptr->next_level[caret];
-            }
+            if (caret != INVALID_CARET)
+                menu_ptr = std::addressof(menu_ptr->next_level[caret]);
         }
         if (!menu_ptr->disabled && !menu_ptr->separator) {
             m_item_selected = menu_ptr;
@@ -187,7 +190,7 @@ void PopupMenu::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
 void PopupMenu::LClick(Pt pt, Flags<ModKey> mod_keys)
 { LButtonUp(pt, mod_keys); }
 
-void PopupMenu::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
+void PopupMenu::LDrag(Pt pt, Pt, Flags<ModKey>)
 {
     bool cursor_is_in_menu = false;
     for (int i = static_cast<int>(m_open_levels.size()) - 1; i >= 0; --i) {
@@ -196,9 +199,9 @@ void PopupMenu::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
         const std::size_t level_idx = static_cast<std::size_t>(i);
 
         // get the correct submenu
-        const MenuItem* menu_ptr = &m_menu_data;
-        for (std::size_t j = 0; j < i; ++j)
-            menu_ptr = &menu_ptr->next_level[m_caret[j]];
+        const MenuItem* menu_ptr = std::addressof(m_menu_data);
+        for (std::size_t j = 0; std::cmp_less(j, i); ++j)
+            menu_ptr = std::addressof(menu_ptr->next_level[m_caret[j]]);
         if (!menu_ptr)
             break;
         const MenuItem& menu = *menu_ptr;
@@ -252,30 +255,3 @@ bool PopupMenu::Run()
 
     return retval;
 }
-
-void PopupMenu::SetBorderColor(Clr clr)
-{ m_border_color = clr; }
-
-void PopupMenu::SetInteriorColor(Clr clr)
-{ m_int_color = clr; }
-
-void PopupMenu::SetTextColor(Clr clr)
-{ m_text_color = clr; }
-
-void PopupMenu::SetHiliteColor(Clr clr)
-{ m_hilite_color = clr; }
-
-const std::shared_ptr<Font>& PopupMenu::GetFont() const
-{ return m_font; }
-
-const MenuItem& PopupMenu::MenuData() const
-{ return m_menu_data; }
-
-const std::vector<Rect>& PopupMenu::OpenLevels() const
-{ return m_open_levels; }
-
-const std::vector<std::size_t>& PopupMenu::Caret() const
-{ return m_caret; }
-
-const MenuItem* PopupMenu::ItemSelected() const
-{ return m_item_selected; }

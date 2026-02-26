@@ -32,7 +32,7 @@ namespace {
 ////////////////////////////////////////////////
 // GG::Button
 ////////////////////////////////////////////////
-Button::Button(std::string str, std::shared_ptr<Font> font, Clr color,
+Button::Button(std::string str, std::shared_ptr<const Font> font, Clr color,
                Clr text_color, Flags<WndFlag> flags) :
     Control(X0, Y0, X1, Y1, flags),
     m_label(Wnd::Create<TextControl>(X0, Y0, X1, Y1, str, font,
@@ -54,18 +54,12 @@ void Button::CompleteConstruction()
     AttachChild(m_label);
 }
 
-Pt Button::MinUsableSize() const
-{ return m_label->MinUsableSize(); }
-
 void Button::Show()
 {
     Wnd::Show();
     m_label->Hide();
     m_label_shadow->Hide();
 }
-
-const std::string& Button::Text() const
-{ return m_label->Text(); }
 
 void Button::Render()
 {
@@ -94,16 +88,7 @@ void Button::SetText(std::string text)
     m_label_shadow->SetText(std::move(text));
 }
 
-void Button::SetUnpressedGraphic(SubTexture st) noexcept
-{ m_unpressed_graphic = std::move(st); }
-
-void Button::SetPressedGraphic(SubTexture st) noexcept
-{ m_pressed_graphic = std::move(st); }
-
-void Button::SetRolloverGraphic(SubTexture st) noexcept
-{ m_rollover_graphic = std::move(st); }
-
-void Button::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
+void Button::LButtonDown(Pt, Flags<ModKey>)
 {
     if (Disabled())
         return;
@@ -123,13 +108,13 @@ void Button::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
     Wnd::LDrag(pt, move, mod_keys);
 }
 
-void Button::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
+void Button::LButtonUp(Pt, Flags<ModKey>)
 {
     if (!Disabled())
         m_state = ButtonState::BN_UNPRESSED;
 }
 
-void Button::LClick(Pt pt, Flags<ModKey> mod_keys)
+void Button::LClick(Pt, Flags<ModKey>)
 {
     if (!Disabled()) {
         m_state = ButtonState::BN_ROLLOVER;
@@ -137,7 +122,7 @@ void Button::LClick(Pt pt, Flags<ModKey> mod_keys)
     }
 }
 
-void Button::RButtonDown(Pt pt, Flags<ModKey> mod_keys)
+void Button::RButtonDown(Pt, Flags<ModKey>)
 {
     if (Disabled())
         return;
@@ -157,13 +142,13 @@ void Button::RDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
     Wnd::LDrag(pt, move, mod_keys);
 }
 
-void Button::RButtonUp(Pt pt, Flags<ModKey> mod_keys)
+void Button::RButtonUp(Pt, Flags<ModKey>)
 {
     if (!Disabled())
         m_state = ButtonState::BN_UNPRESSED;
 }
 
-void Button::RClick(Pt pt, Flags<ModKey> mod_keys)
+void Button::RClick(Pt, Flags<ModKey>)
 {
     if (!Disabled()) {
         m_state = ButtonState::BN_ROLLOVER;
@@ -171,13 +156,13 @@ void Button::RClick(Pt pt, Flags<ModKey> mod_keys)
     }
 }
 
-void Button::MouseEnter(Pt pt, Flags<ModKey> mod_keys)
+void Button::MouseEnter(Pt, Flags<ModKey>)
 {
     if (!Disabled())
         m_state = ButtonState::BN_ROLLOVER;
 }
 
-void Button::MouseHere(Pt pt, Flags<ModKey> mod_keys)
+void Button::MouseHere(Pt, Flags<ModKey>)
 {
     if (!Disabled())
         m_state = ButtonState::BN_ROLLOVER;
@@ -241,7 +226,7 @@ void Button::RenderDefault()
 ////////////////////////////////////////////////
 // GG::StateButton
 ////////////////////////////////////////////////
-StateButton::StateButton(std::string str, const std::shared_ptr<Font>& font,
+StateButton::StateButton(std::string str, const std::shared_ptr<const Font>& font,
                          Flags<TextFormat> format, Clr color,
                          std::shared_ptr<StateButtonRepresenter> representer,
                          Clr text_color) :
@@ -280,7 +265,7 @@ void StateButton::Show()
     m_label->Hide();
 }
 
-void StateButton::LButtonDown(Pt pt, Flags<ModKey> mod_keys)
+void StateButton::LButtonDown(Pt, Flags<ModKey>)
 { SetState(ButtonState::BN_PRESSED); }
 
 void StateButton::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
@@ -289,10 +274,10 @@ void StateButton::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
     Wnd::LDrag(pt, move, mod_keys);
 }
 
-void StateButton::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
+void StateButton::LButtonUp(Pt, Flags<ModKey>)
 { SetState(ButtonState::BN_UNPRESSED); }
 
-void StateButton::LClick(Pt pt, Flags<ModKey> mod_keys)
+void StateButton::LClick(Pt, Flags<ModKey>)
 {
     if (!Disabled()) {
         SetCheck(!m_checked);
@@ -302,7 +287,7 @@ void StateButton::LClick(Pt pt, Flags<ModKey> mod_keys)
     }
 }
 
-void StateButton::MouseHere(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
+void StateButton::MouseHere(GG::Pt, GG::Flags<GG::ModKey>)
 { SetState(ButtonState::BN_ROLLOVER); }
 
 void StateButton::MouseLeave()
@@ -407,79 +392,6 @@ Pt StateButtonRepresenter::MinUsableSize(const StateButton& button) const
     return Pt(std::max(bn_lr.x, text_lr.x) - std::min(bn_ul.x, tx_ul.x),
               std::max(bn_lr.y, text_lr.y) - std::min(bn_ul.y, tx_ul.y));
 }
-
-
-////////////////////////////////////////////////
-// GG::BeveledCheckBoxRepresenter
-////////////////////////////////////////////////
-BeveledCheckBoxRepresenter::BeveledCheckBoxRepresenter(Clr interior):
-    m_int_color(interior)
-{}
-
-void BeveledCheckBoxRepresenter::Render(const GG::StateButton& button) const
-{
-    // draw button
-    const Pt cl_ul = button.ClientUpperLeft();
-    Pt bn_ul, bn_lr, tx_ul;
-
-    DoLayout(button, bn_ul, bn_lr, tx_ul);
-
-    bn_ul += cl_ul;
-    bn_lr += cl_ul;
-
-    static constexpr int BEVEL = 2;
-    static constexpr Pt DOUBLE_BEVEL(X(2 * BEVEL), Y(2 * BEVEL));
-
-    BeveledRectangle(bn_ul, bn_lr,
-                     button.Disabled() ? DisabledColor(m_int_color) : m_int_color,
-                     button.Disabled() ? DisabledColor(button.Color()) : button.Color(),
-                     false, BEVEL);
-    if (button.Checked())
-        BeveledCheck(bn_ul + DOUBLE_BEVEL, bn_lr - DOUBLE_BEVEL,
-                     button.Disabled() ? DisabledColor(button.Color()) : button.Color());
-
-    button.GetLabel()->OffsetMove(tx_ul);
-    button.GetLabel()->Render();
-    button.GetLabel()->OffsetMove(-tx_ul);
-}
-
-
-////////////////////////////////////////////////
-// GG::BeveledRadioRepresenter
-////////////////////////////////////////////////
-BeveledRadioRepresenter::BeveledRadioRepresenter(Clr interior):
-    m_int_color(interior)
-{}
-
-void BeveledRadioRepresenter::Render(const GG::StateButton& button) const
-{
-    // draw button
-    const Pt cl_ul = button.ClientUpperLeft();
-    Pt bn_ul, bn_lr, tx_ul;
-
-    DoLayout(button, bn_ul, bn_lr, tx_ul);
-
-    bn_ul += cl_ul;
-    bn_lr += cl_ul;
-
-    static constexpr int BEVEL = 2;
-    static constexpr Pt DOUBLE_BEVEL(X(2 * BEVEL), Y(2 * BEVEL));
-
-    BeveledCircle(bn_ul, bn_lr,
-                  button.Disabled() ? DisabledColor(m_int_color) : m_int_color,
-                  button.Disabled() ? DisabledColor(button.Color()) : button.Color(),
-                  false, BEVEL);
-    if (button.Checked())
-        Bubble(bn_ul + DOUBLE_BEVEL, bn_lr - DOUBLE_BEVEL,
-               button.Disabled() ? DisabledColor(button.Color()) : button.Color());
-
-    button.GetLabel()->OffsetMove(tx_ul);
-    button.GetLabel()->Render();
-    button.GetLabel()->OffsetMove(-(tx_ul));
-}
-
-Pt BeveledTabRepresenter::MinUsableSize(const StateButton& button) const
-{ return button.GetLabel()->MinUsableSize(); }
 
 
 ////////////////////////////////////////////////
@@ -644,7 +556,7 @@ void RadioButtonGroup::RemoveButton(StateButton* button)
     assert(index < m_button_slots.size());
 
     const int CELLS_PER_BUTTON = m_expand_buttons ? 1 : 2;
-    auto&& layout = GetLayout();
+    auto layout = GetLayout();
     layout->Remove(m_button_slots[index].button.get());
     for (std::size_t i = index + 1; i < m_button_slots.size(); ++i) {
         layout->Remove(m_button_slots[i].button.get());

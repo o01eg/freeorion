@@ -2,7 +2,7 @@
 
 #include <cctype>
 #include <iterator>
-#include <boost/filesystem/fstream.hpp>
+#include <fstream>
 #include "BuildingType.h"
 #include "Building.h"
 #include "Condition.h"
@@ -64,11 +64,11 @@ namespace {
         Universe& universe = context.ContextUniverse();
         auto fleet = universe.InsertNew<Fleet>("", x, y, ship->Owner(), context.current_turn);
 
-        fleet->Rename(fleet->GenerateFleetName(context));
-        fleet->GetMeter(MeterType::METER_STEALTH)->SetCurrent(Meter::LARGE_VALUE);
-
         fleet->AddShips({ship->ID()});
         ship->SetFleetID(fleet->ID());
+
+        fleet->Rename(fleet->GenerateFleetName(context));
+        fleet->GetMeter(MeterType::METER_STEALTH)->SetCurrent(Meter::LARGE_VALUE);
 
         // if aggression specified, use that, otherwise get from whether ship is armed
         FleetAggression new_aggr = aggression == FleetAggression::INVALID_FLEET_AGGRESSION ?
@@ -157,7 +157,7 @@ namespace {
         const int dest_system = fleet->FinalDestinationID();
 
         auto route = context.ContextUniverse().GetPathfinder().ShortestPath(
-            start_system, dest_system, fleet->Owner(), objects).first;
+            start_system, dest_system, fleet->Owner()).first;
 
         // if shortest path is empty, the route may be impossible or trivial, so just set route to move fleet
         // to the next system that it was just set to move to anyway.
@@ -213,24 +213,18 @@ EffectsGroup::EffectsGroup(std::unique_ptr<Condition::Condition>&& scope,
     m_priority(priority),
     m_description(std::move(description)),
     m_content_name(std::move(content_name)),
-    m_has_meter_effects([this]() {
-        return std::any_of(m_effects.begin(), m_effects.end(),
-                           [](const auto& e) noexcept { return e->IsMeterEffect(); });
-    }()),
-    m_has_appearance_effects([this]() {
-        return std::any_of(m_effects.begin(), m_effects.end(),
-                           [](const auto& e) noexcept { return e->IsAppearanceEffect(); });
-    }()),
-    m_has_sitrep_effects([this]() {
-        return std::any_of(m_effects.begin(), m_effects.end(),
-                           [](const auto& e) noexcept { return e->IsSitrepEffect(); });
-    }())
+    m_has_meter_effects(
+        [this]() { return range_any_of(m_effects, [](const auto& e) noexcept { return e->IsMeterEffect(); }); }()),
+    m_has_appearance_effects(
+        [this]() { return range_any_of(m_effects, [](const auto& e) noexcept { return e->IsAppearanceEffect(); }); }()),
+    m_has_sitrep_effects(
+        [this]() { return range_any_of(m_effects, [](const auto& e) noexcept { return e->IsSitrepEffect(); }); }())
 {}
 
 EffectsGroup::~EffectsGroup() = default;
 
 bool EffectsGroup::operator==(const EffectsGroup& rhs) const {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
 
     if (m_stacking_group != rhs.m_stacking_group ||
@@ -380,7 +374,7 @@ std::string Dump(const std::vector<EffectsGroup>& effects_groups) {
 // Effect                                                //
 ///////////////////////////////////////////////////////////
 bool Effect::operator==(const Effect& rhs) const {
-    if (this == &rhs)
+    if (this == std::addressof(rhs))
         return true;
 
     if (typeid(*this) != typeid(rhs))
@@ -391,8 +385,8 @@ bool Effect::operator==(const Effect& rhs) const {
 
 void Effect::Execute(ScriptingContext& context,
                      const TargetSet& targets,
-                     AccountingMap* accounting_map,
-                     const EffectCause& effect_cause,
+                     AccountingMap*,
+                     const EffectCause&,
                      bool only_meter_effects,
                      bool only_appearance_effects,
                      bool include_empire_meter_effects,
@@ -413,9 +407,8 @@ void Effect::Execute(ScriptingContext& context, const TargetSet& targets) const 
         return;
 
     // execute effects on targets
-    ScriptingContext local_context{context};
     for (auto* target : targets) {
-        local_context.effect_target = target;
+        ScriptingContext local_context{context, ScriptingContext::Target{}, target, context.current_value};
         Execute(local_context);
     }
 }
@@ -466,7 +459,7 @@ SetMeter::SetMeter(MeterType meter,
 }
 
 bool SetMeter::operator==(const Effect& rhs) const {
-    if (this == &rhs)
+    if (this == std::addressof(rhs))
         return true;
     if (typeid(*this) != typeid(rhs))
         return false;
@@ -513,9 +506,9 @@ void SetMeter::Execute(ScriptingContext& context,
                        const TargetSet& targets,
                        AccountingMap* accounting_map,
                        const EffectCause& effect_cause,
-                       bool only_meter_effects,
+                       bool,
                        bool only_appearance_effects,
-                       bool include_empire_meter_effects,
+                       bool,
                        bool only_generate_sitrep_effects) const
 {
     if (only_appearance_effects || only_generate_sitrep_effects)
@@ -523,8 +516,11 @@ void SetMeter::Execute(ScriptingContext& context,
     if (targets.empty())
         return;
 
-    TraceLogger(effects) << "\n\nExecute SetMeter effect: \n" << Dump();
-    TraceLogger(effects) << "SetMeter execute " << targets.size() << " before:" << TargetsDump(targets);
+    const bool trace_log = LoggerThresholdEnabled(LogLevel::trace, "effects");
+    if (trace_log) {
+        TraceLogger(effects) << "\n\nExecute SetMeter effect: \n" << Dump();
+        TraceLogger(effects) << "SetMeter execute " << targets.size() << " before:" << TargetsDump(targets);\
+    }
 
     const int source_id{context.source ? context.source->ID() : INVALID_OBJECT_ID};
     const auto& accounting_label{m_accounting_label.empty() ? effect_cause.custom_label : m_accounting_label};
@@ -604,7 +600,8 @@ void SetMeter::Execute(ScriptingContext& context,
             update_meter(new_val, target_id, meter);
     }
 
-    TraceLogger(effects) << "SetMeter execute " << targets.size() << " after:" << TargetsDump(targets);
+    if (trace_log)
+        TraceLogger(effects) << "SetMeter execute " << targets.size() << " after:" << TargetsDump(targets);
 }
 
 void SetMeter::Execute(ScriptingContext& context, const TargetSet& targets) const {
@@ -698,7 +695,7 @@ SetShipPartMeter::SetShipPartMeter(MeterType meter,
 {}
 
 bool SetShipPartMeter::operator==(const Effect& rhs) const {
-    if (this == &rhs)
+    if (this == std::addressof(rhs))
         return true;
     if (typeid(*this) != typeid(rhs))
         return false;
@@ -747,11 +744,11 @@ void SetShipPartMeter::Execute(ScriptingContext& context) const {
 
 void SetShipPartMeter::Execute(ScriptingContext& context,
                                const TargetSet& targets,
-                               AccountingMap* accounting_map,
-                               const EffectCause& effect_cause,
-                               bool only_meter_effects,
+                               AccountingMap*,
+                               const EffectCause&,
+                               bool,
                                bool only_appearance_effects,
-                               bool include_empire_meter_effects,
+                               bool,
                                bool only_generate_sitrep_effects) const
 {
     if (only_appearance_effects || only_generate_sitrep_effects)
@@ -793,7 +790,8 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
             for (auto* target : targets) {
                 if (!target || target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                     continue;
-                const auto part_name = m_part_name->Eval(ScriptingContext{context, ScriptingContext::Target{}, target, EMPTY_STRING_CURRENT_VALUE});
+                const auto part_name = m_part_name->Eval(
+                    ScriptingContext{context, ScriptingContext::Target{}, target, EMPTY_STRING_CURRENT_VALUE});
                 if (Meter* meter = static_cast<Ship*>(target)->GetPartMeter(m_meter, part_name))
                     meter->SetCurrent(new_val);
             }
@@ -809,7 +807,8 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
             for (auto* target : targets) {
                 if (!target || target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                     continue;
-                const auto part_name = m_part_name->Eval(ScriptingContext{context, ScriptingContext::Target{}, target, EMPTY_STRING_CURRENT_VALUE});
+                const auto part_name = m_part_name->Eval(
+                    ScriptingContext{context, ScriptingContext::Target{}, target, EMPTY_STRING_CURRENT_VALUE});
                 if (Meter* meter = static_cast<Ship*>(target)->GetPartMeter(m_meter, part_name)) {
                     auto new_val = OperateData(op_type, static_cast<double>(meter->Current()), rhs);
                     meter->SetCurrent(static_cast<float>(new_val));
@@ -820,7 +819,8 @@ void SetShipPartMeter::Execute(ScriptingContext& context, const TargetSet& targe
             auto* target = targets.front();
             if (!target || target->ObjectType() != UniverseObjectType::OBJ_SHIP)
                 return;
-            const auto part_name = m_part_name->Eval(ScriptingContext{context, ScriptingContext::Target{}, target, EMPTY_STRING_CURRENT_VALUE});
+            const auto part_name = m_part_name->Eval(
+                ScriptingContext{context, ScriptingContext::Target{}, target, EMPTY_STRING_CURRENT_VALUE});
             if (Meter* meter = static_cast<Ship*>(target)->GetPartMeter(m_meter, part_name)) {
                 const ScriptingContext::CurrentValueVariant cvv{static_cast<double>(meter->Current())};
                 const ScriptingContext target_meter_context(context, ScriptingContext::Target{}, target, cvv);
@@ -970,7 +970,7 @@ SetEmpireMeter::SetEmpireMeter(std::unique_ptr<ValueRef::ValueRef<int>>&& empire
 {}
 
 bool SetEmpireMeter::operator==(const Effect& rhs) const {
-    if (this == &rhs)
+    if (this == std::addressof(rhs))
         return true;
     if (typeid(*this) != typeid(rhs))
         return false;
@@ -1026,9 +1026,9 @@ void SetEmpireMeter::Execute(ScriptingContext& context) const {
 
 void SetEmpireMeter::Execute(ScriptingContext& context,
                              const TargetSet& targets,
-                             AccountingMap* accounting_map,
-                             const EffectCause& effect_cause,
-                             bool only_meter_effects,
+                             AccountingMap*,
+                             const EffectCause&,
+                             bool,
                              bool only_appearance_effects,
                              bool include_empire_meter_effects,
                              bool only_generate_sitrep_effects) const
@@ -1205,7 +1205,7 @@ SetEmpireStockpile::SetEmpireStockpile(std::unique_ptr<ValueRef::ValueRef<int>>&
 {}
 
 bool SetEmpireStockpile::operator==(const Effect& rhs) const {
-    if (this == &rhs)
+    if (this == std::addressof(rhs))
         return true;
     if (typeid(*this) != typeid(rhs))
         return false;
@@ -1287,7 +1287,7 @@ SetEmpireCapital::SetEmpireCapital(std::unique_ptr<ValueRef::ValueRef<int>>&& em
 {}
 
 bool SetEmpireCapital::operator==(const Effect& rhs) const {
-    if (this == &rhs)
+    if (this == std::addressof(rhs))
         return true;
     if (typeid(*this) != typeid(rhs))
         return false;
@@ -1530,7 +1530,7 @@ SetSpecies::SetSpecies(std::unique_ptr<ValueRef::ValueRef<std::string>>&& specie
 {}
 
 void SetSpecies::Execute(ScriptingContext& context) const {
-    if (!context.effect_target)
+    if (!context.effect_target || !m_species_name)
         return;
 
     if (context.effect_target->ObjectType() == UniverseObjectType::OBJ_SHIP) {
@@ -1553,26 +1553,20 @@ void SetSpecies::Execute(ScriptingContext& context) const {
         auto& initial_focus = planet->Focus();
         auto available_foci = planet->AvailableFoci(context);
 
-        // leave current focus unchanged if available.
-        if (std::any_of(available_foci.begin(), available_foci.end(),
-                        [&initial_focus](const auto& af) { return initial_focus == af; }))
-        { return; }
+        // leave current focus unchanged, if available.
+        if (range_contains(available_foci, initial_focus))
+            return;
 
-        const Species* species = context.species.GetSpecies(planet->SpeciesName());
-        const auto default_focus = species ? std::string_view{species->DefaultFocus()} : "";
-
-        // chose default focus if available. otherwise use any available focus
-        bool default_available = false;
-        for (const auto& available_focus : available_foci) {
-            if (available_focus == default_focus) {
-                default_available = true;
-                break;
+        // chose default focus for species, if available.
+        if (const Species* species = context.species.GetSpecies(planet->SpeciesName())) {
+            if (range_contains(available_foci, species->DefaultFocus())) {
+                planet->SetFocus(species->DefaultFocus(), context);
+                return;
             }
         }
 
-        if (default_available)
-            planet->SetFocus(std::string{default_focus}, context);
-        else if (!available_foci.empty())
+        // otherwise use any available focus
+        if (!available_foci.empty())
             planet->SetFocus(std::string{available_foci.front()}, context);
     }
 }
@@ -2640,9 +2634,11 @@ void RemoveSpecial::Execute(ScriptingContext& context) const {
         ErrorLogger(effects) << "RemoveSpecial::Execute passed no target object";
         return;
     }
-
-    std::string name = (m_name ? m_name->Eval(context) : "");
-    context.effect_target->RemoveSpecial(name);
+    
+    if (auto obj = dynamic_cast<UniverseObject*>(context.effect_target)) {
+        std::string name = (m_name ? m_name->Eval(context) : "");
+        obj->RemoveSpecial(name);
+    }
 }
 
 std::string RemoveSpecial::Dump(uint8_t ntabs) const {
@@ -2676,11 +2672,12 @@ AddStarlanes::AddStarlanes(std::unique_ptr<Condition::Condition>&& other_lane_en
 {}
 
 namespace {
-    constexpr auto not_null = [](const auto* o) -> bool { return o; };
+    constexpr auto not_null = [](const auto& o) noexcept -> bool { return static_cast<bool>(o); };
 }
 
 void AddStarlanes::Execute(ScriptingContext& context) const {
     const auto to_system = [&context](UniverseObject* o) -> System* {
+        if (!o) return nullptr;
         if (o->ObjectType() == UniverseObjectType::OBJ_SYSTEM)
             return static_cast<System*>(o);
         return context.ContextObjects().getRaw<System>(o->SystemID()); // may be nullptr
@@ -2704,11 +2701,8 @@ void AddStarlanes::Execute(ScriptingContext& context) const {
         return; // nothing to do!
 
     // get systems containing at least one endpoint object
-    std::vector<System*> endpoint_systems;
-    endpoint_systems.reserve(endpoint_objects.size());
-    auto end_sys_rng = endpoint_objects | range_filter(not_null)
-        | range_transform(to_system) | range_filter(not_null);
-    range_copy(end_sys_rng, std::back_inserter(endpoint_systems));
+    auto endpoint_systems = endpoint_objects | range_filter(not_null)
+        | range_transform(to_system) | range_filter(not_null) | range_to_vec;
 
     // ensure uniqueness of results
     std::sort(endpoint_systems.begin(), endpoint_systems.end());
@@ -2771,14 +2765,14 @@ void RemoveStarlanes::Execute(ScriptingContext& context) const {
     const auto endpoint_objects = m_other_lane_endpoint_condition->Eval(std::as_const(context));
 
     // get system IDs of those objects
-    std::vector<int> endpoint_system_ids;
-    endpoint_system_ids.reserve(endpoint_objects.size());
-    std::transform(endpoint_objects.begin(), endpoint_objects.end(), std::back_inserter(endpoint_system_ids),
-                   [](const UniverseObject* obj) { return obj ? obj->SystemID() : INVALID_OBJECT_ID; });
+    static constexpr auto to_sys_id = [](const auto* obj) { return obj ? obj->SystemID() : INVALID_OBJECT_ID; };
+    auto endpoint_system_ids = endpoint_objects | range_transform(to_sys_id) | range_to_vec;
+
     // uniquify
     std::sort(endpoint_system_ids.begin(), endpoint_system_ids.end());
     auto unique_it = std::unique(endpoint_system_ids.begin(), endpoint_system_ids.end());
     endpoint_system_ids.erase(unique_it, endpoint_system_ids.end());
+
     // get all those systems
     auto endpoint_systems = context.ContextObjects().findRaw<System>(endpoint_system_ids);
 
@@ -2862,6 +2856,30 @@ MoveTo::MoveTo(std::unique_ptr<Condition::Condition>&& location_condition) :
     m_location_condition(std::move(location_condition))
 {}
 
+namespace {
+    constexpr Fleet* get_fleet(auto* destination, ObjectMap& objs) {
+        const auto obj_type = destination->ObjectType();
+        if (obj_type == UniverseObjectType::OBJ_FLEET)
+            return static_cast<Fleet*>(destination);
+        if (obj_type == UniverseObjectType::OBJ_SHIP) {
+            auto ship = static_cast<Ship*>(destination);
+            return objs.getRaw<Fleet>(ship->FleetID());
+        }
+        return nullptr;
+    };
+
+    constexpr Planet* get_planet(auto* destination, ObjectMap& objs) {
+        const auto obj_type = destination->ObjectType();
+        if (obj_type == UniverseObjectType::OBJ_PLANET)
+            return static_cast<Planet*>(destination);
+        if (obj_type == UniverseObjectType::OBJ_BUILDING) {
+            auto building = static_cast<Building*>(destination);
+            return objs.getRaw<Planet>(building->PlanetID());
+        }
+        return nullptr;
+    };
+}
+
 void MoveTo::Execute(ScriptingContext& context) const {
     if (!context.effect_target) {
         ErrorLogger(effects) << "MoveTo::Execute given no target object";
@@ -2887,28 +2905,6 @@ void MoveTo::Execute(ScriptingContext& context) const {
 
     // get previous system from which to remove object if necessary
     auto old_sys = objects.getRaw<System>(context.effect_target->SystemID());
-
-    auto get_fleet = [](auto* destination, ObjectMap& objs) -> Fleet* {
-        const auto obj_type = destination->ObjectType();
-        if (obj_type == UniverseObjectType::OBJ_FLEET)
-            return static_cast<Fleet*>(destination);
-        if (obj_type == UniverseObjectType::OBJ_SHIP) {
-            auto ship = static_cast<Ship*>(destination);
-            return objs.getRaw<Fleet>(ship->FleetID());
-        }
-        return nullptr;
-    };
-
-    auto get_planet = [](auto* destination, ObjectMap& objs) -> Planet* {
-        const auto obj_type = destination->ObjectType();
-        if (obj_type == UniverseObjectType::OBJ_PLANET)
-            return static_cast<Planet*>(destination);
-        if (obj_type == UniverseObjectType::OBJ_BUILDING) {
-            auto building = static_cast<Building*>(destination);
-            return objs.getRaw<Planet>(building->PlanetID());
-        }
-        return nullptr;
-    };
 
     // do the moving...
     if (context.effect_target->ObjectType() == UniverseObjectType::OBJ_FLEET) {
@@ -2976,62 +2972,69 @@ void MoveTo::Execute(ScriptingContext& context) const {
         }
 
     } else if (context.effect_target->ObjectType() == UniverseObjectType::OBJ_SHIP) {
-        auto ship = static_cast<Ship*>(context.effect_target);
+        auto const ship = static_cast<Ship*>(context.effect_target);
         // TODO: make sure colonization doesn't interfere with this effect, and vice versa
 
-        // is destination a ship/fleet ?
-        auto dest_fleet = get_fleet(destination, objects);
-        if (dest_fleet)
-            if (dest_fleet->ID() == ship->FleetID())
-                return; // already in destination fleet. nothing to do.
+        // is destination a fleet or a ship in a fleet? if so, get that fleet.
+        auto const dest_fleet = get_fleet(destination, objects);
+        if (dest_fleet && dest_fleet->ID() == ship->FleetID())
+            return; // already in destination fleet. nothing to do.
 
 
-        bool same_owners = ship->Owner() == destination->Owner();
-        int dest_sys_id = destination->SystemID();
-        int ship_sys_id = ship->SystemID();
+        auto const old_fleet = objects.getRaw<Fleet>(ship->FleetID());
+        //DebugLogger() << "old fleet? " << (old_fleet ? old_fleet->ID() : INVALID_OBJECT_ID);
 
 
-        if (ship_sys_id != dest_sys_id) {
-            // ship is moving to a different system.
+        const bool same_owner = !ship->Unowned() && (ship->Owner() == destination->Owner());
+        const int dest_sys_id = destination->SystemID();
+        const int initial_ship_sys_id = ship->SystemID();
+        //DebugLogger() << "owners same: " << same_owner << "  dest sys: " << dest_sys_id
+        //            << "  initial ship sys: " << initial_ship_sys_id;
 
-            // remove ship from old system
-            if (old_sys) {
+
+        // handle ship system
+        if (initial_ship_sys_id != dest_sys_id) {
+            // ship is moving to a different system or from its initial system to non-system location
+
+            if (auto const new_sys = objects.getRaw<System>(dest_sys_id)) {
+                // (move and) insert ship into new system
+                new_sys->Insert(ship, System::NO_ORBIT, context.current_turn, context.ContextObjects());
+
+            } else if (old_sys) {
+                // remove ship from old system
                 old_sys->Remove(ship->ID());
                 ship->SetSystem(INVALID_OBJECT_ID);
             }
-
-            if (auto new_sys = objects.getRaw<System>(dest_sys_id)) {
-                // ship is moving to a new system. insert it.
-                new_sys->Insert(ship, System::NO_ORBIT, context.current_turn, context.ContextObjects());
-            } else {
-                // ship is moving to a non-system location. move it there.
-                ship->MoveTo(dest_fleet);
-            }
-
-            // may create a fleet for ship below...
         }
 
-        auto old_fleet = objects.getRaw<Fleet>(ship->FleetID());
 
-        if (dest_fleet && same_owners) {
+        // handle ship fleet
+        if (dest_fleet && same_owner) {
+            //DebugLogger() << "moving ship into existing same-owner fleet";
             // ship is moving to a different fleet owned by the same empire, so
             // can be inserted into it.
             if (old_fleet)
                 old_fleet->RemoveShips({ship->ID()});
+            ship->MoveTo(dest_fleet); // should not change (system / fleet) of ship
             dest_fleet->AddShips({ship->ID()});
             ship->SetFleetID(dest_fleet->ID());
 
-        } else if (dest_sys_id == ship_sys_id && dest_sys_id != INVALID_OBJECT_ID) {
-            // ship is moving to the system it is already in, but isn't being or
-            // can't be moved into a specific fleet, so the ship can be left in
-            // its current fleet and at its current location
+        } else if (dest_sys_id != INVALID_OBJECT_ID && dest_sys_id == initial_ship_sys_id) {
+            //DebugLogger() << "moving ship to non-fleety object in the same system; no fleet change";
+            // ship is moving to the system it is/was already in, but isn't being or
+            // can't be moved into a specific fleet with the same owner, so the ship
+            // can be left in its current fleet and at its current location
 
-        } else if (destination->X() == ship->X() && destination->Y() == ship->Y()) {
+        } else if (dest_sys_id == INVALID_OBJECT_ID &&
+                   std::pair{ship->X(), ship->Y()} == std::pair{destination->X(), destination->Y()})
+        {
+            //DebugLogger() << "ship already at non-system destination; no fleet change";
             // ship is moving to the same location it's already at, but isn't
-            // being or can't be moved to a specific fleet, so the ship can be
+            // being moved to a specific fleet, so the ship can be
             // left in its current fleet and at its current location
 
         } else {
+            //DebugLogger() << "need new fleet!";
             // need to create a new fleet for ship
 
             // if ship is armed use old fleet's aggression. otherwise use auto-determined aggression
@@ -3049,7 +3052,8 @@ void MoveTo::Execute(ScriptingContext& context) const {
         }
 
         if (old_fleet && old_fleet->Empty()) {
-            old_sys->Remove(old_fleet->ID());
+            if (old_sys)
+                old_sys->Remove(old_fleet->ID());
             universe.EffectDestroy(old_fleet->ID(), INVALID_OBJECT_ID); // no particular object destroyed this fleet
         }
 
@@ -3552,7 +3556,7 @@ void SetDestination::Execute(ScriptingContext& context) const {
 
     // find shortest path for fleet's owner
     auto route_list = context.ContextUniverse().GetPathfinder().ShortestPath(
-        start_system_id, destination_system_id, target_fleet->Owner(), context.ContextObjects()).first;
+        start_system_id, destination_system_id, target_fleet->Owner()).first;
 
     // reject empty move paths (no path exists).
     if (route_list.empty())
@@ -4093,11 +4097,9 @@ uint32_t GenerateSitRepMessage::GetCheckSum() const {
 
 std::vector<std::pair<std::string, const ValueRef::ValueRef<std::string>*>>
 GenerateSitRepMessage::MessageParameters() const {
-    std::vector<std::pair<std::string, const ValueRef::ValueRef<std::string>*>> retval;
-    retval.reserve(m_message_parameters.size());
-    std::transform(m_message_parameters.begin(), m_message_parameters.end(), std::back_inserter(retval),
-                   [](const auto& xx) { return std::pair(xx.first, xx.second.get()); });
-    return retval;
+    static constexpr auto massage = [](const auto& xx) -> std::pair<std::string, const ValueRef::ValueRef<std::string>*>
+    { return {xx.first, xx.second.get()}; };
+    return m_message_parameters | range_transform(massage) | range_to_vec;
 }
 
 std::unique_ptr<Effect> GenerateSitRepMessage::Clone() const {
@@ -4184,10 +4186,8 @@ uint32_t SetTexture::GetCheckSum() const {
     return retval;
 }
 
-std::unique_ptr<Effect> SetTexture::Clone() const {
-    auto texture{m_texture};
-    return std::make_unique<SetTexture>(texture);
-}
+std::unique_ptr<Effect> SetTexture::Clone() const
+{ return std::make_unique<SetTexture>(m_texture); }
 
 
 ///////////////////////////////////////////////////////////
@@ -4202,6 +4202,28 @@ SetVisibility::SetVisibility(std::unique_ptr<ValueRef::ValueRef<Visibility>> vis
     m_affiliation(affiliation),
     m_condition(std::move(of_objects))
 {}
+
+namespace {
+    constexpr auto to_id = [](const auto* o) noexcept(noexcept(o->ID())) { return o->ID(); };
+
+    std::vector<int> GetUniqueMatchesIDs(const ScriptingContext& context, const Condition::Condition* cond) {
+        if (!cond && !context.effect_target)
+            return {};
+        if (!cond)
+            return {context.effect_target->ID()};
+
+        // get target object IDs
+        const auto condition_matches = cond->Eval(context);
+        auto object_ids = condition_matches | range_filter(not_null) | range_transform(to_id) | range_to_vec;
+
+        // ensure uniqueness
+        std::sort(object_ids.begin(), object_ids.end());
+        auto unique_it = std::unique(object_ids.begin(), object_ids.end());
+        object_ids.erase(unique_it, object_ids.end());
+
+        return object_ids;
+    }
+}
 
 void SetVisibility::Execute(ScriptingContext& context) const {
     if (!context.effect_target)
@@ -4284,22 +4306,7 @@ void SetVisibility::Execute(ScriptingContext& context) const {
     }
 
     // what to set visibility of?
-    std::vector<int> object_ids;
-    if (!m_condition) {
-        object_ids.push_back(context.effect_target->ID());
-    } else {
-        // get target object IDs
-        Condition::ObjectSet condition_matches = m_condition->Eval(std::as_const(context));
-        object_ids.reserve(condition_matches.size());
-        std::transform(condition_matches.begin(), condition_matches.end(),
-                       std::back_inserter(object_ids),
-                       [](const auto* o) { return o->ID(); });
-        // ensure uniqueness
-        std::sort(object_ids.begin(), object_ids.end());
-        auto unique_it = std::unique(object_ids.begin(), object_ids.end());
-        object_ids.resize(std::distance(object_ids.begin(), unique_it));
-    }
-
+    const auto object_ids = GetUniqueMatchesIDs(context, m_condition.get());
     const int source_id = context.source ? context.source->ID() : INVALID_OBJECT_ID;
 
     for (const int emp_id : empire_ids) {
@@ -4407,23 +4414,19 @@ void Conditional::Execute(ScriptingContext& context, const TargetSet& targets) c
         return;
 
     // apply sub-condition to target set to pick which to act on with which of sub-effects
-    TargetSet matches{targets.begin(), targets.end()};
+    TargetSet matches(targets);
     TargetSet non_matches;
     non_matches.reserve(matches.size());
     if (m_target_condition)
         m_target_condition->Eval(context, matches, non_matches, Condition::SearchDomain::MATCHES);
 
     if (!matches.empty() && !m_true_effects.empty()) {
-        for (auto& effect : m_true_effects) {
-            if (effect)
-                effect->Execute(context, matches);
-        }
+        for (auto& effect : m_true_effects | range_filter(not_null))
+            effect->Execute(context, matches);
     }
     if (!non_matches.empty() && !m_false_effects.empty()) {
-        for (auto& effect : m_false_effects) {
-            if (effect)
-                effect->Execute(context, non_matches);
-        }
+        for (auto& effect : m_false_effects | range_filter(not_null))
+            effect->Execute(context, non_matches);
     }
 }
 
@@ -4439,7 +4442,7 @@ void Conditional::Execute(ScriptingContext& context,
     TraceLogger(effects) << "\n\nExecute Conditional effect: \n" << Dump();
 
     // apply sub-condition to target set to pick which to act on with which of sub-effects
-    TargetSet matches{targets.begin(), targets.end()};
+    TargetSet matches(targets);
     TargetSet non_matches;
     non_matches.reserve(matches.size());
 

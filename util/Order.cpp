@@ -211,13 +211,13 @@ bool RenameOrder::Check(int empire, int object, std::string new_name,
     }
 
     // disallow control characters
-    if (std::any_of(new_name.begin(), new_name.end(), IsControlChar)) {
+    if (range_any_of(new_name, IsControlChar)) {
         ErrorLogger() << "RenameOrder::Check : passed control character in name.";
         return false;
     }
 
     // disallow formatting characters
-    if (std::any_of(new_name.begin(), new_name.end(), IsFormattingChar)) {
+    if (range_any_of(new_name, IsFormattingChar)) {
         ErrorLogger() << "RenameOrder::Check : passed formatting character in name.";
         return false;
     }
@@ -303,7 +303,7 @@ std::string NewFleetOrder::Dump() const {
 }
 
 bool NewFleetOrder::Check(int empire, const std::string& fleet_name, const std::vector<int>& ship_ids,
-                          FleetAggression aggression, const ScriptingContext& context)
+                          FleetAggression, const ScriptingContext& context)
 {
     if (ship_ids.empty()) {
         ErrorLogger() << "Empire " << empire << " attempted to create a new fleet (" << fleet_name << ") without ships";
@@ -491,7 +491,7 @@ FleetMoveOrder::FleetMoveOrder(int empire_id, int fleet_id, int dest_system_id,
         start_system = fleet->TravelRoute().back();
 
     auto short_path = context.ContextUniverse().GetPathfinder().ShortestPath(
-        start_system, m_dest_system, EmpireID(), context.ContextObjects()).first;
+        start_system, m_dest_system, EmpireID()).first;
     if (short_path.empty()) {
         ErrorLogger() << "FleetMoveOrder generated empty shortest path between system " << start_system
                       << " and " << m_dest_system << " for empire " << EmpireID()
@@ -518,7 +518,7 @@ std::string FleetMoveOrder::Dump() const
 { return boost::io::str(FlexibleFormat(UserString("ORDER_FLEET_MOVE")) % m_fleet % m_dest_system) + ExecutedTag(this); }
 
 bool FleetMoveOrder::Check(int empire_id, int fleet_id, int dest_system_id,
-                           bool append, const ScriptingContext& context)
+                           bool, const ScriptingContext& context)
 {
     auto fleet = context.ContextObjects().getRaw<Fleet>(fleet_id);
     if (!fleet) {
@@ -1332,7 +1332,7 @@ ResearchQueueOrder::ResearchQueueOrder(int empire, std::string tech_name, int po
     m_position(position)
 {}
 
-ResearchQueueOrder::ResearchQueueOrder(int empire, std::string tech_name, bool pause, float dummy) :
+ResearchQueueOrder::ResearchQueueOrder(int empire, std::string tech_name, bool pause, float) :
     Order(empire),
     m_tech_name(std::move(tech_name)),
     m_pause(pause ? PAUSE : RESUME)
@@ -1582,21 +1582,18 @@ void ProductionQueueOrder::ExecuteImpl(ScriptingContext& context) const {
 ////////////////////////////////////////////////
 // ShipDesignOrder
 ////////////////////////////////////////////////
-ShipDesignOrder::ShipDesignOrder(int empire, int existing_design_id_to_remember,
-                                 const ScriptingContext& context) :
+ShipDesignOrder::ShipDesignOrder(int empire, int existing_design_id_to_remember, const ScriptingContext& context) :
     Order(empire),
     m_design_id(existing_design_id_to_remember)
 { CheckRemember(empire, m_design_id, context); }
 
-ShipDesignOrder::ShipDesignOrder(int empire, int design_id_to_erase, bool dummy,
-                                 const ScriptingContext& context) :
+ShipDesignOrder::ShipDesignOrder(int empire, int design_id_to_erase, bool, const ScriptingContext& context) :
     Order(empire),
     m_design_id(design_id_to_erase),
     m_delete_design_from_empire(true)
 { CheckErase(empire, m_design_id, m_delete_design_from_empire, context); }
 
-ShipDesignOrder::ShipDesignOrder(int empire, const ShipDesign& ship_design,
-                                 const ScriptingContext& context) :
+ShipDesignOrder::ShipDesignOrder(int empire, const ShipDesign& ship_design, const ScriptingContext& context) :
     Order(empire),
     m_uuid(ship_design.UUID()),
     m_name(ship_design.Name(false)),
@@ -1644,7 +1641,8 @@ void ShipDesignOrder::ExecuteImpl(ScriptingContext& context) const {
             ShipDesign new_ship_design(std::invalid_argument(""), m_name, m_description,
                                        m_designed_on_turn, EmpireID(), m_hull, m_parts,
                                        m_icon, m_3D_model, m_name_desc_in_stringtable,
-                                       m_is_monster, m_uuid);
+                                       m_is_monster ? ShipDesign::Monster::MONSTER : ShipDesign::Monster::NOTMONSTER,
+                                       m_uuid);
 
             if (m_design_id == INVALID_DESIGN_ID) {
                 // On the client create a new design id
@@ -1718,9 +1716,7 @@ bool ShipDesignOrder::CheckRemember(int empire_id, int existing_design_id_to_rem
     return true;
 }
 
-bool ShipDesignOrder::CheckErase(int empire_id, int design_id_to_erase, bool dummy,
-                                 const ScriptingContext& context)
-{
+bool ShipDesignOrder::CheckErase(int empire_id, int design_id_to_erase, bool, const ScriptingContext& context) {
     const auto empire = context.GetEmpire(empire_id);
     if (!empire) {
         ErrorLogger() << "ShipDesignOrder : given invalid empire id";
@@ -1737,8 +1733,8 @@ bool ShipDesignOrder::CheckErase(int empire_id, int design_id_to_erase, bool dum
     return true;
 }
 
-bool ShipDesignOrder::CheckNew(int empire_id, const std::string& name, const std::string& desc,
-                               const std::string& hull, const std::vector<std::string>& parts,
+bool ShipDesignOrder::CheckNew(int empire_id, const std::string&/* name*/, const std::string&/* desc*/,
+                               const std::string&/* hull*/, const std::vector<std::string>&/* parts*/,
                                const ScriptingContext& context)
 {
     const auto empire = context.GetEmpire(empire_id);
@@ -1752,8 +1748,8 @@ bool ShipDesignOrder::CheckNew(int empire_id, const std::string& name, const std
     return true;
 }
 
-bool ShipDesignOrder::CheckRename(int empire_id, int existing_design_id, const std::string& new_name,
-                                  const std::string& new_description, const ScriptingContext& context)
+bool ShipDesignOrder::CheckRename(int empire_id, int existing_design_id, const std::string&/* new_name*/,
+                                  const std::string&/* new_description*/, const ScriptingContext& context)
 {
     const auto empire = context.GetEmpire(empire_id);
     if (!empire) {
@@ -1879,9 +1875,7 @@ AggressiveOrder::AggressiveOrder(int empire, int object_id, FleetAggression aggr
 std::string AggressiveOrder::Dump() const
 { return UserString("ORDER_FLEET_AGGRESSION"); }
 
-bool AggressiveOrder::Check(int empire_id, int object_id, FleetAggression aggression,
-                            const ScriptingContext& context)
-{
+bool AggressiveOrder::Check(int empire_id, int object_id, FleetAggression, const ScriptingContext& context) {
     const ObjectMap& objects{context.ContextObjects()};
 
     auto fleet = objects.get<Fleet>(object_id);
@@ -1973,10 +1967,8 @@ bool GiveObjectToEmpireOrder::Check(int empire_id, int object_id, int recipient_
         return false;
     }
 
-    const auto system_objects = objects.findRaw<const UniverseObject>(system->ObjectIDs());
-    if (!std::any_of(system_objects.begin(), system_objects.end(),
-                     [recipient_empire_id](const auto& o){ return o->Owner() == recipient_empire_id; }))
-    {
+    const auto owned_by_recipient = [roi{recipient_empire_id}](const UniverseObject& obj) { return obj.OwnedBy(roi); };
+    if (!objects.check_if_any<const UniverseObject>(owned_by_recipient, system->ObjectIDs())) {
         ErrorLogger() << "IssueGiveObjectToEmpireOrder : recipient empire has nothing in system";
         return false;
     }

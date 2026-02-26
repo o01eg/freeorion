@@ -4,18 +4,19 @@
 #include "CUIControls.h"
 #include "../util/Directories.h"
 #include "../util/i18n.h"
+#include "../client/human/GGHumanClientApp.h"
 
 #include <GG/GUI.h>
 
 #include <boost/optional.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem/fstream.hpp>
+#include <filesystem>
+#include <fstream>
 
 
 namespace {
 
-boost::optional<std::string> ReadFile(const boost::filesystem::path& file_path) {
-    boost::filesystem::ifstream fin(file_path);
+boost::optional<std::string> ReadFile(const std::filesystem::path& file_path) {
+    std::ifstream fin(file_path);
     if (!fin.is_open())
         return boost::none;
 
@@ -38,14 +39,23 @@ About::About():
 void About::CompleteConstruction() {
     CUIWnd::CompleteConstruction();
 
-    m_done = Wnd::Create<CUIButton>(UserString("DONE"));
-    m_license = Wnd::Create<CUIButton>(UserString("LICENSE"));
-    m_vision = Wnd::Create<CUIButton>(UserString("VISION"));
-    m_info = GG::Wnd::Create<CUIMultiEdit>(UserString("FREEORION_VISION"), GG::MULTI_WORDBREAK | GG::MULTI_READ_ONLY);
-    AttachChild(m_info);
-    AttachChild(m_vision);
-    AttachChild(m_license);
-    AttachChild(m_done);
+    if ((m_done = Wnd::Create<CUIButton>(UserString("DONE")))) {
+        AttachChild(m_done);
+        m_done->LeftClickedSignal.connect([this]() { EndRun(); });
+    }
+
+    if ((m_license = Wnd::Create<CUIButton>(UserString("LICENSE")))) {
+        AttachChild(m_license);
+        m_license->LeftClickedSignal.connect([this]() { ShowLicense(); });
+    }
+
+    if ((m_vision = Wnd::Create<CUIButton>(UserString("VISION")))) {
+        AttachChild(m_vision);
+        m_vision->LeftClickedSignal.connect([this]() { ShowVision(); });
+    }
+
+    if ((m_info = GG::Wnd::Create<CUIMultiEdit>(UserString("FREEORION_VISION"), GG::MULTI_WORDBREAK | GG::MULTI_READ_ONLY)))
+        AttachChild(m_info);
 
     DoLayout();
 
@@ -53,15 +63,9 @@ void About::CompleteConstruction() {
     // this is not GetResourceDir() / "COPYING" because if a mod or scenario is loaded
     // that changes the settings directory, the copyright notice should be unchanged
     m_license_str = ReadFile(GetRootDataDir() / "default" / "COPYING").value_or("");
-
-    m_done->LeftClickedSignal.connect([this]() { EndRun(); });
-    m_license->LeftClickedSignal.connect([this]() { ShowLicense(); });
-    m_vision->LeftClickedSignal.connect([this]() { ShowVision(); });
 }
 
-void About::KeyPress(GG::Key key, uint32_t key_code_point,
-                     GG::Flags<GG::ModKey> mod_keys)
-{
+void About::KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
     if ((key == GG::Key::GGK_RETURN) || (key == GG::Key::GGK_ESCAPE))
         EndRun();
 }
@@ -77,8 +81,12 @@ void About::DoLayout() {
     static constexpr GG::Y CONTENT_GROUPS_VERTICAL_SPACING{5};
     static constexpr GG::Pt BORDERS_SIZE{ GG::X{5}, GG::Y{5} };
     const GG::Pt BUTTON_SIZE {
-        std::max({ m_vision->MinUsableSize().x, m_license->MinUsableSize().x, m_done->MinUsableSize().x }),
-        std::max({ m_vision->MinUsableSize().y, m_license->MinUsableSize().y, m_done->MinUsableSize().y }),
+        std::max({ m_vision ? m_vision->MinUsableSize().x : GG::X0,
+                   m_license ? m_license->MinUsableSize().x : GG::X0,
+                   m_done ? m_done->MinUsableSize().x : GG::X0}),
+        std::max({ m_vision ? m_vision->MinUsableSize().y : GG::Y0,
+                   m_license ? m_license->MinUsableSize().y : GG::Y0,
+                   m_done ? m_done->MinUsableSize().y : GG::Y0}),
     };
 
     auto const window_lr = ScreenToClient(ClientLowerRight());
@@ -89,8 +97,8 @@ void About::DoLayout() {
 
     for (auto& button : { m_done, m_vision, m_license }) {
         GG::Pt button_ul = draw_point - BUTTON_SIZE;
-        button->SizeMove(button_ul, draw_point);
-
+        if (button)
+            button->SizeMove(button_ul, draw_point);
         draw_point.x -= BUTTON_SIZE.x + BUTTONS_HORIZONTAL_SPACING;
     }
 

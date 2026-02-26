@@ -37,17 +37,19 @@ void ResourcePanel::CompleteConstruction() {
 
     SetName("ResourcePanel");
 
-    auto obj = Objects().get<Planet>(m_rescenter_id);
+    auto& app = GetApp();
+    auto obj = app.GetContext().ContextObjects().get(m_rescenter_id);
     if (!obj) {
-        ErrorLogger() << "ResourcePanel constructed with invalid resource center id " << m_rescenter_id;
+        ErrorLogger() << "ResourcePanel::CompleteConstruction couldn't get object with id  " << m_rescenter_id;
         return;
     }
+    auto& ui = app.GetUI();
 
-    m_expand_button->LeftPressedSignal.connect(
-        boost::bind(&ResourcePanel::ExpandCollapseButtonPressed, this));
+    m_expand_button->LeftPressedSignal.connect(boost::bind(&ResourcePanel::ExpandCollapseButtonPressed, this));
 
     // meter and production indicators
     std::vector<std::pair<MeterType, MeterType>> meters;
+    meters.reserve(5);
 
     // small meter indicators - for use when panel is collapsed
     for (MeterType meter : {MeterType::METER_INDUSTRY, MeterType::METER_RESEARCH,
@@ -68,9 +70,10 @@ void ResourcePanel::CompleteConstruction() {
             continue;
         }
 
-        auto stat = GG::Wnd::Create<StatisticIcon>(
-            ClientUI::MeterIcon(meter), obj->GetMeter(meter)->Initial(),
-            3, false, MeterIconSize().x, MeterIconSize().y);
+        auto stat = GG::Wnd::Create<StatisticIcon>(ui.MeterIcon(meter), ui.GetFont(),
+                                                   MeterIconSize().x, MeterIconSize().y, 3,
+                                                   StatisticIcon::IndicateChangeColour::INDICATE_FOR_OTHER,
+                                                   StatisticIcon::ShowSign::HIDE_IF_NON_NEGATIVE);
         AttachChild(stat);
         m_meter_stats.emplace_back(meter, stat);
         meters.emplace_back(meter, assoc_meter);
@@ -78,34 +81,31 @@ void ResourcePanel::CompleteConstruction() {
             auto meter_string = to_string(meter);
 
             auto pedia_zoom_to_article_action = [meter_string]() {
-                ClientUI::GetClientUI()->ZoomToMeterTypeArticle(std::string{meter_string}); };
+                GetApp().GetUI().ZoomToMeterTypeArticle(std::string{meter_string}); };
 
             auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
             std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                     UserString(meter_string));
-            popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false,
-                                            pedia_zoom_to_article_action));
+            popup->AddMenuItem(std::move(popup_label), false, false, pedia_zoom_to_article_action);
             popup->Run();
         });
     }
 
     // attach and show meter bars and large resource indicators
-    m_multi_meter_status_bar =      GG::Wnd::Create<MultiMeterStatusBar>(Width() - 2*EDGE_PAD,       m_rescenter_id, meters);
-    m_multi_icon_value_indicator =  GG::Wnd::Create<MultiIconValueIndicator>(Width() - 2*EDGE_PAD,   m_rescenter_id, meters);
+    m_multi_meter_status_bar =
+        GG::Wnd::Create<MultiMeterStatusBar>(Width() - 2*EDGE_PAD, m_rescenter_id, meters);
+    m_multi_icon_value_indicator =
+        GG::Wnd::Create<MultiIconValueIndicator>(Width() - 2*EDGE_PAD, m_rescenter_id, std::move(meters));
 
-    // determine if this panel has been created yet.
-    auto it = s_expanded_map.find(m_rescenter_id);
-    if (it == s_expanded_map.end())
-        s_expanded_map[m_rescenter_id] = false; // if not, default to collapsed state
+    // if this panel has been created yet, default to collapsed state
+    s_expanded_map.try_emplace(m_rescenter_id, false);
 
     Refresh();
 }
 
 void ResourcePanel::ExpandCollapse(bool expanded) {
-    if (expanded == s_expanded_map[m_rescenter_id]) return; // nothing to do
-    s_expanded_map[m_rescenter_id] = expanded;
-
-    RequirePreRender();
+    if (expanded != std::exchange(s_expanded_map[m_rescenter_id], expanded))
+        RequirePreRender();
 }
 
 
@@ -114,6 +114,7 @@ namespace {
     bool SortByMeterValue(std::pair<MeterType, std::shared_ptr<StatisticIcon>> left,
                           std::pair<MeterType, std::shared_ptr<StatisticIcon>> right)
     {
+        // TODO: pass by ref and avoid repeated ->GetValue()
         if (std::abs(left.second->GetValue()) == std::abs(right.second->GetValue())) {
             if (left.first == MeterType::METER_INFLUENCE && right.first == MeterType::METER_CONSTRUCTION) {
                 // swap order of MeterType::METER_INFLUENCE and MeterType::METER_CONSTRUCTION in relation to
@@ -128,30 +129,31 @@ namespace {
     }
 }
 
-void ResourcePanel::Update() {
+void ResourcePanel::Update(const ObjectMap& objects) {
     // remove any old browse wnds
-    for (auto& meter_stat : m_meter_stats) {
-        meter_stat.second->ClearBrowseInfoWnd();
-        m_multi_icon_value_indicator->ClearToolTip(meter_stat.first);
+    for (auto& [meter_type, stat_icon] : m_meter_stats) {
+        stat_icon->ClearBrowseInfoWnd();
+        m_multi_icon_value_indicator->ClearToolTip(meter_type);
     }
 
-    auto obj = Objects().get(m_rescenter_id);
+    auto obj = objects.get(m_rescenter_id);
     if (!obj) {
         ErrorLogger() << "BuildingPanel::Update couldn't get object with id " << m_rescenter_id;
         return;
     }
 
     // meter bar displays resource stats
-    m_multi_meter_status_bar->Update();
-    m_multi_icon_value_indicator->Update();
+    m_multi_meter_status_bar->Update(objects);
+    m_multi_icon_value_indicator->Update(objects);
 
     // tooltips
     for (auto& [meter_type, stat_icon] : m_meter_stats) {
         if (!stat_icon)
             continue;
-        auto meter = obj->GetMeter(meter_type);
-        auto init = meter ? meter->Initial() : 0.0f;
-        stat_icon->SetValue(init);
+        if (auto meter = obj->GetMeter(meter_type)) {
+            stat_icon->SetValue(meter->Initial(), 0);
+            stat_icon->SetValue(meter->Current() - meter->Initial(), 1);
+        }
 
         auto assoc_meter_type = AssociatedMeterType(meter_type);
         auto browse_wnd = GG::Wnd::Create<MeterBrowseWnd>(m_rescenter_id, meter_type, assoc_meter_type);
@@ -163,15 +165,15 @@ void ResourcePanel::Update() {
 }
 
 void ResourcePanel::Refresh() {
-    for (auto& meter_stat : m_meter_stats)
-        meter_stat.second->RequirePreRender();
+    for (auto& stat_icon: m_meter_stats | range_values)
+        stat_icon->RequirePreRender();
 
     RequirePreRender();
 }
 
 void ResourcePanel::PreRender() {
     AccordionPanel::PreRender();
-    Update();
+    Update(GetApp().GetContext().ContextObjects());
     DoLayout();
 }
 
@@ -181,8 +183,8 @@ void ResourcePanel::ExpandCollapseButtonPressed()
 void ResourcePanel::DoLayout() {
     AccordionPanel::DoLayout();
 
-    for (auto& meter_stat : m_meter_stats)
-        DetachChild(meter_stat.second);
+    for (auto& stat : m_meter_stats | range_values)
+        DetachChild(stat);
 
     // detach / hide meter bars and large resource indicators
     DetachChild(m_multi_meter_status_bar);
@@ -193,10 +195,9 @@ void ResourcePanel::DoLayout() {
         // position and reattach icons to be shown
         int n = 0;
         GG::X stride = MeterIconSize().x * 7/2;
-        for (auto& meter_stat : m_meter_stats) {
+        for (auto& icon : m_meter_stats | range_values) {
             GG::X x = n * stride;
 
-            auto& icon = meter_stat.second;
             GG::Pt icon_ul(x, GG::Y0);
             GG::Pt icon_lr = icon_ul + MeterIconSize();
             icon->SizeMove(icon_ul, icon_lr);

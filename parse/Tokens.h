@@ -226,6 +226,7 @@
     (LastTurnColonized)                         \
     (LastTurnConquered)                         \
     (LastTurnMoveOrdered)                       \
+    (LatestTurnPolicyAdopted)                   \
     (LastTurnResupplied)                        \
     (LaunchedFrom)                              \
     (LeastHappySpecies)                         \
@@ -303,6 +304,7 @@
     (number)                                    \
     (Number)                                    \
     (NumberOf)                                  \
+    (NumPartClassesInShipDesign)                \
     (NumPoliciesAdopted)                        \
     (NumShips)                                  \
     (NumStarlanes)

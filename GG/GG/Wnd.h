@@ -271,7 +271,7 @@ public:
     };
 
     /** The type of the iterator parameters passed to DropsAcceptable(). */
-    typedef std::map<const Wnd*, bool>::iterator DropsAcceptableIter;
+    using DropsAcceptableIter = std::map<const Wnd*, bool>::iterator;
 
     /** The modes of child clipping. */
     enum class ChildClippingMode : uint8_t {
@@ -669,7 +669,7 @@ public:
     virtual void PreRender();
 
     /** Require that PreRender() be called to update layout before the next Render(). */
-    virtual void RequirePreRender() noexcept { m_needs_prerender = true; }
+    void RequirePreRender() noexcept { m_needs_prerender = true; }
 
     /** Draws this Wnd.  Note that Wnds being dragged for a drag-and-drop
         operation are rendered twice -- once in-place as normal, once in the
@@ -989,8 +989,8 @@ private:
     std::string                       m_name;                     ///< A user-significant name for this Wnd
     std::vector<std::shared_ptr<Wnd>> m_children;                 ///< List of ptrs to child windows kept in order of decreasing area
     std::string                       m_drag_drop_data_type;      ///< The type of drag-and-drop data this Wnd represents, if any. If empty/blank, indicates that this Wnd cannot be drag-dropped.
-    Pt                                m_upperleft{X0, Y0};            ///< Upper left point of window
-    Pt                                m_lowerright{X1, Y1};           ///< Lower right point of window
+    Pt                                m_upperleft{X0, Y0};        ///< Upper left point of window
+    Pt                                m_lowerright{X1, Y1};       ///< Lower right point of window
     Pt                                m_min_size{X0, Y0};                            ///< Minimum window size
     Pt                                m_max_size{X{MAX_WINDOW_SZ},Y{MAX_WINDOW_SZ}}; ///< Maximum window size
 

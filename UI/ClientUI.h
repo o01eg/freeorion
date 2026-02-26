@@ -4,7 +4,7 @@
 
 #include <GG/GGFwd.h>
 
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/container/flat_map.hpp>
 
@@ -26,15 +26,20 @@ class PasswordEnterWnd;
 struct SaveGameUIData;
 class System;
 class ShipDesignManager;
+struct ScriptingContext;
+class ObjectMap;
+class GGHumanClientApp;
 
 //! \brief ClientUI Main Module
-//!This is the main class of the ClientUI module.
-//!it contains objects of many other classes and controls the
-//!display of all information onscreen.
+//! This is the main class of the ClientUI module.
+//! It contains objects of many other classes and controls the display of all information onscreen.
 class ClientUI {
 public:
-    ClientUI();
-    ~ClientUI();
+    explicit ClientUI(GGHumanClientApp& app);
+
+    // not movable or copyable due to reference member
+    ClientUI(const ClientUI&) = delete;
+    ClientUI(ClientUI&&) = delete;
 
     MapWnd*                                 GetMapWnd(bool construct);  //!< Returns the main map window. if \a is true, creates a MapWnd if one doesn't already exist. if \a is false, may return nullptr
     const MapWnd*                           GetMapWndConst() const noexcept { return m_map_wnd.get(); }
@@ -45,7 +50,8 @@ public:
     std::shared_ptr<MultiPlayerLobbyWnd>    GetMultiPlayerLobbyWnd();   //!< Returns the multiplayer lobby window.
     std::shared_ptr<PasswordEnterWnd>       GetPasswordEnterWnd();      //!< Returns the authentication window.
     std::shared_ptr<SaveFileDialog>         GetSaveFileDialog();        //!< Returns a perhaps nullptr to any existing SaveFileDialog
-    ShipDesignManager*                      GetShipDesignManager() { return m_ship_designs.get(); };
+    ShipDesignManager*                      GetShipDesignManager() noexcept { return m_ship_designs.get(); };
+    const ShipDesignManager*                GetShipDesignManager() const noexcept { return m_ship_designs.get(); };
     void                                    GetSaveGameUIData(SaveGameUIData& data); //!< populates the relevant UI state that should be restored after a save-and-load cycle
 
     /** Return the IntroScreen. Hides the MapWnd, MessageWnd and
@@ -61,19 +67,17 @@ public:
 
     void RestoreFromSaveData(const SaveGameUIData& elem);   //!< restores the UI state that was saved in an earlier call to GetSaveGameUIData().
 
-    bool ZoomToObject(const std::string& name);
-    bool ZoomToObject(int id);
-    bool ZoomToPlanet(int id);      //!< Zooms to a particular planet on the galaxy map and opens the sidepanel to show it, or if production screen is open selects it
-    bool ZoomToPlanetPedia(int id); //!< Opens the encyclodedia window and presents the entry for the given planet
-    bool ZoomToSystem(int id);      //!< Zooms to a particular system on the galaxy map and opens the sidepanel to show it
-    bool ZoomToFleet(int id);       //!< Zooms to a particular fleet on the galaxy map and opens the fleet window
-    bool ZoomToShip(int id);        //!< Zooms to a particular ship on the galaxy map and opens its fleet and/or ship window
-    bool ZoomToBuilding(int id);    //!< Zooms to a particular building on the galaxy map and opens the sidepanel to show it
-    bool ZoomToField(int id);       //!< Zooms to a particular field on the map
-    bool ZoomToCombatLog(int id);   //!< Opens combat log for indicated combat
-
-    void ZoomToSystem(std::shared_ptr<const System> system);//!< Zooms to a system on the galaxy map
-    void ZoomToFleet(std::shared_ptr<const Fleet> fleet);   //!< Zooms to a particular fleet on the galaxy map and opens the fleet window
+    bool ZoomToObject(const std::string& name, ScriptingContext& context, int client_empire_id);
+    bool ZoomToObject(int id, ScriptingContext& context, int client_empire_id);
+    bool ZoomToPlanet(int id, ScriptingContext& context);    //!< Zooms to a particular planet on the galaxy map and opens the sidepanel to show it, or if production screen is open selects it
+    bool ZoomToPlanetPedia(int id, const ObjectMap& objects);//!< Opens the encyclodedia window and presents the entry for the given planet
+    bool ZoomToSystem(int id, ScriptingContext& context);    //!< Zooms to a particular system on the galaxy map and opens the sidepanel to show it
+    bool ZoomToSystem(const System& system, ScriptingContext& context); //!< Zooms to a particular system on the galaxy map and opens the sidepanel to show it
+    bool ZoomToFleet(int id, const ScriptingContext& context, int client_empire_id); //!< Zooms to a particular fleet on the galaxy map and opens the fleet window
+    bool ZoomToShip(int id, const ScriptingContext& context, int client_empire_id); //!< Zooms to a particular ship on the galaxy map and opens its fleet and/or ship window
+    bool ZoomToBuilding(int id, ScriptingContext& context);  //!< Zooms to a particular building on the galaxy map and opens the sidepanel to show it
+    bool ZoomToField(int id, const ObjectMap& objects);      //!< Zooms to a particular field on the map
+    bool ZoomToCombatLog(int id);                            //!< Opens combat log for indicated combat
 
     bool ZoomToContent(const std::string& name, bool reverse_lookup = false);
     bool ZoomToTech(std::string tech_name);                  //!< Opens the technology screen and presents a description of the given technology
@@ -97,57 +101,54 @@ public:
 
     /** Loads a texture at random from the set of files starting with \a prefix
         in directory \a dir. */
-    std::shared_ptr<GG::Texture> GetRandomTexture(const boost::filesystem::path& dir,
+    std::shared_ptr<GG::Texture> GetRandomTexture(const std::filesystem::path& dir,
                                                   std::string_view prefix,
                                                   bool mipmap = false);
 
     /** Loads texture \a n % N from the set of files starting with \a prefix in
         directory \a dir, where N is the number of files found in \a dir with
         prefix \a prefix. */
-    std::shared_ptr<GG::Texture> GetModuloTexture(const boost::filesystem::path& dir,
+    std::shared_ptr<GG::Texture> GetModuloTexture(const std::filesystem::path& dir,
                                                   std::string_view prefix, int n,
                                                   bool mipmap = false);
 
     /** Returns all textures in the set of files starting with \a prefix in
         directory \a dir. */
     const std::vector<std::shared_ptr<GG::Texture>>& GetPrefixedTextures(
-        const boost::filesystem::path& dir, std::string_view prefix, bool mipmap = false);
-
-    static ClientUI* GetClientUI();     //!< returns a pointer to the singleton ClientUI class
+        const std::filesystem::path& dir, std::string_view prefix, bool mipmap = false);
 
     /** Shows a message dialog box with the given message; if
       * \a play_alert_sound is true, and UI sound effects are currently enabled,
       * the default alert sound will be played as the message box opens */
-    static void MessageBox(const std::string& message, bool play_alert_sound = false);
+    void MessageBox(const std::string& message, bool play_alert_sound = false);
 
     /** Loads the requested texture from file \a name; mipmap textures are
       * generated if \a mipmap is true; loads default missing.png if name isn't
       * found. */
-    static std::shared_ptr<GG::Texture> GetTexture(const boost::filesystem::path& path,
-                                                   bool mipmap = false);
+    std::shared_ptr<GG::Texture> GetTexture(const std::filesystem::path& path, bool mipmap = false);
 
     /** Returns the default font in the specified point size. Uses "ui.font.path"
       * option setting as the font filename, and provides Unicode character sets
       * based on the contents of the stringtable in use. */
-    static std::shared_ptr<GG::Font> GetFont(int pts = Pts());
+    std::shared_ptr<const GG::Font> GetFont(int pts = Pts()) const;
 
     /** Returns the default font in the specified point size.  Uses
       * "ui.font.bold.path" option setting as the font filename, and provides
       * Unicode character sets based on the contents of the stringtable in use.
       * */
-    static std::shared_ptr<GG::Font> GetBoldFont(int pts = Pts());
+    std::shared_ptr<const GG::Font> GetBoldFont(int pts = Pts()) const;
 
     /** Returns the default font in the specified point size.  Uses
       * "ui.font.title.path" option setting as the font filename, and provides
       * Unicode character sets based on the contents of the stringtable in use. */
-    static std::shared_ptr<GG::Font> GetTitleFont(int pts = TitlePts());
+    std::shared_ptr<const GG::Font> GetTitleFont(int pts = TitlePts()) const;
 
     /** Returns formatted POSIX UTC-time in local timezone. */
     static std::string FormatTimestamp(boost::posix_time::ptime timestamp);
 
     //!@{
-    static boost::filesystem::path ArtDir();    //!< directory holding artwork
-    static boost::filesystem::path SoundDir();  //!< directory holding sound and music
+    static std::filesystem::path ArtDir();      //!< directory holding artwork
+    static std::filesystem::path SoundDir();    //!< directory holding sound and music
 
     static int      Pts();                      //!< default point size
     static int      TitlePts();                 //!< default point size to use for window title
@@ -182,20 +183,20 @@ public:
     static bool     DisplayTimestamp();                 //!< Will be timestamp shown in the chats.
 
     // Content Texture Getters
-    static std::shared_ptr<GG::Texture> PlanetIcon(PlanetType planet_type);
-    static std::shared_ptr<GG::Texture> PlanetSizeIcon(PlanetSize planet_size);
-    static std::shared_ptr<GG::Texture> MeterIcon(MeterType meter_type);
-    static std::shared_ptr<GG::Texture> BuildingIcon(std::string_view building_type_name);
-    static std::shared_ptr<GG::Texture> CategoryIcon(std::string_view category_name);
-    static std::shared_ptr<GG::Texture> TechIcon(std::string_view tech_name);
-    static std::shared_ptr<GG::Texture> PolicyIcon(std::string_view policy_name);
-    static std::shared_ptr<GG::Texture> SpecialIcon(std::string_view special_name);
-    static std::shared_ptr<GG::Texture> SpeciesIcon(std::string_view species_name);
-    static std::shared_ptr<GG::Texture> FieldTexture(std::string_view field_type_name);
-    static std::shared_ptr<GG::Texture> PartIcon(std::string_view part_name);
-    static std::shared_ptr<GG::Texture> HullTexture(std::string_view hull_name);
-    static std::shared_ptr<GG::Texture> HullIcon(std::string_view hull_name);
-    static std::shared_ptr<GG::Texture> ShipDesignIcon(int design_id);
+    std::shared_ptr<GG::Texture> PlanetIcon(PlanetType planet_type);
+    std::shared_ptr<GG::Texture> PlanetSizeIcon(PlanetSize planet_size);
+    std::shared_ptr<GG::Texture> MeterIcon(MeterType meter_type);
+    std::shared_ptr<GG::Texture> BuildingIcon(std::string_view building_type_name);
+    std::shared_ptr<GG::Texture> CategoryIcon(std::string_view category_name);
+    std::shared_ptr<GG::Texture> TechIcon(std::string_view tech_name);
+    std::shared_ptr<GG::Texture> PolicyIcon(std::string_view policy_name);
+    std::shared_ptr<GG::Texture> SpecialIcon(std::string_view special_name);
+    std::shared_ptr<GG::Texture> SpeciesIcon(std::string_view species_name);
+    std::shared_ptr<GG::Texture> FieldTexture(std::string_view field_type_name);
+    std::shared_ptr<GG::Texture> PartIcon(std::string_view part_name);
+    std::shared_ptr<GG::Texture> HullTexture(std::string_view hull_name);
+    std::shared_ptr<GG::Texture> HullIcon(std::string_view hull_name);
+    std::shared_ptr<GG::Texture> ShipDesignIcon(int design_id);
 
     // research screen
     static GG::Clr  KnownTechFillColor();
@@ -217,6 +218,7 @@ private:
     void HandleSizeChange(bool fullscreen) const;
     void HandleFullscreenSwitch() const;
 
+    GGHumanClientApp&                       m_app;
     mutable std::shared_ptr<MapWnd>         m_map_wnd;              //!< the galaxy map
     std::shared_ptr<MessageWnd>             m_message_wnd;          //!< the messages / chat display
     std::shared_ptr<PlayerListWnd>          m_player_list_wnd;      //!< the players list
@@ -233,8 +235,6 @@ private:
                                             m_prefixed_textures;
 
     std::unique_ptr<ShipDesignManager>      m_ship_designs;         //!< ship designs the client knows about, and their ordering in the UI
-
-    static constinit ClientUI*              s_the_UI;               //!< the singleton ClientUI object
 };
 
 namespace GG {

@@ -21,6 +21,9 @@ int ClientApp::PlayerID() const noexcept
 Empire* ClientApp::GetEmpire(int empire_id)
 { return m_empires.GetEmpire(empire_id).get(); }
 
+const Empire* ClientApp::GetEmpire(int empire_id) const
+{ return m_empires.GetEmpire(empire_id).get(); }
+
 int ClientApp::EmpirePlayerID(int empire_id) const noexcept {
     for (const auto& [id, info] : m_player_info)
         if (info.empire_id == empire_id)
@@ -71,12 +74,10 @@ void ClientApp::SendPartialOrders() {
 }
 
 std::string ClientApp::GetVisibleObjectName(const UniverseObject& object) {
-    if (object.ObjectType() == UniverseObjectType::OBJ_SYSTEM) {
-        auto& system = static_cast<const System&>(object);
-        return system.ApparentName(m_empire_id, m_universe);
-    } else {
+    if (object.ObjectType() == UniverseObjectType::OBJ_SYSTEM)
+        return static_cast<const System&>(object).ApparentName(m_empire_id, m_universe);
+    else
         return object.PublicName(m_empire_id, m_universe);
-    }
 }
 
 bool ClientApp::VerifyCheckSum(const Message& msg) {

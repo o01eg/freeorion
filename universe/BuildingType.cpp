@@ -38,7 +38,7 @@ namespace {
 
 BuildingType::BuildingType(std::string&& name, std::string&& description,
                            CommonParams&& common_params, CaptureResult capture_result,
-                           std::string&& icon) :
+                           std::string&& icon, SubType subtype, std::string&& species) :
     m_name(name), // intentional copy so name is usable later in member initializers
     m_description(std::move(description)),
     m_production_cost([](auto&& pc, const auto& name) {
@@ -50,34 +50,34 @@ BuildingType::BuildingType(std::string&& name, std::string&& description,
         return std::move(pt);
     }(std::move(common_params.production_time), name)),
     m_producible(common_params.producible),
+    m_subtype(subtype),
     m_capture_result(capture_result),
     m_tags_concatenated([](auto& tags) {
         // ensure tags are all upper-case
-        std::for_each(tags.begin(), tags.end(),
-                      [](auto& t) { boost::to_upper<std::string>(t); });
-
+        for (auto& tag : tags)
+            boost::to_upper<std::string>(tag);
         // allocate storage for concatenated tags
-        std::size_t params_sz = std::transform_reduce(tags.begin(), tags.end(), 0u, std::plus{},
-                                                      [](const auto& tag) { return tag.size(); });
+        std::size_t params_sz = std::transform_reduce(tags.begin(), tags.end(), std::size_t{0}, std::plus{},
+                                                      [](const auto& tag) noexcept { return tag.size(); });
         std::string retval;
         retval.reserve(params_sz);
-
         // concatenate tags
-        std::for_each(tags.begin(), tags.end(), [&retval](const auto& t) { retval.append(t); });
+        for (const auto& tag : tags)
+            retval.append(tag);
         return retval;
     }(common_params.tags)),
     m_tags([](const auto& tags, const std::string_view tags_concatenated) {
         std::vector<std::string_view> retval;
         std::size_t next_idx = 0;
         retval.reserve(tags.size());
-
         // store views into concatenated tags string
-        std::for_each(tags.begin(), tags.end(), [&next_idx, &retval, tags_concatenated](const auto& t) {
-            retval.push_back(tags_concatenated.substr(next_idx, t.size()));
-            next_idx += t.size();
-        });
+        for (const auto& tag : tags) {
+            retval.push_back(tags_concatenated.substr(next_idx, tag.size()));
+            next_idx += tag.size();
+        }
         return retval;
     }(common_params.tags, m_tags_concatenated)),
+    m_species(std::move(species)),
     m_production_meter_consumption(std::move(common_params.production_meter_consumption)),
     m_production_special_consumption(std::move(common_params.production_special_consumption)),
     m_location([](auto&& l, const auto& name) {
@@ -100,17 +100,19 @@ BuildingType::BuildingType(std::string&& name, std::string&& description,
     m_icon(std::move(icon))
 {}
 
-BuildingType::~BuildingType() = default;
+BuildingType::~BuildingType() = default; // here due to unique_ptr use
 
 bool BuildingType::operator==(const BuildingType& rhs) const {
-    if (&rhs == this)
+    if (std::addressof(rhs) == this)
         return true;
 
     if (m_name != rhs.m_name ||
         m_description != rhs.m_description ||
         m_producible != rhs.m_producible ||
         m_capture_result != rhs.m_capture_result ||
+        m_subtype != rhs.m_subtype ||
         m_tags != rhs.m_tags ||
+        m_species != rhs.m_species ||
         m_icon != rhs.m_icon)
     { return false; }
 
@@ -173,15 +175,22 @@ bool BuildingType::operator==(const BuildingType& rhs) const {
 
 std::string BuildingType::Dump(uint8_t ntabs) const {
     std::string retval = DumpIndent(ntabs) + "BuildingType\n";
-    retval += DumpIndent(ntabs+1) + "name = \"" + m_name + "\"\n";
-    retval += DumpIndent(ntabs+1) + "description = \"" + m_description + "\"\n";
+    if (IsColony())
+        retval += DumpIndent(ntabs+1) + "colony\n";
+    if (IsShipYard())
+        retval += DumpIndent(ntabs+1) + "shipyard\n";
+    if (!m_name.empty())
+        retval += DumpIndent(ntabs+1) + "name = \"" + m_name + "\"\n";
+    if (!m_description.empty())
+        retval += DumpIndent(ntabs+1) + "description = \"" + m_description + "\"\n";
     if (m_production_cost)
         retval += DumpIndent(ntabs+1) + "buildcost = " + m_production_cost->Dump(ntabs+1) + "\n";
     if (m_production_time)
         retval += DumpIndent(ntabs+1) + "buildtime = " + m_production_time->Dump(ntabs+1) + "\n";
+    if (!m_species.empty())
+        retval += DumpIndent(ntabs+1) + "species = \"" + m_species + "\"\n";
     retval += DumpIndent(ntabs+1) + (m_producible ? "Producible" : "Unproducible") + "\n";
-    retval += DumpIndent(ntabs+1) + "captureresult = ";
-    retval.append(to_string(m_capture_result)).append("\n");
+    retval += DumpIndent(ntabs+1) + "captureresult = " + std::string{to_string(m_capture_result)} + "\n";
 
     if (!m_tags.empty()) {
         if (m_tags.size() == 1) {
@@ -212,7 +221,8 @@ std::string BuildingType::Dump(uint8_t ntabs) const {
             retval += effect.Dump(ntabs+2);
         retval += DumpIndent(ntabs+1) + "]\n";
     }
-    retval += DumpIndent(ntabs+1) + "icon = \"" + m_icon + "\"\n";
+    if (!m_icon.empty())
+        retval += DumpIndent(ntabs+1) + "icon = \"" + m_icon + "\"\n";
     return retval;
 }
 
@@ -352,8 +362,10 @@ uint32_t BuildingType::GetCheckSum() const {
     CheckSums::CheckSumCombine(retval, m_production_cost);
     CheckSums::CheckSumCombine(retval, m_production_time);
     CheckSums::CheckSumCombine(retval, m_producible);
+    CheckSums::CheckSumCombine(retval, m_subtype);
     CheckSums::CheckSumCombine(retval, m_capture_result);
     CheckSums::CheckSumCombine(retval, m_tags);
+    CheckSums::CheckSumCombine(retval, m_species);
     CheckSums::CheckSumCombine(retval, m_production_meter_consumption);
     CheckSums::CheckSumCombine(retval, m_production_special_consumption);
     CheckSums::CheckSumCombine(retval, m_location);

@@ -67,11 +67,13 @@ void Scroll::CompleteConstruction()
 {
     if (m_decr) {
         AttachChild(m_decr);
-        m_decr->LeftClickedSignal.connect(boost::bind(&Scroll::ScrollLineIncrDecrImpl, this, true, -1));
+        m_decr_connection = m_decr->LeftClickedSignal.connect(
+            [this]() { ScrollLineIncrDecrImpl(true, -1); });
     }
     if (m_incr) {
         AttachChild(m_incr);
-        m_incr->LeftClickedSignal.connect(boost::bind(&Scroll::ScrollLineIncrDecrImpl, this, true, 1));
+        m_incr_connection = m_incr->LeftClickedSignal.connect(
+            [this]() { ScrollLineIncrDecrImpl(true, 1); });
     }
     AttachChild(m_tab);
     m_tab->InstallEventFilter(shared_from_this());
@@ -102,24 +104,6 @@ Pt Scroll::MinUsableSize() const
     }
     return retval;
 }
-
-std::pair<int, int> Scroll::PosnRange() const
-{ return std::pair<int, int>(m_posn, m_posn + m_page_sz); }
-
-std::pair<int, int> Scroll::ScrollRange() const
-{ return std::pair<int, int>(m_range_min, m_range_max); }
-
-unsigned int Scroll::LineSize() const
-{ return m_line_sz; }
-
-unsigned int Scroll::PageSize() const
-{ return m_page_sz; }
-
-Clr Scroll::InteriorColor() const
-{ return m_int_color; }
-
-Orientation Scroll::ScrollOrientation() const
-{ return m_orientation; }
 
 void Scroll::InitBuffer()
 {

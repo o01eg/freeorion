@@ -684,8 +684,11 @@ namespace {
 
 auto GetResourceDir() -> fs::path const
 {
+    std::cout << "{{ Enter GetResourceDir" << std::endl;
     std::scoped_lock res_dir_lock(res_dir_mutex);
+    std::cout << "GetResourceDir mutex locked" << std::endl;
     if (init) {
+        std::cout << "GetResourceDir initializing..." << std::endl;
         [[unlikely]]
         init = false;
         res_dir = FilenameToPath(GetOptionsDB().Get<std::string>("resource.path"));
@@ -694,6 +697,7 @@ auto GetResourceDir() -> fs::path const
         GetOptionsDB().OptionChangedSignal("resource.path").connect(&RefreshResDir);
         TraceLogger() << "Initialized ResDir and connected change signal";
     }
+    std::cout << "{{ Enter GetResourceDir" << std::endl;
     return res_dir;
 }
 

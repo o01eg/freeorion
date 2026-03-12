@@ -193,6 +193,8 @@ int mainConfigOptionsSetup(const std::vector<std::string>& args) {
         GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());
         GetOptionsDB().SetFromFile(GetPersistentConfigPath());
 
+        std::cout << "load configs from args" << std::endl;
+
         // override previously-saved and default options with command line parameters and flags
         GetOptionsDB().SetFromCommandLine(args);
 

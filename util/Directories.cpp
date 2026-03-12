@@ -692,12 +692,15 @@ auto GetResourceDir() -> fs::path const
         [[unlikely]]
         init = false;
         res_dir = FilenameToPath(GetOptionsDB().Get<std::string>("resource.path"));
+        std::cout << "GetResourceDir converting option..." << std::endl;
         if (!fs::exists(res_dir) || !fs::is_directory(res_dir))
             res_dir = FilenameToPath(GetOptionsDB().GetDefault<std::string>("resource.path"));
+        std::cout << "GetResourceDir signal..." << std::endl;
         GetOptionsDB().OptionChangedSignal("resource.path").connect(&RefreshResDir);
+        std::cout << "GetResourceDir initialized" << std::endl;
         TraceLogger() << "Initialized ResDir and connected change signal";
     }
-    std::cout << "{{ Enter GetResourceDir" << std::endl;
+    std::cout << "Leave GetResourceDir }}" << std::endl;
     return res_dir;
 }
 

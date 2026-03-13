@@ -14,6 +14,7 @@
 #include <boost/log/sources/record_ostream.hpp>
 #include <boost/log/sources/severity_channel_logger.hpp>
 #include <boost/log/support/date_time.hpp>
+#include <boost/log/utility/exception_handler.hpp>
 #include <boost/log/utility/manipulators/add_value.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/file.hpp>
@@ -200,6 +201,26 @@ namespace {
         // Replace any previous frontend for this channel
         GetLoggersToSinkFrontEnds().AddOrReplaceLoggerName(channel_name, std::move(sink_frontend));
     }
+
+    struct ExceptionHandler {
+        typedef void result_type;
+
+        void operator() (const std::runtime_error& e) const {
+            std::cerr << "std::runtime_error: " << e.what() << std::endl;
+        }
+
+        void operator() (const std::logic_error& e) const {
+            std::cerr << "std::logic_error: " << e.what() << std::endl;
+        }
+
+        void operator() (const std::exception& e) const {
+            std::cerr << "std::exception: " << e.what() << std::endl;
+        }
+
+        void operator() () const {
+            std::cerr << "unknown exception" << std::endl;
+        }
+    };
 }
 
 void ApplyConfigurationToFileSinkFrontEnd(const std::string& channel_name,
@@ -264,6 +285,7 @@ void SetLoggerThreshold(const std::string& source, LogLevel threshold) {
 }
 
 void InitLoggingSystem(const std::string& log_file, std::string_view _unnamed_logger_identifier) {
+    std::cout << "Init logging system to " << log_file << " ...";
     auto& unnamed_logger_identifier = LocalUnnamedLoggerIdentifier();
     unnamed_logger_identifier = _unnamed_logger_identifier;
     std::transform(unnamed_logger_identifier.begin(), unnamed_logger_identifier.end(),
@@ -289,6 +311,12 @@ void InitLoggingSystem(const std::string& log_file, std::string_view _unnamed_lo
     // Add global attributes to all records
     logging::core::get()->add_global_attribute("TimeStamp", attr::local_clock());
     logging::core::get()->add_global_attribute("ThreadID", attr::current_thread_id());
+
+    logging::core::get()->set_exception_handler(logging::make_exception_handler<
+        std::runtime_error,
+        std::logic_error,
+        std::exception
+    >(ExceptionHandler(), std::nothrow));
 
     SetLoggerThresholdCore("", default_log_level_threshold);
 
@@ -316,6 +344,7 @@ void InitLoggingSystem(const std::string& log_file, std::string_view _unnamed_lo
         std::strftime(time_as_string_buf, sizeof(time_as_string_buf), "%c", &temp_tm);
         InfoLogger(log) << "Logger initialized at " << time_as_string_buf;
     }
+    std::cout << "Logging system to " << log_file << " initialized";
 }
 
 void ShutdownLoggingSystemFileSink() {

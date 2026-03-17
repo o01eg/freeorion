@@ -190,7 +190,7 @@ ShipDesign::ShipDesign(const ShipDesign& rhs) :
     m_can_bombard(rhs.m_can_bombard),
 
     m_is_monster(rhs.m_is_monster),
-    m_name_desc_in_stringtable(m_name_desc_in_stringtable)
+    m_name_desc_in_stringtable(rhs.m_name_desc_in_stringtable)
 {}
 
 ShipDesign::ShipDesign(ShipDesign&& rhs) :
@@ -229,7 +229,7 @@ ShipDesign::ShipDesign(ShipDesign&& rhs) :
     m_can_bombard(rhs.m_can_bombard),
 
     m_is_monster(rhs.m_is_monster),
-    m_name_desc_in_stringtable(m_name_desc_in_stringtable)
+    m_name_desc_in_stringtable(rhs.m_name_desc_in_stringtable)
 {}
 
 ShipDesign& ShipDesign::operator=(ShipDesign&& rhs) {
@@ -271,7 +271,7 @@ ShipDesign& ShipDesign::operator=(ShipDesign&& rhs) {
     m_can_bombard = rhs.m_can_bombard;
 
     m_is_monster = rhs.m_is_monster;
-    m_name_desc_in_stringtable = m_name_desc_in_stringtable;
+    m_name_desc_in_stringtable = rhs.m_name_desc_in_stringtable;
 
     return *this;
 }
@@ -725,7 +725,7 @@ void ShipDesign::BuildStatCaches() {
         return;
     }
 
-    std::vector<std::string_view> tags = hull->Tags();
+    std::vector<std::string_view> tags{hull->Tags()}; // copy
 
     m_producible =      hull->Producible();
     m_detection =       hull->Detection();
@@ -757,7 +757,7 @@ void ShipDesign::BuildStatCaches() {
         if (!part->Producible())
             m_producible = false;
 
-        ShipPartClass part_class = part->Class();
+        const ShipPartClass part_class = part->Class();
 
         switch (part_class) {
         case ShipPartClass::PC_DIRECT_WEAPON:
@@ -829,10 +829,13 @@ void ShipDesign::BuildStatCaches() {
     // collect unique tags
     std::stable_sort(tags.begin(), tags.end());
     auto last = std::unique(tags.begin(), tags.end());
+    tags.erase(last, tags.end());
 
     // compile concatenated tags into contiguous storage
-    std::size_t tags_sz = std::transform_reduce(tags.begin(), tags.end(), 0u, std::plus{},
+    std::size_t tags_sz = std::transform_reduce(tags.begin(), tags.end(), std::size_t{0}, std::plus{},
                                                 [](const auto& tag) noexcept { return tag.size(); });
+
+    m_tags_concatenated.clear();
     m_tags_concatenated.reserve(tags_sz);
     m_tags.clear();
     m_tags.reserve(tags.size());
@@ -895,7 +898,7 @@ uint32_t ShipDesign::GetCheckSum() const {
 /////////////////////////////////////
 namespace {
     void AddDesignToUniverse(Universe& universe, std::unordered_map<std::string, int>& design_generic_ids,
-                             const std::unique_ptr<ShipDesign>& design, bool monster)
+                             const std::unique_ptr<ShipDesign>& design, bool)
     {
         if (!design)
             return;

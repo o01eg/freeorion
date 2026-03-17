@@ -142,6 +142,7 @@ namespace {
         db.Add("ui.map.starlane.thickness.factor",          UserStringNop("OPTIONS_DB_STARLANE_CORE"),                          2.0,                            RangedStepValidator<double>(1.0, 1.0, 10.0));
         db.Add("ui.map.starlane.empire.color.shown",        UserStringNop("OPTIONS_DB_RESOURCE_STARLANE_COLOURING"),            true,                           Validator<bool>());
 
+        db.Add("ui.map.fleet.eta.shown",                    UserStringNop("OPTIONS_DB_SHOW_FLEET_ETA"),                         true);
         db.Add("ui.map.fleet.supply.shown",                 UserStringNop("OPTIONS_DB_FLEET_SUPPLY_LINES"),                     true,                           Validator<bool>());
         db.Add("ui.map.fleet.supply.width",                 UserStringNop("OPTIONS_DB_FLEET_SUPPLY_LINE_WIDTH"),                3.0,                            RangedStepValidator<double>(0.2, 0.2, 10.0));
         db.Add("ui.map.fleet.supply.dot.spacing",           UserStringNop("OPTIONS_DB_FLEET_SUPPLY_LINE_DOT_SPACING"),          20,                             RangedStepValidator<int>(1, 3, 40));
@@ -345,15 +346,15 @@ namespace {
         auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
         if (!popup) return;
 
-        //popup->AddMenuItem(GG::MenuItem(true)); // separator
+        //popup->AddMenuItem(GG::MenuItem::menu_separator);
 
         const bool disable_end_turn = !turn_btn || turn_btn->Disabled();
         auto start_label = boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_SEND_AND_START")) % turn % order_count);
-        popup->AddMenuItem(GG::MenuItem(std::move(start_label), disable_end_turn, false, end_turn_action));
+        popup->AddMenuItem(std::move(start_label), disable_end_turn, false, end_turn_action);
 
         const bool disable_revoke = disable_end_turn || order_count < 1;
         auto revoke_label = boost::io::str(FlexibleFormat(UserString("MAP_BTN_TURN_REVOKE")) % turn % order_count);
-        popup->AddMenuItem(GG::MenuItem(std::move(revoke_label), disable_revoke, false, revoke_orders_action));
+        popup->AddMenuItem(std::move(revoke_label), disable_revoke, false, revoke_orders_action);
 
         popup->Run();
     }
@@ -402,10 +403,7 @@ namespace {
         typedef std::pair<std::shared_ptr<CUILabel>,
                           std::shared_ptr<CUILabel>> LabelValueType;
 
-        bool WndHasBrowseInfo(const Wnd* wnd, std::size_t mode) const override {
-            assert(mode <= wnd->BrowseModes().size());
-            return true;
-        }
+        bool WndHasBrowseInfo(const Wnd*, std::size_t) const noexcept override { return true; }
 
         void Render() override {
             const GG::Y row_height{ClientUI::Pts() + (m_margin * 2)};
@@ -638,7 +636,7 @@ namespace {
         }
 
     private:
-        void UpdateImpl(std::size_t mode, const Wnd* target) override {
+        void UpdateImpl(std::size_t, const Wnd*) override {
             UpdateLabels();
             ResetShipDesignLabels();
             DoLayout();
@@ -1213,56 +1211,54 @@ void MapWnd::CompleteConstruction() {
     m_btn_moderator->SetBrowseInfoWnd(GG::Wnd::Create<TextBrowseWnd>(
         UserString("MAP_BTN_MODERATOR"), UserString("MAP_BTN_MODERATOR_DESC")));
 
+    const auto make_stat_icon_tex = [font{ui.GetFont()}, hi{m_btn_turn->Height()}](auto tex, std::string name, bool two_values = false) {
+        auto num = two_values ? StatisticIcon::NumValuesDisplayed::TWO : StatisticIcon::NumValuesDisplayed::ONE;
+        auto si = GG::Wnd::Create<StatisticIcon>(std::move(tex), font, ICON_SINGLE_WIDTH, hi, num);
+        if (si)
+            si->SetName(std::move(name));
+        return si;
+    };
+    const auto make_stat_icon = [&make_stat_icon_tex, &ui](MeterType mt, std::string name, bool two_values = false)
+    { return make_stat_icon_tex(ui.MeterIcon(mt), std::move(name), two_values); };
 
     // resources
-    m_population = GG::Wnd::Create<StatisticIcon>(ui.MeterIcon(MeterType::METER_POPULATION),
-                                                  0, 3, false, ICON_SINGLE_WIDTH, m_btn_turn->Height());
-    m_population->SetName("Population StatisticIcon");
+    m_population = make_stat_icon(MeterType::METER_POPULATION, "Population StatisticIcon");
 
-    m_industry = GG::Wnd::Create<StatisticIcon>(ui.MeterIcon(MeterType::METER_INDUSTRY),
-                                                0, 3, false, ICON_SINGLE_WIDTH, m_btn_turn->Height());
-    m_industry->SetName("Industry StatisticIcon");
+    m_industry = make_stat_icon(MeterType::METER_INDUSTRY, "Industry StatisticIcon");
     m_signal_connections.push_back(m_industry->LeftClickedSignal.connect([this](auto) { ToggleProduction(); }));
 
-    m_stockpile = GG::Wnd::Create<StatisticIcon>(ui.MeterIcon(MeterType::METER_STOCKPILE),
-                                                 0, 3, false, ICON_DUAL_WIDTH, m_btn_turn->Height());
-    m_stockpile->SetName("Stockpile StatisticIcon");
+    m_stockpile = make_stat_icon(MeterType::METER_STOCKPILE, "Stockpile StatisticIcon", true);
 
-    m_research = GG::Wnd::Create<StatisticIcon>(ui.MeterIcon(MeterType::METER_RESEARCH),
-                                                0, 3, false, ICON_SINGLE_WIDTH, m_btn_turn->Height());
-    m_research->SetName("Research StatisticIcon");
+    m_research = make_stat_icon(MeterType::METER_RESEARCH, "Research StatisticIcon");
     m_signal_connections.push_back(m_research->LeftClickedSignal.connect(
         [this](auto) { ToggleResearch(GetApp().GetContext()); }));
 
-    m_influence = GG::Wnd::Create<StatisticIcon>(ui.MeterIcon(MeterType::METER_INFLUENCE),
-                                                 0, 3, false, ICON_DUAL_WIDTH, m_btn_turn->Height());
-    m_influence->SetName("Influence StatisticIcon");
+    m_influence = make_stat_icon(MeterType::METER_INFLUENCE, "Influence StatisticIcon", true);
     m_signal_connections.push_back(m_influence->LeftClickedSignal.connect([this](auto) { ToggleGovernment(); }));
 
-    m_fleet = GG::Wnd::Create<StatisticIcon>(ui.GetTexture(ClientUI::ArtDir() / "icons" / "sitrep" / "fleet_arrived.png"),
-                                             0, 3, false, ICON_SINGLE_WIDTH, m_btn_turn->Height());
-    m_fleet->SetName("Fleet StatisticIcon");
+    m_fleet = make_stat_icon_tex(ui.GetTexture(ClientUI::ArtDir() / "icons" / "sitrep" / "fleet_arrived.png"),
+                                 "Fleet StatisticIcon");
 
-    m_detection = GG::Wnd::Create<StatisticIcon>(ui.MeterIcon(MeterType::METER_DETECTION),
-                                                 0, 3, false, ICON_SINGLE_WIDTH, m_btn_turn->Height());
-    m_detection->SetName("Detection StatisticIcon");
+    m_detection = make_stat_icon(MeterType::METER_DETECTION, "Detection StatisticIcon");
 
-    GG::SubTexture wasted_ressource_subtexture = GG::SubTexture(
-        ui.GetTexture(button_texture_dir / "wasted_resource.png", false));
-    GG::SubTexture wasted_ressource_mouseover_subtexture = GG::SubTexture(
-        ui.GetTexture(button_texture_dir / "wasted_resource_mouseover.png", false));
-    GG::SubTexture wasted_ressource_clicked_subtexture = GG::SubTexture(
-        ui.GetTexture(button_texture_dir / "wasted_resource_clicked.png", false));
+    {
+        GG::SubTexture wasted_ressource_subtexture = GG::SubTexture(
+            ui.GetTexture(button_texture_dir / "wasted_resource.png", false));
+        GG::SubTexture wasted_ressource_mouseover_subtexture = GG::SubTexture(
+            ui.GetTexture(button_texture_dir / "wasted_resource_mouseover.png", false));
+        GG::SubTexture wasted_ressource_clicked_subtexture = GG::SubTexture(
+            ui.GetTexture(button_texture_dir / "wasted_resource_clicked.png", false));
 
-    m_industry_wasted = Wnd::Create<CUIButton>(
-        wasted_ressource_subtexture,
-        wasted_ressource_clicked_subtexture,
-        wasted_ressource_mouseover_subtexture);
+        m_industry_wasted = Wnd::Create<CUIButton>(
+            wasted_ressource_subtexture,
+            wasted_ressource_clicked_subtexture,
+            wasted_ressource_mouseover_subtexture);
 
-    m_research_wasted = Wnd::Create<CUIButton>(
-        wasted_ressource_subtexture,
-        wasted_ressource_clicked_subtexture,
-        wasted_ressource_mouseover_subtexture);
+        m_research_wasted = Wnd::Create<CUIButton>(
+            std::move(wasted_ressource_subtexture),
+            std::move(wasted_ressource_clicked_subtexture),
+            std::move(wasted_ressource_mouseover_subtexture));
+    }
 
     m_industry_wasted->Resize(ICON_SIZE);
     m_industry_wasted->SetMinSize(ICON_SIZE);
@@ -1287,27 +1283,27 @@ void MapWnd::CompleteConstruction() {
     // place buttons / icons on toolbar
     /////////////////////////////////////
     {
-    std::vector<GG::X> widths{
-        m_btn_turn->Width(),        ICON_WIDTH,                 ICON_WIDTH,
-        ICON_WIDTH,                 ICON_WIDTH,                 ICON_SINGLE_WIDTH,
-        ICON_DUAL_WIDTH,            ICON_WIDTH,                 ICON_SINGLE_WIDTH,
-        ICON_DUAL_WIDTH,            ICON_SINGLE_WIDTH,          ICON_SINGLE_WIDTH,
-        ICON_SINGLE_WIDTH,          MENU_ICON_SIZE.x,           MENU_ICON_SIZE.x,
-        MENU_ICON_SIZE.x,           MENU_ICON_SIZE.x,           MENU_ICON_SIZE.x,
-        MENU_ICON_SIZE.x,           MENU_ICON_SIZE.x,           MENU_ICON_SIZE.x,
-        MENU_ICON_SIZE.x,           MENU_ICON_SIZE.x,           MENU_ICON_SIZE.x,
-        MENU_ICON_SIZE.x};
+        std::vector<GG::X> widths{
+            m_btn_turn->Width(), ICON_WIDTH,        ICON_WIDTH,
+            ICON_WIDTH,          ICON_WIDTH,        ICON_SINGLE_WIDTH,
+            ICON_DUAL_WIDTH,     ICON_WIDTH,        ICON_SINGLE_WIDTH,
+            ICON_DUAL_WIDTH,     ICON_SINGLE_WIDTH, ICON_SINGLE_WIDTH,
+            ICON_SINGLE_WIDTH,   MENU_ICON_SIZE.x,  MENU_ICON_SIZE.x,
+            MENU_ICON_SIZE.x,    MENU_ICON_SIZE.x,  MENU_ICON_SIZE.x,
+            MENU_ICON_SIZE.x,    MENU_ICON_SIZE.x,  MENU_ICON_SIZE.x,
+            MENU_ICON_SIZE.x,    MENU_ICON_SIZE.x,  MENU_ICON_SIZE.x,
+            MENU_ICON_SIZE.x};
 
-    std::vector<float> stretches{
-        0.0f,                       0.0f,                       0.0f,
-        0.0f,                       0.0f,                       1.0f,
-        2.0f,                       0.0f,                       1.0f,
-        2.0f,                       1.0f,                       1.0f,
-        1.0f,                       0.0f,                       0.0f,
-        0.0f,                       0.0f,                       0.0f,
-        0.0f,                       0.0f,                       0.0f,
-        0.0f,                       0.0f,                       0.0f,
-        0.0f};
+        std::vector<float> stretches{
+            0.0f,                0.0f,              0.0f,
+            0.0f,                0.0f,              1.0f,
+            2.0f,                0.0f,              1.0f,
+            2.0f,                1.0f,              1.0f,
+            1.0f,                0.0f,              0.0f,
+            0.0f,                0.0f,              0.0f,
+            0.0f,                0.0f,              0.0f,
+            0.0f,                0.0f,              0.0f,
+            0.0f};
 
         if (auto layout = GG::Wnd::Create<GG::Layout>(m_toolbar->ClientUpperLeft().x, m_toolbar->ClientUpperLeft().y,
                                                       m_toolbar->ClientWidth(),       m_toolbar->ClientHeight(),
@@ -1877,7 +1873,7 @@ namespace {
     std::shared_ptr<GG::Texture> GetGasTexture() {
         static std::shared_ptr<GG::Texture> gas_texture;
         if (!gas_texture) {
-            if (gas_texture = GetApp().GetUI().GetTexture(ClientUI::ArtDir() / "galaxy_decoration" / "gaseous_array.png")) {
+            if ((gas_texture = GetApp().GetUI().GetTexture(ClientUI::ArtDir() / "galaxy_decoration" / "gaseous_array.png"))) {
                 gas_texture->SetFilters(GL_NEAREST, GL_NEAREST);
                 glBindTexture(GL_TEXTURE_2D, gas_texture->OpenGLId());
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -2658,10 +2654,10 @@ bool MapWnd::PanY(GG::Y y) {
     return true;
 }
 
-void MapWnd::LButtonDown(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys)
+void MapWnd::LButtonDown(GG::Pt pt, GG::Flags<GG::ModKey>)
 { m_drag_offset = pt - ClientUpperLeft(); }
 
-void MapWnd::LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::LDrag(GG::Pt pt, GG::Pt, GG::Flags<GG::ModKey>) {
     if (GetOptionsDB().Get<bool>("ui.map.lock"))
         return;
 
@@ -2672,12 +2668,12 @@ void MapWnd::LDrag(GG::Pt pt, GG::Pt move, GG::Flags<GG::ModKey> mod_keys) {
     m_dragged = true;
 }
 
-void MapWnd::LButtonUp(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::LButtonUp(GG::Pt, GG::Flags<GG::ModKey>) {
     m_drag_offset = GG::Pt(-GG::X1, -GG::Y1);
     m_dragged = false;
 }
 
-void MapWnd::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::LClick(GG::Pt, GG::Flags<GG::ModKey>) {
     m_drag_offset = GG::Pt(-GG::X1, -GG::Y1);
     FleetUIManager& manager = FleetUIManager::GetFleetUIManager();
     const auto fleet_wnd = manager.ActiveFleetWnd();
@@ -2693,7 +2689,7 @@ void MapWnd::LClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
     m_dragged = false;
 }
 
-void MapWnd::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::RClick(GG::Pt pt, GG::Flags<GG::ModKey>) {
     // if in moderator mode, treat as moderator action click
     if (ClientPlayerIsModerator()) {
         // only supported action on empty map location at present is creating a system
@@ -2732,34 +2728,34 @@ void MapWnd::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
         auto detection_range_action = [detectionRange]() { GetOptionsDB().Set<bool>("ui.map.detection.range.shown",        !detectionRange);   };
 
         if (auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y)) {
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_SHOW_FPS"),                     false, fps,            show_fps_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_SHOW_SIDEPANEL_PLANETS"),       false, showPlanets,    show_planets_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_UI_SYSTEM_CIRCLES"),            false, systemCircles,  system_circles_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_RESOURCE_STARLANE_COLOURING"),  false, resourceColor,  resource_color_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_FLEET_SUPPLY_LINES"),           false, fleetSupply,    fleet_supply_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_GALAXY_MAP_GAS"),               false, gas,            gas_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_GALAXY_MAP_STARFIELDS"),        false, starfields,     starfield_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_GALAXY_MAP_SCALE_LINE"),        false, scale,          map_scale_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_GALAXY_MAP_SCALE_CIRCLE"),      false, scaleCircle,    scale_circle_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_GALAXY_MAP_ZOOM_SLIDER"),       false, zoomSlider,     zoom_slider_action));
-            popup->AddMenuItem(GG::MenuItem(UserString("OPTIONS_GALAXY_MAP_DETECTION_RANGE"),   false, detectionRange, detection_range_action));
+            popup->AddMenuItem(UserString("OPTIONS_SHOW_FPS"),                     false, fps,            show_fps_action);
+            popup->AddMenuItem(UserString("OPTIONS_SHOW_SIDEPANEL_PLANETS"),       false, showPlanets,    show_planets_action);
+            popup->AddMenuItem(UserString("OPTIONS_UI_SYSTEM_CIRCLES"),            false, systemCircles,  system_circles_action);
+            popup->AddMenuItem(UserString("OPTIONS_RESOURCE_STARLANE_COLOURING"),  false, resourceColor,  resource_color_action);
+            popup->AddMenuItem(UserString("OPTIONS_FLEET_SUPPLY_LINES"),           false, fleetSupply,    fleet_supply_action);
+            popup->AddMenuItem(UserString("OPTIONS_GALAXY_MAP_GAS"),               false, gas,            gas_action);
+            popup->AddMenuItem(UserString("OPTIONS_GALAXY_MAP_STARFIELDS"),        false, starfields,     starfield_action);
+            popup->AddMenuItem(UserString("OPTIONS_GALAXY_MAP_SCALE_LINE"),        false, scale,          map_scale_action);
+            popup->AddMenuItem(UserString("OPTIONS_GALAXY_MAP_SCALE_CIRCLE"),      false, scaleCircle,    scale_circle_action);
+            popup->AddMenuItem(UserString("OPTIONS_GALAXY_MAP_ZOOM_SLIDER"),       false, zoomSlider,     zoom_slider_action);
+            popup->AddMenuItem(UserString("OPTIONS_GALAXY_MAP_DETECTION_RANGE"),   false, detectionRange, detection_range_action);
             // display popup menu
             popup->Run();
         }
     }
 }
 
-void MapWnd::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey>) {
     if (move)
         Zoom(move, pt);
 }
 
-void MapWnd::KeyPress(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::KeyPress(GG::Key key, uint32_t, GG::Flags<GG::ModKey> mod_keys) {
     if (key == GG::Key::GGK_LSHIFT || key == GG::Key::GGK_RSHIFT)
         ReplotProjectedFleetMovement(mod_keys & GG::MOD_KEY_SHIFT);
 }
 
-void MapWnd::KeyRelease(GG::Key key, uint32_t key_code_point, GG::Flags<GG::ModKey> mod_keys) {
+void MapWnd::KeyRelease(GG::Key key, uint32_t, GG::Flags<GG::ModKey> mod_keys) {
     if (key == GG::Key::GGK_LSHIFT || key == GG::Key::GGK_RSHIFT)
         ReplotProjectedFleetMovement(mod_keys & GG::MOD_KEY_SHIFT);
 }
@@ -3707,8 +3703,8 @@ namespace {
                 // determine colour(s) for lane based on which empire(s) can transfer resources along the lane.
                 // todo: multiple rendered lanes (one for each empire) when multiple empires use the same lane.
                 GG::Clr lane_colour = UNOWNED_LANE_COLOUR;    // default colour if no empires transfer resources along starlane
-                for (const auto& [empire_id, empire] : empires) {
-                    const auto& resource_supply_lanes = sm.SupplyStarlaneTraversals(empire_id);
+                for (const auto& [loop_empire_id, empire] : empires) {
+                    const auto& resource_supply_lanes = sm.SupplyStarlaneTraversals(loop_empire_id);
 
                     std::pair<int, int> lane_forward{start_system->ID(), dest_system->ID()};
                     std::pair<int, int> lane_backward{dest_system->ID(), start_system->ID()};
@@ -4901,7 +4897,7 @@ namespace {
     using StarlaneToFleetsMap = KeyToFleetsMap<std::pair<int, int>>;
 
     /** Return fleet if \p obj is not destroyed, not stale, a fleet and not empty.*/
-    std::shared_ptr<const Fleet> IsQualifiedFleet(auto&& fleet, int empire_id,
+    std::shared_ptr<const Fleet> IsQualifiedFleet(const auto& fleet,
                                                   const auto& known_destroyed_objects,
                                                   const auto& stale_object_info)
     {
@@ -5031,8 +5027,7 @@ void MapWnd::DeferredRefreshFleetButtons() {
     LocationXEmpireToFleetsMap offroad_fleets;
 
     for (auto& [fleet_id, cfleet] : objects.allExisting<Fleet>()) {
-        auto fleet = IsQualifiedFleet(cfleet, client_empire_id,
-                                      this_client_known_destroyed_objects,
+        auto fleet = IsQualifiedFleet(cfleet, this_client_known_destroyed_objects,
                                       this_client_stale_object_info);
         if (!fleet)
             continue;
@@ -5401,7 +5396,7 @@ void MapWnd::MouseEnteringSystem(int system_id, GG::Flags<GG::ModKey> mod_keys) 
     SystemBrowsedSignal(system_id);
 }
 
-void MapWnd::MouseLeavingSystem(int system_id)
+void MapWnd::MouseLeavingSystem(int)
 { MouseEnteringSystem(INVALID_OBJECT_ID, GG::Flags<GG::ModKey>()); }
 
 void MapWnd::PlanetDoubleClicked(int planet_id) {
@@ -5514,7 +5509,7 @@ void MapWnd::PlotFleetMovement(int system_id, bool execute_move, bool append) {
             start_system = fleet->NextSystemID();
 
         // get path to destination...
-        auto route = universe.GetPathfinder().ShortestPath(start_system, system_id, objects).first;
+        auto route = universe.GetPathfinder().ShortestPath(start_system, system_id).first;
         // Prepend a non-empty old_route to the beginning of route.
         if (append && !fleet->TravelRoute().empty()) {
             auto old_route(fleet->TravelRoute());
@@ -5769,7 +5764,7 @@ void MapWnd::FleetButtonRightClicked(const FleetButton* fleet_btn) {
             }
         };
 
-        popup->AddMenuItem(GG::MenuItem(UserString("FW_ORDER_DISMISS_SENSOR_GHOST_ALL"), false, false, forget_fleet_actions));
+        popup->AddMenuItem(UserString("FW_ORDER_DISMISS_SENSOR_GHOST_ALL"), false, false, forget_fleet_actions);
         popup->Run();
 
         // Force a redraw
@@ -6010,7 +6005,7 @@ void MapWnd::ResetTimeoutClock(int timeout_seconds) {
     TimerFiring(0, &m_timeout_clock);
 }
 
-void MapWnd::TimerFiring(unsigned int ticks, GG::Timer* timer) {
+void MapWnd::TimerFiring(unsigned int, GG::Timer*) {
     const auto remaining = m_timeout_time - std::chrono::high_resolution_clock::now();
     const auto remaining_sec = std::chrono::duration_cast<std::chrono::seconds>(remaining);
     if (remaining_sec.count() <= 0) {
@@ -7413,7 +7408,7 @@ namespace {
         }
 
         auto [system_list, path_length] =
-            context.ContextUniverse().GetPathfinder().ShortestPath(start_id, destination_id, empire_id, objects);
+            context.ContextUniverse().GetPathfinder().ShortestPath(start_id, destination_id, empire_id);
 
         if (!system_list.empty() && path_length > 0.0)
             return {path_length, system_list};

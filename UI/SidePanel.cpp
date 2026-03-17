@@ -156,7 +156,7 @@ namespace {
                 if (atmosphere_definition.Tag() == "PlanetAtmosphereData") {
                     try {
                         PlanetAtmosphereData current_data{atmosphere_definition};
-                        auto filename = current_data.planet_filename;
+                        auto filename{current_data.planet_filename}; // copy due to moving from on next line
                         data.emplace(std::move(filename), std::move(current_data));
                     } catch (const std::exception& e) {
                         ErrorLogger() << "GetPlanetAtmosphereData: " << e.what();
@@ -233,6 +233,7 @@ namespace {
     using cxsin = std::sin;
     using cxcos = std::cos;
 #else
+    constexpr std::array<uint8_t, 7> cxsin_factor_increments{3u*2u, 5u*4u, 7u*6u, 9u*8u, 11u*10u, 13u*12u, 15u*14u};
     constexpr GLfloat cxsin(GLfloat a) {
         if (a == 0 || a == PI) return 0.0;
         if (a == PI/2) return 1.0;
@@ -242,14 +243,12 @@ namespace {
 
         GLfloat apow = a;
         GLfloat sum = a;
-        uint64_t factorial = 1;
+        uint64_t factorial = 1u;
         int8_t signpart = 1;
         const GLfloat a2 = a*a;
-
-        static_assert(15*14 < std::numeric_limits<uint8_t>::max());
-        for (uint8_t pow = 3; pow <= 15; pow += 2) {
+        for (uint8_t pow : cxsin_factor_increments) {
             apow *= a2;
-            factorial *= (pow * (pow - 1));
+            factorial *= pow;
             signpart = -signpart;
             sum += (apow / factorial * signpart);
         }
@@ -257,6 +256,7 @@ namespace {
         return sum;
     }
 
+    constexpr std::array<uint8_t, 7> cxcos_factor_increments{1u*2u, 3u*4u, 5u*6u, 7u*8u, 9u*10u, 11u*12u, 13u*14u};
     constexpr GLfloat cxcos(GLfloat a) {
         if (a == 0) return 1.0;
         if (a == PI/2) return 0.0;
@@ -270,10 +270,9 @@ namespace {
         int8_t signpart = 1;
         const GLfloat a2 = a*a;
 
-        static_assert(14*13 < std::numeric_limits<uint8_t>::max());
-        for (uint8_t pow = 2; pow <= 14u; pow += 2u) {
+        for (uint8_t pow : cxcos_factor_increments) {
             apow *= a2;
-            factorial *= (pow * (pow - 1));
+            factorial *= pow;
             signpart = -signpart;
             sum += (apow / factorial * signpart);
         }
@@ -422,61 +421,67 @@ namespace {
     }
 
     const GLfloat* GetLightPosition() {
-        static const auto retval = []() {
-            std::array<GLfloat, 4> retval{0.0f, 0.0f, 0.0f, 0.0f};
+        static const auto retval = []() -> std::array<GLfloat, 4> {
+            try {
+                XMLDoc doc;
+                std::ifstream ifs(ClientUI::ArtDir() / "planets" / "planets.xml");
+                doc.ReadDoc(ifs);
+                ifs.close();
+                const auto& lpos = doc.root_node.Child("GLPlanets").Child("light_pos");
 
-            XMLDoc doc;
-            std::ifstream ifs(ClientUI::ArtDir() / "planets" / "planets.xml");
-            doc.ReadDoc(ifs);
-            ifs.close();
-            const auto& lpos = doc.root_node.Child("GLPlanets").Child("light_pos");
-
-            retval[0] = boost::lexical_cast<GLfloat>(lpos.Child("x").Text());
-            retval[1] = boost::lexical_cast<GLfloat>(lpos.Child("y").Text());
-            retval[2] = boost::lexical_cast<GLfloat>(lpos.Child("z").Text());
-
-            return retval;
+                return {boost::lexical_cast<GLfloat>(lpos.Child("x").Text()),
+                        boost::lexical_cast<GLfloat>(lpos.Child("y").Text()),
+                        boost::lexical_cast<GLfloat>(lpos.Child("z").Text()),
+                        0.0f};
+            } catch (...) {
+                return {10.0f, -7.0f, 8.0f, 0.0f};
+            }
         }();
         return retval.data();
     }
 
+    // output should be float RGBA ranging 0f to 1.0f
     const auto& GetStarLightColors() {
         static const auto light_colors{[]() -> std::map<StarType, std::array<float, 4>> {
-            XMLDoc doc;
-            std::ifstream ifs(ClientUI::ArtDir() / "planets" / "planets.xml");
-            doc.ReadDoc(ifs);
-            ifs.close();
-
             std::map<StarType, std::array<float, 4>> retval;
+            // pre-fill with defaults
+            for (StarType i = StarType::STAR_BLUE; i < StarType::NUM_STAR_TYPES; i = StarType(int(i) + 1))
+                retval[i] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-            if (!doc.root_node.ContainsChild("GLStars") || doc.root_node.Child("GLStars").Children().empty()) {
-                for (StarType i = StarType::STAR_BLUE; i < StarType::NUM_STAR_TYPES;
-                     i = StarType(int(i) + 1))
-                { retval[i] = {1.0f, 1.0f, 1.0f, 1.0f}; }
-                return retval;
-            }
+            // replace from config file where specified
+            try {
+                XMLDoc doc;
+                std::ifstream ifs(ClientUI::ArtDir() / "planets" / "planets.xml");
+                doc.ReadDoc(ifs);
+                ifs.close();
 
-            for (const XMLElement& star_definition : doc.root_node.Child("GLStars").Children()) {
-                if (!star_definition.HasAttribute("star_type") || !star_definition.HasAttribute("color"))
-                    continue;
-                const auto& star_type_name = star_definition.Attribute("star_type");
-                const auto star_type = StarTypeFromString(star_type_name, StarType::INVALID_STAR_TYPE);
-                if (star_type == StarType::INVALID_STAR_TYPE)
-                    continue;
-                std::string_view colour_string = star_definition.Attribute("color");
-                if (colour_string.size() != 6 && colour_string.size() != 8)
-                    continue;
-                const GG::Clr color = GG::Clr::HexClr(colour_string);
-                retval.emplace(star_type, std::array{color.r / 255.0f, color.g / 255.0f,
-                                                     color.b / 255.0f, color.a / 255.0f});
-            }
+                if (!doc.root_node.ContainsChild("GLStars") || doc.root_node.Child("GLStars").Children().empty())
+                    throw std::runtime_error("no GLStars in planets.xml");
+
+                for (const XMLElement& star_definition : doc.root_node.Child("GLStars").Children()) {
+                    if (!star_definition.HasAttribute("star_type") || !star_definition.HasAttribute("color"))
+                        continue;
+                    const auto& star_type_name = star_definition.Attribute("star_type");
+                    const auto star_type = StarTypeFromString(star_type_name, StarType::INVALID_STAR_TYPE);
+                    if (star_type < StarType::STAR_BLUE || star_type >= StarType::NUM_STAR_TYPES)
+                        continue;
+                    static_assert(StarType::STAR_BLUE == StarType{0} && StarType::INVALID_STAR_TYPE == StarType{-1});
+
+                    std::string_view colour_string = star_definition.Attribute("color");
+                    if (colour_string.size() != 6 && colour_string.size() != 8)
+                        continue;
+                    const GG::Clr color = GG::Clr::HexClr(colour_string);
+                    retval.insert_or_assign(star_type, std::array{color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, color.a / 255.0f});
+                }
+            } catch (...) { }
+
             return retval;
         }()};
 
         return light_colors;
     }
 
-    const std::array<float, 4>& StarLightColour(StarType star_type) {
+    std::array<float, 4> StarLightColour(StarType star_type) {
         static constexpr std::array<float, 4> white{1.0f, 1.0f, 1.0f, 1.0f};
         const auto& colour_map = GetStarLightColors();
         auto it = colour_map.find(star_type);
@@ -517,9 +522,9 @@ namespace {
         glLightfv(GL_LIGHT0, GL_SPECULAR, colour.data());
         glEnable(GL_TEXTURE_2D);
 
-        glTranslated(Value(center.x), Value(center.y), -(diameter / 2 + 1));// relocate to locatin on screen where planet is to be rendered
-        glRotated(95.0, -1.0, 0.0, 0.0);                                    // make the poles upright, instead of head-on (we go a bit more than 90 degrees, to avoid some artifacting caused by the GLU-supplied texture coords)
-        glRotated(axial_tilt, 0.0, 1.0, 0.0);                               // axial tilt
+        glTranslated(Value(center.x), Value(center.y), GLdouble(-(diameter / 2 + 1)));// relocate to location on screen where planet is to be rendered
+        glRotated(95.0, -1.0, 0.0, 0.0);                                              // make the poles upright, instead of head-on (we go a bit more than 90 degrees, to avoid some artifacting caused by the GLU-supplied texture coords)
+        glRotated(axial_tilt, 0.0, 1.0, 0.0);                                         // axial tilt
 
         float intensity = static_cast<float>(GetRotatingPlanetAmbientIntensity());
         GG::Clr ambient = GG::FloatClr(intensity, intensity, intensity, 1.0f);
@@ -591,10 +596,10 @@ namespace {
 
     /** Returns map from planet ID to issued annex orders affecting it. There
       * should be only one ship colonzing each planet for this client. */
-    auto PendingAnnexationOrders(const ScriptingContext& context) {
+    auto PendingAnnexationOrders(const ClientApp& app) {
         std::vector<std::pair<int, int>> retval;
 
-        for (const auto& [order_id, order] : GetApp().Orders()) {
+        for (const auto& [order_id, order] : app.Orders()) {
             if (auto annex_order = std::dynamic_pointer_cast<AnnexOrder>(order)) {
                 const auto planet_id = annex_order->PlanetID();
                 retval.emplace_back(planet_id, order_id);
@@ -631,7 +636,7 @@ namespace {
     }
 
     /** Returns map from planet ID to cost to annex. */
-    auto PendingAnnexationPlanetsCosts(const UniverseObject* source_for_empire, const ScriptingContext& context) {
+    auto PendingAnnexationPlanetsCosts(const UniverseObject* source_for_empire, const ScriptingContext& context) { // TODO: pass in app?
         std::vector<std::pair<int, double>> retval;
 
         const auto& app = GetApp();
@@ -832,7 +837,7 @@ public:
 
     void Clear();
     void SetPlanets(const std::vector<int>& planet_ids, StarType star_type, 
-                    ScriptingContext& context);
+                    ScriptingContext& context, int empire_id);
     void SelectPlanet(int planet_id); //!< programatically selects a planet with id \a planet_id
     void SetValidSelectionPredicate(std::function<bool(const UniverseObject*)> pred);
     void ClearValidSelectionPedicate();
@@ -950,7 +955,7 @@ public:
             const auto& atmosphere_data = GetPlanetAtmosphereData();
             const auto it = atmosphere_data.find(rpd.filename);
             if (it != atmosphere_data.end()) {
-                const auto& atmosphere = it->second.atmospheres[RandInt(0, it->second.atmospheres.size() - 1)];
+                const auto& atmosphere = it->second.atmospheres[static_cast<std::size_t>(RandInt(0, it->second.atmospheres.size() - 1))];
                 m_atmosphere_texture = GetApp().GetUI().GetTexture(ClientUI::ArtDir() / atmosphere.filename, true);
                 m_atmosphere_alpha = atmosphere.alpha;
                 m_atmosphere_planet_rect = GG::Rect(GG::X1, GG::Y1, m_atmosphere_texture->DefaultWidth() - 4, m_atmosphere_texture->DefaultHeight() - 4);
@@ -1074,7 +1079,7 @@ class SidePanel::SystemNameDropDownList : public CUIDropDownList {
         };
 
         if (m_order_issuing_enabled && system->OwnedBy(app.EmpireID()))
-            popup->AddMenuItem(GG::MenuItem(UserString("SP_RENAME_SYSTEM"), false, false, rename_action));
+            popup->AddMenuItem(UserString("SP_RENAME_SYSTEM"), false, false, rename_action);
 
         popup->Run();
     }
@@ -1852,11 +1857,8 @@ void SidePanel::PlanetPanel::Refresh(ScriptingContext& context_in, int empire_id
                                            [this](const auto& ids) { return FlexibleContains(ids, m_planet_id); });
 
     const auto& known_destroyed_object_ids = u.EmpireKnownDestroyedObjectIDs(empire_id);
-    const auto not_destroyed_is_shipyard_tag = [&known_destroyed_object_ids](const Building* building) {
-        return building &&
-            !known_destroyed_object_ids.contains(building->ID()) &&
-            building->HasTag(TAG_SHIPYARD);
-    };
+    const auto not_destroyed_is_shipyard_tag = [&known_destroyed_object_ids](const Building* building)
+    { return building && building->IsShipYard() && !known_destroyed_object_ids.contains(building->ID()); };
     const bool has_shipyard = range_any_of(objects.findRaw<const Building>(planet->BuildingIDs()),
                                            not_destroyed_is_shipyard_tag);
 
@@ -2511,19 +2513,19 @@ void SidePanel::PlanetPanel::RClick(GG::Pt pt, GG::Flags<GG::ModKey> mod_keys) {
 
             Refresh(context, empire_id);
         };
-        popup->AddMenuItem(GG::MenuItem(UserString("SP_RENAME_PLANET"), false, false, rename_action));
+        popup->AddMenuItem(UserString("SP_RENAME_PLANET"), false, false, rename_action);
     }
 
     auto pedia_to_planet_action = [this]()
     { GetApp().GetUI().ZoomToPlanetPedia(m_planet_id, GetApp().GetContext().ContextObjects()); };
 
-    popup->AddMenuItem(GG::MenuItem(UserString("SP_PLANET_SUITABILITY"), false, false, pedia_to_planet_action));
+    popup->AddMenuItem(UserString("SP_PLANET_SUITABILITY"), false, false, pedia_to_planet_action);
 
     if (planet->OwnedBy(empire_id)
         && !peaceful_empires_in_system.empty()
         && !ClientPlayerIsModerator())
     {
-        popup->AddMenuItem(GG::MenuItem(true));
+        popup->AddMenuItem(GG::MenuItem::menu_separator);
 
         // submenus for each available recipient empire
         GG::MenuItem give_away_menu(UserString("ORDER_GIVE_PLANET_TO_EMPIRE"), false, false);
@@ -2735,7 +2737,7 @@ void SidePanel::PlanetPanel::ClickAnnex() {
     if (empire_id == ALL_EMPIRES)
         return;
 
-    const auto pending_annex_orders = PendingAnnexationOrders(context);
+    const auto pending_annex_orders = PendingAnnexationOrders(app);
     const auto it = std::find_if(pending_annex_orders.begin(), pending_annex_orders.end(),
                                  [this](const auto& order_id_planet_id)
                                  { return m_planet_id == order_id_planet_id.first; });
@@ -3020,7 +3022,7 @@ void SidePanel::PlanetPanelContainer::Clear() {
 
 void SidePanel::PlanetPanelContainer::SetPlanets(
     const std::vector<int>& planet_ids, StarType star_type,
-    ScriptingContext& context)
+    ScriptingContext& context, int empire_id)
 {
     int initial_selected_planet_panel = m_selected_planet_id;
 
@@ -3030,11 +3032,11 @@ void SidePanel::PlanetPanelContainer::SetPlanets(
     const auto& objects = context.ContextObjects();
 
     std::multimap<int, int> orbits_planets;
-    for (const auto& planet : objects.find<Planet>(planet_ids)) {
+    for (const auto* planet : objects.findRaw<const Planet>(planet_ids)) {
         if (!planet)
             continue;
         int system_id = planet->SystemID();
-        auto system = objects.get<System>(system_id).get();
+        const auto* system = objects.getRaw<const System>(system_id);
         if (!system) {
             ErrorLogger() << "PlanetPanelContainer::SetPlanets couldn't find system of planet" << planet->Name();
             continue;
@@ -3070,7 +3072,7 @@ void SidePanel::PlanetPanelContainer::SetPlanets(
 
     // redo contents and layout of panels, after enabling or disabling, so
     // they take this into account when doing contents
-    RefreshAllPlanetPanels(context, GetApp().EmpireID());
+    RefreshAllPlanetPanels(context, empire_id);
 
     SelectPlanet(initial_selected_planet_panel);
 
@@ -3251,6 +3253,8 @@ void SidePanel::PlanetPanelContainer::RefreshAllPlanetPanels(
     ScriptingContext& context, int empire_id, int excluded_planet_id, bool require_prerender)
 {
     for (auto& panel : m_planet_panels) {
+        if (!panel)
+            continue;
         if (excluded_planet_id > 0 && panel->PlanetID() == INVALID_OBJECT_ID)
             continue;
         panel->Refresh(context, empire_id);
@@ -3575,7 +3579,7 @@ void SidePanel::PreRender() {
 
     // Needs refresh updates all data related to all SizePanels, including system list etc.
     if (s_needs_refresh)
-        RefreshInPreRender(context);
+        RefreshInPreRender(app);
 
     // Update updates the data for each planet tab in all SidePanels
     if (s_needs_update) {
@@ -3608,7 +3612,7 @@ void SidePanel::Update() {
 void SidePanel::UpdateImpl(ScriptingContext& context, int empire_id) {
     //std::cout << "SidePanel::UpdateImpl" << std::endl;
     if (m_system_resource_summary)
-        m_system_resource_summary->Update();
+        m_system_resource_summary->Update(std::as_const(context).ContextObjects());
     // update individual PlanetPanels in PlanetPanelContainer, then redo layout of panel container
     m_planet_panel_container->RefreshAllPlanetPanels(context, empire_id);
 }
@@ -3620,7 +3624,7 @@ void SidePanel::Refresh() {
             panel->RequirePreRender();
 }
 
-void SidePanel::RefreshInPreRender(ScriptingContext& context) {
+void SidePanel::RefreshInPreRender(GGHumanClientApp& app) {
     // disconnect any existing system and fleet signals
     for (const auto& con : s_system_connections)
         con.disconnect();
@@ -3634,11 +3638,13 @@ void SidePanel::RefreshInPreRender(ScriptingContext& context) {
     colony_projections.clear();
     species_colony_projections.clear();
 
+    const auto& context = app.GetContext();
+    const auto& objects = context.ContextObjects();
 
     // refresh individual panels' contents
     for (auto& weak_panel : s_side_panels)
         if (auto panel = weak_panel.lock())
-            panel->RefreshImpl(context);
+            panel->RefreshImpl(app);
 
 
     // early exit if no valid system object to get or connect signals to
@@ -3647,18 +3653,18 @@ void SidePanel::RefreshInPreRender(ScriptingContext& context) {
 
 
     // connect state changed and insertion signals for planets and fleets in system
-    auto system = context.ContextObjects().get<System>(s_system_id);
+    auto* system = objects.getRaw<System>(s_system_id);
     if (!system) {
         ErrorLogger() << "SidePanel::Refresh couldn't get system with id " << s_system_id;
         return;
     }
 
-    for (auto& planet : context.ContextObjects().find<Planet>(system->PlanetIDs())) {
+    for (auto* planet : objects.findRaw<Planet>(system->PlanetIDs())) {
         s_system_connections.insert(planet->ResourceCenterChangedSignal.connect(
             SidePanel::ResourceCenterChangedSignal));
     }
 
-    for (auto& fleet : context.ContextObjects().find<Fleet>(system->FleetIDs())) {
+    for (auto* fleet : objects.findRaw<Fleet>(system->FleetIDs())) {
         s_fleet_state_change_signals[fleet->ID()] = fleet->StateChangedSignal.connect(
             &SidePanel::Update);
     }
@@ -3734,7 +3740,7 @@ void SidePanel::RefreshSystemNames(const ObjectMap& objects) {
     }
 }
 
-void SidePanel::RefreshImpl(ScriptingContext& context) {
+void SidePanel::RefreshImpl(GGHumanClientApp& app) {
     ScopedTimer sidepanel_refresh_impl_timer("SidePanel::RefreshImpl", true);
     Sound::TempUISoundDisabler sound_disabler;
 
@@ -3744,17 +3750,17 @@ void SidePanel::RefreshImpl(ScriptingContext& context) {
     DetachChildAndReset(m_star_graphic);
     DetachChildAndReset(m_system_resource_summary);
 
+    auto& context = app.GetContext();
+    const auto& objects = context.ContextObjects();
 
-    RefreshSystemNames(context.ContextObjects());
+    RefreshSystemNames(objects);
 
     DetachChild(m_star_graphic);
 
-    auto system = context.ContextObjects().get<System>(s_system_id);
+    const auto* system = objects.getRaw<const System>(s_system_id);
     // if no system object, there is nothing to populate with.  early abort.
     if (!system)
         return;
-
-    auto& app = GetApp();
 
     // (re)create top right star graphic
     if (auto graphic = app.GetUI().GetModuloTexture(
@@ -3776,44 +3782,38 @@ void SidePanel::RefreshImpl(ScriptingContext& context) {
         MoveChildDown(m_star_graphic);
     }
 
-    // star type
-    m_star_type_text->SetText("<s>" + GetStarTypeName(system.get()) + "</s>");
+    m_star_type_text->SetText("<s>" + GetStarTypeName(system) + "</s>");
 
+    const auto client_empire_id = app.EmpireID();
 
     // configure selection of planet panels in panel container
-    static constexpr auto owned_by_client_empire = [](const UniverseObject* obj) {
-        const auto empire_id = GetApp().EmpireID();
-        return (empire_id != ALL_EMPIRES) && obj && obj->OwnedBy(empire_id);
-    };
+    const auto owned_by_client_empire = [client_empire_id](const UniverseObject* obj) noexcept
+    { return (client_empire_id != ALL_EMPIRES) && obj && obj->OwnedBy(client_empire_id); };
     if (m_selection_enabled)
         m_planet_panel_container->SetValidSelectionPredicate(std::function(owned_by_client_empire));
     else
         m_planet_panel_container->ClearValidSelectionPedicate();
 
-
     // update planet panel container contents (applying just-set selection predicate)
     //std::cout << " ... setting planet panel container planets" << std::endl;
-    const auto& planet_ids = system->PlanetIDs();
-    std::vector<int> planet_ids_vec(planet_ids.begin(), planet_ids.end());
-    m_planet_panel_container->SetPlanets(planet_ids_vec, system->GetStarType(), context);
+    const std::vector<int> planet_ids = system->PlanetIDs() | range_to_vec;
+    m_planet_panel_container->SetPlanets(planet_ids, system->GetStarType(), context, client_empire_id);
 
 
     // populate system resource summary
 
-    // for getting just the planets owned by player's empire
-    const auto empire_id = app.EmpireID();
     // If all planets are owned by the same empire, then we show the Shields/Defense/Troops/Supply;
     // regardless, if there are any planets owned by the player in the system, we show
     // Production/Research/Influnce.
     int all_owner_id = ALL_EMPIRES;
     bool all_planets_share_owner = true;
     std::vector<int> all_planets, player_planets;
-    for (const auto& planet : context.ContextObjects().find<const Planet>(planet_ids)) {
+    for (const auto* planet : objects.findRaw<const Planet>(planet_ids)) {
         // If it is neither owned nor populated with natives, it can be ignored.
         if (planet->Unowned() && planet->SpeciesName().empty())
             continue;
 
-        int owner = planet->Owner();
+        const int owner = planet->Owner();
         // If all planets have the same owner as each other, then they must have the same owner
         // as the first planet, so store its owner here when finding the first planet.
         if (all_planets.empty())
@@ -3822,7 +3822,7 @@ void SidePanel::RefreshImpl(ScriptingContext& context) {
             all_planets_share_owner = false;
 
         all_planets.push_back(planet->ID());
-        if (owner == empire_id)
+        if (owner == client_empire_id)
             player_planets.push_back(planet->ID());
     }
 
@@ -3850,7 +3850,7 @@ void SidePanel::RefreshImpl(ScriptingContext& context) {
     // refresh the system resource summary.
     m_system_resource_summary = GG::Wnd::Create<MultiIconValueIndicator>(
         Width() - MaxPlanetDiameter() - 8,
-        all_planets_share_owner ? all_planets : player_planets,
+        all_planets_share_owner ? std::move(all_planets) : std::move(player_planets),
         std::move(meter_types));
     m_system_resource_summary->MoveTo(GG::Pt(GG::X(MaxPlanetDiameter() + 4),
                                              GG::Y{140} - m_system_resource_summary->Height()));
@@ -3865,7 +3865,7 @@ void SidePanel::RefreshImpl(ScriptingContext& context) {
         for (const auto type : resource_meters | range_keys) {
             m_system_resource_summary->SetToolTip(type,
                 GG::Wnd::Create<SystemResourceSummaryBrowseWnd>(
-                    MeterToResource(type), s_system_id, empire_id));
+                    MeterToResource(type), s_system_id, client_empire_id));
         }
         // and the other meters
         for (const auto type : general_meters | range_keys) {
@@ -3874,7 +3874,7 @@ void SidePanel::RefreshImpl(ScriptingContext& context) {
         }
 
         AttachChild(m_system_resource_summary);
-        m_system_resource_summary->Update();
+        m_system_resource_summary->Update(objects);
     }
 }
 

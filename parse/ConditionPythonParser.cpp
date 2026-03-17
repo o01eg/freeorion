@@ -149,21 +149,19 @@ namespace {
         std::unique_ptr<ValueRef::ValueRef<double>> low;
         if (kw.has_key("low")) {
             auto low_args = extract<value_ref_wrapper<double>>(kw["low"]);
-            if (low_args.check()) {
+            if (low_args.check())
                 low = CloneUnique(low_args().value_ref);
-            } else {
+            else
                 low = make_constant<double>(extract<double>(kw["low"])());
-            }
         }
 
         std::unique_ptr<ValueRef::ValueRef<double>> high;
         if (kw.has_key("high")) {
             auto high_args = extract<value_ref_wrapper<double>>(kw["high"]);
-            if (high_args.check()) {
+            if (high_args.check())
                 high = CloneUnique(high_args().value_ref);
-            } else {
+            else
                 high = make_constant<double>(extract<double>(kw["high"])());
-            }
         }
         return make_wrapped<Condition::MeterValue>(m, std::move(low), std::move(high));
     }
@@ -172,11 +170,10 @@ namespace {
         std::unique_ptr<ValueRef::ValueRef<int>> number;
         if (kw.has_key("number")) {
             auto number_args = boost::python::extract<value_ref_wrapper<int>>(kw["number"]);
-            if (number_args.check()) {
+            if (number_args.check())
                 number = ValueRef::CloneUnique(number_args().value_ref);
-            } else {
+            else
                 number = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["number"])());
-            }
         } else {
             number = make_constant<int>(std::numeric_limits<int>::max());
         }
@@ -189,11 +186,10 @@ namespace {
                 sortkey = CloneUnique(sortkey_args().value_ref);
             } else {
                 auto sortkey_str_args = boost::python::extract<value_ref_wrapper<std::string>>(kw["sortkey"]);
-                if (sortkey_str_args.check()) {
+                if (sortkey_str_args.check())
                     sortkey_str = ValueRef::CloneUnique(sortkey_str_args().value_ref);
-                } else {
+                else
                     sortkey = make_constant<double>(extract<double>(kw["sortkey"])());
-                }
             }
         }
 
@@ -215,19 +211,16 @@ namespace {
     condition_wrapper insert_visible_to_empire_(const boost::python::tuple& args, const boost::python::dict& kw) {
         std::unique_ptr<ValueRef::ValueRef<int>> empire;
         auto empire_args = extract<value_ref_wrapper<int>>(kw["empire"]);
-        if (empire_args.check()) {
+        if (empire_args.check())
             empire = CloneUnique(empire_args().value_ref);
-        } else {
+        else
             empire = make_constant<int>(extract<int>(kw["empire"])());
-        }
 
-        if (kw.has_key("turn")) {
+        if (kw.has_key("turn"))
             throw std::runtime_error(std::string("Not implemented ") + __func__);
-        }
 
-        if (kw.has_key("visibility")) {
+        if (kw.has_key("visibility"))
             throw std::runtime_error(std::string("Not implemented ") + __func__);
-        }
 
         return make_wrapped<Condition::VisibleToEmpire>(std::move(empire));
     }
@@ -249,21 +242,20 @@ namespace {
                     types.push_back(std::move(constant));
                 }
             }
-            if (have_refs) {
+            if (have_refs)
                 return make_wrapped<Condition::PlanetType<>>(std::move(types));
-            } else { // have only constants
+            else // have only constants
                 return make_wrapped<Condition::PlanetType<::PlanetType>>(std::move(type_vals));
-            }
+
         } else if (kw.has_key("size")) {
             std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetSize>>> sizes;
             boost::python::stl_input_iterator<boost::python::object> it_begin(kw["size"]), it_end;
             for (auto it = it_begin; it != it_end; ++it) {
                 auto size_arg = extract<value_ref_wrapper< ::PlanetSize>>(*it);
-                if (size_arg.check()) {
+                if (size_arg.check())
                     sizes.push_back(CloneUnique(size_arg().value_ref));
-                } else {
+                else
                     sizes.push_back(make_constant< ::PlanetSize>(*it));
-                }
             }
             return make_wrapped<Condition::PlanetSize>(std::move(sizes));
 
@@ -272,16 +264,14 @@ namespace {
             boost::python::stl_input_iterator<boost::python::object> it_begin(kw["environment"]), it_end;
             for (auto it = it_begin; it != it_end; ++it) {
                 auto env_arg = extract<value_ref_wrapper< ::PlanetEnvironment>>(*it);
-                if (env_arg.check()) {
+                if (env_arg.check())
                     environments.push_back(CloneUnique(env_arg().value_ref));
-                } else {
+                else
                     environments.push_back(make_constant< ::PlanetEnvironment>(*it));
-                }
             }
             std::unique_ptr<ValueRef::ValueRef<std::string>> species = nullptr;
-            if (kw.has_key("species")) {
+            if (kw.has_key("species"))
                 species = pyobject_to_vref<std::string>(kw["species"]);
-            }
             return make_wrapped<Condition::PlanetEnvironment>(std::move(environments), std::move(species));
         }
         return make_wrapped<Condition::Type>(UniverseObjectType::OBJ_PLANET);
@@ -293,11 +283,10 @@ namespace {
             boost::python::stl_input_iterator<boost::python::object> it_begin(kw["name"]), it_end;
             for (auto it = it_begin; it != it_end; ++it) {
                 auto name_arg = extract<value_ref_wrapper<std::string>>(*it);
-                if (name_arg.check()) {
+                if (name_arg.check())
                     names.push_back(CloneUnique(name_arg().value_ref));
-                } else {
+                else
                     names.push_back(make_constant<std::string>(extract<std::string>(*it)()));
-                }
             }
             return make_wrapped<Condition::Homeworld>(std::move(names));
         }
@@ -305,34 +294,42 @@ namespace {
     }
 
     condition_wrapper insert_has_special_(const boost::python::tuple& args, const boost::python::dict& kw) {
-        if (kw.has_key("name")) {
-            std::unique_ptr<ValueRef::ValueRef<std::string>> name;
-            auto name_args = extract<value_ref_wrapper<std::string>>(kw["name"]);
-            if (name_args.check()) {
-                name = CloneUnique(name_args().value_ref);
-            } else {
-                name = make_constant<std::string>(extract<std::string>(kw["name"])());
-            }
-            return make_wrapped<Condition::HasSpecial>(std::move(name));
-        }
+        if (!kw.has_key("name"))
+            return make_wrapped<Condition::HasSpecial>();
+
+        auto name_args = extract<value_ref_wrapper<std::string>>(kw["name"]);
+        if (name_args.check())
+            return make_wrapped<Condition::HasSpecial>(CloneUnique(name_args().value_ref));
+
+        auto name_arg = extract<std::string>(kw["name"]);
+        if (name_arg.check())
+            return make_wrapped<Condition::HasSpecial>(make_constant<std::string>(name_arg()));
+
         return make_wrapped<Condition::HasSpecial>();
     }
 
     condition_wrapper insert_has_species_(const boost::python::tuple& args, const boost::python::dict& kw) {
-        if (kw.has_key("name")) {
-            std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> names;
-            boost::python::stl_input_iterator<boost::python::object> it_begin(kw["name"]), it_end;
-            for (auto it = it_begin; it != it_end; ++it) {
-                auto name_arg = extract<value_ref_wrapper<std::string>>(*it);
-                if (name_arg.check()) {
-                    names.push_back(CloneUnique(name_arg().value_ref));
-                } else {
-                    names.push_back(make_constant<std::string>(extract<std::string>(*it)()));
-                }
-            }
-            return make_wrapped<Condition::Species>(std::move(names));
+        if (!kw.has_key("name"))
+            return make_wrapped<Condition::Species>();
+
+        auto name_arg_string = extract<std::string>(kw["name"]);
+        if (name_arg_string.check())
+            return make_wrapped<Condition::Species>(name_arg_string());
+
+        auto name_arg_ref = extract<value_ref_wrapper<std::string>>(kw["name"]);
+        if (name_arg_ref.check())
+            return make_wrapped<Condition::Species>(CloneUnique(name_arg_ref().value_ref));
+
+        std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> names;
+        boost::python::stl_input_iterator<boost::python::object> it_begin(kw["name"]), it_end;
+        for (auto it = it_begin; it != it_end; ++it) {
+            auto name_arg = extract<value_ref_wrapper<std::string>>(*it);
+            if (name_arg.check())
+                names.push_back(CloneUnique(name_arg().value_ref));
+            else
+                names.push_back(make_constant<std::string>(extract<std::string>(*it)()));
         }
-        return make_wrapped<Condition::Species>();
+        return make_wrapped<Condition::Species>(std::move(names));
     }
 
     condition_wrapper insert_is_field_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -511,21 +508,37 @@ namespace {
     }
 
     condition_wrapper insert_building_(const boost::python::tuple& args, const boost::python::dict& kw) {
+        BuildingType::SubType subtype = BuildingType::SubType::NONE;
+        if (kw.has_key("subtype")) {
+            const auto subtype_name = extract<std::string>(kw["subtype"])();
+            if (subtype_name == "colony")
+                subtype = BuildingType::SubType::COLONY;
+            else if (subtype_name == "shipyard")
+                subtype = BuildingType::SubType::SHIPYARD;
+
+        }
+        if (!kw.has_key("name"))
+            return make_wrapped<Condition::Building>(subtype);
+
+        auto name_arg_string = extract<std::string>(kw["name"]);
+        if (name_arg_string.check())
+            return make_wrapped<Condition::Building>(name_arg_string(), subtype);
+
+        auto name_arg_ref = extract<value_ref_wrapper<std::string>>(kw["name"]);
+        if (name_arg_ref.check())
+            return make_wrapped<Condition::Building>(CloneUnique(name_arg_ref().value_ref), subtype);
+
         std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> names;
-        
-        if (kw.has_key("name")) {
-            boost::python::stl_input_iterator<boost::python::object> it_begin(kw["name"]), it_end;
-            for (auto it = it_begin; it != it_end; ++it) {
-                auto name_arg = extract<value_ref_wrapper<std::string>>(*it);
-                if (name_arg.check()) {
-                    names.push_back(CloneUnique(name_arg().value_ref));
-                } else {
-                    names.push_back(make_constant<std::string>(extract<std::string>(*it)()));
-                }
-            }
+        boost::python::stl_input_iterator<boost::python::object> it_begin(kw["name"]), it_end;
+        for (auto it = it_begin; it != it_end; ++it) {
+            auto name_arg = extract<value_ref_wrapper<std::string>>(*it);
+            if (name_arg.check())
+                names.push_back(CloneUnique(name_arg().value_ref));
+            else
+                names.push_back(make_constant<std::string>(extract<std::string>(*it)()));
         }
 
-        return make_wrapped<Condition::Building>(std::move(names));
+        return make_wrapped<Condition::Building>(std::move(names), subtype);
     }
 
     condition_wrapper insert_location_(const boost::python::tuple& args, const boost::python::dict& kw) {
@@ -533,20 +546,18 @@ namespace {
 
         std::unique_ptr<ValueRef::ValueRef<std::string>> name;
         auto name_args = extract<value_ref_wrapper<std::string>>(kw["name"]);
-        if (name_args.check()) {
+        if (name_args.check())
             name = CloneUnique(name_args().value_ref);
-        } else {
+        else
             name = make_constant<std::string>(extract<std::string>(kw["name"])());
-        }
 
         std::unique_ptr<ValueRef::ValueRef<std::string>> name2;
         if (kw.has_key("name2")) {
             auto name2_args = extract<value_ref_wrapper<std::string>>(kw["name2"]);
-            if (name2_args.check()) {
+            if (name2_args.check())
                 name2 = CloneUnique(name2_args().value_ref);
-            } else {
+            else
                 name2 = make_constant<std::string>(extract<std::string>(kw["name2"])());
-            }
         }
 
         return make_wrapped<Condition::Location>(
@@ -557,58 +568,61 @@ namespace {
 
     condition_wrapper insert_enqueued_(const boost::python::tuple& args, const boost::python::dict& kw) {
         BuildType build_type = BuildType::INVALID_BUILD_TYPE;
-        if (kw.has_key("type")) {
+        if (kw.has_key("type"))
             build_type = extract<enum_wrapper<BuildType>>(kw["type"])().value;
-        }
 
         std::unique_ptr<ValueRef::ValueRef<int>> low;
         if (kw.has_key("low")) {
             auto low_args = extract<value_ref_wrapper<int>>(kw["low"]);
-            if (low_args.check()) {
+            if (low_args.check())
                 low = CloneUnique(low_args().value_ref);
-            } else {
+            else
                 low = make_constant<int>(extract<int>(kw["low"])());
-            }
         }
 
         std::unique_ptr<ValueRef::ValueRef<int>> high;
         if (kw.has_key("high")) {
             auto high_args = extract<value_ref_wrapper<int>>(kw["high"]);
-            if (high_args.check()) {
+            if (high_args.check())
                 high = CloneUnique(high_args().value_ref);
-            } else {
+            else
                 high = make_constant<int>(extract<int>(kw["high"])());
-            }
         }
 
         std::unique_ptr<ValueRef::ValueRef<int>> empire;
         if (kw.has_key("empire")) {
             auto empire_args = extract<value_ref_wrapper<int>>(kw["empire"]);
-            if (empire_args.check()) {
+            if (empire_args.check())
                 empire = CloneUnique(empire_args().value_ref);
-            } else {
+            else
                 empire = make_constant<int>(extract<int>(kw["empire"])());
-            }
         }
 
         std::unique_ptr<ValueRef::ValueRef<std::string>> name;
         if (kw.has_key("name")) {
             auto name_args = extract<value_ref_wrapper<std::string>>(kw["name"]);
-            if (name_args.check()) {
+            if (name_args.check())
                 name = CloneUnique(name_args().value_ref);
-            } else {
+            else
                 name = make_constant<std::string>(extract<std::string>(kw["name"])());
-            }
         }
 
         std::unique_ptr<ValueRef::ValueRef<int>> design;
         if (kw.has_key("design")) {
             auto design_args = extract<value_ref_wrapper<int>>(kw["design"]);
-            if (design_args.check()) {
+            if (design_args.check())
                 design = CloneUnique(design_args().value_ref);
-            } else {
+            else
                 design = make_constant<int>(extract<int>(kw["design"])());
-            }
+        }
+
+        BuildingType::SubType subtype = BuildingType::SubType::NONE;
+        if (kw.has_key("subtype")) {
+            const auto subtype_name = extract<std::string>(kw["subtype"])();
+            if (subtype_name == "colony")
+                subtype = BuildingType::SubType::COLONY;
+            else if (subtype_name == "shipyard")
+                subtype = BuildingType::SubType::SHIPYARD;
         }
 
         if (build_type == BuildType::BT_SHIP) {
@@ -617,6 +631,14 @@ namespace {
                 std::move(empire),
                 std::move(low),
                 std::move(high));
+
+        } else if (subtype != BuildingType::SubType::NONE) {
+            return make_wrapped<Condition::Enqueued>(
+                subtype,
+                std::move(empire),
+                std::move(low),
+                std::move(high));
+
         } else {
             return make_wrapped<Condition::Enqueued>(
                 build_type,
@@ -631,21 +653,19 @@ namespace {
         std::unique_ptr<ValueRef::ValueRef<int>> low;
         if (kw.has_key("low")) {
             auto low_args = extract<value_ref_wrapper<int>>(kw["low"]);
-            if (low_args.check()) {
+            if (low_args.check())
                 low = CloneUnique(low_args().value_ref);
-            } else {
+            else
                 low = make_constant<int>(extract<int>(kw["low"])());
-            }
         }
 
         std::unique_ptr<ValueRef::ValueRef<int>> high;
         if (kw.has_key("high")) {
             auto high_args = extract<value_ref_wrapper<int>>(kw["high"]);
-            if (high_args.check()) {
+            if (high_args.check())
                 high = CloneUnique(high_args().value_ref);
-            } else {
+            else
                 high = make_constant<int>(extract<int>(kw["high"])());
-            }
         }
 
         auto condition = CloneUnique(extract<condition_wrapper>(kw["condition"])().condition);
@@ -659,11 +679,10 @@ namespace {
     condition_wrapper insert_produced_by_empire_(const boost::python::tuple& args, const boost::python::dict& kw) {
         std::unique_ptr<ValueRef::ValueRef<int>> empire;
         auto empire_args = extract<value_ref_wrapper<int>>(kw["empire"]);
-        if (empire_args.check()) {
+        if (empire_args.check())
             empire = CloneUnique(empire_args().value_ref);
-        } else {
+        else
             empire = make_constant<int>(extract<int>(kw["empire"])());
-        }
 
         return make_wrapped<Condition::ProducedByEmpire>(std::move(empire));
     }
@@ -671,11 +690,10 @@ namespace {
     condition_wrapper insert_owner_has_tech_(const boost::python::tuple& args, const boost::python::dict& kw) {
         std::unique_ptr<ValueRef::ValueRef<std::string>> name;
         auto name_args = extract<value_ref_wrapper<std::string>>(kw["name"]);
-        if (name_args.check()) {
+        if (name_args.check())
             name = CloneUnique(name_args().value_ref);
-        } else {
+        else
             name = make_constant<std::string>(extract<std::string>(kw["name"])());
-        }
         return make_wrapped<Condition::OwnerHasTech>(std::move(name));
     }
 

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "Building.h"
+#include "BuildingType.h"
 #include "ConditionAll.h"
 #include "ConditionSource.h"
 #include "Condition.h"
@@ -586,11 +587,11 @@ struct FO_COMMON_API None final : public Condition {
               ObjectSet& non_matches, SearchDomain search_domain = SearchDomain::NON_MATCHES) const override;
     [[nodiscard]] bool EvalAny(const ScriptingContext&, std::span<const UniverseObjectCXBase*>) const noexcept override { return false; }
     [[nodiscard]] bool EvalAny(const ScriptingContext&, std::span<const int>) const noexcept override { return false; }
-    [[nodiscard]] ObjectSet GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const override
+    [[nodiscard]] ObjectSet GetDefaultInitialCandidateObjects(const ScriptingContext&) const override
     { return {}; /* efficient rejection of everything. */ }
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
-    void SetTopLevelContent(const std::string& content_name) noexcept override {}
+    void SetTopLevelContent(const std::string&) noexcept override {}
     [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(noexcept(CheckSums::GetCheckSum(""))) override
     { return CheckSums::GetCheckSum("Condition::None"); }
 
@@ -617,7 +618,7 @@ struct FO_COMMON_API NoOp final : public Condition {
     { return UserString("DESC_NOOP"); }
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override
     { return DumpIndent(ntabs) + "NoOp\n"; }
-    void SetTopLevelContent(const std::string& content_name) noexcept override {}
+    void SetTopLevelContent(const std::string&) noexcept override {}
 
     [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(noexcept(CheckSums::GetCheckSum(""))) override
     { return CheckSums::GetCheckSum("Condition::NoOp"); }
@@ -683,7 +684,7 @@ struct FO_COMMON_API RootCandidate final : public Condition {
 
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
-    void SetTopLevelContent(const std::string& content_name) noexcept override {}
+    void SetTopLevelContent(const std::string&) noexcept override {}
 
     [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(noexcept(CheckSums::GetCheckSum(""))) override
     { return CheckSums::GetCheckSum("Condition::RootCandidate"); }
@@ -719,7 +720,7 @@ struct FO_COMMON_API Target final : public Condition {
 
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
-    void SetTopLevelContent(const std::string& content_name) noexcept override {}
+    void SetTopLevelContent(const std::string&) noexcept override {}
 
     [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(noexcept(CheckSums::GetCheckSum(""))) override
     { return CheckSums::GetCheckSum("Condition::Target"); }
@@ -842,7 +843,7 @@ struct FO_COMMON_API Monster final : public Condition {
     [[nodiscard]] ObjectSet GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const override;
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
-    void SetTopLevelContent(const std::string& content_name) noexcept override {}
+    void SetTopLevelContent(const std::string&) noexcept override {}
 
     [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(noexcept(CheckSums::GetCheckSum(""))) override
     { return CheckSums::GetCheckSum("Condition::Monster"); }
@@ -871,7 +872,7 @@ struct FO_COMMON_API Armed final : public Condition {
     { return (!negated) ? UserString("DESC_ARMED") : UserString("DESC_ARMED_NOT"); }
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override
     { return DumpIndent(ntabs) + "Armed\n"; }
-    void SetTopLevelContent(const std::string& content_name) noexcept override {}
+    void SetTopLevelContent(const std::string&) noexcept override {}
 
     [[nodiscard]] constexpr uint32_t GetCheckSum() const noexcept(noexcept(CheckSums::GetCheckSum(""))) override
     { return CheckSums::GetCheckSum("Condition::Armed"); }
@@ -961,12 +962,18 @@ private:
     const bool m_type_local_invariant;
 };
 
-/** Matches all Building objects that are one of the building types specified in \a names. */
+/** Matches all Building objects that are one of the building types specified in \a names.
+  * Just checking if an object is a Building, of any BuildingType, can be done with the
+  * Type Condition. */
 struct FO_COMMON_API Building final : public Condition {
     using string_vref_ptr_vec = std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>;
-    explicit Building(string_vref_ptr_vec&& names);
-    explicit Building(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
-    explicit Building(std::string name);
+    explicit Building(BuildingType::SubType subtype = BuildingType::SubType::NONE);
+    explicit Building(string_vref_ptr_vec&& type_names,
+                      BuildingType::SubType subtype = BuildingType::SubType::NONE);
+    explicit Building(std::unique_ptr<ValueRef::ValueRef<std::string>>&& type_name,
+                      BuildingType::SubType subtype = BuildingType::SubType::NONE);
+    explicit Building(std::string type_name,
+                      BuildingType::SubType subtype = BuildingType::SubType::NONE);
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override;
     [[nodiscard]] bool operator==(const Building& rhs) const;
@@ -988,8 +995,9 @@ struct FO_COMMON_API Building final : public Condition {
 private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
-    string_vref_ptr_vec m_names;
+    string_vref_ptr_vec m_type_names;
     const bool m_names_local_invariant;
+    const BuildingType::SubType m_subtype_requirement = BuildingType::SubType::NONE;
 };
 
 /** Matches all Field objects that are one of the field types specified in \a names. */
@@ -1032,7 +1040,8 @@ struct FO_COMMON_API HasSpecial final : public Condition {
     HasSpecial(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name,
                std::unique_ptr<ValueRef::ValueRef<double>>&& capacity_low,
                std::unique_ptr<ValueRef::ValueRef<double>>&& capacity_high = nullptr);
-    explicit HasSpecial(const HasSpecial& rhs);
+    HasSpecial(const HasSpecial& rhs);
+    HasSpecial(HasSpecial&&) noexcept = default;
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -2038,7 +2047,8 @@ PlanetType(std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetType>>>) -> P
   * Note that all Building objects which are on matching planets are also
   * matched. */
 struct FO_COMMON_API PlanetSize final : public Condition {
-    explicit PlanetSize(std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetSize>>>&& sizes);
+    using ptsize_vref_ptr_vec = std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetSize>>>;
+    explicit PlanetSize(ptsize_vref_ptr_vec&& sizes);
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override;
     void Eval(const ScriptingContext& parent_context, ObjectSet& matches,
@@ -2056,14 +2066,15 @@ struct FO_COMMON_API PlanetSize final : public Condition {
 private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
-    std::vector<std::unique_ptr<ValueRef::ValueRef<::PlanetSize>>> m_sizes;
+    ptsize_vref_ptr_vec m_sizes;
 };
 
 /** Matches all Planet objects that have one of the PlanetEnvironments in
   * \a environments.  Note that all Building objects which are on matching
   * planets are also matched. */
 struct FO_COMMON_API PlanetEnvironment final : public Condition {
-    explicit PlanetEnvironment(std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>>&& environments,
+    using pe_vref_ptr_vec = std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>>;
+    explicit PlanetEnvironment(pe_vref_ptr_vec&& environments,
                                std::unique_ptr<ValueRef::ValueRef<std::string>>&& species_name_ref = nullptr);
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override {
@@ -2089,7 +2100,7 @@ struct FO_COMMON_API PlanetEnvironment final : public Condition {
 private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
-    std::vector<std::unique_ptr<ValueRef::ValueRef<::PlanetEnvironment>>> m_environments;
+    pe_vref_ptr_vec m_environments;
     std::unique_ptr<ValueRef::ValueRef<std::string>> m_species_name;
 };
 
@@ -2097,7 +2108,10 @@ private:
   * Note that all Building object which are on matching planets are also
   * matched. */
 struct FO_COMMON_API Species final : public Condition {
-    explicit Species(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names);
+    using string_vref_ptr_vec = std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>;
+    explicit Species(string_vref_ptr_vec&& names);
+    explicit Species(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name);
+    explicit Species(std::string name);
     Species();
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override;
@@ -2118,7 +2132,7 @@ struct FO_COMMON_API Species final : public Condition {
 private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
-    std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> m_names;
+    string_vref_ptr_vec m_names;
     const bool m_names_local_invariant;
 };
 
@@ -2158,12 +2172,17 @@ struct FO_COMMON_API Enqueued final : public Condition {
              std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id = nullptr,
              std::unique_ptr<ValueRef::ValueRef<int>>&& low = nullptr,
              std::unique_ptr<ValueRef::ValueRef<int>>&& high = nullptr);
+    explicit Enqueued(BuildingType::SubType subtype,
+                      std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id = nullptr,
+                      std::unique_ptr<ValueRef::ValueRef<int>>&& low = nullptr,
+                      std::unique_ptr<ValueRef::ValueRef<int>>&& high = nullptr);
     explicit Enqueued(std::unique_ptr<ValueRef::ValueRef<int>>&& design_id,
                       std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id = nullptr,
                       std::unique_ptr<ValueRef::ValueRef<int>>&& low = nullptr,
                       std::unique_ptr<ValueRef::ValueRef<int>>&& high = nullptr);
     Enqueued();
     Enqueued(const Enqueued& rhs);
+    Enqueued(Enqueued&&) noexcept = default;
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override;
     [[nodiscard]] bool operator==(const Enqueued& rhs) const;
@@ -2183,18 +2202,20 @@ struct FO_COMMON_API Enqueued final : public Condition {
 private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
-    BuildType m_build_type;
-    std::unique_ptr<ValueRef::ValueRef<std::string>>    m_name;
-    std::unique_ptr<ValueRef::ValueRef<int>>            m_design_id;
-    std::unique_ptr<ValueRef::ValueRef<int>>            m_empire_id;
-    std::unique_ptr<ValueRef::ValueRef<int>>            m_low;
-    std::unique_ptr<ValueRef::ValueRef<int>>            m_high;
+    const BuildType m_build_type;
+    const BuildingType::SubType                      m_building_subtype;
+    std::unique_ptr<ValueRef::ValueRef<std::string>> m_name;
+    std::unique_ptr<ValueRef::ValueRef<int>>         m_design_id;
+    std::unique_ptr<ValueRef::ValueRef<int>>         m_empire_id;
+    std::unique_ptr<ValueRef::ValueRef<int>>         m_low;
+    std::unique_ptr<ValueRef::ValueRef<int>>         m_high;
     const bool m_refs_local_invariant;
 };
 
 /** Matches all ProdCenter objects that have one of the FocusTypes in \a foci. */
 struct FO_COMMON_API FocusType final : public Condition {
-    explicit FocusType(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names);
+    using string_vref_ptr_vec = std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>;
+    explicit FocusType(string_vref_ptr_vec&& names);
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override;
     [[nodiscard]] bool operator==(const FocusType& rhs) const;
@@ -2215,14 +2236,15 @@ struct FO_COMMON_API FocusType final : public Condition {
 private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
-    std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>> m_names;
+    string_vref_ptr_vec m_names;
     const bool m_names_local_invariant;
 };
 
 /** Matches all System objects that have one of the StarTypes in \a types.  Note that all objects
     in matching Systems are also matched (Ships, Fleets, Buildings, Planets, etc.). */
 struct FO_COMMON_API StarType final : public Condition {
-    explicit StarType(std::vector<std::unique_ptr<ValueRef::ValueRef< ::StarType>>>&& types);
+    using startype_vref_ptr_vec = std::vector<std::unique_ptr<ValueRef::ValueRef< ::StarType>>>;
+    explicit StarType(startype_vref_ptr_vec&& types);
     explicit StarType(std::unique_ptr<ValueRef::ValueRef<::StarType>>&& type);
     explicit StarType(::StarType type);
 
@@ -2244,7 +2266,7 @@ struct FO_COMMON_API StarType final : public Condition {
 private:
     [[nodiscard]] bool Match(const ScriptingContext& local_context) const override;
 
-    std::vector<std::unique_ptr<ValueRef::ValueRef<::StarType>>> m_types;
+    startype_vref_ptr_vec m_types;
 };
 
 /** Matches all ships whose ShipDesign has the hull specified by \a name. */
@@ -2957,7 +2979,7 @@ struct FO_COMMON_API Stationary final : public Condition {
 
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
-    void SetTopLevelContent(const std::string& content_name) noexcept override {}
+    void SetTopLevelContent(const std::string&) noexcept override {}
 
     [[nodiscard]] std::unique_ptr<Condition> Clone() const override;
 
@@ -2985,7 +3007,7 @@ struct FO_COMMON_API Aggressive final : public Condition {
 
     [[nodiscard]] std::string Description(bool negated = false) const override;
     [[nodiscard]] std::string Dump(uint8_t ntabs = 0) const override;
-    void SetTopLevelContent(const std::string& content_name) noexcept override {}
+    void SetTopLevelContent(const std::string&) noexcept override {}
     [[nodiscard]] constexpr bool GetAggressive() const noexcept { return m_aggressive; }
     [[nodiscard]] constexpr uint32_t GetCheckSum() const override
     { return CheckSums::GetCheckSum("Condition::Aggressive", m_aggressive); }
@@ -3185,8 +3207,9 @@ struct FO_COMMON_API ValueTest final : public Condition {
               std::unique_ptr<ValueRef::ValueRef<int>>&& value_ref2,
               ComparisonType comp2 = ComparisonType::INVALID_COMPARISON,
               std::unique_ptr<ValueRef::ValueRef<int>>&& value_ref3 = nullptr);
+
     ValueTest(const ValueTest& rhs);
-    ValueTest(ValueTest&& rhs) = default;
+    ValueTest(ValueTest&&) noexcept = default;
 
     [[nodiscard]] bool operator==(const Condition& rhs) const override {
         if (this == std::addressof(rhs))

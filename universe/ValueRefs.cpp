@@ -60,9 +60,6 @@ namespace std {
 #endif
 
 
-std::string DoubleToString(double val, int digits, bool always_show_sign);
-bool UserStringExists(const std::string& str);
-
 namespace {
     void LogStackTrace(const std::string_view what) {
         // only output stack trace some times per minute, as this was very slow on windows
@@ -312,18 +309,20 @@ std::string EnumToString(EnumT t)
 {
     static_assert(std::is_enum_v<EnumT>);
     const auto maybe_retval = to_string(t);
+    static_assert(std::is_same_v<decltype(maybe_retval), const std::string_view>);
     if (UserStringExists(maybe_retval))
         return UserString(maybe_retval);
     else
         return std::string{maybe_retval};
 }
 
-std::string FlexibleToString(StarType t) { return EnumToString(t); }
-std::string FlexibleToString(PlanetEnvironment t) { return EnumToString(t); }
-std::string FlexibleToString(PlanetType t) { return EnumToString(t); }
-std::string FlexibleToString(PlanetSize t) { return EnumToString(t); }
-std::string FlexibleToString(Visibility t) { return EnumToString(t); }
-std::string FlexibleToString(UniverseObjectType t) { return EnumToString(t); }
+std::string FlexibleToString(const StarType& t) { return EnumToString(t); }
+std::string FlexibleToString(const PlanetEnvironment& t) { return EnumToString(t); }
+std::string FlexibleToString(const PlanetType& t) { return EnumToString(t); }
+std::string FlexibleToString(const PlanetSize& t) { return EnumToString(t); }
+std::string FlexibleToString(const ShipPartClass& t) { return EnumToString(t); }
+std::string FlexibleToString(const Visibility& t) { return EnumToString(t); }
+std::string FlexibleToString(const UniverseObjectType& t) { return EnumToString(t); }
 
 std::string ValueRefBase::InvariancePattern() const {
     return std::string{RootCandidateInvariant() ? "R" : "r"}
@@ -412,7 +411,7 @@ std::string ReconstructName(std::string_view property_name, ContainerType contai
 }
 
 std::string FormatedDescriptionPropertyNames(ReferenceType ref_type, std::string_view property_name,
-                                             ContainerType container_type, bool return_immediate_value)
+                                             ContainerType container_type, bool)
 {
     const uint8_t bits_count = uint8_t(container_type != ContainerType::NONE ? 1u : 0u) +
         uint8_t((ref_type != NON_OBJECT_REFERENCE && ref_type != INVALID_REFERENCE_TYPE) ? 1u : 0u);
@@ -514,6 +513,20 @@ std::string ComplexVariableDump(std::string_view property_name,
     return retval;
 }
 
+std::string ReduceVectorDescription(StatisticType stat_type, std::string_view value_desc)
+{
+    std::string stringtable_key{"DESC_VAR_"};
+    stringtable_key.append(to_string(stat_type)); // assumes that all StatisticType names are ALL_CAPS
+
+    if (UserStringExists(stringtable_key)) {
+        boost::format formatter = FlexibleFormat(UserString(stringtable_key));
+        formatter % value_desc;
+        return boost::io::str(formatter);
+    }
+
+    return UserString("DESC_VAR_REDUCE_VECTOR");
+}
+
 std::string StatisticDescription(StatisticType stat_type, std::string_view value_desc,
                                  std::string_view condition_desc)
 {
@@ -569,35 +582,35 @@ std::string Constant<double>::Description() const
 { return DoubleToString(m_value, 3, false); }
 
 template <>
-std::string Constant<PlanetSize>::Dump(uint8_t ntabs) const
+std::string Constant<PlanetSize>::Dump(uint8_t) const
 { return std::string{DumpEnum(m_value)}; }
 
 template <>
-std::string Constant<PlanetType>::Dump(uint8_t ntabs) const
+std::string Constant<PlanetType>::Dump(uint8_t) const
 { return std::string{DumpEnum(m_value)}; }
 
 template <>
-std::string Constant<PlanetEnvironment>::Dump(uint8_t ntabs) const
+std::string Constant<PlanetEnvironment>::Dump(uint8_t) const
 { return std::string{DumpEnum(m_value)}; }
 
 template <>
-std::string Constant<UniverseObjectType>::Dump(uint8_t ntabs) const
+std::string Constant<UniverseObjectType>::Dump(uint8_t) const
 { return std::string{DumpEnum(m_value)}; }
 
 template <>
-std::string Constant<StarType>::Dump(uint8_t ntabs) const
+std::string Constant<StarType>::Dump(uint8_t) const
 { return std::string{DumpEnum(m_value)}; }
 
 template <>
-std::string Constant<Visibility>::Dump(uint8_t ntabs) const
+std::string Constant<Visibility>::Dump(uint8_t) const
 { return std::string{DumpEnum(m_value)}; }
 
 template <>
-std::string Constant<int>::Dump(uint8_t ntabs) const
+std::string Constant<int>::Dump(uint8_t) const
 { return std::to_string(m_value); }
 
 template <>
-std::string Constant<double>::Dump(uint8_t ntabs) const
+std::string Constant<double>::Dump(uint8_t) const
 { return std::to_string(m_value); }
 
 namespace StaticTests {
@@ -1355,6 +1368,10 @@ std::string Variable<std::string>::Eval(const ScriptingContext& context) const
             auto ship = static_cast<const Ship*>(object);
             return ship->SpeciesName();
 
+        } else if (object->ObjectType() == UniverseObjectType::OBJ_BUILDING) {
+            auto building = static_cast<const Building*>(object);
+            return building->SpeciesName();
+
         } else if (object->ObjectType() == UniverseObjectType::OBJ_FIGHTER) {
             auto fighter = static_cast<const Fighter*>(object);
             return fighter->SpeciesName();
@@ -1449,8 +1466,6 @@ std::string Statistic<std::string, std::string>::Eval(const ScriptingContext& co
     for (auto& entry : object_property_values)
         observed_values[std::move(entry)]++;
 
-    static constexpr auto second_less = [](const auto& p1, const auto& p2) -> bool
-    { return p1.second < p2.second; };
     auto max = range_max_element(observed_values, second_less);
 
     return max->first;
@@ -1536,7 +1551,7 @@ std::string TotalFighterShots::Description() const {
     return retval;
 }
 
-std::string TotalFighterShots::Dump(uint8_t ntabs) const {
+std::string TotalFighterShots::Dump(uint8_t) const {
     std::string retval = "TotalFighterShots";
     if (m_carrier_id)
         retval += " carrier = " + m_carrier_id->Dump();
@@ -1568,11 +1583,11 @@ int TotalFighterShots::Eval(const ScriptingContext& context) const {
 // ComplexVariable                                       //
 ///////////////////////////////////////////////////////////
 template <>
-PlanetSize ComplexVariable<PlanetSize>::Eval(const ScriptingContext& context) const
+PlanetSize ComplexVariable<PlanetSize>::Eval(const ScriptingContext&) const
 { return PlanetSize::INVALID_PLANET_SIZE; }
 
 template <>
-PlanetType ComplexVariable<PlanetType>::Eval(const ScriptingContext& context) const
+PlanetType ComplexVariable<PlanetType>::Eval(const ScriptingContext&) const
 { return PlanetType::INVALID_PLANET_TYPE; } // TODO: Species favourite planet type?
 
 template <>
@@ -1592,11 +1607,11 @@ PlanetEnvironment ComplexVariable<PlanetEnvironment>::Eval(const ScriptingContex
 }
 
 template <>
-UniverseObjectType ComplexVariable<UniverseObjectType>::Eval(const ScriptingContext& context) const
+UniverseObjectType ComplexVariable<UniverseObjectType>::Eval(const ScriptingContext&) const
 { return UniverseObjectType::INVALID_UNIVERSE_OBJECT_TYPE; }
 
 template <>
-StarType ComplexVariable<StarType>::Eval(const ScriptingContext& context) const
+StarType ComplexVariable<StarType>::Eval(const ScriptingContext&) const
 { return StarType::INVALID_STAR_TYPE; }
 
 template <>
@@ -1677,7 +1692,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         }
 
         std::function<bool(const std::map<std::string, int>::value_type&)> key_filter{nullptr};
-        key_filter = [](auto e) -> bool { return true; };
+        key_filter = [](auto) -> bool { return true; };
 
         if (m_string_ref1) {
             std::string key_string = m_string_ref1->Eval(context);
@@ -1768,7 +1783,7 @@ int ComplexVariable<int>::Eval(const ScriptingContext& context) const
         }
 
         std::function<bool(const std::map<int, int>::value_type&)> key_filter{nullptr};
-        key_filter = [](auto e) -> bool { return true; };
+        key_filter = [](auto) -> bool { return true; };
 
         // if a key integer specified, get just that entry (for single empire or sum of all empires)
         if (m_int_ref2)
@@ -2728,11 +2743,46 @@ std::string ComplexVariable<std::string>::Eval(const ScriptingContext& context) 
 }
 
 template <>
+std::vector<ShipPartClass> ComplexVariable<std::vector<ShipPartClass>>::Eval(
+    const ScriptingContext& context) const
+{
+    if (m_property == Property::PartClassesInShipDesign) {
+        int design_id = INVALID_DESIGN_ID;
+        if (m_int_ref1) {
+            design_id = m_int_ref1->Eval(context);
+            if (design_id == INVALID_DESIGN_ID)
+                return {};
+        } else {
+            return {};
+        }
+
+        const ShipDesign* design = context.ContextUniverse().GetShipDesign(design_id);
+        if (!design)
+            return {};
+        std::vector<ShipPartClass> part_classes;
+        // reusing already counted part classes
+        part_classes.reserve(design->PartClassCount().size());
+
+        for (auto const& [part_class, count] : design->PartClassCount()) {
+            if (count > 0) {
+                part_classes.push_back(part_class);
+            } else {
+                ErrorLogger() << "Unexpected part class entry for " << part_class << " - has zero count in design "  << design_id;
+            }
+        }
+        return part_classes;
+    }
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::vector<ShipPartClass>);
+
+    return {};
+}
+
+template <>
 std::vector<std::string> ComplexVariable<std::vector<std::string>>::Eval(
     const ScriptingContext& context) const
 {
     // unindexed empire properties
-    if (m_property == Property::EmpireAdoptedPolices) {
+    if (m_property == Property::EmpireAdoptedPolicies) {
         const int empire_id = m_int_ref1 ? m_int_ref1->Eval(context) : ALL_EMPIRES;
         if (empire_id == ALL_EMPIRES)
             return {};
@@ -2758,6 +2808,8 @@ std::vector<std::string> ComplexVariable<std::vector<std::string>>::Eval(
         const auto& pols = empire->AvailablePolicies();
         return std::vector<std::string>{pols.begin(), pols.end()};
     }
+    ErrorLogger() << "Unexpected property of type '" << m_property << "'";
+    LOG_UNKNOWN_VARIABLE_PROPERTY_TRACE(std::vector<std::string>)
 
     return {};
 }

@@ -21,6 +21,37 @@
 
 #include "ParserAppFixture.h"
 
+namespace {
+    template <typename T>
+    void DumpEntity(const T& t) {
+        const char* filename = std::getenv("FO_DUMP_FILE");
+        if (filename != nullptr) {
+            std::ofstream f(filename);
+            const auto dump = t.Dump(0);
+            f.write(dump.c_str(), dump.size());
+            f.flush();           
+        } else {
+            BOOST_TEST_MESSAGE(t.Dump(0));
+        }
+    }
+
+    template <typename T>
+    void DumpEntitiesList(const T& t) {
+        const char* filename = std::getenv("FO_DUMP_LIST_FILE");
+        if (filename != nullptr) {
+            std::set<std::string> names;
+            std::transform(t.begin(), t.end(), std::inserter(names, names.end()), [](const auto& pair) { return pair.first; });
+            std::ofstream f(filename);
+            std::copy(names.begin(), names.end(), std::ostream_iterator<std::string>(f, "\n"));
+            f.flush();
+        }
+    }
+}
+
+/**
+ * Each test can dump parsed entity to file with environment variable FO_DUMP_FILE and dump names of all entities to file with environment variable FO_DUMP_LIST_FILE
+ */
+
 BOOST_FIXTURE_TEST_SUITE(TestDefaultPythonParser, ParserAppFixture)
 
 /**
@@ -32,6 +63,7 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, m_default_scripting_dir / "macros");
+    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, m_default_scripting_dir / "techs");
     auto [techs, tech_categories, categories_seen] = *Pending::WaitForPendingUnlocked(std::move(techs_p));
@@ -55,13 +87,14 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
         }
     }
 
+    DumpEntitiesList(techs);
     if (const char* tech_name = std::getenv("FO_CHECKSUM_TECH_NAME")) {
         const auto tech_it = techs.find(tech_name);
-        BOOST_REQUIRE(techs.end() != tech_it);
+        BOOST_REQUIRE_MESSAGE(techs.end() != tech_it, "Missing " << tech_name);
         BOOST_REQUIRE_EQUAL(tech_name, tech_it->second.Name());
 
         BOOST_TEST_MESSAGE("Dump " << tech_name << ":");
-        BOOST_TEST_MESSAGE(tech_it->second.Dump(0));
+        DumpEntity(tech_it->second);
 
         if (const char *tech_checksum_str = std::getenv("FO_CHECKSUM_TECH_VALUE")) {
             unsigned int tech_checksum = boost::lexical_cast<unsigned int>(tech_checksum_str);
@@ -81,6 +114,7 @@ BOOST_AUTO_TEST_CASE(parse_species_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, m_default_scripting_dir / "macros");
+    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto species_p = Pending::ParseSynchronously(parse::species, parser, m_default_scripting_dir / "species");
     const auto [species, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
@@ -104,13 +138,14 @@ BOOST_AUTO_TEST_CASE(parse_species_full) {
         }
     }
 
+    DumpEntitiesList(species);
     if (const char *species_name = std::getenv("FO_CHECKSUM_SPECIES_NAME")) {
         const auto species_it = species.find(species_name);
-        BOOST_REQUIRE(species.end() != species_it);
+        BOOST_REQUIRE_MESSAGE(species.end() != species_it, "Missing " << species_name);
         BOOST_REQUIRE_EQUAL(species_name, species_it->second.Name());
 
         BOOST_TEST_MESSAGE("Dump " << species_name << ":");
-        BOOST_TEST_MESSAGE(species_it->second.Dump(0));
+        DumpEntity(species_it->second);
 
         if (const char *species_checksum_str = std::getenv("FO_CHECKSUM_SPECIES_VALUE")) {
             uint32_t species_checksum = boost::lexical_cast<uint32_t>(species_checksum_str);
@@ -130,6 +165,7 @@ BOOST_AUTO_TEST_CASE(parse_buildings_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, m_default_scripting_dir / "macros");
+    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto buildings_p = Pending::ParseSynchronously(parse::buildings, parser, m_default_scripting_dir / "buildings");
     auto buildings_opt = Pending::WaitForPendingUnlocked(std::move(buildings_p));
@@ -142,13 +178,14 @@ BOOST_AUTO_TEST_CASE(parse_buildings_full) {
 
     BOOST_REQUIRE_EQUAL(109, buildings.size());
 
+    DumpEntitiesList(buildings);
     if (const char *buildings_name = std::getenv("FO_CHECKSUM_BUILDINGS_NAME")) {
         const auto buildings_it = buildings.find(buildings_name);
-        BOOST_REQUIRE(buildings.end() != buildings_it);
+        BOOST_REQUIRE_MESSAGE(buildings.end() != buildings_it, "Missing " << buildings_name);
         BOOST_REQUIRE_EQUAL(buildings_name, buildings_it->second->Name());
 
         BOOST_TEST_MESSAGE("Dump " << buildings_name << ":");
-        BOOST_TEST_MESSAGE(buildings_it->second->Dump(0));
+        DumpEntity(*(buildings_it->second));
 
         if (const char *buildings_checksum_str = std::getenv("FO_CHECKSUM_BUILDINGS_VALUE")) {
             uint32_t buildings_checksum = boost::lexical_cast<uint32_t>(buildings_checksum_str);
@@ -168,6 +205,7 @@ BOOST_AUTO_TEST_CASE(parse_empire_statistics_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, m_default_scripting_dir / "macros");
+    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto empire_statistics_p = Pending::ParseSynchronously(parse::statistics, parser, m_default_scripting_dir / "empire_statistics");
     auto empire_statistics_opt = Pending::WaitForPendingUnlocked(std::move(empire_statistics_p));
@@ -180,12 +218,13 @@ BOOST_AUTO_TEST_CASE(parse_empire_statistics_full) {
 
     BOOST_REQUIRE_EQUAL(22, empire_statistics.size());
 
+    DumpEntitiesList(empire_statistics);
     if (const char *empire_statistic_name = std::getenv("FO_CHECKSUM_EMPIRE_STATISTIC_NAME")) {
         const auto empire_statistic_it = empire_statistics.find(empire_statistic_name);
-        BOOST_REQUIRE(empire_statistics.end() != empire_statistic_it);
+        BOOST_REQUIRE_MESSAGE(empire_statistics.end() != empire_statistic_it, "Missing " << empire_statistic_name);
 
         BOOST_TEST_MESSAGE("Dump " << empire_statistic_name << ":");
-        BOOST_TEST_MESSAGE(empire_statistic_it->second->Dump(0));
+        DumpEntity(*(empire_statistic_it->second));
 
         if (const char *empire_statistic_checksum_str = std::getenv("FO_CHECKSUM_EMPIRE_STATISTIC_VALUE")) {
             uint32_t empire_statistic_checksum = boost::lexical_cast<uint32_t>(empire_statistic_checksum_str);
@@ -213,9 +252,10 @@ BOOST_AUTO_TEST_CASE(parse_encyclopedia_articles_full) {
     BOOST_CHECK(!encyclopedia_articles.empty());
     BOOST_REQUIRE_EQUAL(18, encyclopedia_articles.size());
 
+    DumpEntitiesList(encyclopedia_articles);
     if (const char *encyclopedia_category_name = std::getenv("FO_COUNT_ENCYCLOPEDIA_CATEGORY_NAME")) {
         const auto encyclopedia_category_it = encyclopedia_articles.find(encyclopedia_category_name);
-        BOOST_REQUIRE(encyclopedia_articles.end() != encyclopedia_category_it);
+        BOOST_REQUIRE_MESSAGE(encyclopedia_articles.end() != encyclopedia_category_it, "Missing " << encyclopedia_category_name);
         BOOST_CHECK(!encyclopedia_category_it->second.empty());
 
         if (const char *encyclopedia_category_count_str = std::getenv("FO_COUNT_ENCYCLOPEDIA_CATEGORY_VALUE")) {
@@ -234,6 +274,7 @@ BOOST_AUTO_TEST_CASE(parse_fields_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, m_default_scripting_dir / "macros");
+    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto fields_p = Pending::ParseSynchronously(parse::fields, parser, m_default_scripting_dir / "fields");
     auto fields_opt = Pending::WaitForPendingUnlocked(std::move(fields_p));
@@ -243,12 +284,13 @@ BOOST_AUTO_TEST_CASE(parse_fields_full) {
     const auto fields = *std::move(fields_opt);
     BOOST_CHECK_EQUAL(10, fields.size());
 
+    DumpEntitiesList(fields);
     if (const char *field_name = std::getenv("FO_CHECKSUM_FIELD_NAME")) {
         const auto field_it = fields.find(field_name);
-        BOOST_REQUIRE(fields.end() != field_it);
+        BOOST_REQUIRE_MESSAGE(fields.end() != field_it, "Missing " << field_name);
 
         BOOST_TEST_MESSAGE("Dump " << field_name << ":");
-        BOOST_TEST_MESSAGE(field_it->second->Dump(0));
+        DumpEntity(*(field_it->second));
 
         if (const char *field_checksum_str = std::getenv("FO_CHECKSUM_FIELD_VALUE")) {
             uint32_t field_checksum = boost::lexical_cast<uint32_t>(field_checksum_str);

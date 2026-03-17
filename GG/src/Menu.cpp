@@ -49,12 +49,6 @@ PopupMenu::PopupMenu(X x, Y y, std::shared_ptr<const Font> font, Clr text_color,
     m_origin(x, y)
 { m_open_levels.resize(1); }
 
-void PopupMenu::AddMenuItem(MenuItem&& menu_item)
-{ m_menu_data.next_level.push_back(std::move(menu_item)); }
-
-void PopupMenu::AddMenuItem(std::string str, bool disable, bool check, std::function<void()> selected_on_close_callback)
-{ m_menu_data.next_level.emplace_back(std::move(str), disable, check, selected_on_close_callback); }
-
 void PopupMenu::Render()
 {
     if (m_menu_data.next_level.empty() || !m_font)
@@ -176,7 +170,7 @@ void PopupMenu::Render()
     }
 }
 
-void PopupMenu::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
+void PopupMenu::LButtonUp(Pt, Flags<ModKey>)
 {
     if (m_caret[0] != INVALID_CARET) {
         MenuItem* menu_ptr = std::addressof(m_menu_data);
@@ -196,7 +190,7 @@ void PopupMenu::LButtonUp(Pt pt, Flags<ModKey> mod_keys)
 void PopupMenu::LClick(Pt pt, Flags<ModKey> mod_keys)
 { LButtonUp(pt, mod_keys); }
 
-void PopupMenu::LDrag(Pt pt, Pt move, Flags<ModKey> mod_keys)
+void PopupMenu::LDrag(Pt pt, Pt, Flags<ModKey>)
 {
     bool cursor_is_in_menu = false;
     for (int i = static_cast<int>(m_open_levels.size()) - 1; i >= 0; --i) {
@@ -261,30 +255,3 @@ bool PopupMenu::Run()
 
     return retval;
 }
-
-void PopupMenu::SetBorderColor(Clr clr)
-{ m_border_color = clr; }
-
-void PopupMenu::SetInteriorColor(Clr clr)
-{ m_int_color = clr; }
-
-void PopupMenu::SetTextColor(Clr clr)
-{ m_text_color = clr; }
-
-void PopupMenu::SetHiliteColor(Clr clr)
-{ m_hilite_color = clr; }
-
-const std::shared_ptr<const Font>& PopupMenu::GetFont() const
-{ return m_font; }
-
-const MenuItem& PopupMenu::MenuData() const
-{ return m_menu_data; }
-
-const std::vector<Rect>& PopupMenu::OpenLevels() const
-{ return m_open_levels; }
-
-const std::vector<std::size_t>& PopupMenu::Caret() const
-{ return m_caret; }
-
-const MenuItem* PopupMenu::ItemSelected() const
-{ return m_item_selected; }

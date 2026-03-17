@@ -1110,7 +1110,7 @@ std::unique_ptr<Condition> All::Clone() const
 ///////////////////////////////////////////////////////////
 // None                                                  //
 ///////////////////////////////////////////////////////////
-void None::Eval(const ScriptingContext& parent_context, ObjectSet& matches, ObjectSet& non_matches,
+void None::Eval(const ScriptingContext&, ObjectSet& matches, ObjectSet& non_matches,
                 SearchDomain search_domain) const
 {
     if (std::addressof(matches) == std::addressof(non_matches)) [[unlikely]]
@@ -1149,7 +1149,7 @@ bool NoOp::EvalAny(const ScriptingContext&, std::span<const UniverseObjectCXBase
     return !candidates.empty();
 }
 
-bool NoOp::EvalOne(const ScriptingContext& parent_context, const UniverseObjectCXBase* candidate) const {
+bool NoOp::EvalOne(const ScriptingContext&, const UniverseObjectCXBase* candidate) const {
     DebugLogger(conditions) << "NoOp::EvalOne(" << candidate << ")";
     return candidate;
 }
@@ -1513,7 +1513,7 @@ namespace {
     }
 }
 
-Homeworld::Homeworld(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names) :
+Homeworld::Homeworld(string_vref_ptr_vec&& names) :
     Condition(CondsRTSI(names)),
     m_names(ExcludeNullsIntoVector(std::move(names))),
     m_names_local_invariant(m_names.empty() || range_all_of(m_names, lc_invariant))
@@ -2172,18 +2172,23 @@ std::unique_ptr<Condition> Type::Clone() const
 ///////////////////////////////////////////////////////////
 // Building                                              //
 ///////////////////////////////////////////////////////////
-Building::Building(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names) :
-    Condition(CondsRTSI(names), CheckSums::GetCheckSum("Condition::Building", names)),
-    m_names(ExcludeNullsIntoVector(std::move(names))),
-    m_names_local_invariant(m_names.empty() || range_all_of(m_names, lc_invariant))
+Building::Building(string_vref_ptr_vec&& type_names, BuildingType::SubType subtype) :
+    Condition(CondsRTSI(type_names), CheckSums::GetCheckSum("Condition::Building", type_names, subtype)),
+    m_type_names(ExcludeNullsIntoVector(std::move(type_names))),
+    m_names_local_invariant(m_type_names.empty() || range_all_of(m_type_names, lc_invariant)),
+    m_subtype_requirement(subtype)
 {}
 
-Building::Building(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
-    Building(Enveculate(std::move(name)))
+Building::Building(std::unique_ptr<ValueRef::ValueRef<std::string>>&& type_name, BuildingType::SubType subtype) :
+    Building(Enveculate(std::move(type_name)), subtype)
 {}
 
-Building::Building(std::string name) :
-    Building(std::make_unique<ValueRef::Constant<std::string>>(std::move(name)))
+Building::Building(std::string type_name, BuildingType::SubType subtype) :
+    Building(std::make_unique<ValueRef::Constant<std::string>>(std::move(type_name)), subtype)
+{}
+
+Building::Building(BuildingType::SubType subtype) : 
+    Building(string_vref_ptr_vec{}, subtype)
 {}
 
 bool Building::operator==(const Condition& rhs) const {
@@ -2196,13 +2201,13 @@ bool Building::operator==(const Condition& rhs) const {
 bool Building::operator==(const Building& rhs_) const {
     if (this == std::addressof(rhs_))
         return true;
-    if (m_names.size() != rhs_.m_names.size())
+    if (m_type_names.size() != rhs_.m_type_names.size())
         return false;
-    for (std::size_t i = 0; i < m_names.size(); ++i) {
-        CHECK_COND_VREF_MEMBER(m_names.at(i))
+    for (std::size_t i = 0; i < m_type_names.size(); ++i) {
+        CHECK_COND_VREF_MEMBER(m_type_names.at(i))
     }
 
-    return true;
+    return rhs_.m_subtype_requirement == m_subtype_requirement;
 }
 
 namespace {
@@ -2211,8 +2216,10 @@ namespace {
     template<>
     struct BuildingSimpleMatch<std::string>
     {
-        BuildingSimpleMatch(const std::string& name) noexcept :
-            m_name(name)
+        explicit BuildingSimpleMatch(const std::string& type_name,
+                                     BuildingType::SubType subtype = BuildingType::SubType::NONE) noexcept :
+            m_type_name(type_name),
+            m_subtype_requirement(subtype)
         {}
 
         bool operator()(const auto* candidate) const noexcept {
@@ -2224,17 +2231,26 @@ namespace {
                 return false;
             auto* building = static_cast<const ::Building*>(candidate);
 
-            return building->BuildingTypeName() == m_name;
+            switch (m_subtype_requirement) {
+            case BuildingType::SubType::COLONY:   if (!building->IsColony()) return false; break;
+            case BuildingType::SubType::SHIPYARD: if (!building->IsShipYard()) return false; break;
+            default: break;
+            }
+
+            return building->BuildingTypeName() == m_type_name;
         }
 
-        const std::string& m_name;
+        const std::string& m_type_name;
+        const BuildingType::SubType m_subtype_requirement = BuildingType::SubType::NONE;
     };
 
     template<>
     struct BuildingSimpleMatch<std::vector<std::string>>
     {
-        BuildingSimpleMatch(const std::vector<std::string>& names) noexcept :
-            m_names(names)
+        explicit BuildingSimpleMatch(const std::vector<std::string>& type_names,
+                                     BuildingType::SubType subtype = BuildingType::SubType::NONE) noexcept :
+            m_type_names(type_names),
+            m_subtype_requirement(subtype)
         {}
 
         bool operator()(const auto* candidate) const {
@@ -2246,15 +2262,22 @@ namespace {
                 return false;
             auto* building = static_cast<const ::Building*>(candidate);
 
+            switch (m_subtype_requirement) {
+            case BuildingType::SubType::COLONY:   if (!building->IsColony()) return false; break;
+            case BuildingType::SubType::SHIPYARD: if (!building->IsShipYard()) return false; break;
+            default: break;
+            }
+
             // if no name supplied, match any building
-            if (m_names.empty())
+            if (m_type_names.empty())
                 return true;
 
             // is it one of the specified building types?
-            return range_contains(m_names, building->BuildingTypeName());
+            return range_contains(m_type_names, building->BuildingTypeName());
         }
 
-        const std::vector<std::string>& m_names;
+        const std::vector<std::string>& m_type_names;
+        const BuildingType::SubType m_subtype_requirement = BuildingType::SubType::NONE;
     };
 }
 
@@ -2264,14 +2287,16 @@ void Building::Eval(const ScriptingContext& parent_context, ObjectSet& matches, 
     const bool simple_eval_safe = m_names_local_invariant &&
                                   (parent_context.condition_root_candidate || RootCandidateInvariant());
     if (simple_eval_safe) {
-        if (m_names.size() == 1) {
-            auto match_name = m_names.front()->Eval(parent_context);
-            EvalImpl(matches, non_matches, search_domain, BuildingSimpleMatch<std::string>(match_name));
+        if (m_type_names.size() == 1) {
+            auto type_name = m_type_names.front()->Eval(parent_context);
+            EvalImpl(matches, non_matches, search_domain,
+                     BuildingSimpleMatch<std::string>(type_name, m_subtype_requirement));
         } else {
             // evaluate names once, and use to check all candidate objects
             const auto eval_ref = [&parent_context](const auto& ref) { return ref->Eval(parent_context); };
-            const auto names = m_names | range_transform(eval_ref) | range_to_vec;
-            EvalImpl(matches, non_matches, search_domain, BuildingSimpleMatch<std::vector<std::string>>(names));
+            const auto type_names = m_type_names | range_transform(eval_ref) | range_to_vec;
+            EvalImpl(matches, non_matches, search_domain,
+                     BuildingSimpleMatch<std::vector<std::string>>(type_names, m_subtype_requirement));
         }
     } else {
         // re-evaluate allowed building types range for each candidate object
@@ -2280,11 +2305,11 @@ void Building::Eval(const ScriptingContext& parent_context, ObjectSet& matches, 
 }
 
 std::string Building::Description(bool negated) const {
-    const auto names_sz = m_names.size();
+    const auto names_sz = m_type_names.size();
     std::string values_str;
     values_str.reserve(names_sz*50); // guesstimate
     for (std::size_t i = 0u; i < names_sz; ++i) {
-        auto& n{m_names[i]};
+        auto& n{m_type_names[i]};
         values_str += UserString(n->ConstantExpr() ? n->Eval() : n->Description());
         if (2u <= names_sz && i < names_sz - 2u) {
             values_str += ", ";
@@ -2299,16 +2324,21 @@ std::string Building::Description(bool negated) const {
 }
 
 std::string Building::Dump(uint8_t ntabs) const {
-    std::string retval = DumpIndent(ntabs) + "Building name = ";
-    if (m_names.size() == 1) {
-        retval += m_names[0]->Dump(ntabs) + "\n";
-    } else {
-        retval += "[ ";
-        for (auto& name : m_names) {
+    std::string retval = DumpIndent(ntabs) + "Building";
+    if (m_type_names.size() == 1) {
+        retval += " name = " + m_type_names[0]->Dump(ntabs);
+    } else if (!m_type_names.empty()) {
+        retval += " name = [ ";
+        for (auto& name : m_type_names)
             retval += name->Dump(ntabs) + " ";
-        }
-        retval += "]\n";
+        retval += "]";
     }
+    switch (m_subtype_requirement) {
+    case BuildingType::SubType::COLONY:   retval += " subtype = Colony"; break;
+    case BuildingType::SubType::SHIPYARD: retval += " subtype = ShipYard"; break;
+    default: break;
+    }
+    retval += "\n";
     return retval;
 }
 
@@ -2325,28 +2355,34 @@ bool Building::Match(const ScriptingContext& local_context) const {
         return false;
     auto* building = static_cast<const ::Building*>(candidate);
 
+    switch (m_subtype_requirement) {
+    case BuildingType::SubType::COLONY:   if (!building->IsColony()) return false; break;
+    case BuildingType::SubType::SHIPYARD: if (!building->IsShipYard()) return false; break;
+    default: break;
+    }
+
     // match any building type?
-    if (m_names.empty())
+    if (m_type_names.empty())
         return true;
 
     // match any of the specified building types
     const auto& btn{building->BuildingTypeName()};
-    const auto is_type = [&local_context, &btn] (const auto& name) { return name->Eval(local_context) == btn; };
-    return range_any_of(m_names, is_type);
+    const auto is_type = [&local_context, &btn] (const auto& type_name) { return type_name->Eval(local_context) == btn; };
+    return range_any_of(m_type_names, is_type);
 }
 
 void Building::SetTopLevelContent(const std::string& content_name) {
-    for (auto& name : m_names | range_filter(not_null))
+    for (auto& name : m_type_names | range_filter(not_null))
         name->SetTopLevelContent(content_name);
 }
 
 std::unique_ptr<Condition> Building::Clone() const
-{ return std::make_unique<Building>(ValueRef::CloneUnique(m_names)); }
+{ return std::make_unique<Building>(ValueRef::CloneUnique(m_type_names), m_subtype_requirement); }
 
 ///////////////////////////////////////////////////////////
 // Field                                                 //
 ///////////////////////////////////////////////////////////
-Field::Field(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names) :
+Field::Field(string_vref_ptr_vec&& names) :
     Condition(CondsRTSI(names)),
     m_names(ExcludeNullsIntoVector(std::move(names))),
     m_names_local_invariant(m_names.empty() || range_all_of(m_names, lc_invariant))
@@ -2677,21 +2713,21 @@ std::string HasSpecial::Description(bool negated) const {
 }
 
 std::string HasSpecial::Dump(uint8_t ntabs) const {
-    std::string name_str = (m_name ? m_name->Dump(ntabs) : "");
+    std::string name_str = (m_name ? (" name = " + m_name->Dump(ntabs)) : "");
 
     if (m_since_turn_low || m_since_turn_high) {
         std::string low_dump = (m_since_turn_low ? m_since_turn_low->Dump(ntabs) : std::to_string(BEFORE_FIRST_TURN));
         std::string high_dump = (m_since_turn_high ? m_since_turn_high->Dump(ntabs) : std::to_string(IMPOSSIBLY_LARGE_TURN));
-        return DumpIndent(ntabs) + "HasSpecialSinceTurn name = \"" + name_str + "\" low = " + low_dump + " high = " + high_dump;
-    }
+        return DumpIndent(ntabs) + "HasSpecialSinceTurn" + name_str + " low = " + low_dump + " high = " + high_dump + "\n";
+     }
 
     if (m_capacity_low || m_capacity_high) {
         std::string low_dump = (m_capacity_low ? m_capacity_low->Dump(ntabs) : std::to_string(-FLT_MAX));
         std::string high_dump = (m_capacity_high ? m_capacity_high->Dump(ntabs) : std::to_string(FLT_MAX));
-        return DumpIndent(ntabs) + "HasSpecialCapacity name = \"" + name_str + "\" low = " + low_dump + " high = " + high_dump;
+        return DumpIndent(ntabs) + "HasSpecialCapacity" + name_str + " low = " + low_dump + " high = " + high_dump + "\n";
     }
 
-    return DumpIndent(ntabs) + "HasSpecial name = \"" + name_str + "\"\n";
+    return DumpIndent(ntabs) + "HasSpecial" + name_str + "\n";
 }
 
 bool HasSpecial::Match(const ScriptingContext& local_context) const {
@@ -3522,7 +3558,7 @@ std::unique_ptr<Condition> ObjectID::Clone() const
 ///////////////////////////////////////////////////////////
 // PlanetSize                                            //
 ///////////////////////////////////////////////////////////
-PlanetSize::PlanetSize(std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetSize>>>&& sizes) :
+PlanetSize::PlanetSize(ptsize_vref_ptr_vec&& sizes) :
     Condition(CondsRTSI(sizes)),
     m_sizes(ExcludeNullsIntoVector(std::move(sizes)))
 {}
@@ -3675,7 +3711,7 @@ std::unique_ptr<Condition> PlanetSize::Clone() const
 ///////////////////////////////////////////////////////////
 // PlanetEnvironment                                     //
 ///////////////////////////////////////////////////////////
-PlanetEnvironment::PlanetEnvironment(std::vector<std::unique_ptr<ValueRef::ValueRef< ::PlanetEnvironment>>>&& environments,
+PlanetEnvironment::PlanetEnvironment(pe_vref_ptr_vec&& environments,
                                      std::unique_ptr<ValueRef::ValueRef<std::string>>&& species_name_ref) :
     Condition(CondsRTSI(environments, species_name_ref)),
     m_environments(ExcludeNullsIntoVector(std::move(environments))),
@@ -3862,14 +3898,22 @@ std::unique_ptr<Condition> PlanetEnvironment::Clone() const {
 ///////////////////////////////////////////////////////////
 // Species                                               //
 ///////////////////////////////////////////////////////////
-Species::Species(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names) :
+Species::Species(string_vref_ptr_vec&& names) :
     Condition(CondsRTSI(names)),
     m_names(ExcludeNullsIntoVector(std::move(names))),
     m_names_local_invariant(m_names.empty() || range_all_of(m_names, lc_invariant))
 {}
 
+Species::Species(std::unique_ptr<ValueRef::ValueRef<std::string>>&& name) :
+    Species(Enveculate(std::move(name)))
+{}
+
+Species::Species(std::string name) :
+    Species(std::make_unique<ValueRef::Constant<std::string>>(std::move(name)))
+{}
+
 Species::Species() :
-    Species(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>{})
+    Species(string_vref_ptr_vec{})
 {}
 
 bool Species::operator==(const Condition& rhs) const {
@@ -3905,10 +3949,8 @@ namespace {
             return ship->SpeciesName();
         }
         else if (obj_type == UniverseObjectType::OBJ_BUILDING) {
-            // is it a building on a planet?
             auto* building = static_cast<const ::Building*>(candidate);
-            if (auto planet = objects.getRaw<Planet>(building->PlanetID()))
-                return planet->SpeciesName();
+            return building->SpeciesName();
         }
         return EMPTY_STRING;
     }
@@ -4402,6 +4444,7 @@ Enqueued::Enqueued(std::unique_ptr<ValueRef::ValueRef<int>>&& design_id,
                    std::unique_ptr<ValueRef::ValueRef<int>>&& high) :
     Condition(CondsRTSI(design_id, empire_id, low, high)),
     m_build_type(BuildType::BT_SHIP),
+    m_building_subtype(BuildingType::SubType::NONE),
     m_design_id(std::move(design_id)),
     m_empire_id(std::move(empire_id)),
     m_low(std::move(low)),
@@ -4423,6 +4466,7 @@ Enqueued::Enqueued(BuildType build_type,
                    std::unique_ptr<ValueRef::ValueRef<int>>&& high) :
     Condition(CondsRTSI(name, empire_id, low, high)),
     m_build_type(build_type),
+    m_building_subtype(BuildingType::SubType::NONE),
     m_name(std::move(name)),
     m_empire_id(std::move(empire_id)),
     m_low(std::move(low)),
@@ -4433,9 +4477,25 @@ Enqueued::Enqueued(BuildType build_type,
                            (!m_high || m_high->LocalCandidateInvariant()))
 {}
 
+Enqueued::Enqueued(BuildingType::SubType subtype,
+         std::unique_ptr<ValueRef::ValueRef<int>>&& empire_id,
+         std::unique_ptr<ValueRef::ValueRef<int>>&& low,
+         std::unique_ptr<ValueRef::ValueRef<int>>&& high) :
+    Condition(CondsRTSI(empire_id, low, high)),
+    m_build_type(BuildType::BT_BUILDING),
+    m_building_subtype(subtype),
+    m_empire_id(std::move(empire_id)),
+    m_low(std::move(low)),
+    m_high(std::move(high)),
+    m_refs_local_invariant((!m_empire_id || m_empire_id->LocalCandidateInvariant()) &&
+                           (!m_low || m_low->LocalCandidateInvariant()) &&
+                           (!m_high || m_high->LocalCandidateInvariant()))
+{}
+
 Enqueued::Enqueued(const Enqueued& rhs) :
     Condition(rhs),
     m_build_type(rhs.m_build_type),
+    m_building_subtype(rhs.m_building_subtype),
     m_name(ValueRef::CloneUnique(rhs.m_name)),
     m_design_id(ValueRef::CloneUnique(rhs.m_design_id)),
     m_empire_id(ValueRef::CloneUnique(rhs.m_empire_id)),
@@ -4458,18 +4518,19 @@ bool Enqueued::operator==(const Enqueued& rhs_) const {
         return false;
 
     CHECK_COND_VREF_MEMBER(m_name)
-        CHECK_COND_VREF_MEMBER(m_design_id)
-        CHECK_COND_VREF_MEMBER(m_empire_id)
-        CHECK_COND_VREF_MEMBER(m_low)
-        CHECK_COND_VREF_MEMBER(m_high)
+    CHECK_COND_VREF_MEMBER(m_design_id)
+    CHECK_COND_VREF_MEMBER(m_empire_id)
+    CHECK_COND_VREF_MEMBER(m_low)
+    CHECK_COND_VREF_MEMBER(m_high)
 
-        return true;
+    return m_building_subtype == rhs_.m_building_subtype;
 }
 
 namespace {
     [[nodiscard]] int NumberOnQueue(const ProductionQueue& queue, const BuildType build_type,
                                     const int location_id, const Universe& universe,
-                                    const std::string& name = "", const int design_id = INVALID_DESIGN_ID)
+                                    const std::string& name = "", const int design_id = INVALID_DESIGN_ID,
+                                    const BuildingType::SubType sub_type = BuildingType::SubType::NONE)
     {
         int retval = 0;
         for (const auto& element : queue) {
@@ -4484,6 +4545,21 @@ namespace {
                 // or any building if no name specified
                 if (!name.empty() && element.item.name != name)
                     continue;
+
+                // if no subtype specified, any building is OK
+                if (sub_type != BuildingType::SubType::NONE) {
+                    // get subtype of building on queue...
+                    const BuildingType* bt = GetBuildingType(element.item.name);
+                    if (!bt)
+                        continue;
+
+                    // if subtype of building on queue does not match specified subtype, doesn't count
+                    if (sub_type == BuildingType::SubType::COLONY && !bt->IsColony())
+                        continue;
+                    if (sub_type == BuildingType::SubType::SHIPYARD && !bt->IsShipYard())
+                        continue;
+                }
+
             } else if (build_type == BuildType::BT_SHIP) {
                 if (design_id != INVALID_DESIGN_ID) {
                     // if looking for ships, accept design by id number...
@@ -4503,9 +4579,11 @@ namespace {
     }
 
     struct EnqueuedSimpleMatch {
-        EnqueuedSimpleMatch(BuildType build_type, const std::string& name, int design_id,
-                            int empire_id, int low, int high, const ScriptingContext& context) noexcept :
+        EnqueuedSimpleMatch(BuildType build_type, BuildingType::SubType sub_type,
+                            const std::string& name, int design_id, int empire_id,
+                            int low, int high, const ScriptingContext& context) noexcept :
             m_build_type(build_type),
+            m_building_subtype(sub_type),
             m_name(name),
             m_design_id(design_id),
             m_empire_id(empire_id),
@@ -4538,13 +4616,14 @@ namespace {
             return (m_low <= count && count <= m_high);
         }
 
-        const BuildType         m_build_type;
-        const std::string&      m_name;
-        const int               m_design_id;
-        const int               m_empire_id;
-        const int               m_low;
-        const int               m_high;
-        const ScriptingContext& m_context;
+        const BuildType             m_build_type;
+        const BuildingType::SubType m_building_subtype;
+        const std::string&          m_name;
+        const int                   m_design_id;
+        const int                   m_empire_id;
+        const int                   m_low;
+        const int                   m_high;
+        const ScriptingContext&     m_context;
     };
 }
 
@@ -4573,7 +4652,8 @@ void Enqueued::Eval(const ScriptingContext& parent_context, ObjectSet& matches, 
         // need to test each candidate separately using EvalImpl and EnqueuedSimpleMatch
         // because the test checks that something is enqueued at the candidate location
         EvalImpl(matches, non_matches, search_domain,
-                 EnqueuedSimpleMatch(m_build_type, name, design_id, empire_id, low, high, parent_context));
+                 EnqueuedSimpleMatch(m_build_type, m_building_subtype, name, design_id,
+                                     empire_id, low, high, parent_context));
     } else {
         // re-evaluate allowed building types range for each candidate object
         Condition::Eval(parent_context, matches, non_matches, search_domain);
@@ -4611,26 +4691,28 @@ std::string Enqueued::Description(bool negated) const {
                     std::to_string(m_design_id->Eval()) :
                     m_design_id->Description();
     }
+    std::string subtype_str;
+    if (m_building_subtype == BuildingType::SubType::COLONY)
+        subtype_str = UserString("BLD_SUBTYPE_COLONY");
+    else if (m_building_subtype == BuildingType::SubType::SHIPYARD)
+        subtype_str = UserString("BLD_SUBTYPE_SHIPYARD");
+
     std::string description_str;
-    switch (m_build_type) {
-    case BuildType::BT_BUILDING:    description_str = (!negated)
-                                    ? UserString("DESC_ENQUEUED_BUILDING")
-                                    : UserString("DESC_ENQUEUED_BUILDING_NOT");
-    break;
-    case BuildType::BT_SHIP:        description_str = (!negated)
-                                    ? UserString("DESC_ENQUEUED_DESIGN")
-                                    : UserString("DESC_ENQUEUED_DESIGN_NOT");
-    break;
-    default:                        description_str = (!negated)
-                                    ? UserString("DESC_ENQUEUED")
-                                    : UserString("DESC_ENQUEUED_NOT");
-    break;
-    }
+    if (m_build_type == BuildType::BT_BUILDING && m_building_subtype != BuildingType::SubType::NONE)
+        description_str = (!negated) ? UserString("DESC_ENQUEUED_BUILDING") : UserString("DESC_ENQUEUED_BUILDING_NOT");
+    else if (m_build_type == BuildType::BT_BUILDING && m_building_subtype != BuildingType::SubType::NONE)
+        description_str = (!negated) ? UserString("DESC_ENQUEUED_BUILDING_SUBTYPE") : UserString("DESC_ENQUEUED_BUILDING_SUBTYPE_NOT");
+    else if (m_build_type == BuildType::BT_SHIP)
+        description_str = (!negated) ? UserString("DESC_ENQUEUED_DESIGN") : UserString("DESC_ENQUEUED_DESIGN_NOT");
+    else
+        description_str = (!negated) ? UserString("DESC_ENQUEUED") : UserString("DESC_ENQUEUED_NOT");
+
     return str(FlexibleFormat(description_str)
                % empire_str
                % low_str
                % high_str
-               % what_str);
+               % what_str
+               % subtype_str);
 }
 
 std::string Enqueued::Dump(uint8_t ntabs) const {
@@ -4640,6 +4722,7 @@ std::string Enqueued::Dump(uint8_t ntabs) const {
         retval += " type = Building";
         if (m_name)
             retval += " name = " + m_name->Dump(ntabs);
+
     } else if (m_build_type == BuildType::BT_SHIP) {
         retval += " type = Ship";
         if (m_name)
@@ -4647,6 +4730,12 @@ std::string Enqueued::Dump(uint8_t ntabs) const {
         else if (m_design_id)
             retval += " design = " + m_design_id->Dump(ntabs);
     }
+
+    if (m_building_subtype == BuildingType::SubType::COLONY)
+        retval += " subtype = Colony";
+    if (m_building_subtype == BuildingType::SubType::SHIPYARD)
+        retval += " subtype = Shipyard";
+
     if (m_empire_id)
         retval += " empire = " + m_empire_id->Dump(ntabs);
     if (m_low)
@@ -4671,7 +4760,8 @@ bool Enqueued::Match(const ScriptingContext& local_context) const {
     // special case, see Eval comment
     if (!m_low && !m_high)
         low = 1;
-    return EnqueuedSimpleMatch(m_build_type, name, design_id, empire_id, low, high, local_context)(candidate);
+    return EnqueuedSimpleMatch(m_build_type, m_building_subtype, name, design_id,
+                               empire_id, low, high, local_context)(candidate);
 }
 
 ObjectSet Enqueued::GetDefaultInitialCandidateObjects(const ScriptingContext& parent_context) const
@@ -4710,7 +4800,7 @@ std::unique_ptr<Condition> Enqueued::Clone() const
 ///////////////////////////////////////////////////////////
 // FocusType                                             //
 ///////////////////////////////////////////////////////////
-FocusType::FocusType(std::vector<std::unique_ptr<ValueRef::ValueRef<std::string>>>&& names) :
+FocusType::FocusType(string_vref_ptr_vec&& names) :
     Condition(CondsRTSI(names)),
     m_names(ExcludeNullsIntoVector(std::move(names))),
     m_names_local_invariant(m_names.empty() || range_all_of(m_names, lc_invariant))
@@ -4780,7 +4870,7 @@ void FocusType::Eval(const ScriptingContext& parent_context, ObjectSet& matches,
                      SearchDomain search_domain) const
 {
     const bool simple_eval_safe = m_names_local_invariant &&
-                                  parent_context.condition_root_candidate || RootCandidateInvariant();
+                                 (parent_context.condition_root_candidate || RootCandidateInvariant());
     if (simple_eval_safe) {
         // evaluate names once, and use to check all candidate objects
         const auto eval_ref = [&parent_context](const auto& ref) { return ref->Eval(parent_context); };
@@ -4874,7 +4964,7 @@ std::unique_ptr<Condition> FocusType::Clone() const
 ///////////////////////////////////////////////////////////
 // StarType                                              //
 ///////////////////////////////////////////////////////////
-StarType::StarType(std::vector<std::unique_ptr<ValueRef::ValueRef< ::StarType>>>&& types) :
+StarType::StarType(startype_vref_ptr_vec&& types) :
     Condition(CondsRTSI(types)),
     m_types(ExcludeNullsIntoVector(std::move(types)))
 {}

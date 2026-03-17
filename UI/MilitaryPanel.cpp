@@ -55,9 +55,11 @@ void MilitaryPanel::CompleteConstruction() {
     for (MeterType meter : {MeterType::METER_SHIELD, MeterType::METER_DEFENSE, MeterType::METER_TROOPS,
                             MeterType::METER_DETECTION, MeterType::METER_STEALTH})
     {
-        auto stat = GG::Wnd::Create<StatisticIcon>(
-            app.GetUI().MeterIcon(meter), planet->GetMeter(meter)->Initial(),
-            3, false, MeterIconSize().x, MeterIconSize().y);
+        auto stat = GG::Wnd::Create<StatisticIcon>(app.GetUI().MeterIcon(meter), app.GetUI().GetFont(),
+                                                   MeterIconSize().x, MeterIconSize().y, 3,
+                                                   StatisticIcon::IndicateChangeColour::INDICATE_FOR_OTHER,
+                                                   StatisticIcon::ShowSign::HIDE_IF_NON_NEGATIVE);
+
         AttachChild(stat);
         m_meter_stats.emplace_back(meter, stat);
         meters.emplace_back(meter, AssociatedMeterType(meter));
@@ -69,7 +71,7 @@ void MilitaryPanel::CompleteConstruction() {
             auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
             std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                     UserString(meter_string));
-            popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false, zoom_action));
+            popup->AddMenuItem(std::move(popup_label), false, false, zoom_action);
             popup->Run();
         });
     }
@@ -100,7 +102,7 @@ void MilitaryPanel::Update(const ObjectMap& objects) {
 
     // meter bar displays military stats
     m_multi_meter_status_bar->Update(objects);
-    m_multi_icon_value_indicator->Update();
+    m_multi_icon_value_indicator->Update(objects);
 
     // tooltips
     for (auto& [meter_type, stat] : m_meter_stats) {
@@ -111,7 +113,8 @@ void MilitaryPanel::Update(const ObjectMap& objects) {
             continue;
         }
 
-        stat->SetValue(meter->Initial());
+        stat->SetValue(meter->Initial(), 0);
+        stat->SetValue(meter->Current() - meter->Initial(), 1);
 
         auto browse_wnd = GG::Wnd::Create<MeterBrowseWnd>(m_planet_id, meter_type, AssociatedMeterType(meter_type));
         m_multi_icon_value_indicator->SetToolTip(meter_type, browse_wnd);

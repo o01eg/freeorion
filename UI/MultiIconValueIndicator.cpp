@@ -49,7 +49,6 @@ void MultiIconValueIndicator::CompleteConstruction() {
 
     GG::X x{EDGE_PAD};
     for (const auto primary_meter_type : m_meter_types | range_keys) {
-        {
             // get icon texture.
             auto texture = ui.MeterIcon(primary_meter_type);
 
@@ -60,15 +59,13 @@ void MultiIconValueIndicator::CompleteConstruction() {
                     texture = ui.SpeciesIcon(pc->SpeciesName());
             }
 
-            m_icons.push_back(GG::Wnd::Create<StatisticIcon>(std::move(texture), 0.0, 3, false,
-                                                             IconWidth(), IconHeight()));
-        }
+        auto& icon = m_icons.emplace_back(GG::Wnd::Create<StatisticIcon>(std::move(texture), ui.GetFont(),
+                                                                         IconWidth(), IconHeight()));
         const GG::Pt icon_ul(x, GG::Y(EDGE_PAD));
         const GG::Pt icon_lr = icon_ul + GG::Pt(IconWidth(), IconHeight() + ClientUI::Pts()*3/2);
-        m_icons.back()->SizeMove(icon_ul, icon_lr);
+        icon->SizeMove(icon_ul, icon_lr);
 
-        m_icons.back()->RightClickedSignal.connect([this, primary_meter_type](GG::Pt pt) {
-
+        icon->RightClickedSignal.connect([this, primary_meter_type](GG::Pt pt) {
             const auto meter_string = to_string(primary_meter_type);
             auto popup = GG::Wnd::Create<CUIPopupMenu>(pt.x, pt.y);
 
@@ -81,28 +78,27 @@ void MultiIconValueIndicator::CompleteConstruction() {
                             boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) % UserString(species_name));
                         auto zoom_species_action = [species_name{std::move(species_name)}]()
                         { GetApp().GetUI().ZoomToSpecies(species_name); };
-                        popup->AddMenuItem(GG::MenuItem(std::move(species_label), false, false, zoom_species_action));
+                        popup->AddMenuItem(std::move(species_label), false, false, zoom_species_action);
                     }
                 }
             }
 
-
             auto zoom_article_action = [meter_string]() { GetApp().GetUI().ZoomToMeterTypeArticle(std::string{meter_string});}; // TODO: avoid copy
             std::string popup_label = boost::io::str(FlexibleFormat(UserString("ENC_LOOKUP")) %
                                                                     UserString(meter_string));
-            popup->AddMenuItem(GG::MenuItem(std::move(popup_label), false, false, zoom_article_action));
+            popup->AddMenuItem(std::move(popup_label), false, false, zoom_article_action);
             popup->Run();
         });
-        AttachChild(m_icons.back());
+
+        AttachChild(icon);
         x += IconWidth() + IconSpacing();
     }
+
     if (!m_icons.empty())
         Resize(GG::Pt(Width(), EDGE_PAD + IconHeight() + ClientUI::Pts()*3/2));
-    Update();
-}
 
-bool MultiIconValueIndicator::Empty() const
-{ return m_object_ids.empty(); }
+    Update(objects);
+}
 
 void MultiIconValueIndicator::Render() {
     GG::Pt ul = UpperLeft();
@@ -115,16 +111,16 @@ void MultiIconValueIndicator::Render() {
 void MultiIconValueIndicator::MouseWheel(GG::Pt pt, int move, GG::Flags<GG::ModKey> mod_keys)
 { ForwardEventToParent(); }
 
-void MultiIconValueIndicator::Update() {
+void MultiIconValueIndicator::Update(const ObjectMap& objects) {
     if (m_icons.size() != m_meter_types.size()) {
         ErrorLogger() << "MultiIconValueIndicator::Update has inconsitent numbers of icons and meter types";
         return;
     }
 
-    const auto objs = GetApp().GetContext().ContextObjects().findRaw<UniverseObject>(m_object_ids);
+    const auto objs = objects.findRaw<UniverseObject>(m_object_ids);
     if (objs.empty()) {
         for (auto& icon : m_icons)
-            icon->SetValue(0);
+            if (icon) icon->SetValue(0);
         return;
     }
 

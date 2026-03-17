@@ -14,6 +14,7 @@
 #include "EffectPythonParser.h"
 #include "EnumPythonParser.h"
 #include "SourcePythonParser.h"
+#include "ConditionsPythonModuleParser.h"
 #include "EffectsPythonModuleParser.h"
 #include "ValueRefsPythonModuleParser.h"
 #include "NamedValueRefPythonParser.h"
@@ -50,7 +51,7 @@ namespace {
     template<typename T>
     void compile_eval(const char* content, const std::basic_string<T>& filename, const py::object& globals) {
         TraceLogger() << "Trying to convert path to bytes...";
-        PyObject *filename_str;
+        PyObject* filename_str;
         if constexpr (std::is_same_v<T, wchar_t>) {
             filename_str = PyUnicode_FromWideChar(filename.c_str(), filename.size());
         } else {
@@ -207,12 +208,14 @@ PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& s
         py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init)
             .def(py::self_ns::self + std::string())
             .def(std::string() + py::self_ns::self);
+        py::class_<value_ref_wrapper<std::vector<std::string>>>("ValueRefVectorString", py::no_init);
         py::class_<value_ref_wrapper<Visibility>>("ValueRefVisibility", py::no_init);
         py::class_<value_ref_wrapper<PlanetType>>("ValueRefPlanetType", py::no_init)
             .def(py::self_ns::self != py::self_ns::self);
         py::class_<value_ref_wrapper< ::PlanetEnvironment>>("ValueRefPlanetEnvironment", py::no_init);
         py::class_<value_ref_wrapper<PlanetSize>>("ValueRefPlanetSize", py::no_init)
             .def(py::self_ns::self != py::self_ns::self);
+        py::class_<value_ref_wrapper< ::StarType>>("ValueRefStarType", py::no_init);
         py::class_<condition_wrapper>("Condition", py::no_init)
             .def(py::self_ns::self & py::self_ns::self)
             .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())
@@ -476,6 +479,9 @@ void PythonParser::UnloadModule(py::object module) const {
     const char* module_name = PyModule_GetName(module.ptr());
     py::import("sys").attr("modules").attr("pop")(std::string{"focs."} + module_name);
 }
+
+void PythonParser::LoadConditionsModule() const
+{ (void)LoadModule(&PyInit__conditions); } // marked [[nodiscard]] but result not needed in this case
 
 void PythonParser::LoadValueRefsModule() const
 { (void)LoadModule(&PyInit__value_refs); } // marked [[nodiscard]] but result not needed in this case

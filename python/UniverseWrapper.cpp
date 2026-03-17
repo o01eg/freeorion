@@ -94,8 +94,7 @@ namespace {
 
     auto ShortestPath(const Universe& universe, int start_sys, int end_sys, int empire_id) -> std::vector<int>
     {
-        auto path{universe.GetPathfinder().ShortestPath(
-            start_sys, end_sys, empire_id, universe.EmpireKnownObjects(empire_id)).first};
+        auto path{universe.GetPathfinder().ShortestPath(start_sys, end_sys, empire_id).first};
         static_assert(std::is_same_v<std::vector<int>, decltype(path)>);
         return path;
     }
@@ -655,7 +654,7 @@ namespace FreeOrionPython {
         // BuildingType //
         //////////////////
         py::class_<BuildingType, boost::noncopyable>("buildingType", py::no_init)
-            .add_property("name",               make_function(&BuildingType::Name,          py::return_value_policy<py::copy_const_reference>()))
+            .add_property("name",               make_function(&BuildingType::Name,          py::return_value_policy<py::return_by_value>()))
             .add_property("description",        make_function(&BuildingType::Description,   py::return_value_policy<py::copy_const_reference>()))
             .def("productionCost",              +[](const BuildingType& bt, int empire_id, int location_id) -> float { return bt.ProductionCost(empire_id, location_id, IApp::GetApp()->GetContext()); })
             .def("productionTime",              +[](const BuildingType& bt, int empire_id, int location_id) -> int { return bt.ProductionTime(empire_id, location_id, IApp::GetApp()->GetContext()); })

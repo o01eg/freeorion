@@ -234,9 +234,6 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
             {},
             "icons/tech/orbital_gardens.png"
         };
-#if defined(FREEORION_MACOSX)
-        BOOST_WARN(tech == tech_it->second);
-#else
         BOOST_REQUIRE(tech.Name() == tech_it->second.Name());
         BOOST_REQUIRE(tech.Description() == tech_it->second.Description());
         BOOST_REQUIRE(tech.ShortDescription() == tech_it->second.ShortDescription());
@@ -255,7 +252,6 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
         BOOST_REQUIRE(tech.UnlockedTechs() == tech_it->second.UnlockedTechs());
         BOOST_REQUIRE(tech.Dump() == tech_it->second.Dump());
         BOOST_REQUIRE(tech == tech_it->second);
-#endif
     }
 
     // test it last
@@ -347,7 +343,7 @@ BOOST_AUTO_TEST_CASE(parse_species) {
         BOOST_REQUIRE_EQUAL(831, CheckSums::GetCheckSum(species.Name()));
         BOOST_REQUIRE_EQUAL(1218, CheckSums::GetCheckSum(species.Description()));
         BOOST_REQUIRE_EQUAL(53880, CheckSums::GetCheckSum(species.GameplayDescription()));
-        BOOST_REQUIRE_EQUAL(325509, CheckSums::GetCheckSum(species.Foci()));
+        BOOST_REQUIRE_EQUAL(325629, CheckSums::GetCheckSum(species.Foci()));
         BOOST_REQUIRE_EQUAL(1135, CheckSums::GetCheckSum(species.DefaultFocus()));
         BOOST_REQUIRE_EQUAL(16966, CheckSums::GetCheckSum(species.Likes()));
         BOOST_REQUIRE_EQUAL(16450, CheckSums::GetCheckSum(species.Dislikes()));
@@ -387,7 +383,7 @@ BOOST_AUTO_TEST_CASE(parse_species) {
 
         BOOST_REQUIRE_EQUAL(113801, CheckSums::GetCheckSum(species.AnnexationCost()));
 
-        BOOST_REQUIRE_EQUAL(8239655, CheckSums::GetCheckSum(species.Effects()));
+        BOOST_REQUIRE_EQUAL(8239795, CheckSums::GetCheckSum(species.Effects()));
         BOOST_REQUIRE_EQUAL(14018, CheckSums::GetCheckSum(species.Location()));
         BOOST_REQUIRE_EQUAL(1, CheckSums::GetCheckSum(species.Playable()));
         BOOST_REQUIRE_EQUAL(0, CheckSums::GetCheckSum(species.Native()));
@@ -401,7 +397,7 @@ BOOST_AUTO_TEST_CASE(parse_species) {
         BOOST_TEST_MESSAGE("Dump " << species.Name() << ":");
         BOOST_TEST_MESSAGE(species.Dump(0));
 
-        BOOST_REQUIRE_EQUAL(6807904, species.GetCheckSum());
+        BOOST_REQUIRE_EQUAL(6808164, species.GetCheckSum());
 
         const Species test_species{"SP_ABADDONI",
             "SP_ABADDONI_DESC",
@@ -429,44 +425,44 @@ BOOST_AUTO_TEST_CASE(parse_species) {
                 {"FOCUS_LOGISTICS", "FOCUS_LOGISTICS_DESC", std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("SHP_INTSTEL_LOG")), "icons/focus/supply.png"},
                 {"FOCUS_STOCKPILE", "FOCUS_STOCKPILE_DESC", std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("PRO_GENERIC_SUPPLIES")), "icons/focus/stockpile.png"},
                 {"FOCUS_STEALTH", "FOCUS_STEALTH_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_PLANET_CLOAK")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_PLANET_CLOAK")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("DEF_PLANET_CLOAK"))
                     )
                 ), "icons/focus/stealth.png"},
                 {"FOCUS_BIOTERROR", "FOCUS_BIOTERROR_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_BIOTERROR_PROJECTOR")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_BIOTERROR_PROJECTOR")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("GRO_BIOTERROR"))
                     )
                 ), "icons/focus/bioterror.png"},
                 {"FOCUS_STARGATE_SEND", "FOCUS_STARGATE_SEND_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_STARGATE")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_STARGATE")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_STARGATE"))
                     )
                 ), "icons/focus/stargate_send.png"},
                 {"FOCUS_STARGATE_RECEIVE", "FOCUS_STARGATE_RECEIVE_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_STARGATE")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_STARGATE")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_STARGATE"))
                     )
                 ), "icons/focus/stargate_receive.png"},
                 {"FOCUS_PLANET_DRIVE", "FOCUS_PLANET_DRIVE_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_PLANET_DRIVE")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_PLANET_DRIVE")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("CON_PLANET_DRIVE"))
                     )
                 ), "icons/building/planetary_stardrive.png"},
                 {"FOCUS_DISTORTION", "FOCUS_DISTORTION_DESC", std::make_unique<Condition::Or>(
-                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_SPATIAL_DISTORT_GEN")}))),
+                    std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_SPATIAL_DISTORT_GEN")),
                     std::make_unique<Condition::And>(
-                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>(array_to_vector<ValueRef::ValueRef<std::string>, 1>({std::make_unique<ValueRef::Constant<std::string>>("BLD_TRANSFORMER")}))),
+                        std::make_unique<Condition::Contains<>>(std::make_unique<Condition::Building>("BLD_TRANSFORMER")),
                         std::make_unique<Condition::OwnerHasTech>(std::make_unique<ValueRef::Constant<std::string>>("LRN_SPATIAL_DISTORT_GEN"))
                     )
                 ), "icons/focus/distortion.png"},
@@ -661,7 +657,8 @@ BOOST_AUTO_TEST_CASE(parse_buildings) {
             )
         },
         CaptureResult::CR_CAPTURE,
-        "icons/building/blackhole.png" 
+        "icons/building/blackhole.png",
+        BuildingType::SubType::NONE
     };
 
     BOOST_CHECK_EQUAL(test_building.Name(), building->Name());
@@ -682,9 +679,9 @@ BOOST_AUTO_TEST_CASE(parse_buildings) {
     BOOST_CHECK(dynamic_cast<const Condition::Not*>(location_conds[1]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::EmpireAffiliation*>(location_conds[2]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::StarType*>(location_conds[3]) != nullptr);
-    BOOST_CHECK_EQUAL(22510, location_cond->GetCheckSum());
+    BOOST_CHECK_EQUAL(22520, location_cond->GetCheckSum());
     BOOST_CHECK_EQUAL(3267, location_conds[0]->GetCheckSum());
-    BOOST_CHECK_EQUAL(9108, location_conds[1]->GetCheckSum());
+    BOOST_CHECK_EQUAL(9118, location_conds[1]->GetCheckSum());
     BOOST_CHECK_EQUAL(5108, location_conds[2]->GetCheckSum());
     BOOST_CHECK_EQUAL(3683, location_conds[3]->GetCheckSum());
 
@@ -696,29 +693,18 @@ BOOST_AUTO_TEST_CASE(parse_buildings) {
     BOOST_CHECK(dynamic_cast<const Condition::Not*>(test_location_conds[1]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::EmpireAffiliation*>(test_location_conds[2]) != nullptr);
     BOOST_CHECK(dynamic_cast<const Condition::StarType*>(test_location_conds[3]) != nullptr);
-    BOOST_CHECK_EQUAL(22510, test_location_cond->GetCheckSum());
+    BOOST_CHECK_EQUAL(22520, test_location_cond->GetCheckSum());
     BOOST_CHECK_EQUAL(3267, test_location_conds[0]->GetCheckSum());
-    BOOST_CHECK_EQUAL(9108, test_location_conds[1]->GetCheckSum());
+    BOOST_CHECK_EQUAL(9118, test_location_conds[1]->GetCheckSum());
     BOOST_CHECK_EQUAL(5108, test_location_conds[2]->GetCheckSum());
     BOOST_CHECK_EQUAL(3683, test_location_conds[3]->GetCheckSum());
 
-#if defined(FREEORION_MACOSX)
-    // ToDo: fix broken test on MacOS
-    BOOST_WARN((*test_building.Location()) == (*building->Location()));
-#else
     BOOST_CHECK((*test_building.Location()) == (*building->Location()));
-#endif
     BOOST_CHECK_EQUAL(test_building.Location()->GetCheckSum(), building->Location()->GetCheckSum());
     BOOST_CHECK((*test_building.EnqueueLocation()) == (*building->EnqueueLocation()));
     BOOST_REQUIRE_EQUAL(test_building.Effects().size(), building->Effects().size());
-#if defined(FREEORION_MACOSX)
-    // ToDo: fix broken test on MacOS
-    BOOST_WARN(test_building.Effects() == building->Effects());
-    BOOST_WARN(test_building.Effects()[0] == building->Effects()[0]);
-#else
     BOOST_CHECK(test_building.Effects() == building->Effects());
     BOOST_CHECK(test_building.Effects()[0] == building->Effects()[0]);
-#endif
     BOOST_CHECK_EQUAL(test_building.Effects()[0].GetCheckSum(), building->Effects()[0].GetCheckSum());
     BOOST_CHECK(test_building.Effects()[1] == building->Effects()[1]);
     BOOST_CHECK_EQUAL(test_building.Effects()[1].GetCheckSum(), building->Effects()[1].GetCheckSum());

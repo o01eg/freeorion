@@ -19,8 +19,8 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
-      - uses: actions/cache@v4
+        uses: actions/checkout@v6
+      - uses: actions/cache@v5
         id: build-ppa-install-cache-id
         with:
           path: ${{ runner.temp }}/cache-build-linux-install
@@ -31,7 +31,7 @@ jobs:
           is_cached: ${{ steps.build-ppa-install-cache-id.outputs.cache-hit }}
           cache: ${{ runner.temp }}/cache-build-linux-install
           snapshot: '/'
-          exclude: '/boot /data /dev /mnt /proc /run /sys'
+          exclude: '/boot /data /dev /mnt /proc /run /sys /tmp'
       - name: Ensure installed packages
         run: bash .github/workflows/ppa-install-build.sh
       - name: Export secret keys

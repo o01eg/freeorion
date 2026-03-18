@@ -15,5 +15,10 @@ sudo apt install -y devscripts \
         libopenal-dev \
         libsdl2-dev \
         libvorbis-dev \
-	dh-python \
-	godot3-server
+        build-essential:native \
+        libfreetype6-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libtiff-dev \
+        dh-python \
+        godot3-server

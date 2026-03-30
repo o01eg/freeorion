@@ -7,6 +7,7 @@
 #include "../universe/Effects.h"
 #include "../universe/Enums.h"
 #include "../universe/Species.h"
+#include "../util/Logger.h"
 
 #include "EnumPythonParser.h"
 #include "PythonParserImpl.h"
@@ -34,14 +35,16 @@ namespace {
             py::dict param_args = py::extract<py::dict>(kw["parameters"]);
             py::stl_input_iterator<std::string> p_begin(param_args.keys()), p_end;
             for (auto it = p_begin; it != p_end; ++it) {
-                if (auto p_arg = py::extract<value_ref_wrapper<std::string>>(param_args[*it]); p_arg.check()) {
-                    parameters.emplace_back(*it, ValueRef::CloneUnique(p_arg().value_ref));
-                } else if (auto p_arg_double = py::extract<value_ref_wrapper<double>>(param_args[*it]); p_arg_double.check()) {
-                    parameters.emplace_back(*it, std::make_unique<ValueRef::StringCast<double>>(ValueRef::CloneUnique(p_arg_double().value_ref)));
-                } else if (auto p_arg_int = py::extract<value_ref_wrapper<int>>(param_args[*it]); p_arg_int.check()) {
-                    parameters.emplace_back(*it, std::make_unique<ValueRef::StringCast<int>>(ValueRef::CloneUnique(p_arg_int().value_ref)));
+                if (auto p_arg_string_ref = py::extract<value_ref_wrapper<std::string>>(param_args[*it]); p_arg_string_ref.check()) {
+                    parameters.emplace_back(*it, ValueRef::CloneUnique(p_arg_string_ref().value_ref));
+                } else if (auto p_arg_double_ref = py::extract<value_ref_wrapper<double>>(param_args[*it]); p_arg_double_ref.check()) {
+                    parameters.emplace_back(*it, std::make_unique<ValueRef::StringCast<double>>(ValueRef::CloneUnique(p_arg_double_ref().value_ref)));
+                } else if (auto p_arg_int_ref = py::extract<value_ref_wrapper<int>>(param_args[*it]); p_arg_int_ref.check()) {
+                    parameters.emplace_back(*it, std::make_unique<ValueRef::StringCast<int>>(ValueRef::CloneUnique(p_arg_int_ref().value_ref)));
+                } else if (auto p_arg_string_constant = py::extract<std::string>(param_args[*it]); p_arg_string_constant.check()) {
+                    parameters.emplace_back(*it, std::make_unique<ValueRef::Constant<std::string>>(p_arg_string_constant()));
                 } else {
-                    parameters.emplace_back(*it, std::make_unique<ValueRef::Constant<std::string>>(py::extract<std::string>(param_args[*it])));
+                    ErrorLogger() << "SitRep parameter was not a string ref, double ref, int ref, or constant string";
                 }
             }
         }
@@ -69,15 +72,25 @@ namespace {
             condition = ValueRef::CloneUnique(py::extract<condition_wrapper>(kw["condition"])().condition);
         }
 
-        return effect_wrapper(std::make_shared<Effect::GenerateSitRepMessage>(
-                                    message,
-                                    icon,
-                                    std::move(parameters),
-                                    std::move(empire),
-                                    affiliation,
-                                    std::move(label),
-                                    stringtable_lookup
-                              ));
+        if (kw.has_key("empire")) {
+            return effect_wrapper(std::make_shared<Effect::GenerateSitRepMessage>(
+                                        message,
+                                        icon,
+                                        std::move(parameters),
+                                        std::move(empire),
+                                        affiliation,
+                                        std::move(label),
+                                        stringtable_lookup));
+        } else {
+            return effect_wrapper(std::make_shared<Effect::GenerateSitRepMessage>(
+                                        message,
+                                        icon,
+                                        std::move(parameters),
+                                        affiliation,
+                                        std::move(condition),
+                                        std::move(label),
+                                        stringtable_lookup));
+        }
     }
 
     effect_wrapper insert_conditional_(const py::tuple& args, const py::dict& kw) {

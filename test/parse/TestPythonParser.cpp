@@ -234,9 +234,6 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
             {},
             "icons/tech/orbital_gardens.png"
         };
-#if defined(FREEORION_MACOSX)
-        BOOST_WARN(tech == tech_it->second);
-#else
         BOOST_REQUIRE(tech.Name() == tech_it->second.Name());
         BOOST_REQUIRE(tech.Description() == tech_it->second.Description());
         BOOST_REQUIRE(tech.ShortDescription() == tech_it->second.ShortDescription());
@@ -255,7 +252,6 @@ BOOST_AUTO_TEST_CASE(parse_techs) {
         BOOST_REQUIRE(tech.UnlockedTechs() == tech_it->second.UnlockedTechs());
         BOOST_REQUIRE(tech.Dump() == tech_it->second.Dump());
         BOOST_REQUIRE(tech == tech_it->second);
-#endif
     }
 
     // test it last
@@ -703,23 +699,12 @@ BOOST_AUTO_TEST_CASE(parse_buildings) {
     BOOST_CHECK_EQUAL(5108, test_location_conds[2]->GetCheckSum());
     BOOST_CHECK_EQUAL(3683, test_location_conds[3]->GetCheckSum());
 
-#if defined(FREEORION_MACOSX)
-    // ToDo: fix broken test on MacOS
-    BOOST_WARN((*test_building.Location()) == (*building->Location()));
-#else
     BOOST_CHECK((*test_building.Location()) == (*building->Location()));
-#endif
     BOOST_CHECK_EQUAL(test_building.Location()->GetCheckSum(), building->Location()->GetCheckSum());
     BOOST_CHECK((*test_building.EnqueueLocation()) == (*building->EnqueueLocation()));
     BOOST_REQUIRE_EQUAL(test_building.Effects().size(), building->Effects().size());
-#if defined(FREEORION_MACOSX)
-    // ToDo: fix broken test on MacOS
-    BOOST_WARN(test_building.Effects() == building->Effects());
-    BOOST_WARN(test_building.Effects()[0] == building->Effects()[0]);
-#else
     BOOST_CHECK(test_building.Effects() == building->Effects());
     BOOST_CHECK(test_building.Effects()[0] == building->Effects()[0]);
-#endif
     BOOST_CHECK_EQUAL(test_building.Effects()[0].GetCheckSum(), building->Effects()[0].GetCheckSum());
     BOOST_CHECK(test_building.Effects()[1] == building->Effects()[1]);
     BOOST_CHECK_EQUAL(test_building.Effects()[1].GetCheckSum(), building->Effects()[1].GetCheckSum());
@@ -810,6 +795,34 @@ BOOST_AUTO_TEST_CASE(parse_fields) {
     BOOST_CHECK_EQUAL(4027442, effects[1].GetCheckSum());
     BOOST_CHECK_EQUAL(4016711, effects[2].GetCheckSum());
     BOOST_CHECK_EQUAL(4014678, effects[3].GetCheckSum());
+}
+
+BOOST_AUTO_TEST_CASE(parse_named_values) {
+    PythonParser parser(m_python, m_test_scripting_dir);
+
+    auto named_values_p = Pending::ParseSynchronously(parse::named_value_refs, parser, m_test_scripting_dir / "macros");
+    auto named_values_opt = Pending::WaitForPendingUnlocked(std::move(named_values_p));
+
+    BOOST_REQUIRE(named_values_opt);
+
+    const auto named_values = *std::move(named_values_opt);
+    BOOST_CHECK_EQUAL(0, named_values.size());
+
+    BOOST_WARN_EQUAL(2, GetNamedValueRefManager().GetItems().size());
+
+    const auto* value_ref_ptr = GetNamedValueRefManager().GetValueRefBase("BLD_BLACK_HOLE_POW_GEN_MIN_STABILITY");
+    BOOST_REQUIRE(value_ref_ptr != nullptr);
+
+    const auto* value_ref_ptr_const = dynamic_cast<const ValueRef::Constant<double>*>(value_ref_ptr);
+    BOOST_REQUIRE(value_ref_ptr_const != nullptr);
+    BOOST_CHECK_EQUAL(20, value_ref_ptr_const->Value());
+
+    const auto* value_ref_ptr_int = GetNamedValueRefManager().GetValueRefBase("MIN_MONSTER_DISTANCE");
+    BOOST_REQUIRE(value_ref_ptr_int != nullptr);
+
+    const auto* value_ref_ptr_int_op = dynamic_cast<const ValueRef::Operation<int>*>(value_ref_ptr_int);
+    BOOST_REQUIRE(value_ref_ptr_int_op != nullptr);
+    BOOST_CHECK(ValueRef::OpType::MINUS == value_ref_ptr_int_op->GetOpType());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

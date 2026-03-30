@@ -985,20 +985,24 @@ bool Empire::EnqueuableItem(const ProductionQueue::ProductionItem& item, int loc
 }
 
 int Empire::NumSitRepEntries(int turn) const noexcept {
+    static constexpr auto to_second_size = [](const auto& xx_params) noexcept { return xx_params.second.size(); };
+    static constexpr auto count_sitreps = [](auto&& sitreps_blob) noexcept {
+        return static_cast<int>(std::transform_reduce(sitreps_blob.begin(), sitreps_blob.end(),
+                                                      std::size_t{0}, std::plus<>{}, to_second_size));
+    };
+
     if (turn == INVALID_GAME_TURN)
-        return m_sitrep_entries.size();
-    int count = 0;
-    for (const SitRepEntry& sitrep : m_sitrep_entries)
-        if (sitrep.GetTurn() == turn)
-            count++;
-    return count;
+        return count_sitreps(m_blobbed_sitreps);
+
+    const auto is_turn = [turn](const auto& turn_xx) noexcept { return turn_xx.first.first == turn; };
+    return count_sitreps(m_blobbed_sitreps | range_filter(is_turn));
 }
 
 void Empire::Eliminate(EmpireManager& empires, int current_turn) {
     m_eliminated = true;
 
-    for (auto& entry : empires)
-        entry.second->AddSitRepEntry(CreateEmpireEliminatedSitRep(EmpireID(), current_turn));
+    for (auto& entry : empires | range_values)
+        entry->AddSitRepEntry(CreateEmpireEliminatedSitRep(EmpireID(), current_turn));
 
     // some Empire data not cleared when eliminating since it might be useful
     // to remember later, and having it doesn't hurt anything (as opposed to
@@ -1018,7 +1022,8 @@ void Empire::Eliminate(EmpireManager& empires, int current_turn) {
     // m_available_ship_hulls;
     // m_explored_systems;
     // m_known_ship_designs;
-    m_sitrep_entries.clear();
+    m_blobbed_sitreps.clear();
+
     m_industry_pool.SetObjects({});
     m_research_pool.SetObjects({});
     m_influence_pool.SetObjects({});
@@ -1413,45 +1418,65 @@ float Empire::Population() const
 namespace {
     template <typename X>
         requires (std::is_arithmetic_v<X> || std::is_enum_v<X>)
-    std::size_t SizeOfContents(const X& x)
+    constexpr std::size_t SizeOfContents(const X& x)
     { return 0u; }
 
+    CONSTEXPR_STRING std::size_t SizeOfContents(const std::string& s) {
+        CONSTEXPR_STRING const std::size_t SSO_CAP = std::string{}.capacity();
+        if (s.capacity() <= SSO_CAP)
+            return 0;
+        else
+            return s.capacity() * sizeof(std::string::value_type);
+    }
+
     template <typename F, typename S>
-    std::size_t SizeOfContents(const std::pair<F, S>& p);
+    constexpr std::size_t SizeOfContents(const std::pair<F, S>& p);
 
     template <typename X, typename Fx>
         requires requires(X x, Fx f) { {f(x)} -> std::same_as<std::size_t>; }
-    std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents);
+    constexpr std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents);
+
+    template <typename X>
+        requires requires(X x) { {x.SizeOfContents()} -> std::same_as<std::size_t>; }
+    constexpr std::size_t SizeOfContents(const X& x)
+    { return x.SizeOfContents(); }
 
     template <typename X>
         requires requires(X x) { x.begin(); x.end(); }
-    std::size_t SizeOfContents(const X& x)
+    constexpr std::size_t SizeOfContents(const X& x)
     {
         if constexpr (requires { x.capacity(); }) {
             const std::size_t retval = sizeof(*x.begin())*x.capacity();
-            return std::transform_reduce(x.begin(), x.end(), retval, std::plus<std::size_t>{},
-                                         [](const auto& v) { return SizeOfContents(v); });
+
+            if constexpr (requires { SizeOfContents(*x.begin()); }) {
+                return std::transform_reduce(x.begin(), x.end(), retval, std::plus<std::size_t>{},
+                                             [](const auto& v) { return SizeOfContents(v); });
+            }
+            return retval;
 
         } else if constexpr (requires { x.size(); }) {
             const std::size_t retval = sizeof(*x.begin())*x.size();
-            return std::transform_reduce(x.begin(), x.end(), retval, std::plus<std::size_t>{},
-                                         [](const auto& v) { return SizeOfContents(v); });
+            if constexpr (requires { SizeOfContents(*x.begin()); }) {
+                return std::transform_reduce(x.begin(), x.end(), retval, std::plus<std::size_t>{},
+                                             [](const auto& v) { return SizeOfContents(v); });
+            }
+            return retval;
         }
     }
 
     template <typename F, typename S>
-    std::size_t SizeOfContents(const std::pair<F, S>& p)
+    constexpr std::size_t SizeOfContents(const std::pair<F, S>& p)
     { return SizeOfContents(p.first) + SizeOfContents(p.second); }
 
     // takes custom sz_of_contents as function eg. a lambda
     template <typename X, typename Fx>
         requires requires(X x, Fx f) { {f(x)} -> std::same_as<std::size_t>; }
-    std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents)
+    constexpr std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents)
     { return sz_of_contents(x); }
 
     template <typename X, typename Fx>
         requires requires(X x, Fx f) { {f(*x.begin())} -> std::same_as<std::size_t>; x.begin(); x.end(); }
-    std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents)
+    constexpr std::size_t SizeOfContents(const X& x, const Fx& sz_of_contents)
     {
         if constexpr (requires { x.capacity(); }) {
             const std::size_t retval = (sizeof(*x.begin()) + sizeof(void*))*x.capacity();
@@ -1497,7 +1522,7 @@ namespace {
     { return p ? SizeOfContents(*p) : 0u; }
 
     template <typename X>
-    std::size_t SizeOfContents(const X* p)
+    constexpr std::size_t SizeOfContents(const X* p)
     { return p ? SizeOfContents(*p) : 0u; }
 }
 
@@ -1525,7 +1550,17 @@ std::size_t Empire::SizeInMemory() const {
     retval += SizeOfContents(m_available_ship_hulls);
     retval += SizeOfContents(m_explored_systems);
     retval += SizeOfContents(m_known_ship_designs);
-    retval += SizeOfContents(m_sitrep_entries, [](const SitRepEntry& r) { return SizeOfContents(r.GetIcon()) + SizeOfContents(r.GetLabelString()); });
+
+    retval += SizeOfContents(m_blobbed_sitreps);
+
+    constexpr auto soc_fixed_info = [](const SitRepEntry::FixedInfo& f) {
+        return SizeOfContents(f.m_template_string) +
+               SizeOfContents(f.m_icon) +
+               SizeOfContents(f.m_label) +
+               SizeOfContents(f.m_variable_names);
+    };
+    retval += SizeOfContents(m_blobbed_sitrep_fixed_infos, soc_fixed_info);
+
     constexpr auto soc_rpool = [](const ResourcePool& rp) { return SizeOfContents(rp.ObjectIDs()) + SizeOfContents(rp.Output()) + SizeOfContents(rp.Target()) + SizeOfContents(rp.Groups()); };
     retval += SizeOfContents(m_research_pool, soc_rpool);
     retval += SizeOfContents(m_industry_pool, soc_rpool);
@@ -1559,6 +1594,17 @@ std::size_t Empire::SizeInMemory() const {
     retval += SizeOfContents(m_preserved_system_exit_lanes);
     retval += SizeOfContents(m_pending_system_exit_lanes);
 
+    return retval;
+}
+
+std::map<std::string_view, std::size_t> Empire::SitRepsSizeInMemory() const {
+    std::map<std::string_view, std::size_t> retval;
+    for (const auto& [turn_fixedid, params] : m_blobbed_sitreps) {
+        const auto fixedid = turn_fixedid.second;
+        const std::string_view fixed_template = (fixedid < m_blobbed_sitrep_fixed_infos.size()) ?
+            std::string_view(m_blobbed_sitrep_fixed_infos[fixedid].m_template_string) : std::string_view{};
+        retval[fixed_template] += SizeOfContents(params);
+    }
     return retval;
 }
 
@@ -2118,11 +2164,25 @@ void Empire::RemoveShipDesign(int ship_design_id) {
     }
 }
 
-void Empire::AddSitRepEntry(const SitRepEntry& entry)
-{ m_sitrep_entries.push_back(entry); }
+void Empire::AddSitRepEntry(const SitRepEntry& entry) {
+    auto [fixed, unique] = entry.SplitInfo();
+    auto fixed_info_idx = GetFixedInfoIndex(std::move(fixed));
+    auto& params_list = GetParamsListForTurnAndFixedInfoIdx(unique.m_turn, fixed_info_idx);
+    params_list.emplace_back(std::move(unique.m_variable_values));
+}
 
-void Empire::AddSitRepEntry(SitRepEntry&& entry)
-{ m_sitrep_entries.push_back(std::move(entry)); }
+void Empire::AddSitRepEntry(SitRepEntry&& entry) {
+    auto [fixed, unique] = std::move(entry).SplitInfo();
+    auto fixed_info_idx = GetFixedInfoIndex(std::move(fixed));
+    auto& params_list = GetParamsListForTurnAndFixedInfoIdx(unique.m_turn, fixed_info_idx);
+    params_list.emplace_back(std::move(unique.m_variable_values));
+}
+
+void Empire::MoveSitrepsToBlob(std::vector<SitRepEntry>&& sitreps) {
+    m_blobbed_sitreps.clear();
+    for (auto& entry : sitreps)
+        AddSitRepEntry(std::move(entry));
+}
 
 void Empire::RemoveTech(const std::string& name)
 { m_techs.erase(name); }
@@ -2176,7 +2236,7 @@ void Empire::RemoveShipHull(const std::string& name) {
 }
 
 void Empire::ClearSitRep()
-{ m_sitrep_entries.clear(); }
+{ m_blobbed_sitreps.clear(); }
 
 namespace {
     // remove nonexistant / invalid techs from queue

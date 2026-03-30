@@ -208,12 +208,14 @@ PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& s
         py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init)
             .def(py::self_ns::self + std::string())
             .def(std::string() + py::self_ns::self);
+        py::class_<value_ref_wrapper<std::vector<std::string>>>("ValueRefVectorString", py::no_init);
         py::class_<value_ref_wrapper<Visibility>>("ValueRefVisibility", py::no_init);
         py::class_<value_ref_wrapper<PlanetType>>("ValueRefPlanetType", py::no_init)
             .def(py::self_ns::self != py::self_ns::self);
         py::class_<value_ref_wrapper< ::PlanetEnvironment>>("ValueRefPlanetEnvironment", py::no_init);
         py::class_<value_ref_wrapper<PlanetSize>>("ValueRefPlanetSize", py::no_init)
             .def(py::self_ns::self != py::self_ns::self);
+        py::class_<value_ref_wrapper< ::StarType>>("ValueRefStarType", py::no_init);
         py::class_<condition_wrapper>("Condition", py::no_init)
             .def(py::self_ns::self & py::self_ns::self)
             .def(py::self_ns::self & py::other<value_ref_wrapper<double>>())

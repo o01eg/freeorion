@@ -8,7 +8,6 @@
 #include <thread>
 
 #include <boost/date_time/posix_time/time_formatters.hpp>
-#include <boost/filesystem/exception.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
 #include <boost/lexical_cast.hpp>
@@ -1131,9 +1130,10 @@ namespace {
             return false;
         }
         
-        if (Networking::is_human(player_connection)) {
+        if (!Networking::is_human(player_connection)) {
             ErrorLogger() << "ServerApp::LoadMPGameInit found player connection of wrong type "
-                          << "for human player setup data with player id: " << id;
+                          << "for human player setup data with player id: " << id
+                          << " type: " << player_connection->GetClientType();
             return false;
         }
         return true;
@@ -4078,7 +4078,7 @@ void ServerApp::CacheCostsTimes(const ScriptingContext& context) {
         // cache costs for each empire for techs on queue an that are researchable, which
         // may be used later when updating the queue
 
-        const auto to_id_and_cache = [this, &tm, &context](const auto& id_empire) {
+        const auto to_id_and_cache = [&tm, &context](const auto& id_empire) {
             const auto should_cache = [empire{id_empire.second.get()}](const auto& name_tech) -> bool {
                 return (name_tech.second.Researchable() &&
                         empire->GetTechStatus(name_tech.first) == TechStatus::TS_RESEARCHABLE

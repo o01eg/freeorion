@@ -6,7 +6,9 @@
 
 #include "VarText.h"
 #include "../universe/ConstantsFwd.h"
+#include "../util/ranges.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -16,22 +18,161 @@ class ObjectMap;
 class UniverseObject;
 struct ScriptingContext;
 
+#if !defined(CONSTEXPR_VEC_AND_STRING)
+#  if defined(__cpp_lib_constexpr_vector) && defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 12) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 2))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934))) && ((!defined(__clang_major__) || (__clang_major__ >= 17)))
+#    define CONSTEXPR_VEC_AND_STRING constexpr
+#  else
+#    define CONSTEXPR_VEC_AND_STRING
+#  endif
+#endif
+
 //! Represents a situation report entry for a significant game event.
 class FO_COMMON_API SitRepEntry final : public VarText {
 public:
-    SitRepEntry();
+    SitRepEntry() noexcept = default;
 
-    SitRepEntry(const char* template_string, int turn, const char* icon,
-                const char* label, bool stringtable_lookup);
+    SitRepEntry(std::string template_string, int turn, std::string icon,
+                std::string label, bool stringtable_lookup) noexcept :
+        VarText(std::move(template_string), stringtable_lookup),
+        m_turn(turn),
+        m_icon(std::move(icon)),
+        m_label(std::move(label))
+    {}
 
-    SitRepEntry(std::string&& template_string, int turn, std::string&& icon,
-                std::string&& label, bool stringtable_lookup);
+    SitRepEntry(std::string template_string, int turn, std::string icon,
+                std::string label, bool stringtable_lookup,
+                VarText::VariablesVec data) noexcept :
+        VarText(std::move(template_string), std::move(data), stringtable_lookup),
+        m_turn(turn),
+        m_icon(std::move(icon)),
+        m_label(std::move(label))
+    {}
 
+    SitRepEntry(std::string template_string, int turn, std::string icon,
+                std::string label, bool stringtable_lookup,
+                std::pair<std::string, std::string> param_tag_data) noexcept :
+        SitRepEntry(std::move(template_string), turn, std::move(icon),
+                    std::move(label), stringtable_lookup,
+                    [](auto&& param) {
+                        VarText::VariablesVec retval;
+                        retval.push_back(std::move(param));
+                        return retval;
+                    }(std::move(param_tag_data)))
+    {}
+    [[nodiscard]] const auto&        Variables() const noexcept      { return m_variables; }
     [[nodiscard]] const std::string& GetDataString(const std::string& tag) const;
     [[nodiscard]] int                GetTurn() const noexcept        { return m_turn; }
     [[nodiscard]] const std::string& GetIcon() const noexcept        { return m_icon; }
-    [[nodiscard]] const std::string& GetLabelString() const noexcept { return m_label; }
+    [[nodiscard]] const std::string& GetLabel() const noexcept { return m_label; }
     [[nodiscard]] std::string        Dump() const;
+
+    [[nodiscard]] std::size_t SizeInMemory() const;
+
+    struct FixedInfo {
+        std::string m_template_string;
+        std::string m_icon;
+        std::string m_label;
+        std::vector<std::string> m_variable_names;
+        bool m_stringtable_lookup_flag = false;
+
+        static CONSTEXPR_VEC_AND_STRING std::string DetermineLabel(auto&& label, const auto& template_string) {
+            if (!label.empty()) return std::forward<decltype(label)>(label);
+            if (!template_string.empty()) return template_string + "_LABEL";
+            return {};
+        }
+
+        [[nodiscard]] CONSTEXPR_VEC_AND_STRING FixedInfo() noexcept = default;
+
+        [[nodiscard]] CONSTEXPR_VEC_AND_STRING FixedInfo(std::string&& template_string,
+                                                         std::string&& icon,
+                                                         std::string&& label,
+                                                         std::vector<std::string>&& var_names,
+                                                         bool lookup) noexcept :
+            m_template_string(std::move(template_string)),
+            m_icon(std::move(icon)),
+            m_label(DetermineLabel(std::move(label), m_template_string)),
+            m_variable_names(std::move(var_names)),
+            m_stringtable_lookup_flag(lookup)
+        {}
+
+        [[nodiscard]] CONSTEXPR_VEC_AND_STRING FixedInfo(const std::string& template_string,
+                                                         const std::string& icon,
+                                                         const std::string& label,
+                                                         std::vector<std::string>&& var_names,
+                                                         bool lookup) :
+            m_template_string(template_string),
+            m_icon(icon),
+            m_label(DetermineLabel(label, template_string)),
+            m_variable_names(std::move(var_names)),
+            m_stringtable_lookup_flag(lookup)
+        {}
+
+        CONSTEXPR_VEC_AND_STRING auto operator<=>(const FixedInfo&) const noexcept = default;
+
+        friend class boost::serialization::access;
+        template <typename Archive>
+        void serialize(Archive& ar, const unsigned int version);
+    };
+
+    struct UniqueInfo {
+        CONSTEXPR_VEC_AND_STRING UniqueInfo() noexcept = default;
+
+        CONSTEXPR_VEC_AND_STRING UniqueInfo(std::vector<std::string>&& variable_values, int turn) noexcept :
+            m_variable_values(std::move(variable_values)),
+            m_turn(turn)
+        {}
+
+        CONSTEXPR_VEC_AND_STRING UniqueInfo(const std::vector<std::string>& variable_values, int turn) :
+            m_variable_values(variable_values),
+            m_turn(turn)
+        {}
+
+        CONSTEXPR_VEC_AND_STRING auto operator<=>(const UniqueInfo&) const = default;
+
+        std::vector<std::string> m_variable_values;
+        int m_turn = INVALID_GAME_TURN;
+    };
+
+    // separates data of SitRepEntry into parts likely to recur many times,
+    // and parts that are likely to vary between otherwise similar sitreps
+    auto SplitInfo() const& {
+        return std::pair<FixedInfo, UniqueInfo>(std::piecewise_construct,
+                                                std::forward_as_tuple(this->m_template_string, m_icon, m_label,
+                                                                      this->m_variables | range_keys | range_to_vec,
+                                                                      this->m_stringtable_lookup_flag),
+                                                std::forward_as_tuple(this->m_variables | range_values | range_to_vec, m_turn));
+    }
+    auto SplitInfo() && {
+        static constexpr auto extract_vec = [](auto&& rng) -> std::vector<std::string>
+        { return std::vector(std::make_move_iterator(rng.begin()), std::make_move_iterator(rng.end())); };
+
+        return std::pair<FixedInfo, UniqueInfo>(std::piecewise_construct,
+                                                std::forward_as_tuple(std::move(this->m_template_string), std::move(m_icon), std::move(m_label),
+                                                                      extract_vec(this->m_variables | range_keys),
+                                                                      this->m_stringtable_lookup_flag),
+                                                std::forward_as_tuple(extract_vec(this->m_variables | range_values), m_turn));
+    }
+
+    // recombines separated SitRep entry from parts
+    SitRepEntry(FixedInfo fixed, UniqueInfo unique) :
+        SitRepEntry(std::move(fixed.m_template_string), unique.m_turn, std::move(fixed.m_icon),
+                    std::move(fixed.m_label), fixed.m_stringtable_lookup_flag,
+                    [](auto&& var_names, auto&& var_vals) {
+                        std::size_t sz = std::min(var_names.size(), var_vals.size());
+                        VarText::VariablesVec vars;
+                        vars.reserve(sz);
+                        for (std::size_t idx = 0; idx < sz; ++idx)
+                            vars.emplace_back(std::move(var_names[idx]), std::move(var_vals[idx]));
+                        return vars;
+                    }(std::move(fixed.m_variable_names), std::move(unique.m_variable_values)))
+    {}
+
+    [[nodiscard]] static bool IsValidSitrep(const FixedInfo& fixed, std::span<const std::string_view> param_values, const ScriptingContext* context)
+    { return VarText::GenerateVarText(fixed.m_template_string, fixed.m_variable_names, param_values, context).second; }
+
+    [[nodiscard]] static auto GenerateText(const FixedInfo& fixed, std::span<const std::string_view> param_values, const ScriptingContext* context)
+    { return VarText::GenerateVarText(fixed.m_template_string, fixed.m_variable_names, param_values, context).first; }
+
 
 private:
     int         m_turn = INVALID_GAME_TURN;
@@ -94,6 +235,16 @@ private:
                                                      std::vector<std::pair<std::string, std::string>> parameters,
                                                      std::string label = "", bool stringtable_lookup = true);
 //! @}
+
+template <typename Archive>
+void SitRepEntry::FixedInfo::serialize(Archive& ar, const unsigned int version)
+{
+    ar  & BOOST_SERIALIZATION_NVP(m_template_string)
+        & BOOST_SERIALIZATION_NVP(m_stringtable_lookup_flag)
+        & BOOST_SERIALIZATION_NVP(m_icon)
+        & BOOST_SERIALIZATION_NVP(m_label)
+        & BOOST_SERIALIZATION_NVP(m_variable_names);
+}
 
 template <typename Archive>
 void SitRepEntry::serialize(Archive& ar, const unsigned int version)

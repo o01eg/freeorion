@@ -559,6 +559,7 @@ if(MSVC)
     get_target_property(PARSE_COMPILE_OPTIONS freeorionparse COMPILE_OPTIONS)
     list(REMOVE_ITEM PARSE_COMPILE_OPTIONS 
         "$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<OR:$<CONFIG:DEBUG>,$<CONFIG:RELWITHDEBINFO>>>:/Zi>"
+	"$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<OR:$<CONFIG:DEBUG>,$<CONFIG:RELWITHDEBINFO>>>:/Zf>"
     )
     set_target_properties(freeorionparse
         PROPERTIES

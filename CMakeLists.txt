@@ -977,6 +977,11 @@ cpack_add_component(resources
     DISPLAY_NAME "Game resources"
 )
 
+cpack_add_component(debug-symbols
+    DISPLAY_NAME "Debug symbols"
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<OR:$<CONFIG:DEBUG>,$<CONFIG:RELWITHDEBINFO>>>:REQUIRED:DISABLED>
+)
+
 if(BUILD_TESTING)
     cpack_add_component(binaries-test
         DISPLAY_NAME "Test binaries only"
@@ -1017,6 +1022,13 @@ if(BUILD_CLIENT_GG)
             )
         ]]
         ALL_COMPONENTS)
+        install(
+            FILES
+                $<TARGET_PDB_FILE:freeorion>
+            COMPONENT debug-symbols
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            CONFIGURATIONS Debug RelWithDebInfo
+        )
     endif()
 endif()
 

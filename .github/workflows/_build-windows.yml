@@ -26,23 +26,23 @@ jobs:
           unzip -q ../${{ steps.download-sdk.outputs.filename }} -d ..
           mkdir build
           pushd build
-          cmake -G "Visual Studio 17 2022" -T "v143" -A x64 -DBUILD_TESTING=On -DBUILD_CLIENT_GODOT=On -DCMAKE_C_FLAGS=/MP -DCMAKE_CXX_FLAGS=/MP ..
+          cmake -G "Visual Studio 17 2022" -T "v143" -A x64 -DBUILD_TESTING=On -DBUILD_CLIENT_GODOT=On -DCMAKE_C_FLAGS=/MP -DCMAKE_CXX_FLAGS=/MP -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
       - name: Build
         shell: pwsh
         run: |
           pushd build
-          cmake --build . --config "Release" -- /maxcpucount /property:BuildInParallel=true /property:CL_MPCount=2 /verbosity:minimal
+          cmake --build . --config "RelWithDebInfo" -- /maxcpucount /property:BuildInParallel=true /property:CL_MPCount=2 /verbosity:minimal
       - name: Test
         shell: pwsh
         working-directory: build
         run: |
-          $env:Path += ";$($pwd.Path)\\Release"
-          cmake --build . --config "Release" --target unittest
+          $env:Path += ";$($pwd.Path)\\RelWithDebInfo"
+          cmake --build . --config "RelWithDebInfo" --target unittest
       - name: Test dumping species
         shell: pwsh
         working-directory: build
         run: |
-          $env:Path += ";$($pwd.Path)\\Release"
+          $env:Path += ";$($pwd.Path)\\RelWithDebInfo"
           $env:FO_CHECKSUM_SPECIES_NAME = "SP_CELESTEPHYTE"
           fo_unittest_parse.exe --run_test=TestDefaultPythonParser/parse_species_full --log_level=message
       - name: Download Godot
@@ -60,15 +60,15 @@ jobs:
       - name: Install Godot and dependencies
         shell: pwsh
         run: |
-          unzip -q ../${{ steps.download-godot.outputs.filename }} -d build/Release
-          mkdir build/Release/Godot_v3.2.3-stable_win64.exe.local
-          pushd build/Release/Godot_v3.2.3-stable_win64.exe.local
+          unzip -q ../${{ steps.download-godot.outputs.filename }} -d build/RelWithDebInfo
+          mkdir build/RelWithDebInfo/Godot_v3.2.3-stable_win64.exe.local
+          pushd build/RelWithDebInfo/Godot_v3.2.3-stable_win64.exe.local
           7z e ../../../../${{ steps.download-mesa.outputs.filename }}
       - name: Test Godot
         shell: pwsh
         run: |
-          $env:Path += ";$($pwd.Path)\\build\\Release"
-          .\build\Release\Godot_v3.2.3-stable_win64.exe --no-window --disable-render-loop --video-driver GLES2 --verbose -s --path godot addons/gut/gut_cmdln.gd -gdir=res://test/ -ginclude_subdirs -gexit
+          $env:Path += ";$($pwd.Path)\\build\\RelWithDebInfo"
+          .\build\RelWithDebInfo\Godot_v3.2.3-stable_win64.exe --no-window --disable-render-loop --video-driver GLES2 --verbose -s --path godot addons/gut/gut_cmdln.gd -gdir=res://test/ -ginclude_subdirs -gexit
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -80,7 +80,7 @@ jobs:
       - name: Generate binaries only
         run: |
           pushd build
-          cpack -V -C Release -G ZIP -D CPACK_ARCHIVE_COMPONENT_INSTALL=ON -D CPACK_MONOLITHIC_INSTALL=OFF -D "CPACK_COMPONENTS_ALL=binaries;binaries-test"
+          cpack -V -C RelWithDebInfo -G ZIP -D CPACK_ARCHIVE_COMPONENT_INSTALL=ON -D CPACK_MONOLITHIC_INSTALL=OFF -D "CPACK_COMPONENTS_ALL=binaries;binaries-test;debug-symbols"
       - name: Upload binaries artifacts
         uses: actions/upload-artifact@v4
         with:

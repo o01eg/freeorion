@@ -185,6 +185,8 @@ add_compile_options(
 
     # Produce pdb files in Debug and RelWithDebInfo configuration
     $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<OR:$<CONFIG:DEBUG>,$<CONFIG:RELWITHDEBINFO>>>:/Zi>
+
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<OR:$<CONFIG:DEBUG>,$<CONFIG:RELWITHDEBINFO>>>:/Zf>
  
     # Use the multithread-specific and DLL-specific version of the run-time library in Debug Configuration
     $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:DEBUG>>:/MD>

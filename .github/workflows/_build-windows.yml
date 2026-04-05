@@ -26,12 +26,12 @@ jobs:
           unzip -q ../${{ steps.download-sdk.outputs.filename }} -d ..
           mkdir build
           pushd build
-          cmake -G "Visual Studio 17 2022" -T "v143" -A x64 -DBUILD_TESTING=On -DBUILD_CLIENT_GODOT=Off -DCMAKE_C_FLAGS=/MP -DCMAKE_CXX_FLAGS=/MP -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+          cmake -G "Visual Studio 17 2022" -T "v143" -A x64 -DBUILD_TESTING=On -DBUILD_CLIENT_GODOT=Off -DBUILD_SERVER=Off -DBUILD_AI=Off -DBUILD_PARSERS=Off -DCMAKE_C_FLAGS=/MP -DCMAKE_CXX_FLAGS=/MP -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
       - name: Build
         shell: pwsh
         run: |
           pushd build
-          cmake --build . --config "RelWithDebInfo" -- /maxcpucount /property:BuildInParallel=true /property:CL_MPCount=2 /verbosity:minimal
+          cmake --build . --config "RelWithDebInfo" -- /maxcpucount /property:BuildInParallel=true /property:CL_MPCount=2 /verbosity:detailed
       - name: Test
         shell: pwsh
         working-directory: build

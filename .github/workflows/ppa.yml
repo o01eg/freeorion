@@ -14,7 +14,7 @@ jobs:
         dist:
           - jammy    # 22.04
           - noble    # 24.04
-          - questing # 25.10
+          # - questing # 25.10 - broken Boost.Process
           - resolute # 26.04
 
     steps:

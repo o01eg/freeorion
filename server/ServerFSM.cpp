@@ -3617,10 +3617,10 @@ sc::result ProcessingTurn::react(const ProcessTurn& u) {
                 empire_id));
         }
 
-        if (empire.second->Won()) {
+        if (empire->Won()) {
             if (have_winner)
                 winner_names += ", ";
-            winner_names += empire.second->PlayerName();
+            winner_names += empire->PlayerName();
             have_winner = true;
         }
     }

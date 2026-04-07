@@ -697,12 +697,12 @@ void ServerNetworking::CleanupCookies() {
 
 void ServerNetworking::SendXMPPMessageMUC(std::string message) {
     // ToDo: replace with Boost.Beast
-    std::thread([message] {
+    std::thread([message, this] {
         std::vector<std::string> args{"/usr/bin/curl",
             "http://localhost:8083/",
             "-H", "X-XMPP-Muc: smac",
             "-d", message};
-        Process sendxmpp = Process("/usr/bin/curl", args);
+        Process sendxmpp = Process(m_player_connection_acceptor.get_executor().context(), "/usr/bin/curl", args);
         std::this_thread::sleep_for(std::chrono::seconds(3));
     }).detach();
 }

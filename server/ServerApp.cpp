@@ -85,6 +85,7 @@ ServerApp::ServerApp() :
                  boost::bind(&ServerApp::HandleMessage, this, boost::placeholders::_1, boost::placeholders::_2),
                  boost::bind(&ServerApp::PlayerDisconnected, this, boost::placeholders::_1)),
     m_context(*this),
+    m_fsm(*this),
     m_chat_history(500)
 {
     InfoLogger() << FreeOrionVersionString();
@@ -391,7 +392,6 @@ void ServerApp::UpdateEmpireTurnReceived(bool success, int empire_id, int turn) 
     if (success) {
         if (auto empire = m_empires.GetEmpire(empire_id))
             empire->SetLastTurnReceived(turn);
-    }
     } else if (turn != INVALID_GAME_TURN) {
         if (auto empire = m_empires.GetEmpire(empire_id)) {
             if (!empire->Eliminated()) {
@@ -400,6 +400,7 @@ void ServerApp::UpdateEmpireTurnReceived(bool success, int empire_id, int turn) 
                 WarnLogger() << "ServerApp::UpdateEmpireTurnReceived: player " << empire->PlayerName() << " failed to receive message about turn " << turn;
             }
         }
+    }
 }
 
 void ServerApp::CleanupAIs() {
@@ -1131,15 +1132,14 @@ void ServerApp::SendOutboundChatMessage(const std::string& text, const std::stri
                 ErrorLogger() << "Python interpreter successfully restarted.";
             } else {
                 ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                m_fsm->process_event(ShutdownServer());
+                m_fsm.process_event(ShutdownServer());
             }
         }
     }
 
     if (!success) {
         ErrorLogger() << "Python scripted player notification failed.";
-        ServerApp::GetApp()->Networking().SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"),
-                                                                      false));
+        m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_TURN_EVENTS_ERRORS"), false));
     }
 }
 
@@ -2177,30 +2177,22 @@ std::set<int> ServerApp::LastNotReadyEmpires() {
     DebugLogger() << "ServerApp::LastOneNotReadyEmpire for turn: " << m_current_turn
                   << (m_turn_expired ? " (expired)" : "");
     std::set<int> last_empire_ids;
-    for (const auto& empire_orders : m_turn_sequence) {
-        bool empire_orders_received = true;
-        const auto empire = GetEmpire(empire_orders.first);
+    for (const auto& empire_orders : m_player_data) {
+        const auto empire = GetEmpire(empire_orders.empire_id);
         if (!empire) {
-            ErrorLogger() << " ... invalid empire id in turn sequence: "<< empire_orders.first;
+            ErrorLogger() << " ... invalid empire id in turn sequence: "<< empire_orders.empire_id;
             continue;
         } else if (empire->Eliminated()) {
-            ErrorLogger() << " ... eliminated empire in turn sequence: " << empire_orders.first;
+            ErrorLogger() << " ... eliminated empire in turn sequence: " << empire_orders.empire_id;
             continue;
         } else if (!empire->Ready()) {
-            DebugLogger() << " ... not ready empire id: " << empire_orders.first;
-            empire_orders_received = false;
-        } else if (!empire_orders.second) {
-            DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
-            empire_orders_received = false;
-        } else if (!empire_orders.second->orders) {
-            DebugLogger() << " ... no orders from empire id: " << empire_orders.first;
-            empire_orders_received = false;
+            DebugLogger() << " ... not ready empire id: " << empire_orders.empire_id;
         } else {
-            DebugLogger() << " ... have orders from empire id: " << empire_orders.first;
+            DebugLogger() << " ... have orders from empire id: " << empire_orders.empire_id;
+            continue;
         }
-        if (!empire_orders_received) {
-            last_empire_ids.insert(empire_orders.first);
-        }
+
+        last_empire_ids.insert(empire_orders.empire_id);
     }
     return last_empire_ids;
 }

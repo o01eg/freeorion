@@ -1,3 +1,9 @@
+freeorion (0.5.1.9999.fo0031+git20260406.f4f24a4ppa1~noble) noble; urgency=medium
+
+  * FO0031 game preparation.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Tue, 07 Apr 2026 08:06:45 +0400
+
 freeorion (0.5.0.9999.fo0029+git20241106.ad044ccppa1~noble) noble; urgency=medium
 
   * Update weekly test build.

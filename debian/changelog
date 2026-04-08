@@ -1,3 +1,9 @@
+freeorion (0.5.1.9999.fo0031+git20260406.f4f24a4ppa2~noble) noble; urgency=medium
+
+  * Fix logging initialization order.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Wed, 08 Apr 2026 19:41:24 +0400
+
 freeorion (0.5.1.9999.fo0031+git20260406.f4f24a4ppa1~noble) noble; urgency=medium
 
   * FO0031 game preparation.

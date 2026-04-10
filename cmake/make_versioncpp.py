@@ -115,7 +115,6 @@ required_boost_libraries = [
     "boost_python%s" % boost_python_suffix,
     "boost_serialization",
     "boost_signals",
-    "boost_system",
     "boost_thread",
 ]
 

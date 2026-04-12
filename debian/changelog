@@ -1,3 +1,9 @@
+freeorion (0.5.1.9999.fo0031+git20260406.f4f24a4ppa3~noble) noble; urgency=medium
+
+  * Fix FSM freeze without AI.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Sun, 12 Apr 2026 11:30:31 +0400
+
 freeorion (0.5.1.9999.fo0031+git20260406.f4f24a4ppa2~noble) noble; urgency=medium
 
   * Fix logging initialization order.

@@ -1,3 +1,9 @@
+freeorion (0.5.1.9999.fo0031+git20260413.ad28b23ppa1~noble) noble; urgency=medium
+
+  * Weekly test build 2026-04-13.ad28b23.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Tue, 14 Apr 2026 20:46:10 +0400
+
 freeorion (0.5.1.9999.fo0031+git20260406.f4f24a4ppa3~noble) noble; urgency=medium
 
   * Fix FSM freeze without AI.

@@ -282,56 +282,65 @@ public:
     void           RemoveAccelerator(accel_iterator it);
 
     /** Sets whether to emit keyboard accelerator signals while modal windows are open. */
-    void           EnableModalAcceleratorSignals(bool allow = true);
+    void           EnableModalAcceleratorSignals(bool allow = true) noexcept;
 
     /** Sets whether to swap left and right mouse button events. */
-    void           SetMouseLRSwapped(bool swapped = true);
+    void           SetMouseLRSwapped(bool swapped = true) noexcept;
 
     /** Returns a shared_ptr to the desired font, supporting all printable
         ASCII characters. */
-    std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts);
+    static std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts)
+    { return GetFontManager().GetFont(font_filename, pts); }
 
     /** Returns a shared_ptr to the desired font, supporting all printable
         ASCII characters, from the in-memory contents \a file_contents. */
-    std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts,
-                                        const std::vector<uint8_t>& file_contents);
+    static std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts,
+                                               const std::vector<uint8_t>& file_contents)
+    { return GetFontManager().GetFont(font_filename, pts, file_contents); }
 
     /** Returns a shared_ptr to the desired font, supporting all the
         characters in the UnicodeCharsets in the range [first, last). */
     template <typename CharSets, std::enable_if_t<is_charset_container<CharSets>>* = nullptr>
-    std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts, CharSets&& charsets)
+    static std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts, CharSets&& charsets)
     { return GetFontManager().GetFont(font_filename, pts, std::forward<CharSets>(charsets)); }
 
     /** Returns a shared_ptr to the desired font, supporting all the
         characters in the UnicodeCharsets in the range [first, last), from the
         in-memory contents \a file_contents. */
     template <typename CharSets, std::enable_if_t<is_charset_container<CharSets>>* = nullptr>
-    std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts,
-                                        const std::vector<uint8_t>& file_contents, CharSets&& charsets)
+    static std::shared_ptr<const Font> GetFont(std::string_view font_filename, unsigned int pts,
+                                               const std::vector<uint8_t>& file_contents, CharSets&& charsets)
     { return GetFontManager().GetFont(font_filename, pts, file_contents, std::forward<CharSets>(charsets)); }
 
-    /** Returns a shared_ptr to existing font \a font in a new size, \a pts. */
+    /** Returns a shared_ptr to existing font \a font in a new size, \a pts
+      * using this GUI's StyleFactory in case \a font is empty or its name
+      * is the same as the default font name. */
     std::shared_ptr<const Font> GetFont(const std::shared_ptr<const Font>& font, unsigned int pts) const;
 
     /** Removes the desired font from the managed pool; since shared_ptr's are
         used, the font may be deleted much later. */
-    static void FreeFont(std::string_view font_filename, unsigned int pts);
+    static void FreeFont(std::string_view font_filename, unsigned int pts)
+    { GetFontManager().FreeFont(font_filename, pts); }
 
     /** Adds an already-constructed texture to the managed pool \warning
         calling code <b>must not</b> delete \a texture; the texture pool will
         do that. */
-    void StoreTexture(Texture* texture, std::string texture_name);
+    static void StoreTexture(Texture* texture, std::string texture_name)
+    { GetTextureManager().StoreTexture(texture, std::move(texture_name)); }
 
     /** Adds an already-constructed texture to the managed pool. */
-    void StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name);
+    static void StoreTexture(std::shared_ptr<Texture> texture, std::string texture_name)
+    { GetTextureManager().StoreTexture(std::move(texture), std::move(texture_name)); }
 
     /** Loads the requested texture from file \a name; mipmap textures are
       * generated if \a mipmap is true. */
-    std::shared_ptr<Texture> GetTexture(const std::filesystem::path& path, bool mipmap = false);
+    static std::shared_ptr<Texture> GetTexture(const std::filesystem::path& path, bool mipmap = false)
+    { return GetTextureManager().GetTexture(path, mipmap); }
 
     /** Removes the desired texture from the managed pool; since shared_ptr
       * are used, the texture may be deleted much later. */
-    void FreeTexture(const std::filesystem::path& path);
+    static void FreeTexture(const std::filesystem::path& path)
+    { GetTextureManager().FreeTexture(path); }
 
     /** Sets the currently-installed style factory. */
     void SetStyleFactory(std::unique_ptr<StyleFactory>&& factory) noexcept;

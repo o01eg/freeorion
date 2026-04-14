@@ -16,27 +16,6 @@ using namespace GG;
 ////////////////////////////////////////////////
 // GG::TextControl
 ////////////////////////////////////////////////
-
-Pt TextControl::MinUsableSize(X width) const
-{
-    // If the requested width is within one space width of the cached width
-    // don't recalculate the size
-    X min_delta = m_font ? m_font->SpaceWidth() : X1;
-    X abs_delta_w = X(std::abs(Value(m_cached_minusable_size_width - width)));
-    if (m_cached_minusable_size_width != X0 &&  abs_delta_w < min_delta)
-        return m_cached_minusable_size;
-
-    // Calculate and cache the minimum usable size when m_cached_minusable_size is equal to width.
-    // Create dummy line data with line breaks added so that lines are not wider than width.
-    Flags<TextFormat> dummy_format(m_format);
-    auto dummy_line_data = m_font ?
-        m_font->DetermineLines(m_text, dummy_format, width, m_text_elements) : Font::LineVec{};
-    m_cached_minusable_size = (m_font ? m_font->TextExtent(dummy_line_data) : Pt{})
-        + (ClientUpperLeft() - UpperLeft()) + (LowerRight() - ClientLowerRight());
-    m_cached_minusable_size_width = width;
-    return m_cached_minusable_size;
-}
-
 namespace {
     template <typename T>
     constexpr auto to_addr(T it) noexcept
@@ -49,22 +28,23 @@ namespace {
     }
 }
 
-std::string_view TextControl::Text(CPSize from, CPSize to) const
+std::string_view TextControl::Text(CPSize from, CPSize to) const noexcept
 {
     if (from == INVALID_CP_SIZE || to == INVALID_CP_SIZE)
         return "";
 
-    std::tie(from, to) = [from, to]() { return std::pair{std::min(from, to), std::max(from, to)}; }();
+    std::tie(from, to) = [from, to]() noexcept { return std::pair{std::min(from, to), std::max(from, to)}; }();
 
+    static_assert(noexcept(CodePointIndicesRangeToStringSizeIndices(from, to, m_line_data)));
     const auto txt_sz = m_text.size();
     auto [low_string_idx_strsz, high_string_idx_strsz] = CodePointIndicesRangeToStringSizeIndices(from, to, m_line_data);
     const auto low_string_idx = std::min(Value(low_string_idx_strsz), txt_sz);
     const auto high_string_idx = std::min(Value(high_string_idx_strsz), txt_sz);
     const auto out_length = std::max(low_string_idx, high_string_idx) - std::min(low_string_idx, high_string_idx);
 
-    const auto low_it = m_text.begin() + low_string_idx;
-
     try {
+        auto low_it = m_text.begin();
+        std::advance(low_it, low_string_idx);
         return {to_addr(low_it), out_length};
     } catch (...) {
         return {};
@@ -144,8 +124,6 @@ void TextControl::RecomputeLineData() {
         Resize(text_sz);
     else
         RecomputeTextBounds();
-
-    m_cached_minusable_size_width = X0;
 }
 
 void TextControl::SetFont(std::shared_ptr<const Font> font)

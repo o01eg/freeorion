@@ -88,7 +88,8 @@ jobs:
             if [[ -z "${PREV_GIT_SHA}" ]]; then
               echo "::warning title=Mastodon::Missing previous commit SHA"
             else
-              echo "prev-git-sha=${PREV_GIT_SHA}" >> "${GITHUB_OUTPUT}"
+              FULL_SHA=$(gh api -X GET repos/${{ github.repository }}/commits/${PREV_GIT_SHA} --jq '.sha')
+              echo "prev-git-sha=${FULL_SHA}" >> "${GITHUB_OUTPUT}"
             fi
           fi
       - name: Checkout sources

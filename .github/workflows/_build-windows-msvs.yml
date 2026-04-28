@@ -66,9 +66,9 @@ jobs:
           path: FreeOrion_*_Test_x64_Setup.exe
           if-no-files-found: error
           retention-days: 1
-  windows-2025:
-    name: MSVS 2022 on Windows 2025
-    runs-on: windows-2025
+  windows-2025-vs2026:
+    name: MSVS 2026 on Windows 2025
+    runs-on: windows-2025-vs2026
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -89,7 +89,7 @@ jobs:
           cp ../bin/* ./
       - name: Build
         run: |
-          cd msvc2022
+          cd msvc2026
           msbuild FreeOrion.sln /maxcpucount /property:BuildInParallel=true /property:CL_MPCount=2 /property:PlatformToolset=v143 /property:Configuration=Release /verbosity:minimal
       - name: Cache NSIS
         uses: actions/cache@v3

@@ -582,7 +582,11 @@ if(APPLE)
 endif()
 
 if(BUILD_SERVER)
-    add_executable(freeoriond "")
+    if(ANDROID)
+        add_library(freeoriond SHARED "")
+    else()
+        add_executable(freeoriond "")
+    endif()
     
     if(WIN32)
         set_property(TARGET freeoriond
@@ -607,7 +611,11 @@ if(BUILD_SERVER)
 endif()
 
 if(BUILD_AI)
-    add_executable(freeorionca "")
+    if(ANDROID)
+        add_library(freeorionca SHARED "")
+    else()
+        add_executable(freeorionca "")
+    endif()
     
     if(WIN32)
         set_property(TARGET freeorionca
@@ -856,8 +864,6 @@ if(APPLE AND BUILD_CLIENT_GG)
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_LOG_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_LOG_SETUP_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
-        COMMAND
-           ${CMAKE_COMMAND} -E copy_if_different "${Boost_REGEX_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_PYTHON${Boost_PYTHON_SUFFIX}_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND

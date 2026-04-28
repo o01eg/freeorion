@@ -38,9 +38,9 @@ jobs:
   check-last-post:
     needs: check-run
     runs-on: ubuntu-latest
-    outputs:
-      count: ${{ steps.repo-stats.outputs.count }}
-      authors: ${{ steps.repo-stats.outputs.authors }}
+    #outputs:
+    #  count: ${{ steps.repo-stats.outputs.count }}
+    #  authors: ${{ steps.repo-stats.outputs.authors }}
     steps:
       - name: Get Mastodon account
         run: |
@@ -96,11 +96,12 @@ jobs:
         if: steps.prev-status.outputs.prev-git-sha != ''
         with:
           fetch-depth: 2
+          ref: ${{ steps.prev-status.outputs.prev-git-sha }}
       - name: Fetch recent commits
         id: repo-stats
         if: steps.prev-status.outputs.prev-git-sha != ''
         run: |
-          git fetch --filter=blob:none origin ${{ steps.prev-status.outputs.prev-git-sha }}:FETCH_HEAD
+          git fetch --no-tags --prune --no-recurse-submodules --filter=blob:none origin ${{ github.sha }}:FETCH_HEAD
           COUNT=$(git rev-list --count --no-merges ${{ steps.prev-status.outputs.prev-git-sha }}..${{ github.sha }})
           AUTHORS=$(git log --format='%aN' ${{ steps.prev-status.outputs.prev-git-sha }}..${{ github.sha }} | sort -u | wc -l)
           echo "count=${COUNT}" >> "${GITHUB_OUTPUT}"

@@ -100,7 +100,7 @@ jobs:
         id: repo-stats
         if: steps.prev-status.outputs.prev-git-sha != ''
         run: |
-          git fetch --filter=blob:none origin ${{ steps.prev-status.outputs.prev-git-sha }}
+          git fetch --filter=blob:none origin ${{ steps.prev-status.outputs.prev-git-sha }}:FETCH_HEAD
           COUNT=$(git rev-list --count --no-merges ${{ steps.prev-status.outputs.prev-git-sha }}..${{ github.sha }})
           AUTHORS=$(git log --format='%aN' ${{ steps.prev-status.outputs.prev-git-sha }}..${{ github.sha }} | sort -u | wc -l)
           echo "count=${COUNT}" >> "${GITHUB_OUTPUT}"

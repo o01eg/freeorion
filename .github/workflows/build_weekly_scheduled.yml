@@ -2,6 +2,7 @@ name: "Weekly Scheduled"
 on:
   schedule:
     - cron: '*/20 15-18 * * 2'
+  workflow_dispatch:
 concurrency:
   group: weekly_test_build
   cancel-in-progress: false

@@ -42,7 +42,7 @@ jobs:
       authors: ${{ steps.repo-stats.outputs.authors }}
     steps:
       - name: Get Mastodon account
-        run: >
+        run: |
           RESPONSE=$(curl -sSL -w "\n%{http_code}" \
           -X GET \
           -H "Authorization: Bearer ${{ secrets.MASTODON_ACCESS_TOKEN }}" \
@@ -65,7 +65,7 @@ jobs:
           echo "ACCOUNT_ID=${ACCOUNT_ID}" >> $GITHUB_ENV
       - name: Get last statuses
         id: prev-status
-        run: >
+        run: |
           RESPONSE=$(curl -sSL -w "\n%{http_code}" \
           -X GET \
           -H "Authorization: Bearer ${{ secrets.MASTODON_ACCESS_TOKEN }}" \

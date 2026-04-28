@@ -67,6 +67,8 @@ jobs:
       - name: Get last statuses
         id: prev-status
         run: |
+          echo ${{ github.token }} | gh auth login --with-token
+
           RESPONSE=$(curl -sSL -w "\n%{http_code}" \
           -X GET \
           -H "Authorization: Bearer ${{ secrets.MASTODON_ACCESS_TOKEN }}" \

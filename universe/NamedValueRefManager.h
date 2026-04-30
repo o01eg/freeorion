@@ -118,43 +118,23 @@ private:
         if (!vref && !m_is_lookup_only) {
             ErrorLogger() << "NamedRef<T>::NamedRefInitInvariants() Trying to use invariants without existing value ref (which should exist in this case)";
             return false;
-        } else if (!vref) {
-            DebugLogger() << "NamedRef<T>::NamedRefInitInvariants() could not find value ref, will sleep a bit and retry.";
         }
 
-        static constexpr int MAX_TRIES = 5;
-        for (int try_num = 1; try_num <= MAX_TRIES; ++try_num) {
-            if (vref) {
-                std::scoped_lock invariants_lock(m_invariants_mutex);
+        if (vref) {
+            std::scoped_lock invariants_lock(m_invariants_mutex);
 
-                // initialize invariants and return
-                m_root_candidate_invariant_local = vref->RootCandidateInvariant();
-                m_local_candidate_invariant_local = vref->LocalCandidateInvariant();
-                m_target_invariant_local = vref->TargetInvariant();
-                m_source_invariant_local = vref->SourceInvariant();
-                m_invariants_initialized = true;
-                return true;
+            // initialize invariants and return
+            m_root_candidate_invariant_local = vref->RootCandidateInvariant();
+            m_local_candidate_invariant_local = vref->LocalCandidateInvariant();
+            m_target_invariant_local = vref->TargetInvariant();
+            m_source_invariant_local = vref->SourceInvariant();
+            m_invariants_initialized = true;
+            return true;
 
-            } else if (try_num == MAX_TRIES) {
-                ErrorLogger() << "NamedRef<T>::NamedRefInitInvariants() still could not find value ref after trying "
-                              << try_num << " times. Giving up.";
-
-            } else {
-                // wait a while for parsing...
-                int msecs_count = 200 * try_num;
-                std::chrono::milliseconds msecs(msecs_count);
-                TraceLogger() << "NamedRef<T>::NamedRefInitInvariants() after try " << try_num
-                              << " sleeping for " << msecs_count << " ms before retry.";
-                std::this_thread::sleep_for(msecs);
-
-                // try again to get value ref
-                vref = GetValueRef();
-            }
         }
 
-        WarnLogger() << "NamedRef<T>::NamedRefInitInvariants() Trying to use invariants in a Lookup value ref without existing value ref. "
-                     << "Falling back to non-invariance will prevent performance optimisations. This may be a parse race condition.";
-        return false;
+        ErrorLogger() << "NamedRef<T>::NamedRefInitInvariants() still could not find value ref " << m_value_ref_name << ". Giving up.";
+        throw std::runtime_error("Failed to get named value " + m_value_ref_name);
     }
 
     const std::string  m_value_ref_name;                 //! registered name of value ref

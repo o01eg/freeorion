@@ -38,11 +38,13 @@ jobs:
   check-last-post:
     needs: check-run
     runs-on: ubuntu-latest
-    #outputs:
-    #  count: ${{ steps.repo-stats.outputs.count }}
-    #  authors: ${{ steps.repo-stats.outputs.authors }}
+    outputs:
+      count: ${{ steps.repo-stats.outputs.count }}
+      authors: ${{ steps.repo-stats.outputs.authors }}
+      short-version: ${{ steps.short-version.outputs.short-version }}
     steps:
       - name: Get Mastodon account
+        continue-on-error: true
         run: |
           RESPONSE=$(curl -sSL -w "\n%{http_code}" \
           -X GET \
@@ -65,6 +67,7 @@ jobs:
 
           echo "ACCOUNT_ID=${ACCOUNT_ID}" >> $GITHUB_ENV
       - name: Get last statuses
+        continue-on-error: true
         id: prev-status
         run: |
           echo ${{ github.token }} | gh auth login --with-token
@@ -96,7 +99,6 @@ jobs:
           fi
       - name: Checkout sources
         uses: actions/checkout@v6
-        if: steps.prev-status.outputs.prev-git-sha != ''
         with:
           fetch-depth: 2
           ref: ${{ steps.prev-status.outputs.prev-git-sha }}
@@ -109,6 +111,9 @@ jobs:
           AUTHORS=$(git log --format='%aN' ${{ steps.prev-status.outputs.prev-git-sha }}..${{ github.sha }} | sort -u | wc -l)
           echo "count=${COUNT}" >> "${GITHUB_OUTPUT}"
           echo "authors=${AUTHORS}" >> "${GITHUB_OUTPUT}"
+      - name: Get short version
+        id: short-version
+        run: TZ=UTC0 git show ${{ github.sha }} --format="short-version=%cd.%h" --quiet --date='format-local:%Y-%m-%d' --abbrev=7 >> "$GITHUB_OUTPUT"
   macos:
     needs: check-run
     uses: ./.github/workflows/_build-macos.yml
@@ -182,17 +187,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [merge-binaries-to-sf, to-snap, check-last-post]
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
-        with:
-          sparse-checkout: .github
-      - name: Get version
-        id: get-version
-        run: TZ=UTC0 git show ${{ github.sha }} --format="short-version=%cd.%h" --quiet --date='format-local:%Y-%m-%d' --abbrev=7 >> "$GITHUB_OUTPUT"
       - name: Prepare text
         id: prepare-text
         run: |
-          PRE_TEXT='New #4X #TBS #FreeOrion weekly #TestBuild available (build ${{ steps.get-version.outputs.short-version }})'
+          PRE_TEXT='New #4X #TBS #FreeOrion weekly #TestBuild available (build ${{ needs.check-last-post.outputs.short-version }})'
           COUNT='${{ needs.check-last-post.outputs.count }}'
           AUTHORS='${{ needs.check-last-post.outputs.authors }}'
           STATS_TEXT=""
@@ -206,7 +204,7 @@ jobs:
           curl -sSL
           -X POST
           -H "Authorization: Bearer ${{ secrets.MASTODON_ACCESS_TOKEN }}"
-          -H "Idempotency-Key: ${{ steps.get-version.outputs.short-version }}"
+          -H "Idempotency-Key: ${{ needs.check-last-post.outputs.short-version }}"
           --data-raw "status=${{ steps.prepare-text.outputs.text }}"
           -d 'visibility=public'
           -d 'language=en'

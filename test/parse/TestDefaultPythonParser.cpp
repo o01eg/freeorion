@@ -63,7 +63,6 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, parser, m_default_scripting_dir / "macros");
-    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto techs_p = Pending::ParseSynchronously(parse::techs<TechManager::TechParseTuple>, parser, m_default_scripting_dir / "techs");
     auto [techs, tech_categories, categories_seen] = *Pending::WaitForPendingUnlocked(std::move(techs_p));
@@ -72,7 +71,7 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
     BOOST_CHECK(!tech_categories.empty());
     BOOST_CHECK(!categories_seen.empty());
 
-    BOOST_REQUIRE_EQUAL(211, techs.size());
+    BOOST_REQUIRE_EQUAL(213, techs.size());
     BOOST_REQUIRE_EQUAL(9, tech_categories.size());
     BOOST_REQUIRE_EQUAL(9, categories_seen.size());
 
@@ -114,7 +113,6 @@ BOOST_AUTO_TEST_CASE(parse_species_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, parser, m_default_scripting_dir / "macros");
-    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto species_p = Pending::ParseSynchronously(parse::species, parser, m_default_scripting_dir / "species");
     const auto [species, ordering] = *Pending::WaitForPendingUnlocked(std::move(species_p));
@@ -165,7 +163,6 @@ BOOST_AUTO_TEST_CASE(parse_buildings_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, parser, m_default_scripting_dir / "macros");
-    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto buildings_p = Pending::ParseSynchronously(parse::buildings, parser, m_default_scripting_dir / "buildings");
     auto buildings_opt = Pending::WaitForPendingUnlocked(std::move(buildings_p));
@@ -176,7 +173,7 @@ BOOST_AUTO_TEST_CASE(parse_buildings_full) {
 
     BOOST_CHECK(!buildings.empty());
 
-    BOOST_REQUIRE_EQUAL(109, buildings.size());
+    BOOST_REQUIRE_EQUAL(110, buildings.size());
 
     DumpEntitiesList(buildings);
     if (const char *buildings_name = std::getenv("FO_CHECKSUM_BUILDINGS_NAME")) {
@@ -205,7 +202,6 @@ BOOST_AUTO_TEST_CASE(parse_empire_statistics_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, parser, m_default_scripting_dir / "macros");
-    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto empire_statistics_p = Pending::ParseSynchronously(parse::statistics, parser, m_default_scripting_dir / "empire_statistics");
     auto empire_statistics_opt = Pending::WaitForPendingUnlocked(std::move(empire_statistics_p));
@@ -274,7 +270,6 @@ BOOST_AUTO_TEST_CASE(parse_fields_full) {
     PythonParser parser(m_python, m_default_scripting_dir);
 
     auto named_values = Pending::ParseSynchronously(parse::named_value_refs, parser, m_default_scripting_dir / "macros");
-    auto named_values_py = Pending::ParseSynchronously(parse::named_value_refs_py, parser, m_default_scripting_dir / "macros");
 
     auto fields_p = Pending::ParseSynchronously(parse::fields, parser, m_default_scripting_dir / "fields");
     auto fields_opt = Pending::WaitForPendingUnlocked(std::move(fields_p));
@@ -300,6 +295,42 @@ BOOST_AUTO_TEST_CASE(parse_fields_full) {
         }
     }
 
+}
+
+/**
+ * Checks count of named values in real scripts
+ * FO_CHECKSUM_NAMED_VALUE_NAME determines named value name to be check for FO_CHECKSUM_NAMED_VALUE_VALUE checksum
+ */
+
+BOOST_AUTO_TEST_CASE(parse_named_values_full) {
+    PythonParser parser(m_python, m_default_scripting_dir);
+
+    auto named_values_p = Pending::ParseSynchronously(parse::named_value_refs, parser, m_default_scripting_dir / "macros");
+    auto named_values_opt = Pending::WaitForPendingUnlocked(std::move(named_values_p));
+
+    BOOST_REQUIRE(named_values_opt);
+
+    const auto named_values_empty = *std::move(named_values_opt);
+    BOOST_CHECK_EQUAL(0, named_values_empty.size());
+
+    const auto named_values = GetNamedValueRefManager().GetItems();
+    BOOST_WARN_EQUAL(73, named_values.size()); // Can have named values from other sources
+
+    DumpEntitiesList(named_values);
+    if (const char *named_value_name = std::getenv("FO_CHECKSUM_NAMED_VALUE_NAME")) {
+        const auto named_value_it = named_values.find(named_value_name);
+        BOOST_REQUIRE_MESSAGE(named_values.end() != named_value_it, "Missing " << named_value_name);
+
+        BOOST_TEST_MESSAGE("Dump " << named_value_name << ":");
+        DumpEntity(named_value_it->second.get());
+
+        if (const char *named_value_checksum_str = std::getenv("FO_CHECKSUM_NAMED_VALUE_VALUE")) {
+            uint32_t named_value_checksum = boost::lexical_cast<uint32_t>(named_value_checksum_str);
+            uint32_t value{0};
+            CheckSums::CheckSumCombine(value, named_value_it->second.get());
+            BOOST_REQUIRE_EQUAL(named_value_checksum, value);
+        }
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

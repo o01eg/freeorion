@@ -1088,12 +1088,10 @@ class SidePanel::SystemNameDropDownList : public CUIDropDownList {
 };
 
 namespace {
-    const std::vector<std::shared_ptr<GG::Texture>>& GetAsteroidTextures() {
+    const std::vector<std::shared_ptr<GG::Texture>>& GetAsteroidTextures(ClientUI& ui) {
         static std::vector<std::shared_ptr<GG::Texture>> retval;
-        if (retval.empty()) {
-            retval = GetApp().GetUI().GetPrefixedTextures(
-                ClientUI::ArtDir() / "planets" / "asteroids", "asteroids1_", false);
-        }
+        if (retval.empty())
+            retval = ui.GetPrefixedTextures(ClientUI::ArtDir() / "planets" / "asteroids", "asteroids1_", false);
         return retval;
     }
 
@@ -1350,7 +1348,7 @@ void SidePanel::PlanetPanel::RefreshPlanetGraphic(PlanetType type, PlanetSize si
     DetachChildAndReset(m_rotating_planet_graphic);
 
     if (type == PlanetType::PT_ASTEROIDS) {
-        const auto& textures = GetAsteroidTextures();
+        const auto& textures = GetAsteroidTextures(GetApp().GetUI());
         if (textures.empty())
             return;
         GG::X texture_width = textures.front()->DefaultWidth();
@@ -2630,16 +2628,14 @@ void SidePanel::PlanetPanel::Render() {
     m_colours.store(s_title_box_sz, title_background_colour);
 
 
-    m_verts.activate();
-    m_colours.activate();
-
-
     glDisable(GL_TEXTURE_2D);
     glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
     glEnableClientState(GL_VERTEX_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
 
+    m_verts.activate();
+    m_colours.activate();
 
     // background for whole panel
     glDrawArrays(GL_TRIANGLE_FAN, s_background_start_idx, m_main_border_sz);

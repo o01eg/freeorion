@@ -1829,8 +1829,9 @@ std::pair<StrSize, StrSize> GG::GlyphIndicesRangeToStringSizeIndices(
 
 namespace {
     CONSTEXPR_FONT StrSize CodePointIndexToStringSizeIndexInLines(
-        CPSize cp_idx, const Font::LineVec& line_data)
+        CPSize cp_idx, const Font::LineVec& line_data) noexcept
     {
+        static_assert(noexcept(line_data.begin()->Empty()));
         // LineData contain info about glyphs, not code points, so can't directly access
         // the underlying code points in the text. Instead, can check the code point indices
         // of the glyphs to find the requested ones.
@@ -1853,8 +1854,9 @@ namespace {
 
 
     CONSTEXPR_FONT std::pair<StrSize, StrSize> CodePointIndicesRangeToStringSizeIndicesInLines(
-        CPSize start_idx, CPSize end_idx, const Font::LineVec& line_data)
+        CPSize start_idx, CPSize end_idx, const Font::LineVec& line_data) noexcept
     {
+        static_assert(noexcept(CodePointIndexToStringSizeIndexInLines(start_idx, line_data)));
         return {CodePointIndexToStringSizeIndexInLines(start_idx, line_data),
                 CodePointIndexToStringSizeIndexInLines(end_idx, line_data)};
     }
@@ -1862,8 +1864,11 @@ namespace {
 }
 
 std::pair<StrSize, StrSize> GG::CodePointIndicesRangeToStringSizeIndices(
-    CPSize start_idx, CPSize end_idx, const Font::LineVec& line_data)
-{ return CodePointIndicesRangeToStringSizeIndicesInLines(start_idx, end_idx, line_data); }
+    CPSize start_idx, CPSize end_idx, const Font::LineVec& line_data) noexcept
+{
+    static_assert(noexcept(CodePointIndicesRangeToStringSizeIndicesInLines(start_idx, end_idx, line_data)));
+    return CodePointIndicesRangeToStringSizeIndicesInLines(start_idx, end_idx, line_data);
+}
 
 
 namespace {
@@ -3323,9 +3328,10 @@ void Font::Init(FT_Face& face)
     }
 
     // Get maximum texture size, limited to 1024 wide (just for font texture)
-    GLint GL_TEX_MAX_SIZE;
+    GLint GL_TEX_MAX_SIZE{1};
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &GL_TEX_MAX_SIZE);
-    const std::size_t TEX_MAX_SIZE = std::min<GLint>(2 << 9, GL_TEX_MAX_SIZE);
+    const std::size_t TEX_MAX_WIDTH = std::min<GLint>(2 << 9, GL_TEX_MAX_SIZE);
+    const std::size_t TEX_MAX_HEIGHT = GL_TEX_MAX_SIZE;
 
     std::vector<std::pair<uint32_t, TempGlyphData>> temp_glyph_data;
     temp_glyph_data.reserve(1000); // rough guesstimate
@@ -3353,15 +3359,15 @@ void Font::Init(FT_Face& face)
 
             // copy glyph images
             const FT_Bitmap& glyph_bitmap = face->glyph->bitmap;
-            if ((glyph_bitmap.width > TEX_MAX_SIZE) || (glyph_bitmap.rows > TEX_MAX_SIZE))
+            if ((glyph_bitmap.width > TEX_MAX_WIDTH) || (glyph_bitmap.rows > TEX_MAX_HEIGHT))
                 ThrowBadGlyph("GG::Font::Init : Glyph too large for buffer'%1%'", c); // catch broken fonts
 
-            if (static_cast<std::size_t>(Value(x)) + glyph_bitmap.width >= TEX_MAX_SIZE) { // start a new row of glyph images
+            if (static_cast<std::size_t>(Value(x)) + glyph_bitmap.width >= TEX_MAX_WIDTH) { // start a new row of glyph images
                 if (x > max_x) max_x = x;
                 x = X0;
                 y = max_y;
             }
-            if (static_cast<std::size_t>(Value(y)) + glyph_bitmap.rows >= TEX_MAX_SIZE) {
+            if (static_cast<std::size_t>(Value(y)) + glyph_bitmap.rows >= TEX_MAX_HEIGHT) {
                 // We cannot make the texture any larger. The font does not fit.
                 ThrowBadGlyph("GG::Font::Init : Face too large for buffer. First glyph to no longer fit: '%1%'", c);
             }

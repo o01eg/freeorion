@@ -2920,7 +2920,7 @@ namespace {
         // Ship Designs
         if (!only_description) {
             name = design.Name();
-            texture = app.GetUI().ShipDesignIcon(design_id);
+            texture = ClientUI::ShipDesignIcon(design);
             int default_location_id = DefaultLocationForEmpire(client_empire_id, context);
             turns = design.ProductionTime(client_empire_id, default_location_id, context);
             cost = design.ProductionCost(client_empire_id, default_location_id, context);
@@ -4155,7 +4155,7 @@ void EncyclopediaDetailPanel::HandleSearchTextEntered() {
     timer.EnterSection("Find words in search text");
 
     // force MapWnd construction before possible parallel accesses below...
-    GetApp().GetUI().GetMapWnd(true);
+    GetApp().GetUI().GetMapWnd(ClientUI::ConstructFlag::IF_NOT_YET_DONE);
 
     const unsigned int num_threads = static_cast<unsigned int>(std::max(1, EffectsProcessingThreads()));
     boost::asio::thread_pool thread_pool(num_threads);

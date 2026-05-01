@@ -5,6 +5,7 @@ from focs._effects import (
     UsedInDesignID,
 )
 from focs._value_refs import NumPartClassesInShipDesign, PartOfClassInShipDesign
+from macros.base_prod import RESEARCH_PER_POP
 
 # Proposed naming convention: <EFFECT_NAME> _ <METER_NAME> _ FLAT/PERPOP/<others>
 # Examples:
@@ -12,7 +13,11 @@ from focs._value_refs import NumPartClassesInShipDesign, PartOfClassInShipDesign
 # - GARRISON_2_TROOPREGEN_FLAT (flat bonus/malus to troop regen from tech Garrison_2
 # - GRO_CYBORGS_MAX_TROOPS_PERPOP (bonus/malus per population to MaxTroops from tech GRO_CYBORGS)
 
-# from macros.base_prod import BUILDING_COST_MULTIPLIER
+NamedReal(name="ANCIENT_RUINS_TARGET_RESEARCH_PERPOP", value=5 * RESEARCH_PER_POP)
+
+NamedReal(name="ANCIENT_RUINS_MIN_STABILITY", value=12)
+
+NamedReal(name="IMPERIAL_GARRISON_MAX_TROOPS_FLAT", value=6)
 
 NamedInteger(name="XENOPHOBIC_MAX_JUMPS", value=4)
 

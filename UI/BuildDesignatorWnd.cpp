@@ -175,10 +175,13 @@ namespace {
                 break;
             }
             case BuildType::BT_SHIP: {
-                texture = ui.ShipDesignIcon(m_item.design_id);
                 desc_text = UserString("BT_SHIP");
-                if (const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_item.design_id))
+                if (const ShipDesign* design = context.ContextUniverse().GetShipDesign(m_item.design_id)) {
                     name_text = design->Name(true);
+                    texture = ClientUI::ShipDesignIcon(*design);
+                } else {
+                    texture = ClientUI::ShipDesignIcon(INVALID_OBJECT_ID, context.ContextUniverse());
+                }
                 break;
             }
             case BuildType::BT_STOCKPILE: {
@@ -581,7 +584,7 @@ namespace {
                     main_text += ("\n\n" + failed_cond_loc + ":\n" + location_condition_failed_text);
                 }
 
-            return {ui.ShipDesignIcon(m_item.design_id), std::move(main_text)};
+            return {design ? ClientUI::ShipDesignIcon(*design) : ClientUI::ShipDesignIcon(m_item.design_id, context.ContextUniverse()), std::move(main_text)};
         }
 
         std::pair<std::shared_ptr<GG::Texture>, std::string> PreRenderStockpile()
@@ -1324,7 +1327,7 @@ void BuildDesignatorWnd::CenterOnBuild(int queue_idx, bool open) {
         if (auto build_location = objects.get(location_id)) {
             // centre map on system of build location
             const int system_id = build_location->SystemID();
-            if (auto map = app.GetUI().GetMapWnd(false)) {
+            if (auto map = app.GetUI().GetMapWnd(ClientUI::ConstructFlag::NEVER)) {
                 map->CenterOnObject(system_id, objects);
                 if (open) {
                     map->SelectSystem(system_id, context);

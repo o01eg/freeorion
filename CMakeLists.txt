@@ -103,7 +103,7 @@ else()
 endif()
 
 if(APPLE)
-    set(FreeOrionSDK_VERSION 17)
+    set(FreeOrionSDK_VERSION 18)
     set(FreeOrionSDK_FILE "FreeOrionSDK_${FreeOrionSDK_VERSION}_Clang-MacOSX-10.15-${CMAKE_OSX_ARCHITECTURES}.tar.bz2")
     if(NOT EXISTS "${CMAKE_BINARY_DIR}/${FreeOrionSDK_FILE}")
     file(DOWNLOAD
@@ -361,7 +361,7 @@ set_property(DIRECTORY APPEND
         # It also tries to link by default to the boost in-source zlib librar,
         # which we don't want.
         # http://www.boost.org/doc/libs/1_59_0/boost/iostreams/detail/config/zlib.hpp
-        $<$<PLATFORM_ID:Windows>:BOOST_ZLIB_BINARY=zlib.lib>
+        $<$<PLATFORM_ID:Windows>:BOOST_ZLIB_BINARY=z.lib>
 
         # We don't need localized output of Boost date_time and not setting
         # the define causes the inclusion of code, which contains std::tolower.
@@ -582,7 +582,11 @@ if(APPLE)
 endif()
 
 if(BUILD_SERVER)
-    add_executable(freeoriond "")
+    if(ANDROID)
+        add_library(freeoriond SHARED "")
+    else()
+        add_executable(freeoriond "")
+    endif()
     
     if(WIN32)
         set_property(TARGET freeoriond
@@ -607,7 +611,11 @@ if(BUILD_SERVER)
 endif()
 
 if(BUILD_AI)
-    add_executable(freeorionca "")
+    if(ANDROID)
+        add_library(freeorionca SHARED "")
+    else()
+        add_executable(freeorionca "")
+    endif()
     
     if(WIN32)
         set_property(TARGET freeorionca
@@ -856,8 +864,6 @@ if(APPLE AND BUILD_CLIENT_GG)
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_LOG_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_LOG_SETUP_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
-        COMMAND
-           ${CMAKE_COMMAND} -E copy_if_different "${Boost_REGEX_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
            ${CMAKE_COMMAND} -E copy_if_different "${Boost_PYTHON${Boost_PYTHON_SUFFIX}_LIBRARY}" "$<TARGET_FILE_DIR:freeorion>/../SharedSupport"
         COMMAND
@@ -1196,7 +1202,7 @@ else()
     set(CPACK_SYSTEM_NAME MacOSX)
 endif()
 if(WIN32)
-    set(PACKAGE_FILE_SYSTEM_NAME Win32)
+    set(PACKAGE_FILE_SYSTEM_NAME ${CMAKE_GENERATOR_PLATFORM})
 elseif(APPLE)
     set(PACKAGE_FILE_SYSTEM_NAME ${CPACK_SYSTEM_NAME}_${CMAKE_OSX_DEPLOYMENT_TARGET}_${CMAKE_OSX_ARCHITECTURES})
 else()

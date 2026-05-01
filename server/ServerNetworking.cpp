@@ -694,6 +694,10 @@ void ServerNetworking::CleanupCookies() {
         m_cookies.erase(cookie);
 }
 
+boost::asio::io_context& ServerNetworking::IoContext() {
+    return m_player_connection_acceptor.get_executor().context();
+}
+
 void ServerNetworking::Init() {
 #if defined(FREEORION_LINUX)
     if (GetOptionsDB().Get<int>("network.server.listen.fd") >= 0) {
@@ -769,14 +773,18 @@ void ServerNetworking::AcceptNextMessagingConnection() {
 void ServerNetworking::AcceptPlayerMessagingConnection(PlayerConnectionPtr player_connection,
                                                        boost::system::error_code error)
 {
-    if (!error) {
-        DebugLogger(network) << "ServerNetworking::AcceptPlayerMessagingConnection : connected to new player";
-        m_player_connections.insert(player_connection);
-        player_connection->Start();
-        AcceptNextMessagingConnection();
-    } else {
+    if (error)
         throw error;
-    }
+
+    const auto& p = player_connection;
+    DebugLogger(network) << "ServerNetworking::AcceptPlayerMessagingConnection : connected to new player: "
+                         << "  id: " << (p ? p->PlayerID() : INVALID_PLAYER_ID) 
+                         << "  name: " << (p ? p->PlayerName() : "???")
+                         << "  client type: " << (p ? to_string(p->GetClientType()) : std::string_view{"bad connection ptr"});
+        ;
+    m_player_connections.insert(player_connection);
+    player_connection->Start();
+    AcceptNextMessagingConnection();
 }
 
 void ServerNetworking::DisconnectImpl(PlayerConnectionPtr player_connection) {

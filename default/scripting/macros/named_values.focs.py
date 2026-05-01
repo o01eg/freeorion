@@ -36,3 +36,17 @@ NamedInteger(
     value=NumPartClassesInShipDesign(design=UsedInDesignID)
     + PartOfClassInShipDesign(name="PC_COLONY", design=UsedInDesignID),
 )
+
+# Racial Purity
+
+NamedReal(name="PLC_RACIAL_PURITY_TARGET_STABILITY_SELF", value=5)
+
+NamedReal(name="PLC_RACIAL_PURITY_STABILITY_PER_TURN", value=0.5)
+
+NamedReal(name="PLC_RACIAL_PURITY_TARGET_INFLUENCE_SELF", value=1)
+
+NamedReal(name="PLC_RACIAL_PURITY_TARGET_STABILITY_OTHER", value=-10)
+
+NamedReal(name="PLC_RACIAL_PURITY_TARGET_INFLUENCE_OTHER", value=-1)
+
+NamedReal(name="PLC_RACIAL_PURITY_TARGET_INDUSTRY_OTHER", value=0.25 * RESEARCH_PER_POP)

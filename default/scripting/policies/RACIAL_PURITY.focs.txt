@@ -26,9 +26,9 @@ Policy
                 Species name = Source.Species
             ]
             effects = SetTargetHappiness value = Value
-                + min((NamedReal name = "PLC_RACIAL_PURITY_TARGET_STABILITY_SELF" value = 5),
+                + min((NamedRealLookup name = "PLC_RACIAL_PURITY_TARGET_STABILITY_SELF"),
                     (TurnsSincePolicyAdopted empire = Source.Owner name = ThisPolicy) *
-                    (NamedReal name = "PLC_RACIAL_PURITY_STABILITY_PER_TURN" value = 0.5))
+                    (NamedRealLookup name = "PLC_RACIAL_PURITY_STABILITY_PER_TURN"))
 
         // Influence bonus to influence-focused, capital species 
         EffectsGroup
@@ -39,7 +39,7 @@ Policy
                 Focus type = "FOCUS_INFLUENCE"
             ]
             effects = SetTargetInfluence value = Value
-                + (NamedReal name = "PLC_RACIAL_PURITY_TARGET_INFLUENCE_SELF" value = 1)
+                + (NamedRealLookup name = "PLC_RACIAL_PURITY_TARGET_INFLUENCE_SELF")
 
         // Stability and influence penalty to all non-capital, non-exobot species
         EffectsGroup
@@ -52,9 +52,9 @@ Policy
             ]
             effects = [
                 SetTargetHappiness value = Value
-                    + (NamedReal name = "PLC_RACIAL_PURITY_TARGET_STABILITY_OTHER" value = -10)
+                    + (NamedRealLookup name = "PLC_RACIAL_PURITY_TARGET_STABILITY_OTHER")
                 SetTargetInfluence value = Value
-                    + (NamedReal name = "PLC_RACIAL_PURITY_TARGET_INFLUENCE_OTHER" value = -1)
+                    + (NamedRealLookup name = "PLC_RACIAL_PURITY_TARGET_INFLUENCE_OTHER")
             ]
 
         // Industry bonus to industry-focused, non-capital, non-exobot species (slavery)
@@ -68,7 +68,7 @@ Policy
                 Focus type = "FOCUS_INDUSTRY"
             ]
             effects = SetTargetIndustry value = Value + Target.Population
-                * (NamedReal name = "PLC_RACIAL_PURITY_TARGET_INDUSTRY_OTHER" value = 0.25 * [[RESEARCH_PER_POP]])
+                * (NamedRealLookup name = "PLC_RACIAL_PURITY_TARGET_INDUSTRY_OTHER")
     ]
     graphic = "icons/policies/social_racial_purity.png"
 

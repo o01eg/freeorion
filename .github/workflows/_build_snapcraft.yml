@@ -35,14 +35,12 @@ jobs:
         xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" /bin/bash .github/snap-xvfb-launch.sh
     - name: Optimize screenshot
       run: optipng -o2 screenshot.png
-    - name: Upload logs and screenshot
+    - name: Upload screenshot
       uses: actions/upload-artifact@v4
+      if: ${{ inputs.weekly-deploy }}
       with:
-        name: snap-log-screenshot-${{ github.run_number }}
-        path: |
-          screenshot.png
-          freeorion.log
-          freeorion-godot.log
+        name: snap-screenshot-${{ github.run_number }}
+        path: screenshot.png
         retention-days: 1
     - name: Upload binaries artifacts
       uses: actions/upload-artifact@v4

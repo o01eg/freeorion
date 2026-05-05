@@ -1,3 +1,9 @@
+freeorion (0.5.1.9999.fo0031+git20260503.bd4d5d1ppa1~noble) noble; urgency=medium
+
+  * Weekly test build 2026-05-03.bd4d5d1.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Tue, 05 May 2026 22:15:17 +0400
+
 freeorion (0.5.1.9999.fo0031+git20260429.441e964ppa1~noble) noble; urgency=medium
 
   * Weekly test build 2026-04-29.441e964.

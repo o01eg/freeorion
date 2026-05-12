@@ -74,21 +74,121 @@ namespace {
         }
         py::object o_result{py::handle<>(result)};
     }
+
+    template <typename T1, typename T2>
+    using ResultValueRefNumericType = std::conditional_t<std::is_same_v<T1, double>
+        || std::is_same_v<std::remove_cvref_t<T1>, value_ref_wrapper<double>>
+        || std::is_same_v<T2, double>
+        || std::is_same_v<std::remove_cvref_t<T2>, value_ref_wrapper<double>>
+        , double, int>;
+
+    template <typename T>
+    struct is_wrapper : std::false_type {};
+    template <typename T>
+    struct is_wrapper<value_ref_wrapper<T>> : std::true_type {};
+
+    template <typename T, typename Arg>
+    auto any_type_to_vref(Arg&& arg) {
+        if constexpr (is_wrapper<std::decay_t<Arg>>::value) {
+            using NumericT = typename std::decay_t<Arg>::BaseT;
+            if constexpr (std::is_same_v<T, NumericT>) {
+                return ValueRef::CloneUnique(arg.value_ref);
+            } else {
+                return std::make_unique<ValueRef::StaticCast<NumericT, T>>(ValueRef::CloneUnique(arg.value_ref));
+            }
+        } else {
+            return std::make_unique<ValueRef::Constant<T>>(static_cast<T>(arg));
+        }
+    }
+
+    template <typename T1, typename T2>
+    struct OperationCreator {
+        using BaseT = ResultValueRefNumericType<T1, T2>;
+
+        value_ref_wrapper<BaseT> operator()(ValueRef::OpType op, T1 lhs, T2 rhs) {
+            return value_ref_wrapper<BaseT>(std::make_shared<ValueRef::Operation<BaseT>>(
+                op,
+                any_type_to_vref<BaseT>(std::forward<T1>(lhs)),
+                any_type_to_vref<BaseT>(std::forward<T2>(rhs))
+            ));
+        }
+    };
+
+    template <typename T, typename Arg>
+    void register_arithmetic_ops(py::class_<value_ref_wrapper<T>>& cl) {
+        for (const auto& op : std::initializer_list<std::tuple<const char*, const char*, ValueRef::OpType>>{
+            {"__add__", "__radd__", ValueRef::OpType::PLUS},
+            {"__sub__", "__rsub__", ValueRef::OpType::MINUS},
+            {"__mul__", "__rmul__", ValueRef::OpType::TIMES},
+            {"__truediv__", "__rtruediv__", ValueRef::OpType::DIVIDE},
+            {"__eq__", nullptr, ValueRef::OpType::COMPARE_EQUAL},
+            {"__gt__", nullptr, ValueRef::OpType::COMPARE_GREATER_THAN},
+            {"__ge__", nullptr, ValueRef::OpType::COMPARE_GREATER_THAN_OR_EQUAL},
+            {"__lt__", nullptr, ValueRef::OpType::COMPARE_LESS_THAN},
+            {"__le__", nullptr, ValueRef::OpType::COMPARE_LESS_THAN_OR_EQUAL},
+            {"__ne__", nullptr, ValueRef::OpType::COMPARE_NOT_EQUAL}})
+        {
+            const auto op_type = std::get<2>(op);
+            const char* reverse_op = std::get<1>(op);
+            cl.def(std::get<0>(op), py::make_function(
+                [op_type](const value_ref_wrapper<T>& lhs, Arg rhs){ return OperationCreator<const value_ref_wrapper<T>&, Arg>()(op_type, lhs, rhs); },
+                py::default_call_policies(),
+                boost::mpl::vector<
+                    value_ref_wrapper<typename OperationCreator<const value_ref_wrapper<T>&, Arg>::BaseT>,
+                    const value_ref_wrapper<T>&,
+                    Arg
+                >()
+            ));
+            if (reverse_op != nullptr) {
+                cl.def(reverse_op, py::make_function(
+                    [op_type](const value_ref_wrapper<T>& rhs, Arg lhs){ return OperationCreator<Arg, const value_ref_wrapper<T>&>()(op_type, lhs, rhs); },
+                    py::default_call_policies(),
+                    boost::mpl::vector<
+                        value_ref_wrapper<typename OperationCreator<const value_ref_wrapper<T>&, Arg>::BaseT>,
+                        const value_ref_wrapper<T>&,
+                        Arg
+                    >()
+                ));
+            }
+            cl.def(std::get<0>(op), py::make_function(
+                [op_type](const value_ref_wrapper<T>& lhs, const value_ref_wrapper<Arg>& rhs){ return OperationCreator<const value_ref_wrapper<T>&, const value_ref_wrapper<Arg>&>()(op_type, lhs, rhs); },
+                py::default_call_policies(),
+                boost::mpl::vector<
+                    value_ref_wrapper<typename OperationCreator<const value_ref_wrapper<T>&, const value_ref_wrapper<Arg>&>::BaseT>,
+                    const value_ref_wrapper<T>&,
+                    const value_ref_wrapper<Arg>&
+                >()
+            ));
+        }
+    }
 }
 
 struct module_spec {
-    module_spec(const std::string& name, const std::string& parent_, const PythonParser& parser_) :
+    module_spec(const std::string& name, const std::string& parent_) :
         fullname(name),
-        parent(parent_),
-        parser(parser_)
+        parent(parent_)
     {}
 
     py::list path;
     py::list uninitialized_submodules;
     std::string fullname;
     std::string parent;
-    const PythonParser& parser;
 };
+
+PythonTypes::PythonTypes() {
+    auto builtings = py::import("builtins");
+    type_int = builtings.attr("int");
+    type_float = builtings.attr("float");
+    type_bool = builtings.attr("bool");
+    type_str = builtings.attr("str");
+}
+
+PythonTypes::~PythonTypes() {
+    type_int = py::object();
+    type_float = py::object();
+    type_bool = py::object();
+    type_str = py::object();
+}
 
 PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& scripting_dir) :
     m_python(_python),
@@ -113,12 +213,6 @@ PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& s
     }
 
     try {
-        type_int = py::import("builtins").attr("int");
-        type_float = py::import("builtins").attr("float");
-        type_bool = py::import("builtins").attr("bool");
-        type_str = py::import("builtins").attr("str");
-        py::import("builtins").attr("parser_context") = true;
-
         py::register_exception_translator<import_error>(&translate);
 
         py::class_<PythonParser, py::bases<>, PythonParser, boost::noncopyable>("PythonParser", py::no_init)
@@ -136,67 +230,8 @@ PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& s
             .def_readonly("parent", &module_spec::parent);
 
         // Use wrappers to not collide with types in server and AI
-        py::class_<value_ref_wrapper<int>>("ValueRefInt", py::no_init)
-            .def(int() * py::self_ns::self)
-            .def(py::self_ns::self * py::self_ns::self)
-            .def(double() * py::self_ns::self)
-            .def(py::self_ns::self / int())
-            .def(py::self_ns::self - int())
-            .def(int() - py::self_ns::self)
-            .def(py::self_ns::self + py::self_ns::self)
-            .def(py::self_ns::self + int())
-            .def(int() + py::self_ns::self)
-            .def(double() + py::self_ns::self)
-            .def(py::self_ns::self < py::self_ns::self)
-            .def(py::self_ns::self < int())
-            .def(py::self_ns::self <= int())
-            .def(py::self_ns::self > int())
-            .def(py::self_ns::self >= int())
-            .def(py::self_ns::self >= py::self_ns::self)
-            .def(py::self_ns::self == py::self_ns::self)
-            .def(double() - py::self_ns::self)
-            .def(py::self_ns::self == int())
-            .def(py::self_ns::self != int())
-            .def(py::self_ns::self & py::self_ns::self)
-            .def(py::self_ns::self | py::self_ns::self)
-            .def(~py::self_ns::self)
-            .def(py::self_ns::pow(py::self_ns::self, double()));
-        py::class_<value_ref_wrapper<double>>("ValueRefDouble", py::no_init)
+        auto value_ref_wrapper_double_class = py::class_<value_ref_wrapper<double>>("ValueRefDouble", py::no_init)
             .def("__call__", &value_ref_wrapper<double>::call)
-            .def(int() * py::self_ns::self)
-            .def(py::other<value_ref_wrapper<int>>() * py::self_ns::self)
-            .def(py::self_ns::self * py::other<value_ref_wrapper<int>>())
-            .def(py::self_ns::self * double())
-            .def(py::self_ns::self * py::self_ns::self)
-            .def(double() * py::self_ns::self)
-            .def(py::self_ns::self / py::self_ns::self)
-            .def(py::self_ns::self / int())
-            .def(int() / py::self_ns::self)
-            .def(py::self_ns::self / double())
-            .def(py::self_ns::self + int())
-            .def(py::self_ns::self + double())
-            .def(double() + py::self_ns::self)
-            .def(py::self_ns::self + py::self_ns::self)
-            .def(py::self_ns::self + py::other<value_ref_wrapper<int>>())
-            .def(py::other<value_ref_wrapper<int>>() + py::self_ns::self)
-            .def(py::self_ns::self - double())
-            .def(py::self_ns::self - py::self_ns::self)
-            .def(py::self_ns::self - py::other<value_ref_wrapper<int>>())
-            .def(int() + py::self_ns::self)
-            .def(int() - py::self_ns::self)
-            .def(py::self_ns::self - int())
-            .def(double() <= py::self_ns::self)
-            .def(py::self_ns::self <= double())
-            .def(py::self_ns::self <= py::self_ns::self)
-            .def(py::other<value_ref_wrapper<int>>() <= py::self_ns::self)
-            .def(py::other<value_ref_wrapper<int>>() >= py::self_ns::self)
-            .def(py::self_ns::self >= int())
-            .def(py::self_ns::self > py::self_ns::self)
-            .def(py::self_ns::self >= py::self_ns::self)
-            .def(py::self_ns::self < py::self_ns::self)
-            .def(double() < py::self_ns::self)
-            .def(py::self_ns::self < double())
-            .def(py::self_ns::self != int())
             .def(py::self_ns::pow(py::self_ns::self, double()))
             .def(py::self_ns::pow(double(), py::self_ns::self))
             .def(py::self_ns::pow(py::self_ns::self, py::self_ns::self))
@@ -204,6 +239,15 @@ PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& s
             .def(py::self_ns::self | py::self_ns::self)
             .def(~py::self_ns::self)
             .def(-py::self_ns::self);
+        register_arithmetic_ops<double, double>(value_ref_wrapper_double_class);
+        register_arithmetic_ops<double, int>(value_ref_wrapper_double_class);
+        auto value_ref_wrapper_int_class = py::class_<value_ref_wrapper<int>>("ValueRefInt", py::no_init)
+            .def(py::self_ns::self & py::self_ns::self)
+            .def(py::self_ns::self | py::self_ns::self)
+            .def(~py::self_ns::self)
+            .def(py::self_ns::pow(py::self_ns::self, double()));
+        register_arithmetic_ops<int, double>(value_ref_wrapper_int_class);
+        register_arithmetic_ops<int, int>(value_ref_wrapper_int_class);
         py::class_<value_ref_wrapper<std::string>>("ValueRefString", py::no_init)
             .def(py::self_ns::self + std::string())
             .def(std::string() + py::self_ns::self);
@@ -417,10 +461,6 @@ PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& s
 PythonParser::~PythonParser() {
     try {
         m_meta_path->pop(m_meta_path_len - 1);
-        type_int = py::object();
-        type_float = py::object();
-        type_bool = py::object();
-        type_str = py::object();
         m_meta_path = boost::none;
     } catch (const py::error_already_set&) {
         ErrorLogger() << "Python parser destructor throw exception";
@@ -506,12 +546,14 @@ py::object PythonParser::find_spec(const std::string& fullname, const py::object
     }
 
     if (IsExistingDir(module_path)) {
-        return py::object(module_spec(fullname, parent, *this));
+        return py::object(module_spec(fullname, parent));
     } else {
         module_path.replace_extension("py");
         if (IsExistingFile(module_path))
-            return py::object(module_spec(fullname, parent, *this));
-        else {
+            return py::object(module_spec(fullname, parent));
+        else if (fullname == "_typing") {
+            return py::object();
+        } else {
             ErrorLogger() << "Couldn't find file for module spec " << fullname;
             throw import_error("Couldn't find file for module spec " + fullname);
         }
@@ -550,7 +592,7 @@ py::object PythonParser::exec_module(py::object& module) {
             try {
                 RegisterGlobalsEffects(m_dict);
                 RegisterGlobalsConditions(m_dict);
-                RegisterGlobalsValueRefs(m_dict, *this);
+                RegisterGlobalsValueRefs(m_dict);
                 RegisterGlobalsSources(m_dict);
                 RegisterGlobalsEnums(m_dict);
 

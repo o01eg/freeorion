@@ -1653,11 +1653,11 @@ bool ServerApp::IsLocalHumanPlayer(int player_id) {
     return player && Networking::is_human(player) && player->IsLocalConnection();
 }
 
-bool ServerApp::IsAvailableName(const std::string& player_name) const {
+bool ServerApp::IsAvailableName(const std::string& player_name, bool ignore_ai) const {
     if (player_name.empty())
         return false;
-    const auto has_name = [n{std::string_view{player_name}}](const auto& pcon) noexcept
-    { return pcon->PlayerName() == n; };
+    const auto has_name = [n{std::string_view{player_name}}, ignore_ai](const auto& pcon) noexcept
+    { return pcon->PlayerName() == n && (!ignore_ai || !Networking::is_ai(pcon->GetClientType())); };
     // check if any other player has the same name
     if (range_any_of(m_networking.EstablishedPlayerConnections(), has_name))
         return false;
@@ -1897,8 +1897,16 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
     auto delegation = GetPlayerDelegation(player_connection->PlayerName());
     if (GetOptionsDB().Get<bool>("network.server.take-over-ai")) {
         for (auto& [loop_empire_id, loop_empire] : m_empires) {
-            if (!loop_empire->Eliminated() && Networking::is_ai(GetEmpireClientType(loop_empire_id)))
-                delegation.push_back(loop_empire->PlayerName());
+            if (!loop_empire->Eliminated() && Networking::is_ai(GetEmpireClientType(loop_empire_id))) {
+                if (loop_empire->PlayerName() == player_connection->PlayerName()) {
+                    empire_id = loop_empire_id;
+                    target_empire_id = loop_empire_id;
+                    empire = loop_empire;
+                    break;
+                } else {
+                    delegation.push_back(loop_empire->PlayerName());
+                }
+            }
         }
     }
     if (target_empire_id == ALL_EMPIRES) {
@@ -1921,7 +1929,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
             }
         }
         if (!delegation.empty()) {
-            DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Player should choose between delegates.";
+            DebugLogger() << "ServerApp::AddPlayerIntoGame(...): Player " << player_connection->PlayerName() << " should choose between delegates.";
             return ALL_EMPIRES;
         }
     } else {

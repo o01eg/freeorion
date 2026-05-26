@@ -10,8 +10,6 @@
 
 class PythonCommon;
 
-struct module_spec;
-
 struct FO_PARSE_API PythonTypes {
     PythonTypes();
     ~PythonTypes();
@@ -24,7 +22,7 @@ struct FO_PARSE_API PythonTypes {
 
 class FO_PARSE_API PythonParser {
 public:
-    PythonParser(PythonCommon& _python, const std::filesystem::path& scripting_dir);
+    PythonParser(PythonCommon& _python);
     ~PythonParser();
 
     PythonParser(const PythonParser&) = delete;
@@ -47,15 +45,9 @@ public:
     void LoadConditionsModule() const;
     void LoadValueRefsModule() const;
     void LoadEffectsModule() const;
-private:
-    boost::python::object find_spec(const std::string& fullname, const boost::python::object& path, const boost::python::object& target) const;
-    boost::python::object create_module(const module_spec& spec);
-    boost::python::object exec_module(boost::python::object& module);
 
+private:
     PythonCommon&                  m_python;
-    const std::filesystem::path& m_scripting_dir;
-    boost::optional<boost::python::list>            m_meta_path;
-    int                            m_meta_path_len;
     PyThreadState*                 m_parser_thread_state = nullptr;
     PyThreadState*                 m_main_thread_state = nullptr;
 };

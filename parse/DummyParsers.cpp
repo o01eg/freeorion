@@ -98,15 +98,17 @@ namespace parse {
     bool int_free_variable(std::string& text) { return false; }
     bool double_free_variable(std::string& text) { return false; }
     bool string_free_variable(std::string& text) { return false; }
+
+    void StartBackgroundParsing(const PythonParser& python, SpeciesManager& species_manager)
+    { }
 }
 
 template FO_PARSE_API TechManager::TechParseTuple parse::techs<TechManager::TechParseTuple>(const PythonParser& parser, const std::filesystem::path& path, bool& success);
 
 template FO_PARSE_API std::vector<Policy> parse::policies<std::vector<Policy>>(const std::filesystem::path& path);
 
-PythonParser::PythonParser(PythonCommon& _python, const std::filesystem::path& scripting_dir) :
-    m_python(_python),
-    m_scripting_dir(scripting_dir)
+PythonParser::PythonParser(PythonCommon& _python) :
+    m_python(_python)
 { }
 
 PythonParser::~PythonParser() = default;

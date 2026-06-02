@@ -1,7 +1,6 @@
 from focs._effects import (
     EffectsGroup,
     EmpireHasAdoptedPolicy,
-    GameRule,
     IsSource,
     IsTarget,
     LocalCandidate,
@@ -12,8 +11,11 @@ from focs._effects import (
     SetPopulation,
     SetSpecies,
     Source,
-    StatisticIf,
     Turn,
+)
+from focs._value_refs import (
+    GameRule,
+    StatisticIf,
 )
 from macros.priorities import POPULATION_DEFAULT_PRIORITY
 

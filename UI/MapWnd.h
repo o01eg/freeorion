@@ -249,13 +249,6 @@ private:
         GG::Clr                   colour = GG::CLR_ZERO; // colour of line
     };
 
-    void BufferAddMoveLineVertices(GG::GL2DVertexBuffer& dot_verts_buf,
-                                   GG::GLRGBAColorBuffer& dot_colours_buf,
-                                   GG::GLTexCoordBuffer& dot_star_texture_coords_buf,
-                                   float offset, float dot_size, int dot_spacing,
-                                   const MapWnd::MovementLineData& move_line,
-                                   GG::Clr colour_override = GG::CLR_ZERO) const;
-
     class MapScaleLine;
 
     void InitializeWindows();
@@ -536,6 +529,10 @@ private:
     GG::GL2DVertexBuffer    m_RC_starlane_vertices;
     GG::GLRGBAColorBuffer   m_RC_starlane_colors;
 
+    std::shared_ptr<GG::Texture> m_move_line_dot_texture;           //!< texture of dots showing fleet movement along the lines
+    std::array<GLfloat, 8>  m_dot_tex_quad;                         //!< actual texture coords of movement dot within possible power-of-two padding
+    int                     m_dot_spacing;                          //!< spacing between dots, in screen pixels
+    float                   m_dot_speed;                            //!< speed of dots, in pixels per tick
     GG::GL2DVertexBuffer    m_fleet_move_dot_vertices;
     GG::GLRGBAColorBuffer   m_fleet_move_dot_colours;
     GG::GLTexCoordBuffer    m_fleet_move_dot_star_texture_coords;

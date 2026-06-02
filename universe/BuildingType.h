@@ -3,7 +3,6 @@
 
 
 #include "CommonParams.h"
-#include "ScriptingContext.h"
 #include "../util/AppInterface.h"
 #include "../util/Enum.h"
 #include "../util/Export.h"
@@ -21,6 +20,7 @@ namespace ValueRef {
     struct ValueRef;
 }
 
+struct ScriptingContext;
 
 //! Possible results of a Building being captured by other empires, or an
 //! Planet containing the Building being captured.
@@ -206,7 +206,7 @@ private:
 
     //! Future building type being parsed by parser.
     //! Mutable so that it can be assigned to m_building_types when completed.
-    mutable boost::optional<Pending::Pending<container_type>> m_pending_building_types = boost::none;
+    mutable std::optional<Pending::Pending<container_type>> m_pending_building_types = std::nullopt;
 
     //! Map of building types identified by the BuildingType::Name.
     //! mutable so that when the parse complete it can be updated.

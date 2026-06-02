@@ -6,13 +6,11 @@ from focs._effects import (
     Contains,
     EffectsGroup,
     Enqueued,
-    GameRule,
     HasSpecies,
     IsBuilding,
     IsSource,
     IsTarget,
     LocalCandidate,
-    NamedReal,
     Number,
     Object,
     OwnedBy,
@@ -30,12 +28,16 @@ from focs._effects import (
     Source,
     SpeciesDislikes,
     SpeciesLikes,
-    StatisticCount,
-    StatisticIf,
     Target,
     TargetPopulation,
     UniqueNumberOf,
     Unowned,
+)
+from focs._value_refs import (
+    GameRule,
+    NamedReal,
+    StatisticCount,
+    StatisticIf,
     Value,
 )
 from macros.base_prod import BUILDING_COST_MULTIPLIER

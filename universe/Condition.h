@@ -1,8 +1,11 @@
 #ifndef _Condition_h_
 #define _Condition_h_
 
+#include <algorithm>
 #include <array>
+#include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 #include <stdexcept>
@@ -10,6 +13,7 @@
 #include "../util/Export.h"
 
 
+class UniverseObjectCXBase;
 class UniverseObject;
 
 namespace Effect {

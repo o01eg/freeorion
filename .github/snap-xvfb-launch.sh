@@ -17,11 +17,11 @@ while [ ! -f screenshot.png ]; do
       --setup.ai.player.count 3 \
       -q \
       --network.server.take-over-ai 1 \
-      --network.server.take-over-ai 1 \
       --setup.rules.RULE_TECH_COST_FACTOR 0.1 \
       --setup.rules.RULE_BUILDING_COST_FACTOR 0.1 \
       --setup.rules.RULE_SHIP_PART_COST_FACTOR 0.1 \
       --setup.rules.RULE_SHIP_HULL_COST_FACTOR 0.1 \
+      --setup.star.count 130 \
       --setup.galaxy.shape RANDOM \
       --setup.galaxy.age GALAXY_SETUP_RANDOM \
       --setup.planet.density GALAXY_SETUP_RANDOM \
@@ -35,6 +35,8 @@ while [ ! -f screenshot.png ]; do
 
   sleep 25 # Let's AI play a little
 
+  EMPIRE_ID=$(( $RANDOM % 3 + 1 ))
+  MODE=$(( $RANDOM % 8 + 1 ))
   LIBGL_DEBUG=verbose /snap/bin/freeorion \
     --log-file $(pwd)/freeorion.log \
     --audio.effects.enabled 0 \
@@ -46,17 +48,74 @@ while [ ! -f screenshot.png ]; do
     --video.windowed.top 0 \
     -A \
     --setup.multiplayer.host.address localhost \
-    --setup.multiplayer.player.name AI_$(( $RANDOM % 3 + 1 )) &
+    --setup.multiplayer.player.name AI_${EMPIRE_ID} &
   FOPID=$!
+  SCREENSHOT_TEXT=""
   echo "FreeOrion started pid ${FOPID}"
-  sleep 10
-  # Sometimes parser thread fails
-  if ! grep --quiet "Checksum received from server does not match client checksum." freeorion.log; then
-    xdotool key ctrl+h
-    sleep 5
-    if grep --quiet "Zoomed to capital system " freeorion.log; then
-      import -display :99 -window root $(pwd)/screenshot.png
+  if timeout 30s tail -F --retry -n +1 freeorion.log 2>/dev/null | grep -q -m 1 "Checksum received from server matches client checksum."; then
+    sleep 4
+    FO_WIN_ID=$(xdotool search --name "^FreeOrion" | head -n 1)
+    if [ -n "$FO_WIN_ID" ]; then
+      xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+h
+      if timeout 30s tail -F --retry -n +1 freeorion.log 2>/dev/null | grep -q -m 1 "Zoomed to capital system "; then
+        case $MODE in
+          1)
+            SCREENSHOT_TEXT="Home System"
+            ;;
+          2)
+            xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+shift+period
+            sleep 3
+            SCREENSHOT_TEXT="Next System"
+            ;;
+          3)
+            xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+p
+            sleep 3
+            SCREENSHOT_TEXT="Home System Production"
+            ;;
+          4)
+            xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+shift+period
+            sleep 3
+            xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+p
+            sleep 3
+            SCREENSHOT_TEXT="Next System Production"
+            ;;
+          5)
+            xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+g
+            sleep 3
+            SCREENSHOT_TEXT="Fleet"
+            ;;
+          6)
+            xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+r
+            sleep 3
+            SCREENSHOT_TEXT="Research"
+            ;;
+          7)
+            xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+d
+            sleep 3
+            SCREENSHOT_TEXT="Design"
+            ;;
+          8)
+            xdotool key --window "$FO_WIN_ID" --delay 150 ctrl+i
+            sleep 3
+            SCREENSHOT_TEXT="Government"
+            ;;
+        esac
+      else
+        echo "::error::Skip screenshot because can't zoom"
+      fi
+
+      if [ -n "${SCREENSHOT_TEXT}" ]; then
+        sleep 3
+        import -display :99 -window root $(pwd)/screenshot.png
+        echo "screenshot-alt=${SCREENSHOT_TEXT}" >> "$GITHUB_OUTPUT"
+      else
+        echo "::error::Missing screenshot text"
+      fi
+    else
+      echo "::error::Skip screenshot because no FreeOrion window"
     fi
+  else
+    echo "::error::Skip screenshot because checksum failed"
   fi
   kill -9 ${FOPID}
   wait ${FOPID}

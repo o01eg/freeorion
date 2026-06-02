@@ -5,6 +5,8 @@
 #include <thread>
 #include "ValueRef.h"
 #include "../util/CheckSums.h"
+#include "../util/Logger.h"
+#include "../util/Pending.h"
 
 [[nodiscard]] FO_COMMON_API const std::string& UserString(const std::string& str);
 
@@ -261,7 +263,7 @@ private:
         WaitForPending(m_pending_named_value_refs_focs, /*do not care about result*/true);
     }
 
-    mutable boost::optional<Pending::Pending<NamedValueRefParseMap>> m_pending_named_value_refs_focs = boost::none;
+    mutable std::optional<Pending::Pending<NamedValueRefParseMap>> m_pending_named_value_refs_focs = std::nullopt;
 
     //! Map of ValueRef%s identified by a name and mutexes for those to allow asynchronous registration
     double_container_type m_value_refs_double; // int value refs

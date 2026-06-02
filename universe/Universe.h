@@ -16,10 +16,12 @@
 #include <boost/thread/shared_mutex.hpp>
 #include "ConstantsFwd.h"
 #include "EnumsFwd.h"
+#include "FleetPlan.h"
 #include "ObjectMap.h"
 #include "Pathfinder.h"
 #include "UnlockableItem.h"
 #include "UniverseObject.h"
+#include "ValueRef.h"
 #include "../util/Export.h"
 #include "../util/Pending.h"
 
@@ -30,8 +32,6 @@ class XMLElement;
 class ShipDesign;
 class System;
 class IDAllocator;
-class FleetPlan;
-class MonsterFleetPlan;
 struct ScriptingContext;
 
 
@@ -49,11 +49,6 @@ namespace Effect {
     using AccountingMap = std::unordered_map<int, boost::container::flat_map<MeterType, std::vector<AccountingInfo>>>;
     using SourcesEffectsTargetsAndCause = std::pair<SourcedEffectsGroup, TargetsAndCause>;
     using SourcesEffectsTargetsAndCausesVec = std::vector<SourcesEffectsTargetsAndCause>;
-}
-
-namespace ValueRef {
-    template <typename T>
-    struct ValueRef;
 }
 
 
@@ -214,7 +209,7 @@ public:
       * the server is allocating an id on behalf of itself.  This can be removed
       * when no longer supporting legacy id allocation in pending Orders. \note
       * Universe gains ownership of \a ship_design once inserted. */
-    bool InsertShipDesignID(ShipDesign ship_design, boost::optional<int> empire_id, int id);
+    bool InsertShipDesignID(ShipDesign ship_design, std::optional<int> empire_id, int id);
 
    /** Reset object and ship design id allocation for a new game. */
     void ResetAllIDAllocation(const std::vector<int>& empire_ids = std::vector<int>());
@@ -557,11 +552,11 @@ private:
     //! Various unlocked items are kept as a Pending::Pending while being parsed and
     //! then transfered.  They are mutable to allow processing in const accessors.
     //! @{
-    mutable boost::optional<Pending::Pending<std::vector<UnlockableItem>>>                      m_pending_items = boost::none;
-    mutable boost::optional<Pending::Pending<std::vector<UnlockableItem>>>                      m_pending_buildings = boost::none;
-    mutable boost::optional<Pending::Pending<std::vector<std::unique_ptr<FleetPlan>>>>          m_pending_fleet_plans = boost::none;
-    mutable boost::optional<Pending::Pending<std::vector<std::unique_ptr<MonsterFleetPlan>>>>   m_pending_monster_fleet_plans = boost::none;
-    mutable boost::optional<Pending::Pending<EmpireStatsMap>>                                   m_pending_empire_stats = boost::none;
+    mutable std::optional<Pending::Pending<std::vector<UnlockableItem>>>                      m_pending_items = std::nullopt;
+    mutable std::optional<Pending::Pending<std::vector<UnlockableItem>>>                      m_pending_buildings = std::nullopt;
+    mutable std::optional<Pending::Pending<std::vector<std::unique_ptr<FleetPlan>>>>          m_pending_fleet_plans = std::nullopt;
+    mutable std::optional<Pending::Pending<std::vector<std::unique_ptr<MonsterFleetPlan>>>>   m_pending_monster_fleet_plans = std::nullopt;
+    mutable std::optional<Pending::Pending<EmpireStatsMap>>                                   m_pending_empire_stats = std::nullopt;
 
     mutable std::vector<UnlockableItem>                     m_unlocked_items;
     mutable std::vector<UnlockableItem>                     m_unlocked_buildings;

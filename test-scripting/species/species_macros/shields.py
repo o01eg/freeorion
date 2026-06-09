@@ -1,3 +1,10 @@
+from focs._conditions import IsHuman, IsSource, Ship
+from focs._effects import LocalCandidate, Target
+from focs._effects_new import (
+    EffectsGroup,
+    SetMaxShield,
+    SetShield,
+)
 from focs._value_refs import (
     CurrentTurn,
     GalaxyMaxAIAggression,
@@ -5,21 +12,6 @@ from focs._value_refs import (
 )
 from macros.misc import SHIP_SHIELD_FACTOR
 from macros.priorities import AFTER_ALL_TARGET_MAX_METERS_PRIORITY, DEFAULT_PRIORITY
-
-try:
-    from focs._effects import (
-        EffectsGroup,
-        IsHuman,
-        IsSource,
-        LocalCandidate,
-        SetMaxShield,
-        SetShield,
-        Ship,
-        Target,
-    )
-except ModuleNotFoundError:
-    pass
-
 
 STANDARD_SHIP_SHIELDS = [
     EffectsGroup(  # gives human bonuses when AI Aggression set to Beginner

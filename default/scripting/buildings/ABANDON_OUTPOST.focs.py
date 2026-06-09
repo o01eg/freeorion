@@ -1,21 +1,6 @@
-from focs._effects import (
-    Destroy,
-    EffectsGroup,
-    GenerateSitRepMessage,
-    IsBuilding,
-    IsSource,
-    LocalCandidate,
-    Object,
-    OwnedBy,
-    Partial,
-    Planet,
-    Population,
-    SetOwner,
-    SetVisibility,
-    Source,
-    Target,
-    Turn,
-)
+from focs._conditions import IsBuilding, IsSource, Object, OwnedBy, Planet, Population, Turn
+from focs._effects import LocalCandidate, Partial, Source, Target
+from focs._effects_new import Destroy, EffectsGroup, GenerateSitRepMessage, SetOwner, SetVisibility
 from focs._value_refs import (
     MaxOf,
     ThisBuilding,

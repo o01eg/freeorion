@@ -1,29 +1,23 @@
 from focs._buildings import BuildingType
-from focs._effects import (
+from focs._conditions import (
     Contains,
-    Destroy,
-    EffectsGroup,
     Enqueued,
-    GenerateSitRepMessage,
     Happiness,
     HasSpecial,
     HasSpecies,
     IsBuilding,
     IsSource,
     IsTarget,
-    LocalCandidate,
-    Min,
     Object,
     OwnedBy,
     OwnerHasTech,
     Planet,
     Population,
     ResourceSupplyConnected,
-    Source,
-    Target,
     Turn,
-    Uninhabitable,
 )
+from focs._effects import LocalCandidate, Min, Source, Target, Uninhabitable
+from focs._effects_new import Destroy, EffectsGroup, GenerateSitRepMessage
 from focs._value_refs import (
     GameRule,
     MaxOf,

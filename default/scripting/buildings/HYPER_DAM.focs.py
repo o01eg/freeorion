@@ -1,8 +1,6 @@
 from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
-from focs._effects import (
-    BlackHole,
+from focs._conditions import (
     Contains,
-    EffectsGroup,
     Focus,
     Happiness,
     IsBuilding,
@@ -10,13 +8,11 @@ from focs._effects import (
     OwnedBy,
     Planet,
     ResourceSupplyConnected,
-    SetTargetIndustry,
-    SetTargetPopulation,
-    Source,
     Star,
-    Target,
     TargetPopulation,
 )
+from focs._effects import BlackHole, Source, Target
+from focs._effects_new import EffectsGroup, SetTargetIndustry, SetTargetPopulation
 from focs._value_refs import (
     NamedReal,
     NamedRealLookup,

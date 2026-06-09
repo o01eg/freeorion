@@ -1,23 +1,7 @@
-from focs._effects import (
-    BlackHole,
-    Blue,
-    EffectsGroup,
-    Focus,
-    Happiness,
-    InSystem,
-    Neutron,
-    Orange,
-    OwnedBy,
-    Planet,
-    Red,
-    SetTargetResearch,
-    Source,
-    Star,
-    Target,
-    White,
-    Yellow,
-)
-from focs._tech import *
+from focs._conditions import Focus, Happiness, InSystem, OwnedBy, Planet, Star
+from focs._effects import BlackHole, Blue, Neutron, Orange, Red, Source, Target, White, Yellow
+from focs._effects_new import EffectsGroup, SetTargetResearch
+from focs._techs import Tech
 from focs._value_refs import (
     NamedReal,
     StatisticCount,

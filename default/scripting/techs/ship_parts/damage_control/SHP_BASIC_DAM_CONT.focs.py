@@ -1,20 +1,12 @@
-from focs._effects import (
-    EffectsGroup,
-    InSystem,
-    LocalCandidate,
-    OwnedBy,
-    SetStructure,
-    Ship,
-    Source,
-    Structure,
-    Turn,
-)
-from focs._tech import *
+from focs._conditions import InSystem, OwnedBy, Ship, Structure, Turn
+from focs._effects import LocalCandidate, Source, UnlockPolicy
+from focs._effects_new import EffectsGroup, Item, SetStructure
+from focs._techs import Tech
 from focs._value_refs import (
     Value,
 )
 from macros.base_prod import TECH_COST_MULTIPLIER
-from macros.misc import SHIP_STRUCTURE_FACTOR
+from macros.misc_pre import SHIP_STRUCTURE_FACTOR
 
 Tech(
     name="SHP_BASIC_DAM_CONT",

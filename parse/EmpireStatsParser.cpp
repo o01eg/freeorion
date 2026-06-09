@@ -36,11 +36,11 @@ namespace {
             module(parser_.LoadModule(&PyInit__empire_statistics)),
             stats(stats_)
         {
-            RegisterGlobalsConditions(globals);
             RegisterGlobalsSources(globals);
             RegisterGlobalsEnums(globals);
 
             parser.LoadValueRefsModule();
+            parser.LoadConditionsModule();
 
             module.attr("__stats") = boost::cref(*this);
         }

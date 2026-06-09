@@ -1,3 +1,10 @@
+from focs._conditions import Focus, HasSpecies, Homeworld, IsSource, OwnedBy, Planet, TargetPopulation
+from focs._effects import LocalCandidate, Source, Target
+from focs._effects_new import (
+    EffectsGroup,
+    SetMaxStockpile,
+    SetStockpile,
+)
 from focs._value_refs import (
     Abs,
     CurrentTurn,
@@ -9,25 +16,6 @@ from macros.priorities import (
     AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
     TARGET_EARLY_BEFORE_SCALING_PRIORITY,
 )
-
-try:
-    from focs._effects import (
-        EffectsGroup,
-        Focus,
-        HasSpecies,
-        Homeworld,
-        IsSource,
-        LocalCandidate,
-        OwnedBy,
-        Planet,
-        SetMaxStockpile,
-        SetStockpile,
-        Source,
-        Target,
-        TargetPopulation,
-    )
-except ModuleNotFoundError:
-    pass
 
 
 def STOCKPILE_PER_POP_EFFECTSGROUP__SNIP(label: str, value) -> dict:

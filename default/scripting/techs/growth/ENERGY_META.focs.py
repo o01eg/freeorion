@@ -1,26 +1,21 @@
-from focs._effects import (
+from focs._conditions import Focus, Happiness, OwnedBy, Planet, Ship
+from focs._effects import Source, Target
+from focs._effects_new import (
     EffectsGroup,
-    Focus,
-    Happiness,
-    OwnedBy,
-    Planet,
     SetMaxDefense,
     SetMaxFuel,
     SetMaxShield,
     SetTargetIndustry,
     SetTargetResearch,
-    Ship,
-    Source,
-    Target,
 )
-from focs._tech import *
+from focs._techs import Tech
 from focs._value_refs import (
     NamedReal,
     NamedRealLookup,
     Value,
 )
 from macros.base_prod import INDUSTRY_PER_POP, RESEARCH_PER_POP, TECH_COST_MULTIPLIER
-from macros.misc import PLANET_DEFENSE_FACTOR, PLANET_SHIELD_FACTOR
+from macros.misc_pre import PLANET_DEFENSE_FACTOR, PLANET_SHIELD_FACTOR
 from macros.priorities import (
     TARGET_AFTER_SCALING_PRIORITY,
     TARGET_EARLY_BEFORE_SCALING_PRIORITY,

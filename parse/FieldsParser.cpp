@@ -37,13 +37,12 @@ namespace {
             module(parser_.LoadModule(&PyInit__fields)),
             field_types(field_types_)
         {
-            RegisterGlobalsEffects(globals);
-            RegisterGlobalsConditions(globals);
             RegisterGlobalsSources(globals);
             RegisterGlobalsEnums(globals);
 
             parser.LoadValueRefsModule();
             parser.LoadEffectsModule();
+            parser.LoadConditionsModule();
 
             module.attr("__grammar") = boost::cref(*this);
         }

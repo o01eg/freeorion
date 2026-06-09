@@ -1,23 +1,20 @@
-from focs._effects import (
+from focs._conditions import (
     ContainedBy,
     Contains,
-    EffectsGroup,
     Focus,
-    GenerateSitRepMessage,
     HasTag,
     Monster,
     OwnedBy,
     OwnerHasTech,
     Planet,
     Random,
-    SetOwner,
     Ship,
-    Source,
     System,
-    Target,
     VisibleToEmpire,
 )
-from focs._tech import *
+from focs._effects import Source, Target
+from focs._effects_new import EffectsGroup, GenerateSitRepMessage, SetOwner
+from focs._techs import Tech
 from macros.base_prod import TECH_COST_MULTIPLIER
 
 Tech(

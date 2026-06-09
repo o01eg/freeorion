@@ -1,19 +1,6 @@
-from focs._effects import (
-    Destroy,
-    EffectsGroup,
-    IsSource,
-    Monster,
-    MoveTowards,
-    Number,
-    SetSize,
-    SetSpeed,
-    SetStructure,
-    Ship,
-    Size,
-    Source,
-    WithinDistance,
-)
-from focs._effects_new import MoveInOrbit
+from focs._conditions import IsSource, Monster, Number, Ship, Size, WithinDistance
+from focs._effects import Source
+from focs._effects_new import Destroy, EffectsGroup, MoveInOrbit, MoveTowards, SetSize, SetSpeed, SetStructure
 from focs._fields import FieldType
 from focs._value_refs import (
     MaxOf,
@@ -26,7 +13,7 @@ from focs._value_refs import (
     UniverseWidth,
     Value,
 )
-from macros.misc import SHIP_STRUCTURE_FACTOR
+from macros.misc_pre import SHIP_STRUCTURE_FACTOR
 
 FieldType(
     name="FLD_NANITE_SWARM",

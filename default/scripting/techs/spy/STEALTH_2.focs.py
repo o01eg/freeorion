@@ -1,15 +1,7 @@
-from focs._effects import (
-    AddSpecial,
-    EffectsGroup,
-    HasTag,
-    IsSource,
-    OwnedBy,
-    OwnerHasTech,
-    Planet,
-    RemoveSpecial,
-    Source,
-)
-from focs._tech import *
+from focs._conditions import HasTag, IsSource, OwnedBy, OwnerHasTech, Planet
+from focs._effects import Source
+from focs._effects_new import AddSpecial, EffectsGroup, RemoveSpecial
+from focs._techs import Tech
 from focs._value_refs import (
     StatisticIf,
 )

@@ -1,21 +1,13 @@
-from focs._effects import (
-    DesignHasPart,
-    EffectsGroup,
-    IsHuman,
-    IsSource,
-    LocalCandidate,
-    SetMaxShield,
-    SetShield,
-    Ship,
-    Target,
-)
+from focs._conditions import DesignHasPart, IsHuman, IsSource, Ship
+from focs._effects import LocalCandidate, Target
+from focs._effects_new import EffectsGroup, SetMaxShield, SetShield
 from focs._value_refs import (
     CurrentTurn,
     GalaxyMaxAIAggression,
     StatisticIf,
     Value,
 )
-from macros.misc import SHIP_SHIELD_FACTOR
+from macros.misc_pre import SHIP_SHIELD_FACTOR
 from macros.priorities import AFTER_ALL_TARGET_MAX_METERS_PRIORITY, DEFAULT_PRIORITY
 
 STANDARD_SHIP_SHIELDS = [

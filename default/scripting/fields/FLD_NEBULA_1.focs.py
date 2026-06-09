@@ -1,29 +1,17 @@
 from fields.fields import CREATE_PLANETS
-from focs._effects import (
+from focs._conditions import IsSource, Object, Ship, Size, Star, System, WithinDistance
+from focs._effects import CanSee, NoStar, Orange, Red, Source, White, Yellow
+from focs._effects_new import (
     AddSpecial,
-    CanSee,
     CreateField,
     Destroy,
     EffectsGroup,
     GenerateSitRepMessage,
-    IsSource,
-    NoStar,
-    Object,
-    Orange,
-    Red,
     SetDetection,
     SetSize,
     SetSpeed,
     SetStarType,
     SetStealth,
-    Ship,
-    Size,
-    Source,
-    Star,
-    System,
-    White,
-    WithinDistance,
-    Yellow,
 )
 from focs._fields import FieldType
 from focs._value_refs import (

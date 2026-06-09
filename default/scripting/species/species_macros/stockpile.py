@@ -1,18 +1,6 @@
-from focs._effects import (
-    EffectsGroup,
-    Focus,
-    HasSpecies,
-    Homeworld,
-    IsSource,
-    LocalCandidate,
-    OwnedBy,
-    Planet,
-    SetMaxStockpile,
-    SetStockpile,
-    Source,
-    Target,
-    TargetPopulation,
-)
+from focs._conditions import Focus, HasSpecies, Homeworld, IsSource, OwnedBy, Planet, TargetPopulation
+from focs._effects import LocalCandidate, Source, Target
+from focs._effects_new import EffectsGroup, SetMaxStockpile, SetStockpile
 from focs._value_refs import (
     Abs,
     CurrentTurn,

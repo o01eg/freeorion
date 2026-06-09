@@ -1,14 +1,7 @@
-from focs._effects import (
-    EffectsGroup,
-    IsSource,
-    OwnedBy,
-    OwnerHasTech,
-    Planet,
-    SetDetection,
-    SetEmpireMeter,
-    Source,
-)
-from focs._tech import *
+from focs._conditions import IsSource, OwnedBy, OwnerHasTech, Planet
+from focs._effects import Source, UnlockBuilding, UnlockShipPart
+from focs._effects_new import EffectsGroup, Item, SetDetection, SetEmpireMeter
+from focs._techs import Tech
 from focs._value_refs import (
     NamedReal,
     Value,

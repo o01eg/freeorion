@@ -1,20 +1,7 @@
-from focs._effects import (
-    Contains,
-    EffectsGroup,
-    Focus,
-    Happiness,
-    IsSource,
-    LocalCandidate,
-    Max,
-    OwnedBy,
-    Planet,
-    SetEmpireMeter,
-    SetTargetResearch,
-    Source,
-    System,
-    Target,
-)
-from focs._tech import *
+from focs._conditions import Contains, Focus, Happiness, IsSource, OwnedBy, Planet, System
+from focs._effects import LocalCandidate, Max, Source, Target
+from focs._effects_new import EffectsGroup, SetEmpireMeter, SetTargetResearch
+from focs._techs import Tech
 from focs._value_refs import (
     DirectDistanceBetween,
     MaxOf,

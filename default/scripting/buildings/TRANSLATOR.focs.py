@@ -1,22 +1,18 @@
 from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
-from focs._effects import (
+from focs._conditions import (
     Capital,
     Contains,
-    CountUnique,
-    EffectsGroup,
     Focus,
     HasSpecies,
     IsBuilding,
-    LocalCandidate,
     Object,
     OwnedBy,
     Planet,
-    SetEmpireMeter,
-    SetTargetInfluence,
-    Source,
     TargetPopulation,
     Unowned,
 )
+from focs._effects import CountUnique, LocalCandidate, Source
+from focs._effects_new import EffectsGroup, SetEmpireMeter, SetTargetInfluence
 from focs._value_refs import (
     NamedReal,
     Statistic,

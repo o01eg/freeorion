@@ -1,3 +1,44 @@
+from focs._conditions import (
+    Contains,
+    EmpireHasAdoptedPolicy,
+    Focus,
+    HasSpecies,
+    HasTag,
+    Homeworld,
+    IsSource,
+    IsTarget,
+    OwnedBy,
+    Planet,
+    ResourceSupplyConnected,
+    Star,
+    TargetPopulation,
+    Turn,
+)
+from focs._effects import (
+    AnyEmpire,
+    BlackHole,
+    Blue,
+    GasGiantType,
+    Good,
+    Hostile,
+    LocalCandidate,
+    Neutron,
+    NoStar,
+    Orange,
+    Poor,
+    Red,
+    Source,
+    Target,
+    Uninhabitable,
+    White,
+    Yellow,
+)
+from focs._effects_new import (
+    EffectsGroup,
+    SetPopulation,
+    SetStarType,
+    SetTargetPopulation,
+)
 from focs._value_refs import (
     Abs,
     CurrentTurn,
@@ -14,48 +55,6 @@ from macros.priorities import (
     TARGET_POPULATION_OVERRIDE_PRIORITY,
     TARGET_POPULATION_SCALING_PRIORITY,
 )
-
-try:
-    from focs._effects import (
-        AnyEmpire,
-        BlackHole,
-        Blue,
-        Contains,
-        EffectsGroup,
-        EmpireHasAdoptedPolicy,
-        Focus,
-        GasGiantType,
-        Good,
-        HasSpecies,
-        HasTag,
-        Homeworld,
-        Hostile,
-        IsSource,
-        IsTarget,
-        LocalCandidate,
-        Neutron,
-        NoStar,
-        Orange,
-        OwnedBy,
-        Planet,
-        Poor,
-        Red,
-        ResourceSupplyConnected,
-        SetPopulation,
-        SetStarType,
-        SetTargetPopulation,
-        Source,
-        Star,
-        Target,
-        TargetPopulation,
-        Turn,
-        Uninhabitable,
-        White,
-        Yellow,
-    )
-except ModuleNotFoundError:
-    pass
-
 from species.species_macros.advanced_focus import ADVANCED_FOCUS_EFFECTS
 from species.species_macros.general import (
     FOCUS_CHANGE_PENALTY,

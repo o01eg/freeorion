@@ -1,19 +1,12 @@
 from buildings.buildings_macros import CAN_ADD_STARLANE_TO_SOURCE
-from focs._effects import (
-    AddStarlanes,
-    AnyEmpire,
+from focs._conditions import (
     ContainedBy,
     Contains,
-    CreateShip,
-    Destroy,
-    EffectsGroup,
-    GenerateSitRepMessage,
     HasDesign,
     HasSpecies,
     InSystem,
     IsAnyObject,
     IsSource,
-    LocalCandidate,
     MinimumNumberOf,
     Monster,
     NumberOf,
@@ -21,6 +14,19 @@ from focs._effects import (
     OwnedBy,
     Planet,
     Random,
+    Ship,
+    System,
+    Turn,
+    Unowned,
+    WithinStarlaneJumps,
+)
+from focs._effects import AnyEmpire, LocalCandidate, Source
+from focs._effects_new import (
+    AddStarlanes,
+    CreateShip,
+    Destroy,
+    EffectsGroup,
+    GenerateSitRepMessage,
     RemoveStarlanes,
     SetDefense,
     SetDetection,
@@ -29,13 +35,7 @@ from focs._effects import (
     SetMaxTroops,
     SetShield,
     SetStealth,
-    Ship,
-    Source,
-    System,
-    Turn,
-    Unowned,
     Victory,
-    WithinStarlaneJumps,
 )
 from focs._value_refs import (
     DirectDistanceBetween,
@@ -46,7 +46,7 @@ from focs._value_refs import (
     MaxOf,
     Value,
 )
-from macros.misc import PLANET_DEFENSE_FACTOR, PLANET_SHIELD_FACTOR
+from macros.misc_pre import PLANET_DEFENSE_FACTOR, PLANET_SHIELD_FACTOR
 
 try:
     from focs._buildings import *

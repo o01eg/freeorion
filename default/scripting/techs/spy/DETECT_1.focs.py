@@ -1,22 +1,7 @@
-from focs._effects import (
-    BlackHole,
-    Blue,
-    EffectsGroup,
-    IsSource,
-    Neutron,
-    NoStar,
-    OwnedBy,
-    OwnerHasTech,
-    Planet,
-    SetDetection,
-    SetEmpireMeter,
-    Ship,
-    Source,
-    Star,
-    White,
-    Yellow,
-)
-from focs._tech import *
+from focs._conditions import IsSource, OwnedBy, OwnerHasTech, Planet, Ship, Star
+from focs._effects import BlackHole, Blue, Neutron, NoStar, Source, White, Yellow
+from focs._effects_new import EffectsGroup, SetDetection, SetEmpireMeter
+from focs._techs import Tech
 from focs._value_refs import (
     NamedReal,
     Value,

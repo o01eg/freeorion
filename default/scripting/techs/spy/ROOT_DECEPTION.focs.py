@@ -1,23 +1,7 @@
-from focs._effects import (
-    AddSpecial,
-    BlackHole,
-    EffectsGroup,
-    InSystem,
-    IsTarget,
-    LocalCandidate,
-    Min,
-    Neutron,
-    NoStar,
-    OwnedBy,
-    Red,
-    SetSpecialCapacity,
-    SetStealth,
-    Ship,
-    Source,
-    Star,
-    Target,
-)
-from focs._tech import *
+from focs._conditions import HasSpecial, InSystem, IsTarget, OwnedBy, Ship, Star
+from focs._effects import BlackHole, LocalCandidate, Min, Neutron, NoStar, Red, Source, Target
+from focs._effects_new import AddSpecial, EffectsGroup, SetSpecialCapacity, SetStealth
+from focs._techs import Tech
 from focs._value_refs import (
     MinOf,
     NamedReal,
@@ -183,7 +167,7 @@ Tech(
         ),
         # apply the lowest resulting stealth of ships of higher/equal stealth
         EffectsGroup(
-            scope=Ship & InSystem() & OwnedBy(empire=Source.Owner),
+            scope=Ship & InSystem() & OwnedBy(empire=Source.Owner) & HasSpecial(name=base_stealth_special),
             accountinglabel="FLEET_UNSTEALTHINESS_INSYSTEM_LABEL",
             priority=LATE_AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
             effects=[
@@ -195,7 +179,7 @@ Tech(
         # Needs InGame(), this should not trigger in e.g. ShipDesigner (where the ship is ~InSystem).
         # Do test a) ships going via different starlanes to/from the same system
         EffectsGroup(
-            scope=Ship & InGame() & ~InSystem() & OwnedBy(empire=Source.Owner),
+            scope=Ship & InGame() & ~InSystem() & OwnedBy(empire=Source.Owner) & HasSpecial(name=base_stealth_special),
             accountinglabel="FLEET_UNSTEALTHINESS_ON_STARLANE_LABEL",
             priority=LATE_AFTER_ALL_TARGET_MAX_METERS_PRIORITY,
             effects=[

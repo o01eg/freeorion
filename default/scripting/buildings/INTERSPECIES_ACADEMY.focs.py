@@ -1,13 +1,9 @@
 from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
-from focs._effects import (
-    BuildBuilding,
+from focs._conditions import (
     Contains,
     Described,
-    Destroy,
-    EffectsGroup,
     Enqueued,
     Focus,
-    GenerateSitRepMessage,
     Happiness,
     HasSpecies,
     IsBuilding,
@@ -17,14 +13,17 @@ from focs._effects import (
     OwnedBy,
     Planet,
     Random,
-    RootCandidate,
+    System,
+    WithinStarlaneJumps,
+)
+from focs._effects import BuildBuilding, RootCandidate, Source, Target
+from focs._effects_new import (
+    Destroy,
+    EffectsGroup,
+    GenerateSitRepMessage,
     SetMaxStockpile,
     SetTargetInfluence,
     SetTargetResearch,
-    Source,
-    System,
-    Target,
-    WithinStarlaneJumps,
 )
 from focs._value_refs import (
     NamedReal,

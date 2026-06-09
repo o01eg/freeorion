@@ -1,30 +1,25 @@
+from focs._conditions import Object, Random, Size, System
 from focs._effects import (
     AsteroidsSize,
     AsteroidsType,
     Barren,
-    Conditional,
     Desert,
-    EffectsGroup,
     GasGiantSize,
     GasGiantType,
     Inferno,
     Large,
     Medium,
-    Object,
     Ocean,
     Radiated,
-    Random,
-    Size,
     Small,
     Source,
     Swamp,
-    System,
     Terran,
     Tiny,
     Toxic,
     Tundra,
 )
-from focs._effects_new import CreatePlanet
+from focs._effects_new import Conditional, CreatePlanet, EffectsGroup
 from focs._value_refs import (
     GalaxyPlanetDensity,
     OneOf,

@@ -1,9 +1,7 @@
 from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
-from focs._effects import (
+from focs._conditions import (
     ContainedBy,
     Contains,
-    Destroy,
-    EffectsGroup,
     HasSpecial,
     Industry,
     IsAnyObject,
@@ -11,10 +9,9 @@ from focs._effects import (
     IsSource,
     Object,
     Planet,
-    SetIndustry,
-    Source,
-    Target,
 )
+from focs._effects import Source, Target
+from focs._effects_new import Destroy, EffectsGroup, SetIndustry
 from macros.priorities import (
     CONCENTRATION_CAMP_PRIORITY,
 )

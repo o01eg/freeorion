@@ -1,21 +1,27 @@
 from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
-from focs._effects import (
-    BuildBuilding,
+from focs._conditions import (
     Capital,
     ContainedBy,
     Contains,
-    EffectsGroup,
     Enqueued,
     HasSpecies,
     IsBuilding,
     IsSource,
     IsTarget,
-    LocalCandidate,
     Number,
     Object,
     OwnedBy,
     Planet,
     ProducedByEmpire,
+    SpeciesDislikes,
+    SpeciesLikes,
+    TargetPopulation,
+    UniqueNumberOf,
+    Unowned,
+)
+from focs._effects import BuildBuilding, LocalCandidate, Source, Target
+from focs._effects_new import (
+    EffectsGroup,
     SetEmpireCapital,
     SetEmpireMeter,
     SetMaxDefense,
@@ -25,13 +31,6 @@ from focs._effects import (
     SetTargetConstruction,
     SetTargetHappiness,
     SetTargetInfluence,
-    Source,
-    SpeciesDislikes,
-    SpeciesLikes,
-    Target,
-    TargetPopulation,
-    UniqueNumberOf,
-    Unowned,
 )
 from focs._value_refs import (
     GameRule,
@@ -41,7 +40,7 @@ from focs._value_refs import (
     Value,
 )
 from macros.base_prod import BUILDING_COST_MULTIPLIER
-from macros.misc import PLANET_DEFENSE_FACTOR
+from macros.misc_pre import PLANET_DEFENSE_FACTOR
 from macros.priorities import TARGET_AFTER_SCALING_PRIORITY
 
 try:

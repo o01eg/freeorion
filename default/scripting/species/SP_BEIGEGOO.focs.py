@@ -1,18 +1,6 @@
-from focs._effects import (
-    AddSpecial,
-    Blue,
-    Conditional,
-    CreateShip,
-    EffectsGroup,
-    IsSource,
-    Orange,
-    Planet,
-    Red,
-    Star,
-    Turn,
-    White,
-    Yellow,
-)
+from focs._conditions import IsSource, Planet, Star, Turn
+from focs._effects import Blue, Orange, Red, White, Yellow
+from focs._effects_new import AddSpecial, Conditional, CreateShip, EffectsGroup
 from focs._species import *
 from focs._value_refs import (
     GalaxyMaxAIAggression,

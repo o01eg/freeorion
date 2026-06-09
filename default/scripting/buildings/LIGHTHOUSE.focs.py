@@ -1,23 +1,18 @@
 from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
-from focs._effects import (
+from focs._conditions import (
     Contains,
-    EffectsGroup,
-    EnemyOf,
     InSystem,
     IsBuilding,
     IsSource,
-    LocalCandidate,
-    Max,
     OwnedBy,
     Planet,
-    SetSpeed,
-    SetStealth,
     Ship,
-    Source,
     Speed,
     Unowned,
     WithinDistance,
 )
+from focs._effects import EnemyOf, LocalCandidate, Max, Source
+from focs._effects_new import EffectsGroup, SetSpeed, SetStealth
 from focs._value_refs import (
     MinOf,
     NamedReal,

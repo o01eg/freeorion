@@ -1,10 +1,7 @@
-from focs._effects import (
-    EffectsGroup,
-    IsSource,
-    SetEmpireMeter,
-    Source,
-)
-from focs._tech import *
+from focs._conditions import IsSource
+from focs._effects import Source, UnlockBuilding
+from focs._effects_new import EffectsGroup, Item, SetEmpireMeter
+from focs._techs import Tech
 from focs._value_refs import (
     Value,
 )

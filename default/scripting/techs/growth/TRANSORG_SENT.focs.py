@@ -1,14 +1,7 @@
-from focs._effects import (
-    Conditional,
-    EffectsGroup,
-    LocalCandidate,
-    OwnedBy,
-    Planet,
-    SetInfluence,
-    Source,
-    Target,
-)
-from focs._tech import *
+from focs._conditions import OwnedBy, Planet
+from focs._effects import LocalCandidate, Source, Target, UnlockPolicy
+from focs._effects_new import Conditional, EffectsGroup, Item, SetInfluence
+from focs._techs import Tech
 from focs._value_refs import (
     MaxOf,
     MinOf,

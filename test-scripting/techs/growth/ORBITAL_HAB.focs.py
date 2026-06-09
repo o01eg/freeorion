@@ -1,22 +1,15 @@
+from focs._conditions import HasSpecies, OwnedBy
+from focs._effects import Source, Target
+from focs._effects_new import (
+    EffectsGroup,
+    SetTargetPopulation,
+)
+from focs._techs import Tech
 from focs._value_refs import (
     Value,
 )
 from macros.base_prod import TECH_COST_MULTIPLIER
 from macros.priorities import TARGET_POPULATION_AFTER_SCALING_PRIORITY
-
-try:
-    from focs._effects import (
-        EffectsGroup,
-        HasSpecies,
-        OwnedBy,
-        SetTargetPopulation,
-        Source,
-        Target,
-    )
-    from focs._tech import *
-except ModuleNotFoundError:
-    pass
-
 
 Tech(
     name="CON_ORBITAL_HAB",

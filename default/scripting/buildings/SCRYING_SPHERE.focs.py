@@ -1,20 +1,17 @@
 from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
-from focs._effects import (
+from focs._conditions import (
     Capital,
     ContainedBy,
     Contains,
-    EffectsGroup,
     IsBuilding,
     OwnedBy,
-    Partial,
     Planet,
-    SetEmpireMeter,
-    SetVisibility,
-    Source,
     System,
     Unowned,
     WithinStarlaneJumps,
 )
+from focs._effects import Partial, Source
+from focs._effects_new import EffectsGroup, SetEmpireMeter, SetVisibility
 from focs._value_refs import (
     MaxOf,
     Value,

@@ -1,19 +1,13 @@
-from focs._effects import (
+from focs._conditions import HasSpecial, IsSource, OwnerHasTech, Planet, Turn
+from focs._effects import Source, Target, Uninhabitable
+from focs._effects_new import (
     AddSpecial,
     EffectsGroup,
     GenerateSitRepMessage,
     GiveEmpireTech,
-    HasSpecial,
-    IsSource,
-    OwnerHasTech,
-    Planet,
     RemoveSpecial,
     SetPopulation,
     SetTargetPopulation,
-    Source,
-    Target,
-    Turn,
-    Uninhabitable,
 )
 from focs._species import *
 from macros.priorities import POPULATION_OVERRIDE_PRIORITY, TARGET_POPULATION_OVERRIDE_PRIORITY

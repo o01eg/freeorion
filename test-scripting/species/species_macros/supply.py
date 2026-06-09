@@ -1,27 +1,20 @@
+from focs._conditions import IsSource, Planet
+from focs._effects import LocalCandidate, Target
+
+# NO_SUPPLY
+# '''
+# '''
+from focs._effects_new import (
+    EffectsGroup,
+    SetMaxSupply,
+    SetSupply,
+)
 from focs._value_refs import (
     CurrentTurn,
     MinOf,
     Value,
 )
 from macros.priorities import AFTER_ALL_TARGET_MAX_METERS_PRIORITY
-
-# NO_SUPPLY
-# '''
-# '''
-
-try:
-    from focs._effects import (
-        EffectsGroup,
-        IsSource,
-        LocalCandidate,
-        Planet,
-        SetMaxSupply,
-        SetSupply,
-        Target,
-    )
-except ModuleNotFoundError:
-    pass
-
 
 STANDARD_SUPPLY_GROWTH = EffectsGroup(  # increase 1 per turn, up to max
     scope=IsSource,

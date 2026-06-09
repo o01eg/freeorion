@@ -1,30 +1,21 @@
-from focs._effects import (
-    AllyOf,
+from focs._conditions import (
     Capital,
     ContainedBy,
     Contains,
-    EffectsGroup,
     EmpireHasAdoptedPolicy,
-    EnemyOf,
-    GasGiantType,
-    GiveEmpirePolicy,
     HasSpecies,
     InSystem,
     IsSource,
-    LocalCandidate,
     Object,
     OwnedBy,
     Planet,
-    RootCandidate,
-    SetFuel,
-    SetStructure,
     Ship,
-    Source,
     Stationary,
     Structure,
-    Target,
     Turn,
 )
+from focs._effects import AllyOf, EnemyOf, GasGiantType, LocalCandidate, RootCandidate, Source, Target
+from focs._effects_new import EffectsGroup, GiveEmpirePolicy, SetFuel, SetStructure
 from focs._species import *
 from focs._value_refs import (
     ThisSpecies,

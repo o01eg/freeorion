@@ -1,9 +1,6 @@
-from focs._effects import (
-    EffectsGroup,
-    IsSource,
-    Victory,
-)
-from focs._tech import *
+from focs._conditions import IsSource
+from focs._effects_new import EffectsGroup, Victory
+from focs._techs import Tech
 from focs._value_refs import (
     GalaxySize,
     GameRule,

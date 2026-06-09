@@ -40,12 +40,12 @@ namespace {
             module(parser_.LoadModule(&PyInit__buildings)),
             buildings(buildings_)
         {
-            RegisterGlobalsEffects(globals);
-            RegisterGlobalsConditions(globals);
             RegisterGlobalsSources(globals);
             RegisterGlobalsEnums(globals);
 
             parser.LoadValueRefsModule();
+            parser.LoadEffectsModule();
+            parser.LoadConditionsModule();
 
             module.attr("__grammar") = boost::cref(*this);
         }

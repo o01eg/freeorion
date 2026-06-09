@@ -1,3 +1,39 @@
+from focs._conditions import (
+    ContainedBy,
+    Contains,
+    DesignHasPart,
+    Fleet,
+    Focus,
+    InSystem,
+    IsBuilding,
+    IsSource,
+    Number,
+    Object,
+    OwnedBy,
+    Planet,
+    Random,
+    Ship,
+    Stationary,
+    System,
+    Turn,
+    Unowned,
+    WithinDistance,
+    WithinStarlaneJumps,
+)
+from focs._effects import EnemyOf, LocalCandidate, RootCandidate, Source, Target
+from focs._effects_new import (
+    AddSpecial,
+    Conditional,
+    Destroy,
+    EffectsGroup,
+    GenerateSitRepMessage,
+    MoveTo,
+    MoveTowards,
+    SetMaxSupply,
+    SetPopulation,
+    SetStealth,
+    SetTargetPopulation,
+)
 from focs._value_refs import (
     DirectDistanceBetween,
     Value,
@@ -7,49 +43,6 @@ from macros.priorities import (
     POPULATION_FIRST_PRIORITY,
     TARGET_POPULATION_AFTER_SCALING_PRIORITY,
 )
-
-try:
-    from focs._effects import (
-        AddSpecial,
-        Conditional,
-        ContainedBy,
-        Contains,
-        DesignHasPart,
-        Destroy,
-        EffectsGroup,
-        EnemyOf,
-        Fleet,
-        Focus,
-        GenerateSitRepMessage,
-        InSystem,
-        IsBuilding,
-        IsSource,
-        LocalCandidate,
-        MoveTo,
-        MoveTowards,
-        Number,
-        Object,
-        OwnedBy,
-        Planet,
-        Random,
-        RootCandidate,
-        SetMaxSupply,
-        SetPopulation,
-        SetStealth,
-        SetTargetPopulation,
-        Ship,
-        Source,
-        Stationary,
-        System,
-        Target,
-        Turn,
-        Unowned,
-        WithinDistance,
-        WithinStarlaneJumps,
-    )
-except ModuleNotFoundError:
-    pass
-
 
 PLANETARY_DRIVE_ACTIVATION = (
     Planet()

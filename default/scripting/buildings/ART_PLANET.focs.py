@@ -1,21 +1,6 @@
-from focs._effects import (
-    AsteroidsType,
-    Barren,
-    Contains,
-    Destroy,
-    EffectsGroup,
-    GasGiantType,
-    GenerateSitRepMessage,
-    IsBuilding,
-    IsSource,
-    Object,
-    OwnedBy,
-    Planet,
-    Population,
-    SetPlanetType,
-    Source,
-    Target,
-)
+from focs._conditions import Contains, IsBuilding, IsSource, Object, OwnedBy, Planet, Population
+from focs._effects import AsteroidsType, Barren, GasGiantType, Source, Target
+from focs._effects_new import Destroy, EffectsGroup, GenerateSitRepMessage, SetPlanetType
 from macros.base_prod import BUILDING_COST_MULTIPLIER
 from macros.enqueue import ENQUEUE_ARTIFICIAL_PLANET_EXCLUSION
 

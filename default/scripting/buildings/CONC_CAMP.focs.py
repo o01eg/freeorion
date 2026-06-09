@@ -1,12 +1,8 @@
 from buildings.buildings_macros import SPECIES_LIKES_OR_DISLIKES_BUILDING_STABILITY_EFFECTS
-from focs._effects import (
-    AddSpecial,
+from focs._conditions import (
     ContainedBy,
     Contains,
-    Destroy,
-    EffectsGroup,
     EmpireHasAdoptedPolicy,
-    GenerateSitRepMessage,
     HasSpecial,
     IsBuilding,
     IsSource,
@@ -15,12 +11,17 @@ from focs._effects import (
     Planet,
     Population,
     ProducedByEmpire,
+)
+from focs._effects import Source, Target
+from focs._effects_new import (
+    AddSpecial,
+    Destroy,
+    EffectsGroup,
+    GenerateSitRepMessage,
     SetIndustry,
     SetPopulation,
     SetSpeciesOpinion,
     SetTargetIndustry,
-    Source,
-    Target,
 )
 from focs._value_refs import (
     MinOf,

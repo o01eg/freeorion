@@ -1120,7 +1120,6 @@ void ServerApp::PushChatMessage(std::string text, std::string player_name, std::
 void ServerApp::SendOutboundChatMessage(const std::string& text, const std::string& player_name, bool allow_email) {
     bool success = false;
     try {
-        m_python_server.SetCurrentDir(GetPythonAuthDir());
         success = m_python_server.SendOutboundChatMessage(text, player_name, allow_email);
     } catch (const boost::python::error_already_set& err) {
         success = false;

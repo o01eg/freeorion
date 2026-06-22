@@ -71,7 +71,7 @@ option(BUILD_PARSERS "Build parsers" ON)
 option(ENABLE_CPPCHECK "Enable cppcheck check"  OFF)
 
 set(BUILD_CLIENT_GODOT "OFF" CACHE STRING "Build Godot client (experimental)")
-set_property(CACHE BUILD_CLIENT_GODOT PROPERTY STRINGS "OFF" "3")
+set_property(CACHE BUILD_CLIENT_GODOT PROPERTY STRINGS "OFF" "3" "4")
 
 set(GODOT_CPP_ROOT "" CACHE PATH "Path to Godot CPP libraries (empty to build internally)")
 
@@ -727,9 +727,11 @@ if(BUILD_CLIENT_GG)
     target_dependent_data_symlink_to_build(freeorion ${PROJECT_SOURCE_DIR}/default)
 endif()
 
-if(BUILD_CLIENT_GODOT EQUAL "3")
+if(NOT BUILD_CLIENT_GODOT EQUAL "OFF")
     add_library(freeoriongodot SHARED "")
+endif()
 
+if(BUILD_CLIENT_GODOT EQUAL "3")
     if(CMAKE_BUILD_TYPE MATCHES Debug)
         set(GODOT_CPP_BUILD_TYPE Debug)
     else()
@@ -947,7 +949,7 @@ endif()
 ## Recurse into sources.
 ##
 
-if(BUILD_AI OR BUILD_CLIENT_GG OR BUILD_CLIENT_GODOT EQUAL "3")
+if(BUILD_AI OR BUILD_CLIENT_GG OR NOT BUILD_CLIENT_GODOT EQUAL "OFF")
     add_subdirectory(client)
 endif()
 add_subdirectory(combat)

@@ -58,6 +58,28 @@ namespace {
         return py::object(py::handle<>(raw_py_str));
     }
 
+    template<typename T = std::filesystem::path::value_type>
+    std::basic_string<T> pyobject_to_path(const py::object& o_filename) {
+        PyObject* raw_obj = o_filename.ptr();
+        if (!raw_obj || !PyUnicode_Check(raw_obj))
+            return {};
+        if constexpr (std::is_same_v<T, wchar_t>) {
+            Py_ssize_t size = 0;
+            wchar_t* buffer = PyUnicode_AsWideCharString(raw_obj, &size);
+            if (!buffer)
+                return {};
+            std::basic_string<T> result(buffer, size);
+            PyMem_Free(buffer);
+            return result;
+        } else {
+            Py_ssize_t size = 0;
+            const char* buffer = PyUnicode_AsUTF8AndSize(raw_obj, &size);
+            if (!buffer)
+                return {};
+            return std::basic_string<T>(buffer, size);
+        }
+    }
+
     auto GetPythonExecutable() // should be the containing C++ binary / .exe file
     { return py::extract<std::string>(py::import("sys").attr("executable"))(); }
 
@@ -70,10 +92,12 @@ namespace {
     }
 
     constexpr bool STATIC_FALSE = false;
+    constexpr bool STATIC_TRUE = true;
 }
 
 struct module_spec {
-    py::list path;
+    py::object submodule_search_locations;
+    py::object origin;
     py::list uninitialized_submodules;
     std::string fullname;
     std::string parent;
@@ -92,8 +116,9 @@ BOOST_PYTHON_MODULE(freeorion_loader) {
         .def_readonly("name", &module_spec::fullname)
         .def_readonly("_uninitialized_submodules", &module_spec::uninitialized_submodules)
         .add_property("loader", py::make_function(+[](const module_spec& self) -> const PythonCommon& { return self.python; }, py::return_value_policy<py::reference_existing_object>()))
-        .def_readonly("submodule_search_locations", &module_spec::path)
-        .def_readonly("has_location", STATIC_FALSE)
+        .def_readonly("submodule_search_locations", &module_spec::submodule_search_locations)
+        .def_readonly("origin", &module_spec::origin)
+        .def_readonly("has_location", STATIC_TRUE)
         .def_readonly("cached", STATIC_FALSE)
         .def_readonly("parent", &module_spec::parent);
 }
@@ -294,10 +319,6 @@ void PythonCommon::SetModulesDir(const std::filesystem::path& modules_dir) {
     m_modules_dir = modules_dir;
 }
 
-void PythonCommon::SetPopulateGlobalsFunc(std::function<void(boost::python::dict&)> populate_globals_func) {
-    m_populate_globals_func = populate_globals_func;
-}
-
 py::object PythonCommon::find_spec(const std::string& fullname, const py::object& path, const py::object& target) const {
     auto module_path(m_modules_dir);
     std::string parent;
@@ -316,15 +337,32 @@ py::object PythonCommon::find_spec(const std::string& fullname, const py::object
     }
 
     if (IsExistingDir(module_path)) {
-        return py::object(module_spec{
-            .fullname = fullname,
-            .parent = parent,
-            .python = *this
-        });
+        auto init_py_path = module_path / "__init__.py";
+        py::list search_locations;
+        search_locations.append(path_to_pyobject(module_path.native()));
+        if (IsExistingFile(init_py_path)) {
+            return py::object(module_spec{
+                .submodule_search_locations = search_locations,
+                .origin = path_to_pyobject(init_py_path.native()),
+                .fullname = fullname,
+                .parent = parent,
+                .python = *this
+            });
+        } else {
+            return py::object(module_spec{
+                .submodule_search_locations = search_locations,
+                .origin = py::object(),
+                .fullname = fullname,
+                .parent = parent,
+                .python = *this
+            });
+        }
     } else {
         module_path.replace_extension("py");
         if (IsExistingFile(module_path)) {
             return py::object(module_spec{
+                .submodule_search_locations = py::object(),
+                .origin = path_to_pyobject(module_path.native()),
                 .fullname = fullname,
                 .parent = parent,
                 .python = *this
@@ -344,49 +382,43 @@ py::object PythonCommon::exec_module(py::object& module) {
 
     py::dict globals = py::extract<py::dict>(module.attr("__dict__"));
 
-    auto module_path(m_modules_dir);
-    for (auto it = boost::algorithm::make_split_iterator(fullname, boost::algorithm::token_finder(boost::algorithm::is_any_of(".")));
-         it != boost::algorithm::split_iterator<std::string::iterator>(); ++it)
-    { module_path = module_path / boost::copy_range<std::string>(*it); }
+    if (!globals.contains("__file__"))
+        return py::object();
+    py::object py_module_path = globals["__file__"];
+    if (py_module_path.is_none())
+        return py::object();
+    auto module_path = std::filesystem::path(pyobject_to_path(py_module_path));
 
-    if (IsExistingDir(module_path)) {
+    if (IsExistingFile(module_path)) {
+        std::string file_contents;
+        bool read_success = ReadFile(module_path, file_contents);
+        if (!read_success) {
+            ErrorLogger() << "Unable to open data file " << module_path.string();
+            throw import_error("Unreadable module " + fullname);
+        }
+
+        // store globals content in module namespace
+        // it is required so functions in the same module will see each other
+        // and still import will work
+        DebugLogger() << "Executing module file " << module_path.string();
+        try {
+            CompileEval(file_contents.c_str(), module_path.native(), globals);
+        } catch (const boost::python::error_already_set&) {
+            HandleErrorAlreadySet();
+            ErrorLogger() << "Unable to parse module file " << PathToString(module_path);
+            if (!IsPythonRunning()) {
+                ErrorLogger() << "Python interpreter is no longer running.  Attempting to restart.";
+                if (Initialize()) {
+                    ErrorLogger() << "Python interpreter successfully restarted.";
+                } else {
+                    ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
+                }
+            }
+            throw import_error("Cannot execute module " + fullname);
+        }
+
         return py::object();
     } else {
-        module_path.replace_extension("py");
-        if (IsExistingFile(module_path)) {
-            std::string file_contents;
-            bool read_success = ReadFile(module_path, file_contents);
-            if (!read_success) {
-                ErrorLogger() << "Unable to open data file " << module_path.string();
-                throw import_error("Unreadable module " + fullname);
-            }
-
-            // store globals content in module namespace
-            // it is required so functions in the same module will see each other
-            // and still import will work
-            DebugLogger() << "Executing module file " << module_path.string();
-            try {
-                if (m_populate_globals_func)
-                    m_populate_globals_func(globals);
-
-                CompileEval(file_contents.c_str(), module_path.native(), globals);
-            } catch (const boost::python::error_already_set&) {
-                HandleErrorAlreadySet();
-                ErrorLogger() << "Unable to parse module file " << PathToString(module_path);
-                if (!IsPythonRunning()) {
-                    ErrorLogger() << "Python interpreter is no longer running.  Attempting to restart.";
-                    if (Initialize()) {
-                        ErrorLogger() << "Python interpreter successfully restarted.";
-                    } else {
-                        ErrorLogger() << "Python interpreter failed to restart.  Exiting.";
-                    }
-                }
-                throw import_error("Cannot execute module " + fullname);
-            }
-
-            return py::object();
-        } else {
-            throw import_error("Module not existed " + fullname);
-        }
+        throw import_error("Module not existed " + fullname);
     }
 }

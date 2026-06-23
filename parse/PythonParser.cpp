@@ -394,6 +394,8 @@ PythonParser::PythonParser(PythonCommon& _python) :
 
 PythonParser::~PythonParser()
 {
+    m_initialized_moduiles.clear();
+
     // To correctly init it again between sub-interpreters border
     m_python.FinalizeModuleLoader();
 
@@ -433,12 +435,16 @@ bool PythonParser::ParseFileCommon(const std::filesystem::path& path,
 }
 
 py::object PythonParser::LoadModule(PyObject* (*init_function)()) const {
+    auto it = m_initialized_moduiles.find(init_function);
+    if (it != m_initialized_moduiles.end())
+        return it->second;
     PyObject *py_module = init_function();
     if (py_module) {
         const char* module_name = PyModule_GetName(py_module);
         DebugLogger() << "Injecting parser module " << module_name;
         py::object module{py::handle<>(py_module)};
         py::extract<py::dict>(py::import("sys").attr("modules"))()[std::string{"focs."} + module_name] = module;
+        m_initialized_moduiles[init_function] = module;
         return module;
     }
     return py::object();
@@ -456,7 +462,7 @@ void PythonParser::LoadValueRefsModule() const
 { (void)LoadModule(&PyInit__value_refs); } // marked [[nodiscard]] but result not needed in this case
 
 void PythonParser::LoadEffectsModule() const
-{ (void)LoadModule(&PyInit__effects_new); } // marked [[nodiscard]] but result not needed in this case
+{ (void)LoadModule(&PyInit__effects); } // marked [[nodiscard]] but result not needed in this case
 
 void PythonParser::LoadSourcesModule() const
 { (void)LoadModule(&PyInit__sources); } // marked [[nodiscard]] but result not needed in this case

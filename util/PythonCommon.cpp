@@ -315,58 +315,63 @@ void PythonCommon::CompileEval(const char* code, const std::filesystem::path& fi
     py::object o_result{py::handle<>(result)};
 }
 
-void PythonCommon::SetModulesDir(const std::filesystem::path& modules_dir) {
-    m_modules_dir = modules_dir;
+void PythonCommon::SetModulesDirs(const std::vector<std::filesystem::path>& modules_dirs) {
+    m_modules_dirs = modules_dirs;
+}
+
+void PythonCommon::SetModulesDirs(std::vector<std::filesystem::path>&& modules_dirs) {
+    m_modules_dirs = std::move(modules_dirs);
 }
 
 py::object PythonCommon::find_spec(const std::string& fullname, const py::object& path, const py::object& target) const {
-    auto module_path(m_modules_dir);
-    std::string parent;
-    std::string current;
-    for (auto it = boost::algorithm::make_split_iterator(fullname, boost::algorithm::token_finder(boost::algorithm::is_any_of(".")));
-         it != boost::algorithm::split_iterator<std::string::const_iterator>(); ++it)
-    {
-        module_path = module_path / boost::copy_range<std::string>(*it);
-        if (!current.empty()) {
-            if (parent.empty())
-                parent = std::move(current);
-            else
-                parent = parent + "." + current;
+    for (auto module_path : m_modules_dirs) {
+        std::string parent;
+        std::string current;
+        for (auto it = boost::algorithm::make_split_iterator(fullname, boost::algorithm::token_finder(boost::algorithm::is_any_of(".")));
+            it != boost::algorithm::split_iterator<std::string::const_iterator>(); ++it)
+        {
+            module_path = module_path / boost::copy_range<std::string>(*it);
+            if (!current.empty()) {
+                if (parent.empty())
+                    parent = std::move(current);
+                else
+                    parent = parent + "." + current;
+            }
+            current = boost::copy_range<std::string>(*it);
         }
-        current = boost::copy_range<std::string>(*it);
-    }
 
-    if (IsExistingDir(module_path)) {
-        auto init_py_path = module_path / "__init__.py";
-        py::list search_locations;
-        search_locations.append(path_to_pyobject(module_path.native()));
-        if (IsExistingFile(init_py_path)) {
-            return py::object(module_spec{
-                .submodule_search_locations = search_locations,
-                .origin = path_to_pyobject(init_py_path.native()),
-                .fullname = fullname,
-                .parent = parent,
-                .python = *this
-            });
+        if (IsExistingDir(module_path)) {
+            auto init_py_path = module_path / "__init__.py";
+            py::list search_locations;
+            search_locations.append(path_to_pyobject(module_path.native()));
+            if (IsExistingFile(init_py_path)) {
+                return py::object(module_spec{
+                    .submodule_search_locations = search_locations,
+                    .origin = path_to_pyobject(init_py_path.native()),
+                    .fullname = fullname,
+                    .parent = parent,
+                    .python = *this
+                });
+            } else {
+                return py::object(module_spec{
+                    .submodule_search_locations = search_locations,
+                    .origin = py::object(),
+                    .fullname = fullname,
+                    .parent = parent,
+                    .python = *this
+                });
+            }
         } else {
-            return py::object(module_spec{
-                .submodule_search_locations = search_locations,
-                .origin = py::object(),
-                .fullname = fullname,
-                .parent = parent,
-                .python = *this
-            });
-        }
-    } else {
-        module_path.replace_extension("py");
-        if (IsExistingFile(module_path)) {
-            return py::object(module_spec{
-                .submodule_search_locations = py::object(),
-                .origin = path_to_pyobject(module_path.native()),
-                .fullname = fullname,
-                .parent = parent,
-                .python = *this
-            });
+            module_path.replace_extension("py");
+            if (IsExistingFile(module_path)) {
+                return py::object(module_spec{
+                    .submodule_search_locations = py::object(), // None for standard files
+                    .origin = path_to_pyobject(module_path.native()),
+                    .fullname = fullname,
+                    .parent = parent,
+                    .python = *this
+                });
+            }
         }
     }
 
@@ -395,6 +400,28 @@ py::object PythonCommon::exec_module(py::object& module) {
         if (!read_success) {
             ErrorLogger() << "Unable to open data file " << module_path.string();
             throw import_error("Unreadable module " + fullname);
+        }
+
+        if (globals.contains("__spec__")) {
+            py::object py_spec = globals["__spec__"];
+            auto opt_spec = py::extract<const module_spec&>(py_spec);
+            if (opt_spec.check()) {
+                const module_spec& spec = opt_spec();
+                if (spec.parent.empty()) {
+                    if (module_path.filename() == "__init__.py") {
+                        globals["__package__"] = fullname;
+                    } else {
+                        size_t last_dot = fullname.find_last_of('.');
+                        globals["__package__"] = (last_dot != std::string::npos) ? fullname.substr(0, last_dot) : "";
+                    }
+                } else {
+                    globals["__package__"] = spec.parent;
+                }
+            } else {
+                WarnLogger() << "Wrong spec in module " << module_path.string();
+            }
+        } else {
+            WarnLogger() << "No spec in module " << module_path.string();
         }
 
         // store globals content in module namespace

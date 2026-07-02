@@ -137,6 +137,8 @@ namespace parse {
         py_grammar(const PythonParser& parser)
         {
             parser.LoadValueRefsModule();
+            parser.LoadConditionsModule();
+            parser.LoadSourcesModule();
         }
     };
 }

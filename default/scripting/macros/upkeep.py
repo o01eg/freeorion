@@ -14,3 +14,14 @@ COLONIZATION_POLICY_MULTIPLIER = (
     + (StatisticIf(float, condition=IsSource & EmpireHasAdoptedPolicy(empire=Source.Owner, name="PLC_CENTRALIZATION")))
     / 3
 )
+
+
+def DESIGN_SIMPLICITY_COMPLEXITY_FACTOR_FOR_ARG1_VREF_STATIC(arg: int) -> float:
+    if arg > 4:
+        return 1.0
+    elif arg > 3:
+        return 0.95
+    elif arg > 2:
+        return 0.9
+    else:
+        return 0.8

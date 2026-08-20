@@ -16,6 +16,7 @@ jobs:
           - noble    # 24.04
           # - questing # 25.10 - broken Boost.Process
           - resolute # 26.04
+          - stonking # 26.10
 
     steps:
       - name: Checkout sources

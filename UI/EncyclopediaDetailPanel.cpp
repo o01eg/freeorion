@@ -2979,7 +2979,7 @@ namespace {
                                             GG::Clr&/* color*/, std::weak_ptr<const ShipDesign>& inc_design,
                                             bool only_description = false)
     {
-        int client_empire_id = GetApp().EmpireID();
+        const int client_empire_id = GetApp().EmpireID();
         general_type = UserString("ENC_INCOMPETE_SHIP_DESIGN");
 
         auto incomplete_design = inc_design.lock();
@@ -3010,7 +3010,12 @@ namespace {
             texture = ui.GetTexture(ClientUI::ArtDir() / design_icon, true);
 
         const int default_location_id = DefaultLocationForEmpire(client_empire_id, context);
-        universe.InsertShipDesignID(*incomplete_design, client_empire_id, incomplete_design->ID());
+        turns = incomplete_design->ProductionTime(client_empire_id, default_location_id, context);
+        cost = incomplete_design->ProductionCost(client_empire_id, default_location_id, context);
+        cost_units = UserString("ENC_PP");
+
+        const auto incomplete_design_id = incomplete_design->ID();
+        universe.InsertShipDesignID(*incomplete_design, client_empire_id, incomplete_design_id);
         detailed_description = GetDetailedDescriptionBase(*incomplete_design);
 
         // baseline values, may be overridden
@@ -3063,31 +3068,31 @@ namespace {
             if (this_ship && !this_ship->SpeciesName().empty())
                 additional_species.insert(this_ship->SpeciesName());
         }
-        // temporary ship to use for estimating design's meter values
-        auto temp = universe.InsertTemp<Ship>(client_empire_id, incomplete_design->ID(), "",
-                                              universe, species_manager, client_empire_id,
-                                              context.current_turn);
 
-        // apply empty species for 'Generic' entry
-        universe.UpdateMeterEstimates(temp->ID(), context);
-        temp->Resupply(context.current_turn);
+        // create temporary ship to use for estimating design's meter values
+        if (auto temp_ship = universe.InsertTemp<Ship>(client_empire_id, incomplete_design_id, "",
+                                                       universe, species_manager, client_empire_id,
+                                                       context.current_turn))
+        {
+            const auto temporary_ship_id = temp_ship->ID();
 
-        turns = incomplete_design->ProductionTime(client_empire_id, default_location_id, context);
-        cost = incomplete_design->ProductionCost(client_empire_id, default_location_id, context);
-        cost_units = UserString("ENC_PP");
+            // apply empty species for 'Generic' entry
+            universe.UpdateMeterEstimates(temporary_ship_id, context);
+            temp_ship->Resupply(context.current_turn);
 
-        detailed_description.append(GetDetailedDescriptionStats(temp, enemy_DR, enemy_shots, cost));
+            detailed_description.append(GetDetailedDescriptionStats(temp_ship, enemy_DR, enemy_shots, cost));
 
-        // apply various species to ship, re-calculating the meter values for each
-        for (auto& species_name : additional_species) {
-            temp->SetSpecies(species_name, species_manager);
-            universe.UpdateMeterEstimates(temp->ID(), context);
-            temp->Resupply(context.current_turn);
-            detailed_description.append(GetDetailedDescriptionStats(temp, enemy_DR, enemy_shots, cost));
+            // apply various species to ship, re-calculating the meter values for each
+            for (auto& species_name : additional_species) {
+                temp_ship->SetSpecies(species_name, species_manager);
+                universe.UpdateMeterEstimates(temporary_ship_id, context);
+                temp_ship->Resupply(context.current_turn);
+                detailed_description.append(GetDetailedDescriptionStats(temp_ship, enemy_DR, enemy_shots, cost));
+            }
+
+            universe.Delete(temporary_ship_id);
+            universe.DeleteShipDesign(incomplete_design_id);
         }
-
-        universe.Delete(temp->ID());
-        universe.DeleteShipDesign(TEMPORARY_OBJECT_ID);
     }
 
     void RefreshDetailPanelObjectTag(       const std::string&/* item_type*/, const std::string& item_name,
@@ -3482,9 +3487,11 @@ namespace {
 
         general_type = UserString("SP_PLANET_SUITABILITY");
 
-        auto& context = GetApp().GetContext();
+        auto& app = GetApp();
+        auto& context = app.GetContext();
         auto& objects = context.ContextObjects();
         auto& universe = context.ContextUniverse();
+        const auto client_empire_id = app.EmpireID();
 
         int planet_id = ToInt(item_name, INVALID_OBJECT_ID);
         auto planet = objects.get<Planet>(planet_id); // non-const so it can be test modified to check results for various species
@@ -3503,7 +3510,7 @@ namespace {
         }
 
         try {
-            name = planet->PublicName(planet_id, universe);
+            name = planet->PublicName(client_empire_id, universe);
 
             const auto species_names = ReportedSpeciesForPlanet(*planet);
             const auto target_population_species = SpeciesEnvByTargetPop(planet, species_names);
@@ -3523,7 +3530,7 @@ namespace {
                 if (target_pop > 0) {
                     if (!positive_header_placed) {
                         auto pos_header = str(FlexibleFormat(UserString("ENC_SUITABILITY_REPORT_POSITIVE_HEADER"))
-                                              % planet->PublicName(planet_id, universe));
+                                              % planet->PublicName(client_empire_id, universe));
                         TraceLogger() << "Suitability report positive header \"" << pos_header << "\"";
                         detailed_description.append(pos_header);
                         positive_header_placed = true;
@@ -3542,7 +3549,7 @@ namespace {
                             detailed_description += "\n\n";
 
                         auto neg_header = str(FlexibleFormat(UserString("ENC_SUITABILITY_REPORT_NEGATIVE_HEADER"))
-                                              % planet->PublicName(planet_id, universe));
+                                              % planet->PublicName(client_empire_id, universe));
                         TraceLogger() << "Suitability report regative header \"" << neg_header << "\"";
                         detailed_description.append(neg_header);
                         negative_header_placed = true;

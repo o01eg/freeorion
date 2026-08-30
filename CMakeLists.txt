@@ -839,6 +839,17 @@ elseif(BUILD_CLIENT_GODOT STREQUAL "4")
         PRIVATE
             -DFREEORION_BUILD_HUMAN_GODOT4
     )
+
+    set(BITS 32)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(BITS 64)
+    endif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+
+    string(TOLOWER ${CMAKE_SYSTEM_NAME} SYSTEM_NAME)
+    if(ANDROID)
+        # Added the android abi after system name
+        set(SYSTEM_NAME ${SYSTEM_NAME}.${ANDROID_ABI})
+    endif()
 endif()
 
 if(WIN32 AND BUILD_CLIENT_GG)

@@ -456,11 +456,19 @@ void InitDirs(std::string const& argv0, bool test)
 
     InitBinDir(argv0);
 #elif defined(FREEORION_ANDROID)
-    JNIEnv *env;
+    // The thread may already be attached to the VM (e.g. the GLThread that runs
+    // Godot's rendering). Only attach here if it is not, and only detach it if
+    // we attached it ourselves; detaching a runtime-attached thread aborts.
+    JNIEnv *env = nullptr;
     if (s_jni_env) {
         env = s_jni_env;
     } else {
+        s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    }
+    bool attached = false;
+    if (!env) {
         s_java_vm->AttachCurrentThreadAsDaemon(&env, nullptr);
+        attached = true;
     }
 
     jobject activity = env->NewLocalRef(s_activity);
@@ -494,9 +502,8 @@ void InitDirs(std::string const& argv0, bool test)
     s_jni_asset_manager = env->NewGlobalRef(asset_manager);
     s_asset_manager = AAssetManager_fromJava(env, s_jni_asset_manager);
 
-    if (!s_jni_env) {
+    if (attached)
         s_java_vm->DetachCurrentThread();
-    }
 
     RedirectOutputLogAndroid(ANDROID_LOG_ERROR, "stderr", 2);
     RedirectOutputLogAndroid(ANDROID_LOG_INFO, "stdout", 1);
@@ -622,11 +629,16 @@ std::string GetAndroidLang()
 {
     std::string retval;
 
-    JNIEnv *env;
+    JNIEnv *env = nullptr;
     if (s_jni_env != nullptr) {
         env = s_jni_env;
     } else {
+        s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    }
+    bool attached = false;
+    if (!env) {
         s_java_vm->AttachCurrentThreadAsDaemon(&env, nullptr);
+        attached = true;
     }
 
     jclass locale_class = env->FindClass("java/util/Locale");
@@ -640,7 +652,7 @@ std::string GetAndroidLang()
     retval = std::string(language_chars);
     env->ReleaseStringUTFChars(language, language_chars);
 
-    if (!s_jni_env)
+    if (attached)
         s_java_vm->DetachCurrentThread();
 
     return retval;
@@ -826,11 +838,16 @@ auto ListDir(const fs::path& path, std::function<bool (const fs::path&)> predica
     directories.push_front(path);
 
     // ToDo: Register thread once after moving to single backgroung parsing thread for Python
-    JNIEnv *env;
+    JNIEnv *env = nullptr;
     if (s_jni_env != nullptr) {
         env = s_jni_env;
     } else {
+        s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    }
+    bool attached = false;
+    if (!env) {
         s_java_vm->AttachCurrentThreadAsDaemon(&env, nullptr);
+        attached = true;
     }
 
     jmethodID list_mid = env->GetMethodID(env->GetObjectClass(s_jni_asset_manager), "list", "(Ljava/lang/String;)[Ljava/lang/String;");
@@ -868,7 +885,7 @@ auto ListDir(const fs::path& path, std::function<bool (const fs::path&)> predica
             env->DeleteLocalRef(jstr);
         }
     }
-    if (!s_jni_env)
+    if (attached)
         s_java_vm->DetachCurrentThread();
 
 #else
@@ -988,11 +1005,16 @@ auto IsExistingDir(std::filesystem::path const& path) -> bool
         }
     }
 
-    JNIEnv *env;
+    JNIEnv *env = nullptr;
     if (s_jni_env != nullptr) {
         env = s_jni_env;
     } else {
+        s_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    }
+    bool attached = false;
+    if (!env) {
         s_java_vm->AttachCurrentThreadAsDaemon(&env, nullptr);
+        attached = true;
     }
 
     // Check assets with JNI to get subdirectories
@@ -1001,12 +1023,12 @@ auto IsExistingDir(std::filesystem::path const& path) -> bool
     jobjectArray list_object = reinterpret_cast<jobjectArray>(env->CallObjectMethod(s_jni_asset_manager, list_mid, path_object));
     env->DeleteLocalRef(path_object);
     if (!list_object) {
-        if (!s_jni_env)
+        if (attached)
             s_java_vm->DetachCurrentThread();
         return false;
     }
     auto length = env->GetArrayLength(list_object);
-    if (!s_jni_env)
+    if (attached)
         s_java_vm->DetachCurrentThread();
 
     return length > 0;

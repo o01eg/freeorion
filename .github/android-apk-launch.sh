@@ -28,7 +28,7 @@ fi
 echo "::endgroup::"
 
 echo "::group::Starting APK"
-adb shell am start -W -n "$LAUNCHER"
+adb shell am start -W -n "$LAUNCHER" --esa command_line_params "--quickstart"
 echo "::endgroup::"
 
 sleep 180

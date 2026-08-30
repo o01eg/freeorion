@@ -90,13 +90,13 @@ int GodotClientApp::EffectsProcessingThreads() const
 GodotClientApp* GodotClientApp::GetApp()
 { return static_cast<GodotClientApp*>(s_app); }
 
-#ifndef FREEORION_ANDROID
 void GodotClientApp::StartServer() {
     if (m_networking->PingLocalHostServer(std::chrono::milliseconds(100))) {
         ErrorLogger() << "Can't start local server because a server is already connecting at 127.0.0.0.";
         throw LocalServerAlreadyRunningException();
     }
-
+    // ToDo: use service
+#ifndef FREEORION_ANDROID
     std::string SERVER_CLIENT_EXE = GetOptionsDB().Get<std::string>("misc.server-local-binary.path");
     DebugLogger() << "GodotClientApp::StartServer: " << SERVER_CLIENT_EXE;
 
@@ -144,11 +144,15 @@ void GodotClientApp::StartServer() {
     for (auto arg : args)
         DebugLogger() << arg;
     m_server_process = Process(m_networking->IoContext(), SERVER_CLIENT_EXE, args);
+#endif
     DebugLogger() << "... finished launching server process.";
 }
 
 void GodotClientApp::FreeServer() {
+    // ToDo: use service
+#ifndef FREEORION_ANDROID
     m_server_process.Free();
+#endif
     m_networking->SetPlayerID(Networking::INVALID_PLAYER_ID);
     m_networking->SetHostPlayerID(Networking::INVALID_PLAYER_ID);
     SetEmpireID(ALL_EMPIRES);
@@ -256,7 +260,6 @@ void GodotClientApp::NewSinglePlayerGame() {
     m_networking->SendMessage(HostSPGameMessage(setup_data, DependencyVersions()));
     DebugLogger() << "GodotClientApp::NewSinglePlayerGame done";
 }
-#endif
 
 bool GodotClientApp::SinglePlayerGame() const
 { return m_single_player_game; }

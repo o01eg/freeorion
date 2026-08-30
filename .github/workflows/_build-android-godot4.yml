@@ -111,3 +111,115 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.11.1"
+      - name: Build FreeOrion Android plugin
+        run: |
+          cd godot4/android-plugin
+          gradle assembleDebug --no-daemon
+          mkdir -p ../android/plugins
+          cp build/outputs/aar/*-debug.aar ../android/plugins/freeorion-debug.aar
+          cat > ../android/plugins/freeorion.gdap <<'EOF'
+          [config]
+          name="FreeOrion"
+          binary_type="local"
+          binary="res://android/plugins/freeorion-debug.aar"
+          EOF
+          ls -la ../android/plugins/
+      - name: Generate Debug Keystore
+        run: |
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+      - name: Configure Godot Editor Settings
+        run: |
+          mkdir -p ~/.config/godot/
+          cat <<EOF > ~/.config/godot/editor_settings-4.tres
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "${{ env.ANDROID_HOME }}"
+          export/android/timestamping_authority_url = ""
+          export/android/shutdown_timestamping = true
+          EOF
+
+          sed -i 's|keystore/debug=""|keystore/debug="${{ github.workspace }}/debug.keystore"|' godot4/export_presets.cfg
+          sed -i 's|keystore/debug_user=""|keystore/debug_user="androiddebugkey"|' godot4/export_presets.cfg
+          sed -i 's|keystore/debug_password=""|keystore/debug_password="android"|' godot4/export_presets.cfg
+      - name: Export APK via Godot CLI
+        run: |
+          cd godot4
+          godot --headless -v --export-debug "Android" ../freeorion.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-godot4
+          path: freeorion.apk
+          if-no-files-found: error
+          retention-days: 1
+  run-android:
+    name: Run Android
+    runs-on: ubuntu-24.04
+    needs: export-android
+    steps:
+      - uses: actions/cache@v5
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+            ~/.android/debug.keystore
+          key: avd-test-godot-v2
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: run emulator to generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          profile: Galaxy Nexus
+          cores: 2
+          sdcard-path-or-size: 1G
+          avd-name: test
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          working-directory: ./
+          channel: beta
+          script: echo "Generated AVD snapshot for caching."
+      - name: Checkout sources
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/android-apk-launch.sh
+      - name: Dowload APK
+        uses: actions/download-artifact@v8
+        with:
+          name: android-godot4
+          path: .
+      - name: run game on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          profile: Galaxy Nexus
+          cores: 2
+          sdcard-path-or-size: 1G
+          avd-name: test
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          working-directory: ./
+          channel: beta
+          script: bash .github/android-apk-launch.sh 4
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-test-logs-godot4-${{ github.run_number }}
+          path: |
+            freeorion-godot.log
+            logcat.log
+          if-no-files-found: error
+          retention-days: 1

@@ -26,6 +26,7 @@ void FreeOrionNode::_bind_methods() {
     godot::ClassDB::bind_method(godot::D_METHOD("start_network_thread"), &FreeOrionNode::start_network_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("start_parsing_thread"), &FreeOrionNode::start_parsing_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("new_single_player_game"), &FreeOrionNode::new_single_player_game);
+    godot::ClassDB::bind_method(godot::D_METHOD("options_get_bool"), &FreeOrionNode::options_get_bool);
 
     ADD_SIGNAL(godot::MethodInfo("parsing_completed"));
     ADD_SIGNAL(godot::MethodInfo("start_game", godot::PropertyInfo(godot::Variant::BOOL, "is_new_game")));
@@ -54,8 +55,10 @@ void FreeOrionNode::_ready() {
     GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());
     GetOptionsDB().SetFromFile(GetPersistentConfigPath());
 
-#if !defined(FREEORION_ANDROID)
     std::vector<std::string> args;
+#ifdef FREEORION_ANDROID
+    // ToDo: get something from plugin
+#else
     args.emplace_back(std::move(executable_path));
     const godot::PackedStringArray wargs = godot::OS::get_singleton()->get_cmdline_args();
     for (const godot::String &warg : wargs) {
@@ -65,10 +68,17 @@ void FreeOrionNode::_ready() {
             args.emplace_back(std::move(arg));
         }
     }
-
+    const godot::PackedStringArray uwargs = godot::OS::get_singleton()->get_cmdline_user_args();
+    for (const godot::String &uwarg : uwargs) {
+        const std::string arg = uwarg.utf8().get_data();
+        // Exclude Godot's options
+        if (arg != "-s" && arg.rfind("-g", 0) != 0) {
+            args.emplace_back(std::move(arg));
+        }
+    }
+#endif
     // override previously-saved and default options with command line parameters and flags
     GetOptionsDB().SetFromCommandLine(args);
-#endif
 
     CompleteXDGMigration();
 
@@ -155,11 +165,11 @@ void FreeOrionNode::start_parsing_thread()
 { m_parsing_thread->start(godot::Callable(this, "parsing_thread")); }
 
 void FreeOrionNode::new_single_player_game() {
-#ifdef FREEORION_ANDROID
-    ErrorLogger() << "No single player game supported";
-#else
     m_app->NewSinglePlayerGame();
-#endif
+}
+
+bool FreeOrionNode::options_get_bool(godot::String option) const {
+    return GetOptionsDB().Get<bool>(option.utf8().get_data());
 }
 
 void FreeOrionNode::HandleMessage(Message&& msg) {

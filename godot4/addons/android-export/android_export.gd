@@ -14,7 +14,7 @@ class AndroidExportPlugin:
 		return platform is EditorExportPlatformAndroid
 
 	func _get_android_manifest_activity_element_contents(
-		platform: EditorExportPlatform, debug: bool
+		_platform: EditorExportPlatform, _debug: bool
 	) -> String:
 		print("FreeOrion AndroidExportPlugin: patched activiy element")
 		return '''

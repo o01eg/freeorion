@@ -4,7 +4,7 @@
         android:shortcutId="quickstart_shortcut"
         android:enabled="true"
         android:shortcutShortLabel="@string/quickstart_short_label"
-        android:shortcutIcon="@mipmap/icon">
+        android:icon="@mipmap/icon">
         
         <intent
             android:action="android.intent.action.MAIN"

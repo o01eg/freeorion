@@ -10,6 +10,9 @@ class AndroidExportPlugin:
 	func _get_name() -> String:
 		return "AndroidExportPlugin"
 
+	func _supports_platform(platform: EditorExportPlatform) -> bool:
+		return platform is EditorExportPlatformAndroid
+
 	func _get_android_manifest_activity_element_contents(
 		platform: EditorExportPlatform, debug: bool
 	) -> String:

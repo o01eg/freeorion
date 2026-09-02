@@ -8,7 +8,8 @@
         
         <intent
             android:action="android.intent.action.MAIN"
-            android:targetClass="com.godot.game.GodotAppLauncher">
+            android:targetPackage="org.godotengine.freeoriongodotclient"
+            android:targetClass="com.godot.game.GodotApp">
 
             <extra android:name="quickstart" android:value="true" />
         </intent>

@@ -56,9 +56,6 @@ void FreeOrionNode::_ready() {
     GetOptionsDB().SetFromFile(GetPersistentConfigPath());
 
     std::vector<std::string> args;
-#ifdef FREEORION_ANDROID
-    // ToDo: get something from plugin
-#else
     args.emplace_back(std::move(executable_path));
     const godot::PackedStringArray wargs = godot::OS::get_singleton()->get_cmdline_args();
     for (const godot::String &warg : wargs) {
@@ -76,7 +73,6 @@ void FreeOrionNode::_ready() {
             args.emplace_back(std::move(arg));
         }
     }
-#endif
     // override previously-saved and default options with command line parameters and flags
     GetOptionsDB().SetFromCommandLine(args);
 

@@ -5,6 +5,9 @@ import android.app.Activity;
 import org.godotengine.godot.Godot;
 import org.godotengine.godot.plugin.GodotPlugin;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Minimal FreeOrion Android plugin.
  * <p>
@@ -32,6 +35,21 @@ public final class FreeOrionPlugin extends GodotPlugin {
     @Override
     public String getPluginName() {
         return "FreeOrion";
+    }
+
+    /**
+     * Expose the "quickstart" intent extra (set by the launcher shortcut) as a
+     * command line flag so the FreeOrion client can pick it up through the
+     * normal OptionsDB command line parsing path.
+     */
+    @Override
+    public List<String> getCommandLineParams(List<String> params) {
+        List<String> result = new ArrayList<>(params);
+        Activity activity = getActivity();
+        if (activity != null && activity.getIntent().getBooleanExtra("quickstart", false)) {
+            result.add("--quickstart");
+        }
+        return result;
     }
 
     private static native void setAndroidActivity(Activity activity);

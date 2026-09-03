@@ -852,6 +852,35 @@ elseif(BUILD_CLIENT_GODOT STREQUAL "4")
     endif()
 endif()
 
+# On Android the server and AI libraries are bundled into the android plugin
+# AAR (NOT registered as GDExtension dependencies), so the dedicated
+# FreeOrionServerService process can System.loadLibrary() them. Copy the built
+# libraries plus their shared dependency (libiconv) into the plugin's jniLibs
+# so the APK carries them under lib/<abi>.
+if(ANDROID AND BUILD_CLIENT_GODOT STREQUAL "4")
+    set(GODOT_PLUGIN_JNI_LIBS "${CMAKE_SOURCE_DIR}/${GODOT_PROJECT_DIR}/android-plugin/src/main/jniLibs")
+    if(BUILD_SERVER)
+        add_custom_command(TARGET freeoriond POST_BUILD
+            COMMAND
+                ${CMAKE_COMMAND} -E make_directory "${GODOT_PLUGIN_JNI_LIBS}/${ANDROID_ABI}"
+            COMMAND
+                ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeoriond>" "${GODOT_PLUGIN_JNI_LIBS}/${ANDROID_ABI}/$<TARGET_FILE_NAME:freeoriond>"
+            COMMAND
+                ${CMAKE_STRIP} -g -S -d --strip-debug "${GODOT_PLUGIN_JNI_LIBS}/${ANDROID_ABI}/$<TARGET_FILE_NAME:freeoriond>"
+        )
+    endif()
+    if(BUILD_AI)
+        add_custom_command(TARGET freeorionca POST_BUILD
+            COMMAND
+                ${CMAKE_COMMAND} -E make_directory "${GODOT_PLUGIN_JNI_LIBS}/${ANDROID_ABI}"
+            COMMAND
+                ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:freeorionca>" "${GODOT_PLUGIN_JNI_LIBS}/${ANDROID_ABI}/$<TARGET_FILE_NAME:freeorionca>"
+            COMMAND
+                ${CMAKE_STRIP} -g -S -d --strip-debug "${GODOT_PLUGIN_JNI_LIBS}/${ANDROID_ABI}/$<TARGET_FILE_NAME:freeorionca>"
+        )
+    endif()
+endif()
+
 if(WIN32 AND BUILD_CLIENT_GG)
     add_custom_command(TARGET freeorion POST_BUILD
         COMMAND

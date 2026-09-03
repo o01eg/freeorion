@@ -40,7 +40,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: android-binaries-godot4-${{ matrix.arch }}
-          path: godot4/bin/**/*.so
+          path: |
+            godot4/bin/**/*.so
+            godot4/android-plugin/src/main/jniLibs/**/*.so
           if-no-files-found: error
           retention-days: 1
   merge-binaries:
@@ -83,7 +85,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: android-binaries-godot4
-          path: godot4/bin/
+          path: godot4/
       - name: Install Godot and Templates
         run: |
           wget --content-disposition "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=stable&slug=linux.x86_64.zip&platform=linux.64"

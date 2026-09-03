@@ -1,9 +1,12 @@
 package org.freeorion.godot;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.util.Log;
 
 import org.godotengine.godot.Godot;
 import org.godotengine.godot.plugin.GodotPlugin;
+import org.godotengine.godot.plugin.UsedByGodot;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +22,8 @@ import java.util.List;
  * exported from that library), then feeds it the current Godot activity.
  */
 public final class FreeOrionPlugin extends GodotPlugin {
+
+    private static final String TAG = "FreeOrionPlugin";
 
     static {
         System.loadLibrary("freeoriongodot");
@@ -53,4 +58,34 @@ public final class FreeOrionPlugin extends GodotPlugin {
     }
 
     private static native void setAndroidActivity(Activity activity);
+
+    /**
+     * Start the FreeOrion server service in its own process.
+     * Called from native GodotClientApp::StartServer().
+     */
+    @UsedByGodot
+    public void startServer() {
+        Activity activity = getActivity();
+        if (activity == null) {
+            Log.w(TAG, "No activity available; cannot start server service");
+            return;
+        }
+        Log.i(TAG, "Starting FreeOrionServerService");
+        activity.startService(new Intent(activity, FreeOrionServerService.class));
+    }
+
+    /**
+     * Stop the FreeOrion server service.
+     * Called from native GodotClientApp::FreeServer().
+     */
+    @UsedByGodot
+    public void stopServer() {
+        Activity activity = getActivity();
+        if (activity == null) {
+            Log.w(TAG, "No activity available; cannot stop server service");
+            return;
+        }
+        Log.i(TAG, "Stopping FreeOrionServerService");
+        activity.stopService(new Intent(activity, FreeOrionServerService.class));
+    }
 }

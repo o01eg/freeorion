@@ -1,6 +1,11 @@
 
 #include "GodotClientApp.h"
 
+#ifdef FREEORION_ANDROID
+#include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/object.hpp>
+#endif
+
 #include "../ClientNetworking.h"
 #include "../../Empire/Empire.h"
 #include "../../parse/PythonParser.h"
@@ -95,8 +100,16 @@ void GodotClientApp::StartServer() {
         ErrorLogger() << "Can't start local server because a server is already connecting at 127.0.0.0.";
         throw LocalServerAlreadyRunningException();
     }
-    // ToDo: use service
-#ifndef FREEORION_ANDROID
+#ifdef FREEORION_ANDROID
+    DebugLogger() << "GodotClientApp::StartServer: starting server service";
+    if (auto* engine = godot::Engine::get_singleton()) {
+        if (auto* plugin = engine->get_singleton("FreeOrion"))
+            plugin->call("startServer");
+        else
+            ErrorLogger() << "GodotClientApp::StartServer: FreeOrion plugin singleton not found";
+    }
+    DebugLogger() << "... finished starting server service.";
+#else
     std::string SERVER_CLIENT_EXE = GetOptionsDB().Get<std::string>("misc.server-local-binary.path");
     DebugLogger() << "GodotClientApp::StartServer: " << SERVER_CLIENT_EXE;
 
@@ -149,8 +162,14 @@ void GodotClientApp::StartServer() {
 }
 
 void GodotClientApp::FreeServer() {
-    // ToDo: use service
-#ifndef FREEORION_ANDROID
+#ifdef FREEORION_ANDROID
+    if (auto* engine = godot::Engine::get_singleton()) {
+        if (auto* plugin = engine->get_singleton("FreeOrion"))
+            plugin->call("stopServer");
+        else
+            ErrorLogger() << "GodotClientApp::StartServer: FreeOrion plugin singleton not found";
+    }
+#else
     m_server_process.Free();
 #endif
     m_networking->SetPlayerID(Networking::INVALID_PLAYER_ID);

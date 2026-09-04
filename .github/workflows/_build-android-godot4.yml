@@ -75,6 +75,7 @@ jobs:
           mv default/data/art godot4/assets/
           mv default/data/fonts godot4/assets/
           mv default/data/sound godot4/assets/
+          mkdir -p godot4/default/
           mv default/scripting godot4/default/
           mv default/stringtables godot4/default/
           mv default/python godot4/default/
@@ -221,7 +222,7 @@ jobs:
         with:
           name: android-test-logs-godot4-${{ github.run_number }}
           path: |
-            freeorion-godot.log
+            freeorion*.log
             logcat.log
           if-no-files-found: error
           retention-days: 1

@@ -179,7 +179,7 @@ jobs:
       - name: Export APK via Godot CLI
         run: |
           cd godot4
-          godot --headless -v --export-debug "Android" ../freeorion.apk
+          godot --headless -v --export-debug "Android" ../freeorion.apk || godot --headless -v --export-debug "Android" ../freeorion.apk || godot --headless -v --export-debug "Android" ../freeorion.apk  || godot --headless -v --export-debug "Android" ../freeorion.apk
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:

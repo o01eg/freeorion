@@ -55,6 +55,6 @@ public final class FreeOrionServerService extends Service {
         Log.i(TAG, "FreeOrion server service destroyed");
     }
 
-    private static native void startService(Context activity, String[] args);
+    private static native int startService(Context activity, String[] args);
     private static native void stopService();
 }

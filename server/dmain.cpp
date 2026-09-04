@@ -74,7 +74,7 @@ Java_org_freeorion_godot_FreeOrionServerService_stopService(JNIEnv*, jclass) {
 }
 
 // Called by org.freeorion.godot.FreeOrionServerService#startService native function
-extern "C" JNIEXPORT void JNICALL
+extern "C" JNIEXPORT int JNICALL
 Java_org_freeorion_godot_FreeOrionServerService_startService(JNIEnv* env, jclass, jobject context, jobjectArray argsArray) {
     SetAndroidEnvironment(env, context, false);
     std::vector<std::string> args;

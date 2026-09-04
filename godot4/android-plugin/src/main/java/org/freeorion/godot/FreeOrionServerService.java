@@ -50,9 +50,11 @@ public final class FreeOrionServerService extends Service {
 
     @Override
     public void onDestroy() {
+        stopService();
         super.onDestroy();
         Log.i(TAG, "FreeOrion server service destroyed");
     }
 
     private static native void startService(Context activity, String[] args);
+    private static native void stopService();
 }

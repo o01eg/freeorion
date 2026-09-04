@@ -66,6 +66,13 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
         }
     }
 #elifdef FREEORION_ANDROID
+//Called by org.freeorion.godot.FreeOrionServerService#stopService native function
+extern "C" JNIEXPORT void JNICALL
+Java_org_freeorion_godot_FreeOrionServerService_stopService(JNIEnv*, jclass) {
+    ServerApp& app = GetApp();
+    app.SignalHandler(boost::system::error_code{}, 0);
+}
+
 // Called by org.freeorion.godot.FreeOrionServerService#startService native function
 extern "C" JNIEXPORT void JNICALL
 Java_org_freeorion_godot_FreeOrionServerService_startService(JNIEnv* env, jclass, jobject context, jobjectArray argsArray) {

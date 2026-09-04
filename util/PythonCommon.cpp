@@ -235,39 +235,43 @@ bool PythonCommon::InitCommonImports()
 { return true; }
 
 void PythonCommon::HandleErrorAlreadySet() {
-    if (!Py_IsInitialized()) {
-        ErrorLogger() << "Python interpreter not initialized and exception handler called.";
-        return;
-    }
+    try {
+        if (!Py_IsInitialized()) {
+            ErrorLogger() << "Python interpreter not initialized and exception handler called.";
+            return;
+        }
 
-    // Matches system exit
-    if (PyErr_ExceptionMatches(m_system_exit.ptr()))
-    {
-        Finalize();
-        ErrorLogger() << "Python interpreter exited with SystemExit(), sys.exit(), exit, quit or some other alias.";
-        return;
-    }
+        // Matches system exit
+        if (PyErr_ExceptionMatches(m_system_exit.ptr()))
+        {
+            Finalize();
+            ErrorLogger() << "Python interpreter exited with SystemExit(), sys.exit(), exit, quit or some other alias.";
+            return;
+        }
 
-    PyObject *extype, *value, *traceback;
-    PyErr_Fetch(std::addressof(extype), std::addressof(value), std::addressof(traceback));
-    PyErr_NormalizeException(std::addressof(extype), std::addressof(value), std::addressof(traceback));
-    if (!extype) {
-        ErrorLogger() << "Missing python exception type";
-        return;
-    }
+        PyObject *extype, *value, *traceback;
+        PyErr_Fetch(std::addressof(extype), std::addressof(value), std::addressof(traceback));
+        PyErr_NormalizeException(std::addressof(extype), std::addressof(value), std::addressof(traceback));
+        if (!extype) {
+            ErrorLogger() << "Missing python exception type";
+            return;
+        }
 
-    py::object o_extype(py::handle<>(py::borrowed(extype)));
-    py::object o_value(py::handle<>(py::borrowed(value)));
-    py::object o_traceback = (traceback != nullptr) ?
-        py::object(py::handle<>(py::borrowed(traceback))) : py::object();
+        py::object o_extype(py::handle<>(py::borrowed(extype)));
+        py::object o_value(py::handle<>(py::borrowed(value)));
+        py::object o_traceback = (traceback != nullptr) ?
+            py::object(py::handle<>(py::borrowed(traceback))) : py::object();
 
-    py::object lines = m_traceback_format_exception(o_extype, o_value, o_traceback);
-    for (int i = 0; i < len(lines); ++i) {
-        std::string line = py::extract<std::string>(lines[i])();
-        boost::algorithm::trim_right(line);
-        ErrorLogger() << line;
+        py::object lines = m_traceback_format_exception(o_extype, o_value, o_traceback);
+        for (int i = 0; i < len(lines); ++i) {
+            std::string line = py::extract<std::string>(lines[i])();
+            boost::algorithm::trim_right(line);
+            ErrorLogger() << line;
+        }
+    } catch (const py::error_already_set&) {
+        ErrorLogger() << "Python error handle throw exception. See stderr";
+        PyErr_Print();
     }
-    return;
 }
 
 void PythonCommon::Finalize() {

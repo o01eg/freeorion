@@ -813,7 +813,7 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
                     try {
                         // check if parameter exists...
                         if (std::cmp_greater_equal(i + 1, args.size())) {
-                            InfoLogger() << "Option \"" << option_name << "\" trying to be set from empty value";
+                            InfoLogger() << "Option \"" << option_name << "\" trying to be set from empty value (i + 1): " << (i + 1) << " args.size(): " << args.size();
                             m_dirty |= option.SetFromString("");
                             InfoLogger() << "Option \"" << option_name << "\", was set on the command line with no value";
                             continue;

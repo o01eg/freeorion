@@ -70,7 +70,7 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
 extern "C" JNIEXPORT void JNICALL
 Java_org_freeorion_godot_FreeOrionServerService_stopService(JNIEnv*, jclass) {
     ServerApp& app = GetApp();
-    app.SignalHandler(boost::system::error_code{}, 0);
+    app.Stop();
 }
 
 // Called by org.freeorion.godot.FreeOrionServerService#startService native function

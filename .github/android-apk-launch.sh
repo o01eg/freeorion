@@ -42,6 +42,10 @@ adb logcat -d >logcat.log
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-godot.log >freeorion-godot.log 2>&1
 echo "::endgroup::"
 
+echo "::group::List logs"
+adb exec-out run-as org.godotengine.freeoriongodotclient ls -l files/
+echo "::endgroup::"
+
 echo "::group::Checking errors"
 ERRORS=$(grep -B1 "\[error\] godot : \(PythonParser\|Parse\|ReportParseError\|PythonCommon\)" freeorion-godot.log || true)
 if [ -n "$ERRORS" ]; then

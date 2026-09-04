@@ -107,7 +107,7 @@ void GodotClientApp::StartServer() {
             godot::PackedStringArray args;
             if (m_single_player_game) {
                 args.append("--singleplayer");
-                args.emplace_back("--skip-checksum");
+                args.append("--skip-checksum");
             }
             plugin->call("startServer", args);
         } else

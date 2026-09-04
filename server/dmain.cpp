@@ -28,7 +28,7 @@ unroll and hide the stack trace, print a message and still crash anyways. */
 
 #ifdef FREEORION_ANDROID
 #  include <jni.h>
-#  include "../../util/Directories.h"
+#  include "../util/Directories.h"
 #endif
 
 namespace {

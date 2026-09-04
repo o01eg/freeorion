@@ -51,8 +51,15 @@ public final class FreeOrionPlugin extends GodotPlugin {
     public List<String> getCommandLineParams(List<String> params) {
         List<String> result = new ArrayList<>(params);
         Activity activity = getActivity();
-        if (activity != null && activity.getIntent().getBooleanExtra("quickstart", false)) {
-            result.add("--quickstart");
+        if (activity != null) {
+            if (activity.getIntent().getBooleanExtra("quickstart", false)) {
+                result.add("--quickstart");
+            }
+            int autoAdvanceNTurns = activity.getIntent().getIntExtra("auto-advance-n-turns", 0);
+            if (autoAdvanceNTurns > 0) {
+                result.add("--auto-advance-n-turns");
+                result.add(Integer.toString(autoAdvanceNTurns));
+            }
         }
         return result;
     }

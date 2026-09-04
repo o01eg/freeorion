@@ -217,7 +217,15 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
             GetGameRules().SetFromStrings(m_app->GetGalaxySetupData().GetGameRules());
 
             bool is_new_game = !(loaded_game_data && ui_data_available);
+            m_app->StartGame(is_new_game);
             call_deferred("emit_signal", "start_game", is_new_game);
+
+            if (m_app->AutoTurnsLeft() > 0) {
+                SaveGameUIData ui_data;
+                m_app->StartTurn(ui_data);
+                m_app->DecAutoTurns();
+            }
+
             break;
         }
         default:

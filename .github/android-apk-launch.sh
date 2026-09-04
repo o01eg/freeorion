@@ -28,7 +28,7 @@ fi
 echo "::endgroup::"
 
 echo "::group::Starting APK"
-adb shell am start -W -n "$LAUNCHER" --ez quickstart true
+adb shell am start -W -n "$LAUNCHER" --ez quickstart true --ei auto-advance-n-turns 100
 echo "::endgroup::"
 
 sleep 180

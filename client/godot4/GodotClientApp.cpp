@@ -27,6 +27,8 @@ namespace {
         db.Add("setup.initial.species",          UserStringNop("OPTIONS_DB_GAMESETUP_STARTING_SPECIES_NAME"),    std::string("SP_HUMAN"),    Validator<std::string>());
         db.Add("setup.multiplayer.player.name",  UserStringNop("OPTIONS_DB_MP_PLAYER_NAME"),     std::string(""),            Validator<std::string>());
         db.Add("setup.multiplayer.host.address", UserStringNop("OPTIONS_DB_MP_HOST_ADDRESS"),    std::string("localhost"),   Validator<std::string>());
+        db.Add<int>("auto-advance-n-turns",      UserStringNop("OPTIONS_DB_AUTO_N_TURNS"),           0,
+                    RangedValidator<int>(0, 400),       OptionsDB::Storable::UNSTORABLE);
     }
     bool temp_bool = RegisterOptions(&AddOptions);
 
@@ -76,6 +78,8 @@ GodotClientApp::GodotClientApp() {
     LogDependencyVersions();
 
     SetStringtableDependentOptionDefaults();
+
+    m_auto_turns = GetOptionsDB().Get<int>("auto-advance-n-turns");
 }
 
 GodotClientApp::~GodotClientApp() {
@@ -285,11 +289,24 @@ void GodotClientApp::NewSinglePlayerGame() {
     DebugLogger() << "GodotClientApp::NewSinglePlayerGame done";
 }
 
+int  GodotClientApp::AutoTurnsLeft() const
+{ return m_auto_turns; }
+
+void GodotClientApp::InitAutoTurns(int auto_turns) {
+    m_auto_turns = auto_turns;
+    if (!m_game_started || m_auto_turns < 0)
+        m_auto_turns = 0;
+}
+
+void GodotClientApp::DecAutoTurns(int n)
+{ InitAutoTurns(m_auto_turns - n); }
+
 bool GodotClientApp::SinglePlayerGame() const
 { return m_single_player_game; }
 
 void GodotClientApp::SetSinglePlayerGame(bool sp/* = true*/)
 { m_single_player_game = sp; }
 
-
+void GodotClientApp::StartGame(bool is_new_game)
+{ m_game_started = true; }
 

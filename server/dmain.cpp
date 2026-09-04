@@ -8,6 +8,10 @@
 
 #include <fstream>
 
+#if defined(FREEORION_ANDROID) || defined(__GNUC__) || defined(__clang__)
+#include <cxxabi.h>
+#endif
+
 #if defined(FREEORION_LINUX)
 /* Freeorion aims to have exceptions handled and operation continue normally.
 An example of good exception handling is the exceptions caught around config.xml loading.
@@ -39,6 +43,32 @@ const auto& GetLoggerInitHelper() {
         ~LoggerHelper() { ShutdownLoggingSystemFileSink(); }
     } static_logger_init_helper;
     return static_logger_init_helper;
+}
+
+inline std::string getExceptionTypeName() {
+#if defined(FREEORION_ANDROID) || defined(__GNUC__) || defined(__clang__)
+    int status = 0;
+    const std::type_info* ex_type = abi::__cxa_current_exception_type();
+    if (!ex_type) {
+        return "unknown (not a C++ exception)";
+    }
+    
+    char* demangled_name = abi::__cxa_demangle(ex_type->name(), nullptr, nullptr, &status);
+    std::string result;
+    
+    if (status == 0 && demangled_name) {
+        result = demangled_name;
+        std::free(demangled_name);
+    } else {
+        result = ex_type->name();
+    }
+    return result;
+
+#elif defined(FREEORION_WINDOWS) || defined(_MSC_VER)
+    return "unknown (MSVC exception)";
+#else
+    return "unknown";
+#endif
 }
 }
 
@@ -178,8 +208,9 @@ int main(int argc, char* argv[]) {
         std::cerr << "main() caught exception(std::exception): " << e.what() << std::endl;
         return 1;
     } catch (...) {
-        ErrorLogger() << "main() caught unknown exception.";
-        std::cerr << "main() caught unknown exception." << std::endl;
+        std::string exType = getExceptionTypeName();
+        ErrorLogger() << "main() caught unknown exception of type: " << exType;
+        std::cerr << "main() caught unknown exceptionof type: " << exType << std::endl;
         return 1;
     }
 #endif
@@ -187,4 +218,3 @@ int main(int argc, char* argv[]) {
     DebugLogger() << "freeorion server main exited cleanly.";
     return 0;
 }
-

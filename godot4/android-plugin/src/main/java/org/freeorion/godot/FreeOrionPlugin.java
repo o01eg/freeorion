@@ -1,5 +1,6 @@
 package org.freeorion.godot;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
@@ -71,7 +72,7 @@ public final class FreeOrionPlugin extends GodotPlugin {
         }
         Log.i(TAG, "Starting FreeOrionServerService");
         Intent intent = new Intent(activity, FreeOrionServerService.class);
-        intent.putExtra("args", serverArgs);
+        intent.putExtra("args", args);
         activity.startService(intent);
     }
 

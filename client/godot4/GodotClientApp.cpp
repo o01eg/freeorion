@@ -103,9 +103,14 @@ void GodotClientApp::StartServer() {
 #ifdef FREEORION_ANDROID
     DebugLogger() << "GodotClientApp::StartServer: starting server service";
     if (auto* engine = godot::Engine::get_singleton()) {
-        if (auto* plugin = engine->get_singleton("FreeOrion"))
-            plugin->call("startServer");
-        else
+        if (auto* plugin = engine->get_singleton("FreeOrion")) {
+            godot::PackedStringArray args;
+            if (m_single_player_game) {
+                args.append("--singleplayer");
+                args.emplace_back("--skip-checksum");
+            }
+            plugin->call("startServer", args);
+        } else
             ErrorLogger() << "GodotClientApp::StartServer: FreeOrion plugin singleton not found";
     }
     DebugLogger() << "... finished starting server service.";

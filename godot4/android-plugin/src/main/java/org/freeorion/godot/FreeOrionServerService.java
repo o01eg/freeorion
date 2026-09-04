@@ -30,8 +30,16 @@ public final class FreeOrionServerService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.i(TAG, "FreeOrion server service started; keeping it running");
+        String[] serverArgs = null;
+        if (intent != null) {
+            serverArgs = intent.getStringArrayExtra("args");
+        }
+
+        final String[] finalArgs = serverArgs;
         System.loadLibrary("freeoriond");
-        startService(this);
+        new Thread(() -> {
+            startService(this, finalArgs);
+        }, "FreeOrionServerThread").start();
         return START_STICKY;
     }
 
@@ -46,5 +54,5 @@ public final class FreeOrionServerService extends Service {
         Log.i(TAG, "FreeOrion server service destroyed");
     }
 
-    private static native void startService(Context activity);
+    private static native void startService(Context activity, String[] args);
 }

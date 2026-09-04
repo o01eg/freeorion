@@ -63,14 +63,16 @@ public final class FreeOrionPlugin extends GodotPlugin {
      * Called from native GodotClientApp::StartServer().
      */
     @UsedByGodot
-    public void startServer() {
+    public void startServer(String[] args) {
         Activity activity = getActivity();
         if (activity == null) {
             Log.w(TAG, "No activity available; cannot start server service");
             return;
         }
         Log.i(TAG, "Starting FreeOrionServerService");
-        activity.startService(new Intent(activity, FreeOrionServerService.class));
+        Intent intent = new Intent(activity, FreeOrionServerService.class);
+        intent.putExtra("args", serverArgs);
+        activity.startService(intent);
     }
 
     /**

@@ -68,9 +68,21 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
 #elifdef FREEORION_ANDROID
 // Called by org.freeorion.godot.FreeOrionServerService#startService native function
 extern "C" JNIEXPORT void JNICALL
-Java_org_freeorion_godot_FreeOrionServerService_startService(JNIEnv* env, jclass, jobject context) {
+Java_org_freeorion_godot_FreeOrionServerService_startService(JNIEnv* env, jclass, jobject context, jobjectArray argsArray) {
     SetAndroidEnvironment(env, context, false);
     std::vector<std::string> args;
+    if (argsArray != nullptr) {
+        jsize length = env->GetArrayLength(argsArray);
+        for (jsize i = 0; i < length; ++i) {
+            auto jstr = static_cast<jstring>(env->GetObjectArrayElement(argsArray, i));
+            const char* chars = env->GetStringUTFChars(jstr, nullptr);
+            if (chars) {
+                args.emplace_back(chars);
+                env->ReleaseStringUTFChars(jstr, chars);
+            }
+            env->DeleteLocalRef(jstr);
+        }
+    }
 #else
 int main(int argc, char* argv[]) {
     std::vector<std::string> args;

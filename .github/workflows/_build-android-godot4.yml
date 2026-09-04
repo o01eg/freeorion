@@ -57,10 +57,39 @@ jobs:
           pattern: android-binaries-godot4-*
           delete-merged: true
           retention-days: 1
+  build-plugin:
+    name: Build Android Plugin AAR
+    runs-on: ubuntu-latest
+    needs: merge-binaries
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+      - name: Download binaries
+        uses: actions/download-artifact@v8
+        with:
+          name: android-binaries-godot4
+          path: godot4/
+      - name: Set up Java and Android SDK
+        uses: android-actions/setup-android@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.11.1"
+      - name: Build FreeOrion Android plugin
+        run: |
+          cd godot4/android-plugin
+          gradle assembleDebug --no-daemon
+      - name: Upload AAR artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: freeorion-aar-plugin
+          path: godot4/android-plugin/build/outputs/aar/*-debug.aar
+          if-no-files-found: error
+          retention-days: 1
   export-android:
     name: Export Android
     runs-on: ubuntu-latest
-    needs: merge-binaries
+    needs: build-plugin
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
@@ -114,12 +143,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.11.1"
+      - name: Download AAR plugin
+        uses: actions/download-artifact@v8
+        with:
+          name: freeorion-aar-plugin
+          path: godot4/android/plugins/
       - name: Build FreeOrion Android plugin
         run: |
-          cd godot4/android-plugin
-          gradle assembleDebug --no-daemon
-          mkdir -p ../android/plugins
-          cp build/outputs/aar/*-debug.aar ../android/plugins/freeorion-debug.aar
+          mv godot4/android/plugins/*-debug.aar godot4/android/plugins/freeorion-debug.aar
           cat > ../android/plugins/freeorion.gdap <<'EOF'
           [config]
           name="FreeOrion"

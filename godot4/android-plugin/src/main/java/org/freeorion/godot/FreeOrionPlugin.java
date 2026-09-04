@@ -33,7 +33,7 @@ public final class FreeOrionPlugin extends GodotPlugin {
         super(godot);
         Activity activity = getActivity();
         if (activity != null) {
-            setAndroidActivity(activity);
+            setAndroidContext(activity);
         }
     }
 
@@ -57,7 +57,7 @@ public final class FreeOrionPlugin extends GodotPlugin {
         return result;
     }
 
-    private static native void setAndroidContext(Context activity);
+    private static native void setAndroidContext(Context context);
 
     /**
      * Start the FreeOrion server service in its own process.

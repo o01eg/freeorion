@@ -78,6 +78,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_org_freeorion_godot_FreeOrionServerService_startService(JNIEnv* env, jclass, jobject context, jobjectArray argsArray) {
     SetAndroidEnvironment(env, context, false);
     std::vector<std::string> args;
+    bool testing = false;
     if (argsArray != nullptr) {
         jsize length = env->GetArrayLength(argsArray);
         for (jsize i = 0; i < length; ++i) {
@@ -85,6 +86,7 @@ Java_org_freeorion_godot_FreeOrionServerService_startService(JNIEnv* env, jclass
             const char* chars = env->GetStringUTFChars(jstr, nullptr);
             if (chars) {
                 args.emplace_back(chars);
+                testing = testing || (args.back() == "--testing");
                 env->ReleaseStringUTFChars(jstr, chars);
             }
             env->DeleteLocalRef(jstr);

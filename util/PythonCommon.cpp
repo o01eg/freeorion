@@ -249,25 +249,8 @@ void PythonCommon::HandleErrorAlreadySet() {
             return;
         }
 
-        PyObject *extype, *value, *traceback;
-        PyErr_Fetch(std::addressof(extype), std::addressof(value), std::addressof(traceback));
-        PyErr_NormalizeException(std::addressof(extype), std::addressof(value), std::addressof(traceback));
-        if (!extype) {
-            ErrorLogger() << "Missing python exception type";
-            return;
-        }
-
-        py::object o_extype(py::handle<>(py::borrowed(extype)));
-        py::object o_value(py::handle<>(py::borrowed(value)));
-        py::object o_traceback = (traceback != nullptr) ?
-            py::object(py::handle<>(py::borrowed(traceback))) : py::object();
-
-        py::object lines = m_traceback_format_exception(o_extype, o_value, o_traceback);
-        for (int i = 0; i < len(lines); ++i) {
-            std::string line = py::extract<std::string>(lines[i])();
-            boost::algorithm::trim_right(line);
-            ErrorLogger() << line;
-        }
+        PyErr_Print();
+        ErrorLogger() << "Python throw exception. See stderr";
     } catch (const py::error_already_set&) {
         ErrorLogger() << "Python error handle throw exception. See stderr";
         PyErr_Print();

@@ -826,10 +826,14 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
                             throw std::runtime_error("the option \"" + option.name +
                                                      "\" was followed by the parameter \"" + std::string{value_str} +
                                                      "\", which appears to be an option flag, not a parameter value, because it begins with a \"-\" character.");
-                        m_dirty |= option.SetFromString(value_str);
 
-                        InfoLogger() << "Option \"" << option_name << "\", was set on the command line with value: " << value_str;
+                        try {
+                            m_dirty |= option.SetFromString(value_str);
 
+                            InfoLogger() << "Option \"" << option_name << "\", was set on the command line with value: " << value_str;
+                        } catch (const std::exception& e) {
+                            throw std::runtime_error("OptionsDB::SetFromCommandLine() : the following exception was caught when attempting to set option \"" + option.name + "\" to value \"" + std::string{value_str} + "\": " + e.what() + "\n\n");
+                        }
                     } catch (const std::exception& e) {
                         throw std::runtime_error("OptionsDB::SetFromCommandLine() : the following exception was caught when attempting to set option \"" + option.name + "\": " + e.what() + "\n\n");
                     }

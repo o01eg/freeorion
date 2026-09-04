@@ -62,6 +62,7 @@ void FreeOrionNode::_ready() {
         const std::string arg = warg.utf8().get_data();
         // Exclude Godot's options
         if (arg != "-s" && arg.rfind("-g", 0) != 0) {
+            InfoLogger() << "Command line " << arg;
             args.emplace_back(std::move(arg));
         }
     }
@@ -70,6 +71,7 @@ void FreeOrionNode::_ready() {
         const std::string arg = uwarg.utf8().get_data();
         // Exclude Godot's options
         if (arg != "-s" && arg.rfind("-g", 0) != 0) {
+            InfoLogger() << "User command line " << arg;
             args.emplace_back(std::move(arg));
         }
     }

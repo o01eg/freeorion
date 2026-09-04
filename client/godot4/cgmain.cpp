@@ -37,9 +37,9 @@ extern "C" GDExtensionBool GDE_EXPORT freeorion_library_init(GDExtensionInterfac
 }
 
 #ifdef FREEORION_ANDROID
-// Called by org.freeorion.godot.FreeOrionPlugin#setAndroidActivity native function
+// Called by org.freeorion.godot.FreeOrionPlugin#setAndroidContext native function
 extern "C" JNIEXPORT void JNICALL
-Java_org_freeorion_godot_FreeOrionPlugin_setAndroidActivity(JNIEnv* env, jclass /*cls*/, jobject activity) {
-    SetAndroidEnvironment(env, activity);
+Java_org_freeorion_godot_FreeOrionPlugin_setAndroidContext(JNIEnv* env, jclass, jobject context) {
+    SetAndroidEnvironment(env, context, true);
 }
 #endif

@@ -26,6 +26,11 @@ unroll and hide the stack trace, print a message and still crash anyways. */
 #  include <windows.h>
 #endif
 
+#ifdef FREEORION_ANDROID
+#  include <jni.h>
+#  include "../../util/Directories.h"
+#endif
+
 namespace {
 const auto& GetLoggerInitHelper() {
     // used to for init of logger before ServerApp and thus logger shutdown after ServerApp
@@ -37,15 +42,7 @@ const auto& GetLoggerInitHelper() {
 }
 }
 
-#ifndef FREEORION_WIN32
-int main(int argc, char* argv[]) {
-    std::vector<std::string> args;
-    bool testing = false;
-    for (int i = 0; i < argc; ++i) {
-        args.push_back(argv[i]);
-        testing = testing || (args.back() == "--testing");
-    }
-#else
+#ifdef FREEORION_WIN32
 int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
     // copy UTF-16 command line arguments to UTF-8 vector
     std::vector<std::string> args;
@@ -68,7 +65,20 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
             std::cerr << "main() couldn't convert argument to UTF8" << std::endl;
         }
     }
-
+#elifdef FREEORION_ANDROID
+// Called by org.freeorion.godot.FreeOrionServerService#startService native function
+extern "C" JNIEXPORT void JNICALL
+Java_org_freeorion_godot_FreeOrionServerService_startService(JNIEnv* env, jclass, jobject context) {
+    SetAndroidEnvironment(env, context, false);
+    std::vector<std::string> args;
+#else
+int main(int argc, char* argv[]) {
+    std::vector<std::string> args;
+    bool testing = false;
+    for (int i = 0; i < argc; ++i) {
+        args.push_back(argv[i]);
+        testing = testing || (args.back() == "--testing");
+    }
 #endif
     InitDirs((args.empty() ? "" : args.front()), testing);
 

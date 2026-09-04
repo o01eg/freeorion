@@ -71,10 +71,11 @@ namespace {
     fs::path       s_user_dir;
     fs::path       s_cache_dir;
     fs::path       s_python_home;
-    jweak          s_activity;
+    jweak          s_context;
     AAssetManager* s_asset_manager;
     jobject        s_jni_asset_manager;
     JavaVM*        s_java_vm;
+    bool           s_copy_python_lib;
 
 #define PYTHON_LIB_PATH "lib/python" BOOST_PP_STRINGIZE(BOOST_PP_CAT(PY_MAJOR_VERSION, PY_MINOR_VERSION)) ".zip"
 
@@ -471,12 +472,12 @@ void InitDirs(std::string const& argv0, bool test)
         attached = true;
     }
 
-    jobject activity = env->NewLocalRef(s_activity);
+    jobject context = env->NewLocalRef(s_context);
 
-    jclass activity_cls = env->GetObjectClass(activity);
+    jclass context_cls = env->GetObjectClass(context);
 
-    jmethodID get_files_dir_mid = env->GetMethodID(activity_cls, "getFilesDir", "()Ljava/io/File;");
-    jobject files_dir = env->CallObjectMethod(activity, get_files_dir_mid);
+    jmethodID get_files_dir_mid = env->GetMethodID(context_cls, "getFilesDir", "()Ljava/io/File;");
+    jobject files_dir = env->CallObjectMethod(context, get_files_dir_mid);
 
     jclass file_cls = env->GetObjectClass(files_dir);
     jmethodID get_absolute_path_mid = env->GetMethodID(file_cls, "getAbsolutePath", "()Ljava/lang/String;");
@@ -486,8 +487,8 @@ void InitDirs(std::string const& argv0, bool test)
     s_user_dir = fs::path(files_dir_chars);
     env->ReleaseStringUTFChars(files_dir_path, files_dir_chars);
 
-    jmethodID get_cache_dir_mid = env->GetMethodID(activity_cls, "getCacheDir", "()Ljava/io/File;");
-    jobject cache_dir = env->CallObjectMethod(activity, get_cache_dir_mid);
+    jmethodID get_cache_dir_mid = env->GetMethodID(context_cls, "getCacheDir", "()Ljava/io/File;");
+    jobject cache_dir = env->CallObjectMethod(context, get_cache_dir_mid);
 
     file_cls = env->GetObjectClass(cache_dir);
     get_absolute_path_mid = env->GetMethodID(file_cls, "getAbsolutePath", "()Ljava/lang/String;");
@@ -497,8 +498,8 @@ void InitDirs(std::string const& argv0, bool test)
     s_cache_dir = fs::path(cache_dir_chars);
     env->ReleaseStringUTFChars(cache_dir_path, cache_dir_chars);
 
-    jmethodID get_assets_mid = env->GetMethodID(activity_cls, "getAssets", "()Landroid/content/res/AssetManager;");
-    jobject asset_manager = env->CallObjectMethod(activity, get_assets_mid);
+    jmethodID get_assets_mid = env->GetMethodID(context_cls, "getAssets", "()Landroid/content/res/AssetManager;");
+    jobject asset_manager = env->CallObjectMethod(context, get_assets_mid);
     s_jni_asset_manager = env->NewGlobalRef(asset_manager);
     s_asset_manager = AAssetManager_fromJava(env, s_jni_asset_manager);
 
@@ -509,8 +510,10 @@ void InitDirs(std::string const& argv0, bool test)
     RedirectOutputLogAndroid(ANDROID_LOG_INFO, "stdout", 1);
 
     s_python_home = s_cache_dir / "python";
-    fs::create_directories(s_python_home / "lib");
-    CopyInitialResourceAndroid(PYTHON_LIB_PATH);
+    if (s_copy_python_lib) {
+        fs::create_directories(s_python_home / "lib");
+        CopyInitialResourceAndroid(PYTHON_LIB_PATH);
+    }
 #endif
 
     g_initialized = true;
@@ -618,11 +621,12 @@ auto GetPythonHome() -> fs::path const
 #endif
 
 #if defined(FREEORION_ANDROID)
-void SetAndroidEnvironment(JNIEnv* env, jobject activity)
+void SetAndroidEnvironment(JNIEnv* env, jobject context, bool copy_python_lib)
 {
     s_jni_env = env;
     s_jni_env->GetJavaVM(&s_java_vm);
-    s_activity = env->NewWeakGlobalRef(activity);
+    s_context = env->NewWeakGlobalRef(context);
+    s_copy_python_lib = copy_python_lib;
 }
 
 std::string GetAndroidLang()

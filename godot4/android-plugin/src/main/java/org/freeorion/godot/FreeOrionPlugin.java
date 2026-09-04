@@ -1,6 +1,6 @@
 package org.freeorion.godot;
 
-import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
@@ -18,8 +18,7 @@ import java.util.List;
  * to the extension, so the FreeOrion client would otherwise call InitDirs()
  * with a null JavaVM/activity and crash. This plugin re-loads the very same
  * libfreeoriongodot.so through System.loadLibrary so the JVM can resolve our
- * JNI method (binds to Java_org_freeorion_godot_FreeOrionPlugin_nativeSetAndroidActivity
- * exported from that library), then feeds it the current Godot activity.
+ * JNI method, then feeds it the current Godot activity.
  */
 public final class FreeOrionPlugin extends GodotPlugin {
 
@@ -57,7 +56,7 @@ public final class FreeOrionPlugin extends GodotPlugin {
         return result;
     }
 
-    private static native void setAndroidActivity(Activity activity);
+    private static native void setAndroidContext(Context activity);
 
     /**
      * Start the FreeOrion server service in its own process.

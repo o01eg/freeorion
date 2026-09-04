@@ -1,5 +1,6 @@
 package org.freeorion.godot;
 
+import android.content.Context;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
@@ -29,7 +30,8 @@ public final class FreeOrionServerService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.i(TAG, "FreeOrion server service started; keeping it running");
-        // TODO: run the native FreeOrion server here.
+        System.loadLibrary("freeoriond");
+        startService(this);
         return START_STICKY;
     }
 
@@ -43,4 +45,6 @@ public final class FreeOrionServerService extends Service {
         super.onDestroy();
         Log.i(TAG, "FreeOrion server service destroyed");
     }
+
+    private static native void startService(Context activity);
 }

@@ -151,13 +151,13 @@ jobs:
       - name: Build FreeOrion Android plugin
         run: |
           mv godot4/android/plugins/*-debug.aar godot4/android/plugins/freeorion-debug.aar
-          cat > ../android/plugins/freeorion.gdap <<'EOF'
+          cat > godot4/android/plugins/freeorion.gdap <<'EOF'
           [config]
           name="FreeOrion"
           binary_type="local"
           binary="res://android/plugins/freeorion-debug.aar"
           EOF
-          ls -la ../android/plugins/
+          ls -la godot4/android/plugins/
       - name: Generate Debug Keystore
         run: |
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"

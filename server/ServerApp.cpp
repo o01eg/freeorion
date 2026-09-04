@@ -1535,6 +1535,8 @@ void ServerApp::GenerateUniverse(std::map<int, PlayerSetupData>& player_setup_da
         }
     }
 
+    DebugLogger() << "Universe creation " << (success ? "succeeded" : "failed");
+
     if (!success)
         m_networking.SendMessageAll(ErrorMessage(UserStringNop("SERVER_UNIVERSE_GENERATION_ERRORS"), false));
 

@@ -10,5 +10,13 @@
             android:name="org.freeorion.godot.FreeOrionServerService"
             android:exported="false"
             android:process=":freeoriond" />
+        <service
+            android:name="org.freeorion.godot.FreeOrionAIService1"
+            android:exported="false"
+            android:process=":freeorionca1" />
+        <service
+            android:name="org.freeorion.godot.FreeOrionAIService2"
+            android:exported="false"
+            android:process=":freeorionca2" />
     </application>
 </manifest>

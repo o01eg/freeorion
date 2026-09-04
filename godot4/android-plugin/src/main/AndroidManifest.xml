@@ -9,6 +9,6 @@
         <service
             android:name="org.freeorion.godot.FreeOrionServerService"
             android:exported="false"
-            android:process=":server" />
+            android:process=":freeoriond" />
     </application>
 </manifest>

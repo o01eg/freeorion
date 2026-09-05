@@ -26,6 +26,7 @@ void FreeOrionNode::_bind_methods() {
     godot::ClassDB::bind_method(godot::D_METHOD("start_network_thread"), &FreeOrionNode::start_network_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("start_parsing_thread"), &FreeOrionNode::start_parsing_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("new_single_player_game"), &FreeOrionNode::new_single_player_game);
+    godot::ClassDB::bind_method(godot::D_METHOD("start_turn"), &FreeOrionNode::start_turn);
     godot::ClassDB::bind_method(godot::D_METHOD("options_get_bool"), &FreeOrionNode::options_get_bool);
 
     ADD_SIGNAL(godot::MethodInfo("parsing_completed"));
@@ -163,8 +164,12 @@ void FreeOrionNode::start_network_thread()
 void FreeOrionNode::start_parsing_thread()
 { m_parsing_thread->start(godot::Callable(this, "parsing_thread")); }
 
-void FreeOrionNode::new_single_player_game() {
-    m_app->NewSinglePlayerGame();
+void FreeOrionNode::new_single_player_game()
+{ m_app->NewSinglePlayerGame(); }
+
+void FreeOrionNode::start_turn() {
+    SaveGameUIData ui_data;
+    m_app->StartTurn(ui_data);
 }
 
 bool FreeOrionNode::options_get_bool(godot::String option) const {
@@ -238,19 +243,15 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
             break;
         }
         case Message::MessageType::TURN_PARTIAL_UPDATE: {
-            int empire_id = ALL_EMPIRES;
-            ExtractTurnPartialUpdateMessageData(msg, empire_id, GetUniverse());
-            m_app->SetEmpireID(empire_id);
+            ExtractTurnPartialUpdateMessageData(msg, m_app->EmpireID(), GetUniverse());
             break;
         }
         case Message::MessageType::TURN_UPDATE: {
-            int empire_id = ALL_EMPIRES;
             int current_turn = INVALID_GAME_TURN;
             m_app->Orders().Reset();
-            ExtractTurnUpdateMessageData(msg,                   empire_id,           current_turn,
+            ExtractTurnUpdateMessageData(msg,                   m_app->EmpireID(),   current_turn,
                                          Empires(),             GetUniverse(),       GetSpeciesManager(),
                                          GetCombatLogManager(), GetSupplyManager(),  m_app->Players());
-            m_app->SetEmpireID(empire_id);
             m_app->SetCurrentTurn(current_turn);
             call_deferred("emit_signal", "turn_update");
 

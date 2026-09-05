@@ -772,6 +772,8 @@ void OptionsDB::SetFromCommandLine(const std::vector<std::string>& args) {
     for (std::size_t i = 1u; i < args.size(); ++i) {
         std::string_view current_token{args[i]};
 
+        InfoLogger() << "Option token \"" << args[i] << "\" i=" << i << " args.size()=" << args.size();
+
         if (current_token.find("--") == 0) {
             std::string option_name{current_token.substr(2)}; // need a string here as there is no unordered_map heterogeneous lookup :(
 

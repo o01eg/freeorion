@@ -30,6 +30,7 @@ void FreeOrionNode::_bind_methods() {
 
     ADD_SIGNAL(godot::MethodInfo("parsing_completed"));
     ADD_SIGNAL(godot::MethodInfo("start_game", godot::PropertyInfo(godot::Variant::BOOL, "is_new_game")));
+    ADD_SIGNAL(godot::MethodInfo("turn_update"));
 }
 
 FreeOrionNode::FreeOrionNode()
@@ -228,6 +229,36 @@ void FreeOrionNode::HandleMessage(Message&& msg) {
                 m_app->DecAutoTurns();
             }
 
+            break;
+        }
+        case Message::MessageType::TURN_PROGRESS: {
+            Message::TurnProgressPhase phase_id;
+            ExtractTurnProgressMessageData(msg, phase_id);
+            m_app->HandleTurnPhaseUpdate(phase_id);
+            break;
+        }
+        case Message::MessageType::TURN_PARTIAL_UPDATE: {
+            int empire_id = ALL_EMPIRES;
+            ExtractTurnPartialUpdateMessageData(msg, empire_id, GetUniverse());
+            m_app->SetEmpireID(empire_id);
+            break;
+        }
+        case Message::MessageType::TURN_UPDATE: {
+            int empire_id = ALL_EMPIRES;
+            int current_turn = INVALID_GAME_TURN;
+            m_app->Orders().Reset();
+            ExtractTurnUpdateMessageData(msg,                   empire_id,           current_turn,
+                                         Empires(),             GetUniverse(),       GetSpeciesManager(),
+                                         GetCombatLogManager(), GetSupplyManager(),  m_app->Players());
+            m_app->SetEmpireID(empire_id);
+            m_app->SetCurrentTurn(current_turn);
+            call_deferred("emit_signal", "turn_update");
+
+            if (m_app->AutoTurnsLeft() > 0) {
+                SaveGameUIData ui_data;
+                m_app->StartTurn(ui_data);
+                m_app->DecAutoTurns();
+            }
             break;
         }
         default:

@@ -16,7 +16,9 @@
 #include "../universe/Universe.h"
 #include "../util/AppInterface.h"
 #include "../util/MultiplayerCommon.h"
-#include "../util/Process.h"
+#ifndef FREEORION_ANDROID
+#  include "../util/Process.h"
+#endif
 
 
 class OrderSet;

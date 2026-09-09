@@ -57,7 +57,7 @@ namespace {
         db.Add<GSOG>("setup.specials.frequency",    UserStringNop("OPTIONS_DB_GAMESETUP_SPECIALS_FREQUENCY"), GALAXY_SETUP_MEDIUM,  RangedValidator(GALAXY_SETUP_NONE, GALAXY_SETUP_RANDOM));
         db.Add<GSOG>("setup.native.frequency",      UserStringNop("OPTIONS_DB_GAMESETUP_NATIVE_FREQUENCY"),   GALAXY_SETUP_MEDIUM,  RangedValidator(GALAXY_SETUP_NONE, GALAXY_SETUP_RANDOM));
 #ifdef FREEORION_ANDROID
-        db.Add<int>("setup.ai.player.count",        UserStringNop("OPTIONS_DB_GAMESETUP_NUM_AI_PLAYERS"),     0,                    RangedValidator<int>(0, IApp::MAX_AI_PLAYERS()));
+        db.Add<int>("setup.ai.player.count",        UserStringNop("OPTIONS_DB_GAMESETUP_NUM_AI_PLAYERS"),     2,                    RangedValidator<int>(0, IApp::MAX_AI_PLAYERS()));
 #else
         db.Add<int>("setup.ai.player.count",        UserStringNop("OPTIONS_DB_GAMESETUP_NUM_AI_PLAYERS"),     6,                    RangedValidator<int>(0, IApp::MAX_AI_PLAYERS()));
 #endif

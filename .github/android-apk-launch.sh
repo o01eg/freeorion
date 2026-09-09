@@ -28,7 +28,7 @@ fi
 echo "::endgroup::"
 
 echo "::group::Starting APK"
-adb shell am start -W -n "$LAUNCHER"
+adb shell am start -W -n "$LAUNCHER" --ez quickstart true --ei auto-advance-n-turns 100
 echo "::endgroup::"
 
 sleep 180
@@ -40,6 +40,11 @@ echo "::endgroup::"
 echo "::group::Getting logs"
 adb logcat -d >logcat.log
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-godot.log >freeorion-godot.log 2>&1
+adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeoriond.log >freeoriond.log 2>&1
+echo "::endgroup::"
+
+echo "::group::List logs"
+adb exec-out run-as org.godotengine.freeoriongodotclient ls -l files/
 echo "::endgroup::"
 
 echo "::group::Checking errors"

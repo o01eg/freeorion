@@ -254,6 +254,12 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
 
 #ifdef FREEORION_ANDROID
     int slot_id = 1;
+    std::vector<std::string> args;
+    args.reserve(4);
+    args.push_back("\"\"");
+    args.push_back("place_holder");
+    const std::size_t player_name_in_vec_idx = args.size()-1;
+    args.push_back(std::to_string(max_aggression));
 #else
     // binary / executable to run for AI clients
     auto force_ai_executable = GetOptionsDB().Get<std::string>("ai-executable");
@@ -328,7 +334,7 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
                       << " empire name:" << ai_psd.empire_name
                       << " save empire id: " << ai_psd.save_game_empire_id;
 #ifdef FREEORION_ANDROID
-        m_ai_client_processes.emplace(ai_psd, AndroidAIService(slot_id++, ai_psd.player_name));
+        m_ai_client_processes.emplace(ai_psd, AndroidAIService(slot_id++, args));
 #else
         m_ai_client_processes.emplace(ai_psd, Process(m_io_context, AI_CLIENT_EXE, args));
 #endif

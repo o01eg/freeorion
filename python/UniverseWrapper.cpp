@@ -361,7 +361,11 @@ namespace FreeOrionPython {
                                                 py::return_value_policy<py::reference_existing_object>())
             .def("getShip",                     +[](const Universe& u, int id) -> const Ship* { return u.Objects().getRaw<const Ship>(id); },
                                                 py::return_value_policy<py::reference_existing_object>())
-            .def("getPlanet",                   +[](const Universe& u, int id) -> const Planet* { return u.Objects().getRaw<const Planet>(id); },
+            .def("getPlanet",                   +[](const Universe& u, int id) -> const Planet* {
+                                                    auto result = u.Objects().getRaw<const Planet>(id); 
+                                                    DebugLogger() << "Universe::getPlanet by " << id << ": " << (result ? result->Name() : "<null>");
+                                                    return result;
+                                                },
                                                 py::return_value_policy<py::reference_existing_object>())
             .def("getSystem",                   +[](const Universe& u, int id) -> const System* { return u.Objects().getRaw<const System>(id); },
                                                 py::return_value_policy<py::reference_existing_object>())

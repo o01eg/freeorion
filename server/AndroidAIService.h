@@ -2,10 +2,11 @@
 #define _AndroidAIService_h_
 
 #include <string>
+#include <vector>
 
 class AndroidAIService {
 public:
-    AndroidAIService(int slot_id, const std::string& player_name);
+    AndroidAIService(int slot_id, const std::vector<std::string>& args);
     ~AndroidAIService();
 
     AndroidAIService(const AndroidAIService&) = delete;

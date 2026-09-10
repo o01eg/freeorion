@@ -60,8 +60,9 @@ int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
 //Called by org.freeorion.godot.FreeOrionAIService#stopNativeService native function
 extern "C" JNIEXPORT void JNICALL
 Java_org_freeorion_godot_FreeOrionAIService_stopNativeService(JNIEnv*, jclass) {
-    AIClientApp& app = GetApp();
-    app.ExitApp(0);
+    AIClientApp* app = AIClientApp::GetApp();
+    if (app)
+        app->ExitApp(0);
 }
 
 // Called by org.freeorion.godot.FreeOrionAIService#startNativeService native function

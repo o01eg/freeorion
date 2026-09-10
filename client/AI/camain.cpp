@@ -32,6 +32,37 @@ unroll and hide the stack trace, print a message and still crash anyways. */
 #  include "../../util/AndroidEnvironment.h"
 #endif
 
+#if defined(FREEORION_ANDROID) || defined(__GNUC__) || defined(__clang__)
+#include <cxxabi.h>
+#endif
+
+
+inline std::string GetExceptionTypeName() {
+#if defined(FREEORION_ANDROID) || defined(__GNUC__) || defined(__clang__)
+    int status = 0;
+    const std::type_info* ex_type = abi::__cxa_current_exception_type();
+    if (!ex_type) {
+        return "unknown (not a C++ exception)";
+    }
+    
+    char* demangled_name = abi::__cxa_demangle(ex_type->name(), nullptr, nullptr, &status);
+    std::string result;
+    
+    if (status == 0 && demangled_name) {
+        result = demangled_name;
+        std::free(demangled_name);
+    } else {
+        result = ex_type->name();
+    }
+    return result;
+
+#elif defined(FREEORION_WINDOWS) || defined(_MSC_VER)
+    return "unknown (MSVC exception)";
+#else
+    return "unknown";
+#endif
+}
+
 #if defined(FREEORION_WIN32)
 
 int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {
@@ -138,9 +169,10 @@ int main(int argc, char* argv[]) {
         ShutdownLoggingSystemFileSink();
         return 1;
     } catch (...) {
+        std::string ex_type = GetExceptionTypeName();
         std::string diagnostic_info = boost::current_exception_diagnostic_information();
-        ErrorLogger() << "main() caught unknown exception: " << diagnostic_info;
-        std::cerr << "main() caught unknown exception: " << diagnostic_info << std::endl;
+        ErrorLogger() << "main() caught unknown exception: " << diagnostic_info << ". Type: " << ex_type;
+        std::cerr << "main() caught unknown exception: " << diagnostic_info << ". Type: " << ex_type << std::endl;
         ShutdownLoggingSystemFileSink();
         return 1;
     }

@@ -272,6 +272,7 @@ void AIClientApp::HandleMessage(const Message& msg) {
             DebugLogger() << "Message::GAME_START Starting New Game!";
             m_AI->StartNewGame();
         }
+        DebugLogger() << "Message::GAME_START Generating orders!";
         m_AI->GenerateOrders();
         break;
     }

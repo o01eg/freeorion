@@ -5,7 +5,7 @@ on:
     inputs:
       debug_sanitize:
         description: "Debug Build Type & Sanitizer"
-        default: false
+        default: true
         type: boolean
 env:
   GODOT_VERSION: "4.7.2"

@@ -46,6 +46,11 @@ public final class FreeOrionPlugin extends GodotPlugin {
                 result.add("--auto-advance-n-turns");
                 result.add(Integer.toString(autoAdvanceNTurns));
             }
+            int setupAIPlayerCount = activity.getIntent().getIntExtra("setup.ai.player.count", -1);
+            if (setupAIPlayerCount >= 0) {
+                result.add("--setup.ai.player.count");
+                result.add(Integer.toString(setupAIPlayerCount));
+            }
         }
         return result;
     }

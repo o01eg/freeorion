@@ -27,7 +27,7 @@ unroll and hide the stack trace, print a message and still crash anyways. */
 #endif
 
 #ifdef FREEORION_ANDROID
-#  include "../util/AndroidEnvironment.h"
+#  include "../../util/AndroidEnvironment.h"
 #endif
 
 #if defined(FREEORION_WIN32)

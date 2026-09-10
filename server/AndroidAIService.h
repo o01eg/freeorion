@@ -16,6 +16,7 @@ public:
     AndroidAIService& operator=(AndroidAIService&&) noexcept = default;
 
     void Kill();
+    void Free();
 private:
     int m_slot_id;
     bool m_killed;

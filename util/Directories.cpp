@@ -27,6 +27,7 @@
 #  include <android/asset_manager_jni.h>
 #  include <android/log.h>
 #  include <patchlevel.h>
+#  include "AndroidEnvironment.h"
 #endif
 
 #if defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU) || defined(FREEORION_ANDROID)
@@ -67,15 +68,11 @@ namespace {
 #endif
 
 #if defined(FREEORION_ANDROID)
-    thread_local JNIEnv* s_jni_env = nullptr;
     fs::path       s_user_dir;
     fs::path       s_cache_dir;
     fs::path       s_python_home;
-    jweak          s_context;
     AAssetManager* s_asset_manager;
     jobject        s_jni_asset_manager;
-    JavaVM*        s_java_vm;
-    bool           s_copy_python_lib;
 
 #  define PYTHON_LIB_PATH "lib/python" BOOST_PP_STRINGIZE(BOOST_PP_CAT(PY_MAJOR_VERSION, PY_MINOR_VERSION)) ".zip"
 
@@ -114,45 +111,6 @@ namespace {
         }
         ofs.close();
     }
-
-    /** The thread may already be attached to the VM (e.g. the GLThread that runs
-      * Godot's rendering). Only attach here if it is not, and only detach it if
-      * we attached it ourselves; detaching a runtime-attached thread aborts. */
-    class ScopedJNIEnv {
-    public:
-        ScopedJNIEnv() {
-            if (s_jni_env != nullptr)
-                m_env = s_jni_env;
-            else if (s_java_vm != nullptr)
-                s_java_vm->GetEnv(reinterpret_cast<void**>(&m_env), JNI_VERSION_1_6);
-
-            if (m_env == nullptr && s_java_vm != nullptr) {
-                s_java_vm->AttachCurrentThreadAsDaemon(&m_env, nullptr);
-                m_attached = true;
-            }
-
-            if (!m_env) {
-                throw std::runtime_error("ScopedJNIEnv: Failed to obtain JNIEnv or attach thread to JVM");
-            }
-        }
-
-        ~ScopedJNIEnv() {
-            if (m_attached && s_java_vm != nullptr)
-                s_java_vm->DetachCurrentThread();
-        }
-
-        ScopedJNIEnv(const ScopedJNIEnv&) = delete;
-        ScopedJNIEnv& operator=(const ScopedJNIEnv&) = delete;
-
-        JNIEnv* get() const { return m_env; }
-
-        operator JNIEnv*() const { return m_env; }
-
-        JNIEnv* operator->() const { return m_env; }
-    private:
-        JNIEnv* m_env = nullptr;
-        bool m_attached = false;
-    };
 #endif
 
 #if defined(FREEORION_LINUX) || defined(FREEORION_FREEBSD) || defined(FREEORION_OPENBSD) || defined(FREEORION_NETBSD) || defined(FREEORION_DRAGONFLY) || defined(FREEORION_HAIKU)
@@ -498,7 +456,7 @@ void InitDirs(std::string const& argv0, bool test)
 #elif defined(FREEORION_ANDROID)
     ScopedJNIEnv env;
 
-    jobject context = env->NewLocalRef(s_context);
+    jobject context = env->NewLocalRef(ScopedJNIEnv::Context());
 
     jclass context_cls = env->GetObjectClass(context);
 
@@ -533,7 +491,7 @@ void InitDirs(std::string const& argv0, bool test)
     RedirectOutputLogAndroid(ANDROID_LOG_INFO, "stdout", 1);
 
     s_python_home = s_cache_dir / "python";
-    if (s_copy_python_lib) {
+    if (ScopedJNIEnv::CopyPythonLib()) {
         fs::create_directories(s_python_home / "lib");
         CopyInitialResourceAndroid(PYTHON_LIB_PATH);
     }
@@ -640,36 +598,6 @@ auto GetPythonHome() -> fs::path const
 #elif defined(FREEORION_WIN32)
     return GetBinDir();
 #endif
-}
-#endif
-
-#if defined(FREEORION_ANDROID)
-void SetAndroidEnvironment(JNIEnv* env, jobject context, bool copy_python_lib)
-{
-    s_jni_env = env;
-    s_jni_env->GetJavaVM(&s_java_vm);
-    s_context = env->NewWeakGlobalRef(context);
-    s_copy_python_lib = copy_python_lib;
-}
-
-std::string GetAndroidLang()
-{
-    std::string retval;
-
-    ScopedJNIEnv env;
-
-    jclass locale_class = env->FindClass("java/util/Locale");
-    jmethodID get_default_mid = env->GetStaticMethodID(locale_class, "getDefault", "()Ljava/util/Locale;");
-    jobject locale = env->CallStaticObjectMethod(locale_class, get_default_mid);
-
-    jmethodID get_language_mid = env->GetMethodID(locale_class, "getLanguage", "()Ljava/lang/String;");
-    jstring language = reinterpret_cast<jstring>(env->CallObjectMethod(locale, get_language_mid));
-
-    const char *language_chars = env->GetStringUTFChars(language, nullptr);
-    retval = std::string(language_chars);
-    env->ReleaseStringUTFChars(language, language_chars);
-
-    return retval;
 }
 #endif
 

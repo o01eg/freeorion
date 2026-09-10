@@ -3,8 +3,7 @@
 #include <godot_cpp/godot.hpp>
 
 #ifdef FREEORION_ANDROID
-# include <jni.h>
-# include "../../util/Directories.h"
+# include "../../util/AndroidEnvironment.h"
 #endif
 
 #include "FreeOrionNode.h"

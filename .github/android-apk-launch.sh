@@ -28,10 +28,16 @@ fi
 echo "::endgroup::"
 
 echo "::group::Starting APK"
-adb shell am start -W -n "$LAUNCHER" --ez quickstart true --ei auto-advance-n-turns 100
+adb shell am start -W -n "$LAUNCHER" --ez quickstart true --ei auto-advance-n-turns 100 --ei setup.ai.player.count 2
 echo "::endgroup::"
 
+echo "::group::Waiting..."
 sleep 180
+echo "::endgroup::"
+
+echo "::group::Taking screenshot"
+adb exec-out screencap -p > android-screenshot.png || echo "Failed to take screenshot"
+echo "::endgroup::"
 
 echo "::group::Stopping APK"
 adb shell am force-stop org.godotengine.freeoriongodotclient

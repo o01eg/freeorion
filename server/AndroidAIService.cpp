@@ -3,7 +3,7 @@
 #include "../util/AndroidEnvironment.h"
 
 namespace {
-    void ControlAndroidService(const std::string& class_name, bool start, const std::string& player_name = "") {
+    void ControlAndroidService(const std::string& class_name, bool start, const std::vector<std::string>& args = {}) {
         ScopedJNIEnv env;
         jobject context = env->NewLocalRef(ScopedJNIEnv::Context());
         jclass service_cls = env->FindClass(class_name.c_str());
@@ -11,13 +11,20 @@ namespace {
         jmethodID intent_ctor_mid = env->GetMethodID(intent_cls, "<init>", "(Landroid/content/Context;Ljava/lang/Class;)V");
         jobject intent = env->NewObject(intent_cls, intent_ctor_mid, context, service_cls);
 
-        if (!player_name.empty()) {
-            jmethodID put_extra_mid = env->GetMethodID(intent_cls, "putExtra", "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;");
-            jstring key = env->NewStringUTF("player_name");
-            jstring value = env->NewStringUTF(player_name.c_str());
-            env->CallObjectMethod(intent, put_extra_mid, key, value);
+        if (!args.empty()) {
+            jclass string_cls = env->FindClass("java/lang/String");
+            jobjectArray args_array = env->NewObjectArray(args.size(), string_cls, nullptr);
+            for (size_t i = 0; i < args.size(); ++i) {
+                jstring str = env->NewStringUTF(args[i].c_str());
+                env->SetObjectArrayElement(args_array, i, str);
+                env->DeleteLocalRef(str);
+            }
+
+            jmethodID put_extra_mid = env->GetMethodID(intent_cls, "putExtra", "(Ljava/lang/String;[Ljava/lang/String;)Landroid/content/Intent;");
+            jstring key = env->NewStringUTF("args");
+            env->CallObjectMethod(intent, put_extra_mid, key, args_array);
             env->DeleteLocalRef(key);
-            env->DeleteLocalRef(value);
+            env->DeleteLocalRef(args_array);
         }
 
         jclass context_cls = env->GetObjectClass(context);
@@ -33,9 +40,9 @@ namespace {
     }
 }
 
-AndroidAIService::AndroidAIService(int slot_id, const std::string& player_name)
+AndroidAIService::AndroidAIService(int slot_id, const std::vector<std::string>& args)
     : m_slot_id(slot_id)
-{ ControlAndroidService("org/freeorion/godot/FreeOrionAIService" + std::to_string(m_slot_id), true, player_name); }
+{ ControlAndroidService("org/freeorion/godot/FreeOrionAIService" + std::to_string(m_slot_id), true, args); }
 
 AndroidAIService::~AndroidAIService()
 { Kill(); }

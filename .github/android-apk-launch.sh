@@ -2,6 +2,7 @@
 
 echo "::group::Installing APK"
 adb devices
+adb shell settings put secure immersive_mode_confirmations confirmed
 adb install freeorion.apk
 sleep 1
 adb logcat -c

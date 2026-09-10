@@ -53,3 +53,6 @@ void AndroidAIService::Kill() {
         m_killed = true;
     }
 }
+
+void AndroidAIService::Free()
+{ m_killed = true; }

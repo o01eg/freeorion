@@ -1,5 +1,7 @@
 #include "AIClientApp.h"
 
+#include <boost/exception/diagnostic_information.hpp>
+
 #include "../../util/OptionsDB.h"
 #include "../../util/Directories.h"
 #include "../../util/Logger.h"
@@ -136,8 +138,9 @@ int main(int argc, char* argv[]) {
         ShutdownLoggingSystemFileSink();
         return 1;
     } catch (...) {
-        ErrorLogger() << "main() caught unknown exception.";
-        std::cerr << "main() caught unknown exception." << std::endl;
+        std::string diagnostic_info = boost::current_exception_diagnostic_information();
+        ErrorLogger() << "main() caught unknown exception: " << diagnostic_info;
+        std::cerr << "main() caught unknown exception: " << diagnostic_info << std::endl;
         ShutdownLoggingSystemFileSink();
         return 1;
     }

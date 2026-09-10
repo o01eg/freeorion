@@ -14,10 +14,10 @@ namespace {
 
         if (start) {
             jmethodID start_service_mid = env->GetMethodID(context_cls, "startService", "(Landroid/content/Intent;)Landroid/content/ComponentName;");
-            env->CallObjectMethod(context, start_service, intent);
+            env->CallObjectMethod(context, start_service_mid, intent);
         } else {
-            jmethodID stop_service = env->GetMethodID(context_cls, "stopService", "(Landroid/content/Intent;)Z");
-            env->CallBooleanMethod(context, stop_service, intent);
+            jmethodID stop_service_mid = env->GetMethodID(context_cls, "stopService", "(Landroid/content/Intent;)Z");
+            env->CallBooleanMethod(context, stop_service_mid, intent);
         }
 
         env->DeleteLocalRef(intent);

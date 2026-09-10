@@ -340,5 +340,6 @@ jobs:
           path: |
             freeorion*.log
             logcat.log
+            android-screenshot.png
           if-no-files-found: error
           retention-days: 1

@@ -26,6 +26,10 @@ unroll and hide the stack trace, print a message and still crash anyways. */
 #  include <windows.h>
 #endif
 
+#ifdef FREEORION_ANDROID
+#  include "../util/AndroidEnvironment.h"
+#endif
+
 #if defined(FREEORION_WIN32)
 
 int wmain(int argc, wchar_t* argv[], wchar_t* envp[]) {

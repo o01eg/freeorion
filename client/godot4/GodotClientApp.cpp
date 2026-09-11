@@ -162,6 +162,9 @@ void GodotClientApp::StartServer() {
         args.emplace_back("--singleplayer");
         args.emplace_back("--skip-checksum");
     }
+#ifdef FREEORION_MACOSX
+    args.emplace_back("--testing");
+#endif
     DebugLogger() << "Launching server process with args: ";
     for (auto arg : args)
         DebugLogger() << arg;

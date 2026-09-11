@@ -12,6 +12,9 @@ public abstract class FreeOrionAIService extends Service {
 
     final int number;
 
+    private static volatile boolean mNativeStarted = false;
+    private static volatile boolean mDestroyed = false;
+
     protected FreeOrionAIService(int number) {
         this.number = number;
     }
@@ -32,7 +35,10 @@ public abstract class FreeOrionAIService extends Service {
 
         final String[] finalArgs = aiArgs;
         new Thread(() -> {
+            if (mDestroyed) return;
             System.loadLibrary("freeorionca");
+            if (mDestroyed) return;
+            mNativeStarted = true;
             startNativeService(this, finalArgs);
         }, "FreeOrionAIThread").start();
         return START_STICKY;
@@ -45,9 +51,10 @@ public abstract class FreeOrionAIService extends Service {
 
     @Override
     public void onDestroy() {
-        new Thread(() -> {
-            stopNativeService();
-        }, "FreeOrionAIThreadStop").start();
+        mDestroyed = true;
+        if (mNativeStarted) {
+            new Thread(() -> stopNativeService(), "FreeOrionAIThreadStop").start();
+        }
         super.onDestroy();
         Log.i(TAG + number, "FreeOrion AI " + number + " service destroyed");
     }

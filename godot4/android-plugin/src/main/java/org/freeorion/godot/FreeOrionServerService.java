@@ -13,6 +13,9 @@ import android.util.Log;
 public final class FreeOrionServerService extends Service {
     private static final String TAG = "FreeOrionServerService";
 
+    private static volatile boolean mNativeStarted = false;
+    private static volatile boolean mDestroyed = false;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -29,7 +32,10 @@ public final class FreeOrionServerService extends Service {
 
         final String[] finalArgs = serverArgs;
         new Thread(() -> {
+            if (mDestroyed) return;
             System.loadLibrary("freeoriond");
+            if (mDestroyed) return;
+            mNativeStarted = true;
             startNativeService(this, finalArgs);
         }, "FreeOrionServerThread").start();
         return START_STICKY;
@@ -42,9 +48,10 @@ public final class FreeOrionServerService extends Service {
 
     @Override
     public void onDestroy() {
-        new Thread(() -> {
-            stopNativeService();
-        }, "FreeOrionServerThreadStop").start();
+        mDestroyed = true;
+        if (mNativeStarted) {
+            new Thread(() -> stopNativeService(), "FreeOrionServerThreadStop").start();
+        }
         super.onDestroy();
         Log.i(TAG, "FreeOrion server service destroyed");
     }

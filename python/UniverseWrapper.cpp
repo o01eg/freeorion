@@ -362,8 +362,18 @@ namespace FreeOrionPython {
             .def("getShip",                     +[](const Universe& u, int id) -> const Ship* { return u.Objects().getRaw<const Ship>(id); },
                                                 py::return_value_policy<py::reference_existing_object>())
             .def("getPlanet",                   +[](const Universe& u, int id) -> const Planet* {
-                                                    auto result = u.Objects().getRaw<const Planet>(id); 
-                                                    DebugLogger() << "Universe::getPlanet by " << id << ": " << (result ? result->Name() : "<null>");
+                                                    auto result = u.Objects().getRaw<const Planet>(id);
+                                                    if (!result) {
+                                                        const auto* raw = u.Objects().getRaw<const UniverseObject>(id);
+                                                        DebugLogger() << "Universe::getPlanet by " << id << ": <null>"
+                                                                      << "; object at that id: "
+                                                                      << (raw ? (std::string(DumpEnum(raw->ObjectType())) + " \"" + raw->Name() + "\"")
+                                                                              : std::string("absent"))
+                                                                      << "; m_objects.size()=" << u.Objects().template size<UniverseObject>()
+                                                                      << "; planets.size()=" << u.Objects().template size<Planet>();
+                                                    } else {
+                                                        DebugLogger() << "Universe::getPlanet by " << id << ": " << result->Name();
+                                                    }
                                                     return result;
                                                 },
                                                 py::return_value_policy<py::reference_existing_object>())

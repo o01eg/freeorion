@@ -1,5 +1,6 @@
 import freeOrionAIInterface as fo
 from collections.abc import Callable, Mapping
+from logging import warning
 
 import AIDependencies
 from common.fo_typing import PlanetId, SpeciesName, SystemId
@@ -32,8 +33,18 @@ class PlanetInfo:
 @cache_for_current_turn
 def _get_planets_info() -> Mapping[PlanetId, PlanetInfo]:
     universe = fo.getUniverse()
-    planets = (universe.getPlanet(pid) for pid in universe.planetIDs)
-    return {planet.id: PlanetInfo(planet.id) for planet in planets}
+    result = {}
+    for pid in universe.planetIDs:
+        planet = universe.getPlanet(pid)
+        if planet is None:
+            warning(
+                "getPlanet(%s) returned None although %s is listed in universe.planetIDs "
+                "(planetIDs=%s). Skipping ghost object id.",
+                pid, pid, universe.planetIDs[:16],
+            )
+            continue
+        result[planet.id] = PlanetInfo(planet.id)
+    return result
 
 
 def _get_system_planets_map(planet_filter: Callable[[PlanetInfo], bool]) -> Mapping[SystemId, tuple[PlanetId]]:

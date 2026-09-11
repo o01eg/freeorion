@@ -241,6 +241,16 @@ void AIClientApp::HandleMessage(const Message& msg) {
 
     case Message::MessageType::GAME_START: {
         DebugLogger() << "AIClientApp::HandleMessage : Received GAME_START message; starting AI turn...";
+        {
+            const std::string& text = msg.Text();
+            DebugLogger() << "AIClientApp::HandleMessage : GAME_START message text size: " << text.size();
+            const std::string ai_log_dir = GetOptionsDB().Get<std::string>("ai-log-dir");
+            const auto dump_path = (ai_log_dir.empty() ? GetUserDataDir() : FilenameToPath(ai_log_dir))
+                / (m_player_name + ".gamestart.bin");
+            std::ofstream dump(FilenameToPath(dump_path), std::ios::binary | std::ios::trunc);
+            dump.write(text.data(), text.size());
+            DebugLogger() << "AIClientApp::HandleMessage : Wrote GAME_START message text to " << PathToString(dump_path);
+        }
         bool single_player_game;        // ignored
         bool loaded_game_data;
         bool ui_data_available;         // ignored

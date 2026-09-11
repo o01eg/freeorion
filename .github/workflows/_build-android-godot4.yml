@@ -116,6 +116,7 @@ jobs:
           name: android-binaries-godot4-${{ matrix.arch }}
           path: |
             godot4/bin/**/*.so
+            godot4/bin/**/*.debug
             godot4/android-plugin/src/main/jniLibs/**/*.so
             godot4/android-plugin/src/main/resources/lib/**/wrap.sh
           if-no-files-found: error

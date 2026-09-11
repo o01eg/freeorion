@@ -29,7 +29,10 @@ fi
 echo "::endgroup::"
 
 echo "::group::Starting APK"
+adb logcat &
+LOGCAT_PID=$!
 adb shell am start -W -n "$LAUNCHER" --ez quickstart true --ei auto-advance-n-turns 100 --ei setup.ai.player.count 2
+kill "${LOGCAT_PID}"
 echo "::endgroup::"
 
 echo "::group::Waiting..."

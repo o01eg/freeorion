@@ -11,6 +11,8 @@ android {
     defaultConfig {
         minSdk 21
         targetSdk 33
+
+        manifestPlaceholders = [extractNativeLibs: hasAsan ? "true" : "false"]
     }
 
     packagingOptions {

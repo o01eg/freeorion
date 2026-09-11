@@ -124,7 +124,8 @@ int main(int argc, char* argv[]) {
         db.Add<int>("network.server.cookies.expire-minutes",                UserStringNop("OPTIONS_DB_COOKIES_EXPIRE"),             15);
         db.Add<bool>("network.server.publish-statistics",                   UserStringNop("OPTIONS_DB_PUBLISH_STATISTICS"),         true);
         db.Add<bool>("network.server.publish-seed",                         UserStringNop("OPTIONS_DB_PUBLISH_SEED"),               true);
-        db.Add<bool>("network.server.binary.enabled",                       UserStringNop("OPTIONS_DB_SERVER_BINARY_SERIALIZATION"),true);
+        db.Add<bool>("network.server.binary.enabled",                       UserStringNop("OPTIONS_DB_SERVER_BINARY_SERIALIZATION"),false);
+        db.Add<bool>("network.server.compression.enabled",                  UserStringNop("OPTIONS_DB_SERVER_COMPRESSION"),         false);
         db.Add<std::string>("network.server.turn-timeout.first-turn-time",  UserStringNop("OPTIONS_DB_FIRST_TURN_TIME"),            "");
         db.Add<int>("network.server.turn-timeout.max-interval",             UserStringNop("OPTIONS_DB_TIMEOUT_INTERVAL"),           0);
         db.Add<bool>("network.server.turn-timeout.fixed-interval",          UserStringNop("OPTIONS_DB_TIMEOUT_FIXED_INTERVAL"),     false);

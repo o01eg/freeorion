@@ -50,6 +50,8 @@ adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-god
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeoriond.log >freeoriond.log 2>&1
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_1.log >AI_1.log 2>&1
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_2.log >AI_2.log 2>&1
+adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_1.gamestart.bin >AI_1.gamestart.bin 2>&1
+adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_2.gamestart.bin >AI_2.gamestart.bin 2>&1
 echo "::endgroup::"
 
 echo "::group::List logs"

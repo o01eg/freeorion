@@ -20,6 +20,10 @@ config/icon="uid://cj7u2a5f57ueg"
 
 GlobalFreeOrionNode="*res://FreeOrionNode.tscn"
 
+[display]
+
+window/frame_pacing/android/enable_frame_pacing=false
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/gut/plugin.cfg", "res://addons/android-export/plugin.cfg")
@@ -27,5 +31,5 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg", "res://addons/android-e
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method.mobile="mobile"
 textures/vram_compression/import_etc2_astc=true

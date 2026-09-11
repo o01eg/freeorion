@@ -341,6 +341,7 @@ jobs:
             freeorion*.log
             logcat.log
             AI_*.log
+            AI_*.gamestart.bin
             android-screenshot.png
           if-no-files-found: error
           retention-days: 1

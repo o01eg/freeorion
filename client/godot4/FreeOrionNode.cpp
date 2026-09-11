@@ -45,8 +45,11 @@ void FreeOrionNode::_ready() {
         return;
 
     std::string executable_path = godot::OS::get_singleton()->get_executable_path().utf8().get_data();
-
+#ifdef FREEORION_MACOSX
+    InitDirs(executable_path, true);
+#else
     InitDirs(executable_path);
+#endif
 
 #ifdef FREEORION_WIN32
     GetOptionsDB().Add<std::filesystem::path>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),   GetBinDir() / "freeoriond.exe");

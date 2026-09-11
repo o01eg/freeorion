@@ -914,7 +914,7 @@ void ServerApp::SendNewGameStartMessages() {
         const auto player_id = player_connection->PlayerID();
         const auto empire_id = PlayerEmpireID(player_id);
         const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
-        const bool use_compression = !player_connection->IsLocalConnection();
+        const bool use_compression = player_connection->IsCompressionUsed();
         DebugLogger() << "SendGameStartMessages: Sending GameStartMessage to player " << player_connection->PlayerName()
             << " use binary " << (use_binary_serialization ? "true" : "false")
             << " use compress " << (use_compression ? "true" : "false");
@@ -1455,7 +1455,7 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         RevokeEmpireTurnReadyness(empire_id);
 
         const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
-        const bool use_compression = !player_connection->IsLocalConnection();
+        const bool use_compression = player_connection->IsCompressionUsed();
 
         DebugLogger() << "LoadGameInit: Sending GameStartMessage to player " << player_connection->PlayerName()
             << " use binary " << (use_binary_serialization ? "true" : "false")
@@ -1783,7 +1783,7 @@ std::vector<PlayerSetupData> ServerApp::FillListPlayers() {
 void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
     const std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
     const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
-    const bool use_compression = !player_connection->IsLocalConnection();
+    const bool use_compression = player_connection->IsCompressionUsed();
 
     if (Networking::is_mod_or_obs(player_connection)) {
         DebugLogger() << "AddObserverPlayerIntoGame: Sending GameStartMessage to player " << player_connection->PlayerName()
@@ -2031,7 +2031,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
 
     const auto player_info_map = GetPlayerInfoMap();
     const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
-    const bool use_compression = !player_connection->IsLocalConnection();
+    const bool use_compression = player_connection->IsCompressionUsed();
 
     for (auto& loop_empire : m_empires | range_values) {
         loop_empire->UpdateOwnedObjectCounters(m_universe);

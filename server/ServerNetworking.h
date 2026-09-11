@@ -84,6 +84,9 @@ public:
     /** Checks if the server will enable binary serialization for this client's connection. */
     [[nodiscard]] bool IsBinarySerializationUsed() const;
 
+    /** Checks if the server will enable compression for this client's connection. */
+    [[nodiscard]] bool IsCompressionUsed() const;
+
     /** Checks if client associated with this connection runs on the same
         physical machine as the server */
     [[nodiscard]] bool IsLocalConnection() const noexcept { return m_is_local_connection; }

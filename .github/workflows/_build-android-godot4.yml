@@ -163,7 +163,7 @@ jobs:
       - name: Build FreeOrion Android plugin
         run: |
           cd godot4/android-plugin
-          gradle assembleDebug --no-daemon
+          gradle assembleDebug -PenableAsan=${{ inputs.debug_sanitize }} --no-daemon
       - name: Upload AAR artifact
         uses: actions/upload-artifact@v7
         with:

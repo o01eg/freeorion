@@ -914,12 +914,16 @@ void ServerApp::SendNewGameStartMessages() {
         const auto player_id = player_connection->PlayerID();
         const auto empire_id = PlayerEmpireID(player_id);
         const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
-        player_connection->SendMessage(GameStartMessage(m_single_player_game,    empire_id,
-                                                        m_current_turn,          m_empires,
-                                                        m_universe,              m_species_manager,
-                                                        GetCombatLogManager(),   m_supply_manager,
-                                                        player_info_map,         m_galaxy_setup_data,
-                                                        use_binary_serialization,!player_connection->IsLocalConnection()),
+        const bool use_compression = !player_connection->IsLocalConnection();
+        DebugLogger() << "SendGameStartMessages: Sending GameStartMessage to player " << player_connection->PlayerName()
+            << " use binary " << (use_binary_serialization ? "true" : "false")
+            << " use compress " << (use_compression ? "true" : "false");
+        player_connection->SendMessage(GameStartMessage(m_single_player_game,     empire_id,
+                                                        m_current_turn,           m_empires,
+                                                        m_universe,               m_species_manager,
+                                                        GetCombatLogManager(),    m_supply_manager,
+                                                        player_info_map,          m_galaxy_setup_data,
+                                                        use_binary_serialization, use_compression),
                                        empire_id, m_current_turn);
     }
 }
@@ -1451,6 +1455,11 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
         RevokeEmpireTurnReadyness(empire_id);
 
         const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
+        const bool use_compression = !player_connection->IsLocalConnection();
+
+        DebugLogger() << "LoadGameInit: Sending GameStartMessage to player " << player_connection->PlayerName()
+            << " use binary " << (use_binary_serialization ? "true" : "false")
+            << " use compress " << (use_compression ? "true" : "false");
 
         if (Networking::is_ai(client_type)) {
             // get save state string
@@ -1462,7 +1471,7 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
                                                             m_species_manager, GetCombatLogManager(),
                                                             m_supply_manager, player_info_map, psgd.orders, sss,
                                                             m_galaxy_setup_data, use_binary_serialization,
-                                                            !player_connection->IsLocalConnection()),
+                                                            use_compression),
                                            empire_id, m_current_turn);
 
         } else if (Networking::is_human(client_type)) {
@@ -1472,7 +1481,7 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
                                                             m_supply_manager, player_info_map, psgd.orders,
                                                             psgd.ui_data, m_galaxy_setup_data,
                                                             use_binary_serialization,
-                                                            !player_connection->IsLocalConnection()),
+                                                            use_compression),
                                             empire_id, m_current_turn);
 
         } else if (Networking::is_mod_or_obs(client_type)) {
@@ -1481,7 +1490,7 @@ void ServerApp::LoadGameInit(const std::vector<PlayerSaveGameData>& player_save_
                                                             m_species_manager, GetCombatLogManager(),
                                                             m_supply_manager, player_info_map,
                                                             m_galaxy_setup_data, use_binary_serialization,
-                                                            !player_connection->IsLocalConnection()));
+                                                            use_compression));
         } else {
             ErrorLogger() << "ServerApp::CommonGameInit unsupported client type: skipping game start message.";
         }
@@ -1774,15 +1783,20 @@ std::vector<PlayerSetupData> ServerApp::FillListPlayers() {
 void ServerApp::AddObserverPlayerIntoGame(const PlayerConnectionPtr& player_connection) {
     const std::map<int, PlayerInfo> player_info_map = GetPlayerInfoMap();
     const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
+    const bool use_compression = !player_connection->IsLocalConnection();
 
     if (Networking::is_mod_or_obs(player_connection)) {
+        DebugLogger() << "AddObserverPlayerIntoGame: Sending GameStartMessage to player " << player_connection->PlayerName()
+            << " use binary " << (use_binary_serialization ? "true" : "false")
+            << " use compress " << (use_compression ? "true" : "false");
+
         // simply sends GAME_START message so established player will known he is in the game now
         player_connection->SendMessage(GameStartMessage(m_single_player_game, ALL_EMPIRES,
                                                         m_current_turn, m_empires, m_universe,
                                                         m_species_manager, GetCombatLogManager(),
                                                         m_supply_manager, player_info_map,
                                                         m_galaxy_setup_data, use_binary_serialization,
-                                                        !player_connection->IsLocalConnection()));
+                                                        use_compression));
     } else {
         ErrorLogger() << "ServerApp::CommonGameInit unsupported client type: skipping game start message.";
     }
@@ -2017,12 +2031,17 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
 
     const auto player_info_map = GetPlayerInfoMap();
     const bool use_binary_serialization = player_connection->IsBinarySerializationUsed();
+    const bool use_compression = !player_connection->IsLocalConnection();
 
     for (auto& loop_empire : m_empires | range_values) {
         loop_empire->UpdateOwnedObjectCounters(m_universe);
         loop_empire->PrepQueueAvailabilityInfoForSerialization(m_context);
         loop_empire->PrepPolicyInfoForSerialization(m_context);
     }
+
+    DebugLogger() << "AddPlayerIntoGame: Sending GameStartMessage to player " << player_connection->PlayerName()
+        << " use binary " << (use_binary_serialization ? "true" : "false")
+        << " use compress " << (use_compression ? "true" : "false");
 
     player_connection->SendMessage(
         GameStartMessage(m_single_player_game, empire_id,
@@ -2031,7 +2050,7 @@ int ServerApp::AddPlayerIntoGame(const PlayerConnectionPtr& player_connection, i
                          m_supply_manager, player_info_map, orders,
                          ui_data, m_galaxy_setup_data,
                          use_binary_serialization,
-                         !player_connection->IsLocalConnection()),
+                         use_compression),
         empire_id, m_current_turn);
 
     return empire_id;

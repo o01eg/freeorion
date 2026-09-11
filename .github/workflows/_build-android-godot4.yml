@@ -261,6 +261,9 @@ jobs:
           sed -i 's|keystore/debug=""|keystore/debug="${{ github.workspace }}/debug.keystore"|' godot4/export_presets.cfg
           sed -i 's|keystore/debug_user=""|keystore/debug_user="androiddebugkey"|' godot4/export_presets.cfg
           sed -i 's|keystore/debug_password=""|keystore/debug_password="android"|' godot4/export_presets.cfg
+          if [ "${{ inputs.debug_sanitize }}" = "true" ]; then
+            sed -i 's|gradle_build/compress_native_libraries=false|gradle_build/compress_native_libraries=true|' godot4/export_presets.cfg
+          fi
       - name: Export APK via Godot CLI
         run: |
           cd godot4

@@ -317,6 +317,11 @@ bool PlayerConnection::IsBinarySerializationUsed() const {
         && m_client_version_string == FreeOrionVersionString();
 }
 
+bool PlayerConnection::IsCompressionUsed() const {
+    return GetOptionsDB().Get<bool>("network.server.compression.enabled")
+        && !IsLocalConnection();
+}
+
 namespace {
     std::string MessageTypeName(Message::MessageType type) {
         switch (type) {

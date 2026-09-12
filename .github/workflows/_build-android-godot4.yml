@@ -346,5 +346,6 @@ jobs:
             AI_*.log
             AI_*.gamestart.bin
             android-screenshot.png
+            server-stack-*.log
           if-no-files-found: error
           retention-days: 1

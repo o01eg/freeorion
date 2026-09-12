@@ -25,7 +25,10 @@ expand_mode = 1
 stretch_mode = 5
 
 [node name="LogoTex" type="TextureRect" parent="."]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 0.1
 texture = ExtResource("3_wagwi")
+expand_mode = 1
+stretch_mode = 5

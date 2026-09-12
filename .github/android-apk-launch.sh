@@ -37,7 +37,7 @@ echo "::endgroup::"
 
 echo "::group::Waiting..."
 if [ "$1" = "4" ]; then
-  sleep 360
+  sleep 420
 else
   sleep 180
 fi

@@ -36,12 +36,31 @@ kill "${LOGCAT_PID}"
 echo "::endgroup::"
 
 echo "::group::Waiting..."
-sleep 180
+if [ "$1" = "4" ]; then
+  sleep 300
+else
+  sleep 180
+fi
 echo "::endgroup::"
 
 echo "::group::Taking screenshot"
 adb exec-out screencap -p > android-screenshot.png || echo "Failed to take screenshot"
 echo "::endgroup::"
+
+if [ "$1" = "4" ]; then
+  echo "::group::Dumping server stacks"
+  STACK_PIDS=$(adb shell pidof org.godotengine.freeoriongodotclient:freeoriond 2>/dev/null | tr -d '\r')
+  if [ -n "$STACK_PIDS" ]; then
+    for P in $STACK_PIDS; do
+      echo "Dumping stack for server pid $P"
+      adb shell debuggerd -b "$P" > "server-stack-$P.log" || echo "Failed to dump stack for pid $P"
+      sleep 2
+    done
+  else
+    echo "Server process not found"
+  fi
+  echo "::endgroup::"
+fi
 
 echo "::group::Stopping APK"
 adb shell am force-stop org.godotengine.freeoriongodotclient

@@ -41,7 +41,7 @@ namespace {
     const std::string DUMMY_EMPTY_MESSAGE = "Lathanda";
 
     //! Returns true if \p payload contains (after decompression) an XML text
-    bool IsXmlArchive(const std::string& payload) {
+    bool IsZlibXmlArchive(const std::string& payload) {
         std::istringstream iss(payload);
         boost::iostreams::filtering_istream zis;
         zis.push(boost::iostreams::zlib_decompressor());
@@ -908,7 +908,7 @@ void ExtractGameStartMessageData(std::string text, bool& single_player_game, int
                                  std::string& save_state_string, GalaxySetupData& galaxy_setup_data)
 {
     try {
-        bool try_xml = IsXmlArchive(text);
+        bool try_xml = IsZlibXmlArchive(text);
         bool did_some_binary_deserialization = false;
         if (!try_xml) {
             try {

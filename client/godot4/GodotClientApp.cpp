@@ -113,6 +113,8 @@ void GodotClientApp::StartServer() {
                 args.append("--singleplayer");
                 args.append("--skip-checksum");
             }
+            args.append("--effects.server.threads");
+            args.append("1");
             plugin->call("startServer", args);
         } else
             ErrorLogger() << "GodotClientApp::StartServer: FreeOrion plugin singleton not found";

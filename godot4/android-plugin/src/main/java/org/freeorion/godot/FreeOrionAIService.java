@@ -35,11 +35,19 @@ public abstract class FreeOrionAIService extends Service {
 
         final String[] finalArgs = aiArgs;
         new Thread(() -> {
-            if (mDestroyed) return;
+            if (mDestroyed) {
+                Log.w(TAG + number, "FreeOrion AI " + number + " start aborted: already destroyed before loadLibrary");
+                return;
+            }
             System.loadLibrary("freeorionca");
-            if (mDestroyed) return;
+            if (mDestroyed) {
+                Log.w(TAG + number, "FreeOrion AI " + number + " start aborted: destroyed during loadLibrary");
+                return;
+            }
             mNativeStarted = true;
+            Log.i(TAG + number, "FreeOrion AI " + number + " native startNativeService begin");
             startNativeService(this, finalArgs);
+            Log.i(TAG + number, "FreeOrion AI " + number + " native startNativeService returned");
         }, "FreeOrionAIThread").start();
         return START_STICKY;
     }
@@ -52,6 +60,8 @@ public abstract class FreeOrionAIService extends Service {
     @Override
     public void onDestroy() {
         mDestroyed = true;
+        Log.i(TAG + number, "FreeOrion AI " + number + " destroyed, nativeStarted=" + mNativeStarted + " -> "
+                + (mNativeStarted ? "stopping native service" : "native service was never started"));
         if (mNativeStarted) {
             new Thread(() -> stopNativeService(), "FreeOrionAIThreadStop").start();
         }

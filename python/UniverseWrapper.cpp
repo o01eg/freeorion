@@ -41,7 +41,12 @@ namespace {
 
     template <typename T>
     auto ObjectIDs(const Universe& universe) -> std::vector<int>
-    { return universe.Objects().allWithIDs<T>() | range_keys | range_to_vec; }
+    {
+        std::vector<int> result;
+        for (const auto& [id, obj] : universe.Objects().allWithIDs<T>())
+            result.push_back(id);
+        return result;
+    }
 
 
     auto ObjectTagsAsStringVec(const UniverseObject& o) -> std::vector<std::string>

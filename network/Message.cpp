@@ -39,6 +39,17 @@
 
 namespace {
     const std::string DUMMY_EMPTY_MESSAGE = "Lathanda";
+
+    //! Returns true if \p payload contains (after decompression) an XML text
+    bool IsXmlArchive(const std::string& payload) {
+        std::istringstream iss(payload);
+        boost::iostreams::filtering_istream zis;
+        zis.push(boost::iostreams::zlib_decompressor());
+        zis.push(iss);
+        std::string signature(5, '\0');
+        zis.read(signature.data(), 5);
+        return strncmp(signature.c_str(), "<?xml", 5) == 0;
+    }
 }
 
 ////////////////////////////////////////////////

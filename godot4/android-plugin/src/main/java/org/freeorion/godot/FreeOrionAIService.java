@@ -12,8 +12,8 @@ public abstract class FreeOrionAIService extends Service {
 
     final int number;
 
-    private static volatile boolean mNativeStarted = false;
-    private static volatile boolean mDestroyed = false;
+    private static volatile boolean NATIVE_STARTED = false;
+    private static volatile boolean DESTROYED = false;
 
     protected FreeOrionAIService(int number) {
         this.number = number;
@@ -35,16 +35,16 @@ public abstract class FreeOrionAIService extends Service {
 
         final String[] finalArgs = aiArgs;
         new Thread(() -> {
-            if (mDestroyed) {
+            if (DESTROYED) {
                 Log.w(TAG + number, "FreeOrion AI " + number + " start aborted: already destroyed before loadLibrary");
                 return;
             }
             System.loadLibrary("freeorionca");
-            if (mDestroyed) {
+            if (DESTROYED) {
                 Log.w(TAG + number, "FreeOrion AI " + number + " start aborted: destroyed during loadLibrary");
                 return;
             }
-            mNativeStarted = true;
+            NATIVE_STARTED = true;
             Log.i(TAG + number, "FreeOrion AI " + number + " native startNativeService begin");
             startNativeService(this, finalArgs);
             Log.i(TAG + number, "FreeOrion AI " + number + " native startNativeService returned");
@@ -59,10 +59,10 @@ public abstract class FreeOrionAIService extends Service {
 
     @Override
     public void onDestroy() {
-        mDestroyed = true;
-        Log.i(TAG + number, "FreeOrion AI " + number + " destroyed, nativeStarted=" + mNativeStarted + " -> "
-                + (mNativeStarted ? "stopping native service" : "native service was never started"));
-        if (mNativeStarted) {
+        DESTROYED = true;
+        Log.i(TAG + number, "FreeOrion AI " + number + " destroyed, nativeStarted=" + NATIVE_STARTED + " -> "
+                + (NATIVE_STARTED ? "stopping native service" : "native service was never started"));
+        if (NATIVE_STARTED) {
             new Thread(() -> stopNativeService(), "FreeOrionAIThreadStop").start();
         }
         super.onDestroy();

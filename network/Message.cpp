@@ -908,63 +908,65 @@ void ExtractGameStartMessageData(std::string text, bool& single_player_game, int
                                  std::string& save_state_string, GalaxySetupData& galaxy_setup_data)
 {
     try {
-        bool try_xml = false;
+        bool try_xml = IsXmlArchive(text);
         bool did_some_binary_deserialization = false;
-        try {
-            // first attempt binary deserialziation
-            std::istringstream is(text);
-            boost::iostreams::filtering_istream zis;
-            zis.push(boost::iostreams::zlib_decompressor());
-            zis.push(is);
-
-            freeorion_bin_iarchive ia(zis);
-            ia >> BOOST_SERIALIZATION_NVP(single_player_game)
-               >> BOOST_SERIALIZATION_NVP(empire_id)
-               >> BOOST_SERIALIZATION_NVP(current_turn);
-            GlobalSerializationEncodingForEmpire() = empire_id;
-
-            did_some_binary_deserialization = true; // got some binary data, so don't retry as XML even if following deserialization fails
-
-            ScopedTimer deserialize_timer;
-            ia >> BOOST_SERIALIZATION_NVP(empires);
-            DebugLogger() << "ExtractGameStartMessage empire deserialization time " << deserialize_timer.DurationString();
-
-            ia >> BOOST_SERIALIZATION_NVP(species);
-            combat_logs.Clear();    // only needed when loading new game, not when incrementally serializing logs on turn update
-            SerializeIncompleteLogs(ia, combat_logs, 1);
-            ia >> BOOST_SERIALIZATION_NVP(supply);
-
-            deserialize_timer.restart();
-            Deserialize(ia, universe);
-            DebugLogger() << "ExtractGameStartMessage universe deserialization time " << deserialize_timer.DurationString();
-
-
-            ia >> BOOST_SERIALIZATION_NVP(players)
-               >> BOOST_SERIALIZATION_NVP(loaded_game_data);
-            if (loaded_game_data) {
-                Deserialize(ia, orders);
-                DebugLogger() << "deserialized orders: " << orders.size();
-                ia >> BOOST_SERIALIZATION_NVP(ui_data_available);
-                DebugLogger() << (ui_data_available ? "have UI data" : "do not have UI data");
-                if (ui_data_available)
-                    ia >> BOOST_SERIALIZATION_NVP(ui_data);
-                ia >> BOOST_SERIALIZATION_NVP(save_state_string_available);
-                DebugLogger() << (save_state_string_available ? "have save state string" : "do not have save state string");
-                if (save_state_string_available) {
-                    ia >> BOOST_SERIALIZATION_NVP(save_state_string);
-                    DebugLogger() << "save state string size:" << save_state_string.size();
+        if (!try_xml) {
+            try {
+                // first attempt binary deserialziation
+                std::istringstream is(text);
+                boost::iostreams::filtering_istream zis;
+                zis.push(boost::iostreams::zlib_decompressor());
+                zis.push(is);
+    
+                freeorion_bin_iarchive ia(zis);
+                ia >> BOOST_SERIALIZATION_NVP(single_player_game)
+                   >> BOOST_SERIALIZATION_NVP(empire_id)
+                   >> BOOST_SERIALIZATION_NVP(current_turn);
+                GlobalSerializationEncodingForEmpire() = empire_id;
+    
+                did_some_binary_deserialization = true; // got some binary data, so don't retry as XML even if following deserialization fails
+    
+                ScopedTimer deserialize_timer;
+                ia >> BOOST_SERIALIZATION_NVP(empires);
+                DebugLogger() << "ExtractGameStartMessage empire deserialization time " << deserialize_timer.DurationString();
+    
+                ia >> BOOST_SERIALIZATION_NVP(species);
+                combat_logs.Clear();    // only needed when loading new game, not when incrementally serializing logs on turn update
+                SerializeIncompleteLogs(ia, combat_logs, 1);
+                ia >> BOOST_SERIALIZATION_NVP(supply);
+    
+                deserialize_timer.restart();
+                Deserialize(ia, universe);
+                DebugLogger() << "ExtractGameStartMessage universe deserialization time " << deserialize_timer.DurationString();
+    
+    
+                ia >> BOOST_SERIALIZATION_NVP(players)
+                   >> BOOST_SERIALIZATION_NVP(loaded_game_data);
+                if (loaded_game_data) {
+                    Deserialize(ia, orders);
+                    DebugLogger() << "deserialized orders: " << orders.size();
+                    ia >> BOOST_SERIALIZATION_NVP(ui_data_available);
+                    DebugLogger() << (ui_data_available ? "have UI data" : "do not have UI data");
+                    if (ui_data_available)
+                        ia >> BOOST_SERIALIZATION_NVP(ui_data);
+                    ia >> BOOST_SERIALIZATION_NVP(save_state_string_available);
+                    DebugLogger() << (save_state_string_available ? "have save state string" : "do not have save state string");
+                    if (save_state_string_available) {
+                        ia >> BOOST_SERIALIZATION_NVP(save_state_string);
+                        DebugLogger() << "save state string size:" << save_state_string.size();
+                    }
+                } else {
+                    ui_data_available = false;
+                    save_state_string_available = false;
                 }
-            } else {
-                ui_data_available = false;
-                save_state_string_available = false;
+                ia >> BOOST_SERIALIZATION_NVP(galaxy_setup_data);
+            } catch (...) {
+                if (did_some_binary_deserialization) {
+                    ErrorLogger() << "Deserialization error after partially-done binary deserialization";
+                    throw;
+                }
+                try_xml = true; // try XML deserialization if no binary data was deserialized
             }
-            ia >> BOOST_SERIALIZATION_NVP(galaxy_setup_data);
-        } catch (...) {
-            if (did_some_binary_deserialization) {
-                ErrorLogger() << "Deserialization error after partially-done binary deserialization";
-                throw;
-            }
-            try_xml = true; // try XML deserialization if no binary data was deserialized
         }
         if (try_xml) {
             // if binary deserialization failed, try more-portable XML deserialization

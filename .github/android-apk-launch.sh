@@ -37,7 +37,7 @@ echo "::endgroup::"
 
 echo "::group::Waiting..."
 if [ "$1" = "4" ]; then
-  sleep 300
+  sleep 360
 else
   sleep 180
 fi
@@ -49,11 +49,16 @@ echo "::endgroup::"
 
 if [ "$1" = "4" ]; then
   echo "::group::Dumping server stacks"
+  adb root >/dev/null 2>&1 || true
+  adb wait-for-device
   STACK_PIDS=$(adb shell pidof org.godotengine.freeoriongodotclient:freeoriond 2>/dev/null | tr -d '\r')
   if [ -n "$STACK_PIDS" ]; then
     for P in $STACK_PIDS; do
       echo "Dumping stack for server pid $P"
-      adb shell debuggerd -b "$P" > "server-stack-$P.log" || echo "Failed to dump stack for pid $P"
+      if ! adb shell debuggerd -b "$P" > "server-stack-$P.log" 2>&1 && \
+         ! adb shell su 0 debuggerd -b "$P" > "server-stack-su-$P.log" 2>&1; then
+        echo "Failed to dump stack for pid $P"
+      fi
       sleep 2
     done
   else

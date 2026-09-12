@@ -1,6 +1,7 @@
 #include "AndroidAIService.h"
 
 #include "../util/AndroidEnvironment.h"
+#include "../util/Logger.h"
 
 namespace {
     void ControlAndroidService(const std::string& class_name, bool start, const std::vector<std::string>& args = {}) {
@@ -31,9 +32,11 @@ namespace {
         if (start) {
             jmethodID start_service_mid = env->GetMethodID(context_cls, "startService", "(Landroid/content/Intent;)Landroid/content/ComponentName;");
             env->CallObjectMethod(context, start_service_mid, intent);
+            DebugLogger() << "AndroidAIService: startService for " << class_name;
         } else {
             jmethodID stop_service_mid = env->GetMethodID(context_cls, "stopService", "(Landroid/content/Intent;)Z");
             env->CallBooleanMethod(context, stop_service_mid, intent);
+            DebugLogger() << "AndroidAIService: stopService for " << class_name;
         }
 
         env->DeleteLocalRef(intent);
@@ -47,12 +50,26 @@ AndroidAIService::AndroidAIService(int slot_id, const std::vector<std::string>& 
 AndroidAIService::~AndroidAIService()
 { Kill(); }
 
+AndroidAIService::AndroidAIService(AndroidAIService&& rhs) noexcept
+    : m_slot_id(rhs.m_slot_id)
+{ rhs.m_killed = true; }
+
+AndroidAIService& AndroidAIService::operator=(AndroidAIService&& rhs) noexcept {
+    if (this != &rhs) {
+        m_slot_id = rhs.m_slot_id;
+        m_killed = false;
+        rhs.m_killed = true;
+    }
+    return *this;
+}
+
 void AndroidAIService::Kill() {
     if (!m_killed) {
+        DebugLogger() << "AndroidAIService: killing slot " << m_slot_id;
         ControlAndroidService("org/freeorion/godot/FreeOrionAIService" + std::to_string(m_slot_id), false);
         m_killed = true;
     }
 }
 
 void AndroidAIService::Free()
-{ m_killed = true; }
+{ DebugLogger() << "AndroidAIService: freeing slot " << m_slot_id; m_killed = true; }

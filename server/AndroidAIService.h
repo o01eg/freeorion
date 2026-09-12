@@ -12,14 +12,14 @@ public:
     AndroidAIService(const AndroidAIService&) = delete;
     AndroidAIService& operator=(const AndroidAIService&) = delete;
 
-    AndroidAIService(AndroidAIService&&) noexcept = default;
-    AndroidAIService& operator=(AndroidAIService&&) noexcept = default;
+    AndroidAIService(AndroidAIService&&) noexcept;
+    AndroidAIService& operator=(AndroidAIService&&) noexcept;
 
     void Kill();
     void Free();
 private:
     int m_slot_id;
-    bool m_killed;
+    bool m_killed = false;
 };
 
 #endif

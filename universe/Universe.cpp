@@ -1318,8 +1318,11 @@ namespace {
 
             };
 
-            futures.emplace_back(i, std::async(std::launch::async, eval_active_sources));
-            DebugLogger(effects) << "Spawning std::async activation eval total is " << futures.size();
+            if (EffectsProcessingThreads() > 1) {
+                futures.emplace_back(i, std::async(std::launch::async, eval_active_sources));
+            } else {
+                active_sources[i] = eval_active_sources();
+            }
 
             // save evaluation lookup index in cache
             already_evaluated_activation_condition_idx.emplace_back(effects_group.Activation(), i);
@@ -1519,7 +1522,6 @@ namespace {
         if (errno)
             DebugLogger(effects) << "GetThreadPool() errno was initially: " << errno;
         const auto thread_count = static_cast<unsigned int>(std::max(1, EffectsProcessingThreads()));
-        DebugLogger(effects) << "GetThreadPool() with " << thread_count << " threads";
         try {
             errno = 0; // https://github.com/chriskohlhoff/asio/issues/1588
             return boost::asio::thread_pool(thread_count);

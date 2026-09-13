@@ -29,7 +29,7 @@ fi
 echo "::endgroup::"
 
 echo "::group::Starting APK"
-adb logcat &
+adb logcat "*:W" &
 LOGCAT_PID=$!
 adb shell am start -W -n "$LAUNCHER" --ez quickstart true --ei auto-advance-n-turns 100 --ei setup.ai.player.count 2
 kill "${LOGCAT_PID}"
@@ -47,7 +47,7 @@ echo "::group::Taking screenshot"
 adb exec-out screencap -p > android-screenshot.png || echo "Failed to take screenshot"
 echo "::endgroup::"
 
-if [ "$1" = "4" ]; then
+if [ "$1" = "4" ] && [ "$2" = "true" ]; then
   echo "::group::Dumping server stacks"
   adb root >/dev/null 2>&1 || true
   adb wait-for-device
@@ -62,7 +62,7 @@ if [ "$1" = "4" ]; then
       sleep 2
     done
   else
-    echo "Server process not found"
+    echo "::error title=Server::Server process not found"
   fi
   echo "::endgroup::"
 fi
@@ -77,8 +77,6 @@ adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-god
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeoriond.log >freeoriond.log 2>&1
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_1.log >AI_1.log 2>&1
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_2.log >AI_2.log 2>&1
-adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_1.gamestart.bin >AI_1.gamestart.bin 2>&1
-adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_2.gamestart.bin >AI_2.gamestart.bin 2>&1
 echo "::endgroup::"
 
 echo "::group::List logs"

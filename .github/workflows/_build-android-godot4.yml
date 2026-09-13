@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [x86_64]
+        arch: [x86_64, armeabi-v7a, arm64-v8a]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
@@ -346,7 +346,6 @@ jobs:
             freeorion*.log
             logcat.log
             AI_*.log
-            AI_*.gamestart.bin
             android-screenshot.png
             server-stack-*.log
           if-no-files-found: error

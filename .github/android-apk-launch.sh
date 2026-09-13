@@ -94,7 +94,7 @@ if [ -n "$ERRORS" ]; then
 fi
 echo "::endgroup::"
 
-echo "::group::Checking finish"
+echo "::group::Checking parsing finish"
 if ! grep -q "\[debug\] godot : FreeOrionNode.cpp:[0-9]\+ : FreeOrionNode::parsing_thread(): Freeorion parsing stopped" freeorion-godot.log; then
   echo "::error title=Parser::Parsing thread did not stopped!"
   echo "::endgroup::"
@@ -105,4 +105,14 @@ if [ -n "$ERRORS" ]; then
   exit 1
 fi
 echo "::endgroup::"
+
+if [ "$1" = "4" ]; then
+  echo "::group::Checking server turns"
+  if ! grep -q "\[debug\] server : ServerApp.cpp:[0-9]\+ : ServerApp::AllOrdersReceived for turn: 3" freeoriond.log; then
+    echo "::error title=Server::Turn orders didn't received!"
+    echo "::endgroup::"
+    exit 1
+  fi
+  echo "::endgroup::"
+fi
 

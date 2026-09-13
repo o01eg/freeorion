@@ -320,6 +320,12 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
     }
 #endif
 
+    if (EffectsProcessingThreads() == 1) {
+        args.push_back("--effects.ai.threads");
+        args.push_back("1");
+        DebugLogger() << "forcing --effects.ai.threads 1 to match single-threaded effects server";
+    }
+
     // for each AI client player, create a new AI client process
     for (const auto& ai_psd : player_setup_data | range_filter(Networking::is_ai)) {
         // check that AIs have a name, as they will be sorted later based on it

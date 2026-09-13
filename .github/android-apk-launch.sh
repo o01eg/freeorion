@@ -74,9 +74,11 @@ echo "::endgroup::"
 echo "::group::Getting logs"
 adb logcat -d >logcat.log
 adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-godot.log >freeorion-godot.log 2>&1
-adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeoriond.log >freeoriond.log 2>&1
-adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_1.log >AI_1.log 2>&1
-adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_2.log >AI_2.log 2>&1
+if [ "$1" = "4" ]; then
+  adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeoriond.log >freeoriond.log 2>&1
+  adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_1.log >AI_1.log 2>&1
+  adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_2.log >AI_2.log 2>&1
+fi
 echo "::endgroup::"
 
 echo "::group::List logs"

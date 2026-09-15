@@ -156,6 +156,8 @@ jobs:
           path: godot4/
       - name: Set up Java and Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:

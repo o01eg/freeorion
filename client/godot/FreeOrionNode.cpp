@@ -106,16 +106,17 @@ FreeOrionNode::~FreeOrionNode()
 void FreeOrionNode::_init() {
 #if defined(FREEORION_ANDROID)
     SetAndroidEnvironment(s_android_api_struct->godot_android_get_env(),
-                          s_android_api_struct->godot_android_get_activity());
+                          s_android_api_struct->godot_android_get_activity(),
+                          true);
 #endif
     std::string executable_path = godot::OS::get_singleton()->get_executable_path().utf8().get_data();
 
     InitDirs(executable_path);
 
 #ifdef FREEORION_WIN32
-    GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),   PathToString(GetBinDir() / "freeoriond.exe"));
+    GetOptionsDB().Add<std::filesystem::path>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),   GetBinDir() / "freeoriond.exe");
 #else
-    GetOptionsDB().Add<std::string>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),   PathToString(GetBinDir() / "freeoriond"));
+    GetOptionsDB().Add<std::filesystem::path>("misc.server-local-binary.path", UserStringNop("OPTIONS_DB_FREEORIOND_PATH"),   GetBinDir() / "freeoriond");
 #endif
 
     GetOptionsDB().SetFromFile(GetConfigPath(), FreeOrionVersionString());

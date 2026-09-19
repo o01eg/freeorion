@@ -4,6 +4,8 @@ on:
     branches:
       - master
       - 'release-v*'
+permissions:
+  security-events: write
 jobs:
   android:
     uses: ./.github/workflows/_build-android.yml

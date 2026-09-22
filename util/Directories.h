@@ -8,10 +8,6 @@
 #include "Enum.h"
 #include "Export.h"
 
-#if defined(FREEORION_ANDROID)
-#  include <jni.h>
-#endif
-
 //! Types of root directories
 #if !defined(FREEORION_LINUX)
 FO_ENUM(
@@ -120,7 +116,7 @@ FO_COMMON_API auto GetUserDataDir() -> std::filesystem::path const;
 
 //! Converts UTF-8 string into a path, doing any required wide-character
 //! conversions as determined by the operating system / filesystem.
-FO_COMMON_API auto FilenameToPath(std::string const& path_str) -> std::filesystem::path;
+FO_COMMON_API auto FilenameToPath(std::string_view path_str) -> std::filesystem::path;
 
 //! Returns the directory that contains all game resources.
 //!
@@ -155,14 +151,6 @@ FO_COMMON_API auto GetBinDir() -> std::filesystem::path const;
 FO_COMMON_API auto GetPythonHome() -> std::filesystem::path const;
 #endif
 
-#if defined(FREEORION_ANDROID)
-//! Sets android environment to access directories
-FO_COMMON_API void SetAndroidEnvironment(JNIEnv* env, jobject activity, bool copy_python_lib);
-
-//! Gets locale language from android anvironment
-FO_COMMON_API std::string GetAndroidLang();
-#endif
-
 //! Returns the full path to the configfile.
 FO_COMMON_API auto GetConfigPath() -> std::filesystem::path const;
 
@@ -181,12 +169,10 @@ FO_COMMON_API auto GetServerSaveDir() -> std::filesystem::path const;
 
 //! Returns an utf-8 encoded string from the given filesystem path.
 FO_COMMON_API auto PathToString(std::filesystem::path const& path) -> std::string;
+void PathToString(auto) = delete; // disable implicit conversions
 
 //! Returns current timestamp in a form that can be used in file names
 FO_COMMON_API auto FilenameTimestamp() -> std::string;
-
-//! Returns the path to @p to, as it appears from @p from.
-FO_COMMON_API auto RelativePath(std::filesystem::path const& from, std::filesystem::path const& to) -> std::filesystem::path;
 
 //! Returns true if the given @p path referrs to a FO content script and false
 //! otherwise.
@@ -201,7 +187,9 @@ FO_COMMON_API auto IsFOCPyScript(std::filesystem::path const& path) -> bool;
 //!
 //! When passing a @p predicate, the pathes need to match this predicate.  If
 //! no predicate is given pathes need to refer to files.
-FO_COMMON_API auto ListDir(std::filesystem::path const& path, std::function<bool (std::filesystem::path const&)> predicate=nullptr) -> std::vector<std::filesystem::path>;
+FO_COMMON_API auto ListDir(std::filesystem::path const& path, std::function<bool (std::filesystem::path const&)> predicate = nullptr) -> std::vector<std::filesystem::path>;
+void ListDir(auto, std::function<bool (std::filesystem::path const&)>) = delete; // disable implicit conversion
+void ListDir(auto) = delete;
 
 //! Returns true iff the @p test_dir is in @p dir and @p dir
 //! is existing directory.
@@ -216,6 +204,7 @@ FO_COMMON_API auto IsExistingFile(std::filesystem::path const& path) -> bool;
 //! Returns true iff path exists and is a directory
 FO_COMMON_API auto IsExistingDir(std::filesystem::path const& path) -> bool;
 
-//! Reads text file content from @p path and returs true if success
+//! Reads text file content from @p path and returns true if success
 FO_COMMON_API auto ReadFile(std::filesystem::path const& path, std::string& file_contents) -> bool;
+void ReadFile(auto path, std::string&) = delete; // disable implicit conversion
 #endif

@@ -298,11 +298,9 @@ namespace {
             default_structure_effects = !boost::python::extract<bool>(kw["NoDefaultStructureEffect"])();
 
         std::vector<ShipHull::Slot> slots;
-        if (kw.has_key("slots")) {
-            boost::python::stl_input_iterator<ship_slot_wrapper> slots_begin(kw["slots"]), slots_end;
-            for (auto it = slots_begin; it != slots_end; ++it)
-                slots.push_back(it->slot);
-        }
+        boost::python::stl_input_iterator<ship_slot_wrapper> slots_begin(kw["slots"]), slots_end;
+        for (auto it = slots_begin; it != slots_end; ++it)
+            slots.push_back(it->slot);
 
         auto production_cost = pyobject_to_vref_or_cast<double, int>(kw["buildcost"]);
         auto production_time = pyobject_to_vref_or_cast<int, double>(kw["buildtime"]);
@@ -317,17 +315,9 @@ namespace {
             tags = std::set<std::string>(tags_begin, tags_end);
         }
 
-        std::unique_ptr<Condition::Condition> location;
-        if (kw.has_key("location"))
-            location = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["location"])().condition);
-        else
-            location = std::make_unique<Condition::All>();
+        auto location = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["location"])().condition);
 
-        std::unique_ptr<Condition::Condition> enqueue_location;
-        if (kw.has_key("enqueuelocation"))
-            enqueue_location = ValueRef::CloneUnique(boost::python::extract<condition_wrapper>(kw["enqueuelocation"])().condition);
-        else
-            enqueue_location = std::make_unique<Condition::All>();
+        std::unique_ptr<Condition::Condition> enqueue_location = std::make_unique<Condition::All>();
 
         std::vector<std::unique_ptr<Effect::EffectsGroup>> effectsgroups;
         boost::python::stl_input_iterator<effect_group_wrapper> effectsgroups_begin(kw["effectsgroups"]), effectsgroups_end;
@@ -388,7 +378,7 @@ BOOST_PYTHON_MODULE(_ship_hulls) {
     boost::python::docstring_options doc_options(true, true, false);
 
     boost::python::class_<py_grammar, boost::python::bases<>, py_grammar, boost::noncopyable>("__Grammar", boost::python::no_init);
-    boost::python::class_<ship_slot_wrapper, boost::python::bases<>, ship_slot_wrapper, boost::noncopyable>("_ShipSlot", boost::python::no_init);
+    boost::python::class_<ship_slot_wrapper>("_ShipSlot", boost::python::no_init);
 
     boost::python::def("Slot", boost::python::raw_function(py_insert_slot_));
 

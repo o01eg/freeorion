@@ -41,7 +41,12 @@ namespace {
 
     template <typename T>
     auto ObjectIDs(const Universe& universe) -> std::vector<int>
-    { return universe.Objects().allWithIDs<T>() | range_keys | range_to_vec; }
+    {
+        std::vector<int> result;
+        for (const auto& [id, obj] : universe.Objects().allWithIDs<T>())
+            result.push_back(id);
+        return result;
+    }
 
 
     auto ObjectTagsAsStringVec(const UniverseObject& o) -> std::vector<std::string>
@@ -361,7 +366,21 @@ namespace FreeOrionPython {
                                                 py::return_value_policy<py::reference_existing_object>())
             .def("getShip",                     +[](const Universe& u, int id) -> const Ship* { return u.Objects().getRaw<const Ship>(id); },
                                                 py::return_value_policy<py::reference_existing_object>())
-            .def("getPlanet",                   +[](const Universe& u, int id) -> const Planet* { return u.Objects().getRaw<const Planet>(id); },
+            .def("getPlanet",                   +[](const Universe& u, int id) -> const Planet* {
+                                                    auto result = u.Objects().getRaw<const Planet>(id);
+                                                    if (!result) {
+                                                        const auto* raw = u.Objects().getRaw<const UniverseObject>(id);
+                                                        DebugLogger() << "Universe::getPlanet by " << id << ": <null>"
+                                                                      << "; object at that id: "
+                                                                      << (raw ? (std::string(DumpEnum(raw->ObjectType())) + " \"" + raw->Name() + "\"")
+                                                                              : std::string("absent"))
+                                                                      << "; m_objects.size()=" << u.Objects().template size<UniverseObject>()
+                                                                      << "; planets.size()=" << u.Objects().template size<Planet>();
+                                                    } else {
+                                                        DebugLogger() << "Universe::getPlanet by " << id << ": " << result->Name();
+                                                    }
+                                                    return result;
+                                                },
                                                 py::return_value_policy<py::reference_existing_object>())
             .def("getSystem",                   +[](const Universe& u, int id) -> const System* { return u.Objects().getRaw<const System>(id); },
                                                 py::return_value_policy<py::reference_existing_object>())

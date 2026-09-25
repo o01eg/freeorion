@@ -177,8 +177,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "main() caught exception(std::exception): " << e.what() << std::endl;
         return 1;
     } catch (...) {
-        ErrorLogger() << "main() caught unknown exception";
-        std::cerr << "main() caught unknown exception" << std::endl;
+        ErrorLogger() << "main() caught unknown exception.";
+        std::cerr << "main() caught unknown exception." << std::endl;
         return 1;
     }
 #endif

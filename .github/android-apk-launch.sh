@@ -106,3 +106,13 @@ if [ -n "$ERRORS" ]; then
 fi
 echo "::endgroup::"
 
+if [ "$1" = "4" ]; then
+  echo "::group::Checking server turns"
+  if ! grep -q "\[debug\] server : ServerApp.cpp:[0-9]\+ : ServerApp::AllOrdersReceived for turn: 3" freeoriond.log; then
+    echo "::error title=Server::Turn orders didn't received!"
+    echo "::endgroup::"
+    exit 1
+  fi
+  echo "::endgroup::"
+fi
+

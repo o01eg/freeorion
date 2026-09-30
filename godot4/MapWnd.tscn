@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3 uid="uid://bbmlrg7wbu7cs"]
+[gd_scene load_steps=4 format=3 uid="uid://bbmlrg7wbu7cs"]
 
 [ext_resource type="AudioStream" uid="uid://3a4jg0i7pgkb" path="res://assets/sound/artificial_intelligence_v3.ogg" id="1_vno04"]
+[ext_resource type="PackedScene" uid="uid://bx4bc46ask5n6" path="res://CUIButton.tscn" id="2_cuibtn"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toolbar"]
 content_margin_left = 5.0
@@ -27,10 +28,19 @@ grow_vertical = 2
 stream = ExtResource("1_vno04")
 autoplay = true
 
-[node name="ToolBar" type="PanelContainer" parent="."]
+[node name="ToolBar" type="Panel" parent="."]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 42.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_toolbar")
+
+[node name="BtnTurn" parent="ToolBar" instance=ExtResource("2_cuibtn")]
+auto_translate_mode = 2
+layout_mode = 0
+offset_left = 5.0
+offset_top = 8.0
+offset_right = 116.0
+offset_bottom = 33.0
+text = "MAP_BTN_TURN_UPDATE"

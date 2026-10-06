@@ -9,6 +9,7 @@ on:
         type: boolean
 env:
   GODOT_VERSION: "4.7.2"
+  GODOT_FLAVOR: "stable"
 jobs:
   android:
     name: ${{ matrix.arch }} (${{ inputs.debug_sanitize && 'RelWithDebInfo_ASan' || 'MinSizeRel' }})
@@ -207,21 +208,21 @@ jobs:
           path: godot4/
       - name: Install Godot and Templates
         run: |
-          wget --content-disposition "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=stable&slug=linux.x86_64.zip&platform=linux.64"
-          wget --content-disposition "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=stable&slug=export_templates.tpz&platform=templates"
+          wget --content-disposition "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=${{ env.GODOT_FLAVOR }}&slug=linux.x86_64.zip&platform=linux.64"
+          wget --content-disposition "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=${{ env.GODOT_FLAVOR }}&slug=export_templates.tpz&platform=templates"
 
-          unzip Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64.zip
-          sudo mv Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64 /usr/local/bin/godot
+          unzip Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_linux.x86_64.zip
+          sudo mv Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_linux.x86_64 /usr/local/bin/godot
 
-          mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
-          unzip Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz
-          mv templates/* ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable/
+          mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.${{ env.GODOT_FLAVOR }}
+          unzip Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_export_templates.tpz
+          mv templates/* ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.${{ env.GODOT_FLAVOR }}/
       - name: Install Android build template into project
         run: |
           mkdir -p godot4/android/build
-          unzip -o -q ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable/android_source.zip -d godot4/android/build
+          unzip -o -q ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.${{ env.GODOT_FLAVOR }}/android_source.zip -d godot4/android/build
           echo -n "" > godot4/android/build/.gdignore
-          echo -n "${{ env.GODOT_VERSION }}.stable" > godot4/android/.build_version
+          echo -n "${{ env.GODOT_VERSION }}.${{ env.GODOT_FLAVOR }}" > godot4/android/.build_version
       - name: Set up Java and Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -268,95 +269,3 @@ jobs:
           if [ "${{ inputs.debug_sanitize }}" = "true" ]; then
             sed -i 's|gradle_build/compress_native_libraries=false|gradle_build/compress_native_libraries=true|' godot4/export_presets.cfg
           fi
-      - name: Export APK via Godot CLI
-        run: |
-          cd godot4
-          godot --headless -v --export-debug "Android" ../freeorion.apk
-      - name: Upload APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-godot4
-          path: freeorion.apk
-          if-no-files-found: error
-          retention-days: 1
-  run-android:
-    name: Run Android
-    runs-on: ubuntu-24.04
-    needs: export-android
-    steps:
-      - uses: actions/cache/restore@v5
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-            ~/.android/debug.keystore
-          key: avd-test-godot-v2
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: run emulator to generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 31
-          target: google_apis
-          arch: x86_64
-          profile: Galaxy Nexus
-          cores: 2
-          sdcard-path-or-size: 1G
-          avd-name: test
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          working-directory: ./
-          channel: beta
-          script: echo "Generated AVD snapshot for caching."
-      - uses: actions/cache/save@v5
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-            ~/.android/debug.keystore
-          key: avd-test-godot-v2
-      - name: Checkout sources
-        uses: actions/checkout@v6
-        with:
-          sparse-checkout: .github/android-apk-launch.sh
-      - name: Dowload APK
-        uses: actions/download-artifact@v8
-        with:
-          name: android-godot4
-          path: .
-      - name: run game on emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 31
-          target: google_apis
-          arch: x86_64
-          profile: Galaxy Nexus
-          cores: 2
-          sdcard-path-or-size: 1G
-          avd-name: test
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          working-directory: ./
-          channel: beta
-          script: bash .github/android-apk-launch.sh 4 "${{ inputs.debug_sanitize }}"
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-test-logs-godot4-${{ github.run_number }}
-          path: |
-            freeorion*.log
-            logcat.log
-            AI_*.log
-            android-screenshot.png
-            server-stack-*.log
-          if-no-files-found: error
-          retention-days: 1

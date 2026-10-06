@@ -8,8 +8,8 @@ on:
         default: false
         type: boolean
 env:
-  GODOT_VERSION: "4.7.2"
-  GODOT_FLAVOR: "stable"
+  GODOT_VERSION: "4.8"
+  GODOT_FLAVOR: "dev7"
 jobs:
   android:
     name: ${{ matrix.arch }} (${{ inputs.debug_sanitize && 'RelWithDebInfo_ASan' || 'MinSizeRel' }})

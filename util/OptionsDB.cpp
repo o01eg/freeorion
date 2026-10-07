@@ -1,4 +1,4 @@
-#include "OptionsDB.h"
+﻿#include "OptionsDB.h"
 
 #include "Directories.h"
 #include "i18n.h"
@@ -7,6 +7,7 @@
 #include "XMLDoc.h"
 #include "ranges.h"
 
+#include <charconv>
 #include <iostream>
 #include <iomanip>
 #include <stdexcept>
@@ -14,7 +15,7 @@
 #include <utility>
 #if !defined(__cpp_lib_integer_comparison_functions)
 namespace std {
-    inline auto cmp_greater_equal(auto&& lhs, auto&& rhs) { return lhs < rhs; }
+    inline auto cmp_greater_equal(auto&& lhs, auto&& rhs) { return lhs >= rhs; }
 }
 #endif
 
@@ -25,6 +26,14 @@ namespace std {
 #include <fstream>
 #include <boost/range/algorithm_ext/erase.hpp>
 #include <boost/tokenizer.hpp>
+
+#if !defined(CONSTEXPR_STRING)
+#  if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+#    define CONSTEXPR_STRING constexpr
+#  else
+#    define CONSTEXPR_STRING
+#  endif
+#endif
 
 namespace {
     std::vector<OptionsDBFn>& OptionsRegistry() noexcept {
@@ -53,6 +62,96 @@ namespace {
     static_assert(StripQuotation("unquoted") == "unquoted");
     static_assert(StripQuotation("").empty());
 
+    // replaces XML-probematic chars &<>'" with XML-safe placeholders
+    CONSTEXPR_STRING void AppendCharToXMLText(std::string& text, std::string::value_type ch) {
+        switch (ch) {
+        case '&':
+            text.append("&amp;");
+            break;
+        case '<':
+            text.append("&lt;");
+            break;
+        case '>':
+            text.append("&gt;");
+            break;
+        case '\'':
+            text.append("&apos;");
+            break;
+        case '\"':
+            text.append("&quot;");
+            break;
+        default:
+            text.push_back(ch);
+        }
+    }
+
+#if defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+    constexpr std::string AppendedTest(std::string_view str, std::string::value_type ch) {
+        std::string retval{str};
+        AppendCharToXMLText(retval, ch);
+        return retval;
+    }
+
+    static_assert(AppendedTest("a", 'b') == "ab");
+    static_assert(AppendedTest("オ", 'b') == "オb");
+    static_assert(AppendedTest("a", '&') == "a&amp;");
+    static_assert(AppendedTest("a", '<') == "a&lt;");
+    static_assert(AppendedTest("a", '"') == "a&quot;");
+    static_assert(AppendedTest("a", '\'') == "a&apos;");
+#endif
+
+    void ErrorLoggerWrapper(std::string_view lhs, std::string_view rhs)
+    { ErrorLogger() << "ConvertXMLTextToString: " << lhs << rhs; }
+
+#if defined(__cpp_lib_is_constant_evaluated) && (!defined(__clang_major__) || (__clang_major__ >= 14)) && defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+    constexpr
+#endif
+    std::string ConvertXMLTextToString(std::string_view input_string) {
+        std::string retval{};
+
+        for (size_t index = 0; index < input_string.size(); ++index) {
+            const auto ch = input_string[index];
+            if (ch != '&') {
+                retval.push_back(ch);
+                continue;
+            }
+
+            const auto semicolon_index = input_string.find(';', index);
+            if (semicolon_index == std::string_view::npos) {
+                if (!std::is_constant_evaluated())
+                    ErrorLoggerWrapper("Can't find semicolon after ampersand in string: ", input_string);
+                retval.push_back('?');
+                return retval;                
+            }
+            const auto entity = input_string.substr(index + 1, semicolon_index - index - 1);
+            if (entity == "amp") {
+                retval.push_back('&');
+            } else if (entity == "lt") {
+                retval.push_back('<');
+            } else if (entity == "gt") {
+                retval.push_back('>');
+            } else if (entity == "apos") {
+                retval.push_back('\'');
+            } else if (entity == "quot") {
+                retval.push_back('\"');
+            } else {
+                if (!std::is_constant_evaluated())
+                    ErrorLoggerWrapper("ConvertXMLTextToString got unknown XML entity: ", entity);
+            }
+            index = semicolon_index;
+        }
+        return retval;
+    }
+
+    std::filesystem::path ConvertXMLTextToPath(std::string_view input_string)
+    { return FilenameToPath(ConvertXMLTextToString(input_string)); }
+
+#if defined(__cpp_lib_is_constant_evaluated) && (!defined(__clang_major__) || (__clang_major__ >= 14)) && defined(__cpp_lib_constexpr_string) && ((!defined(__GNUC__) || (__GNUC__ > 11))) && ((!defined(_MSC_VER) || (_MSC_VER >= 1934)))
+    static_assert(ConvertXMLTextToString("").empty());
+    static_assert(ConvertXMLTextToString("abcd") == "abcd");
+    static_assert(ConvertXMLTextToString("&amp;&lt;&apos;") == "&<'");
+    static_assert(ConvertXMLTextToString("オ&quot;") == "オ\"");
+#endif
 
     ///< the master list of abbreviated option names, and their corresponding long-form names
     boost::container::flat_map<char, std::string> short_names;
@@ -981,3 +1080,21 @@ std::vector<std::string> StringToList(const std::string& input_string) {
     Tokenizer tokens{input_string, separator};
     return {tokens.begin(), tokens.end()};
 }
+
+std::string PathToXMLText(std::filesystem::path path) {
+    const auto path_str = PathToString(path);
+    std::string text;
+    text.reserve(path_str.size());
+    for (auto it = path_str.cbegin(); it != path_str.cend(); ++it)
+        AppendCharToXMLText(text, *it);
+    return text;
+}
+
+std::filesystem::path XMLTextToPath(std::string_view input_string)
+{ return ConvertXMLTextToPath(input_string); }
+
+std::filesystem::path XMLTextToPath(const char* input_string)
+{ return XMLTextToPath(std::string_view{input_string}); }
+
+std::filesystem::path XMLTextToPath(const std::string& input_string)
+{ return XMLTextToPath(std::string_view{input_string}); }

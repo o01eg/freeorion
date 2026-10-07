@@ -5,6 +5,7 @@
 //!     Declares the StringTable class.
 
 #include <boost/unordered_map.hpp>
+#include <filesystem>
 #include <string>
 #include <set>
 #include <mutex>
@@ -33,7 +34,7 @@
 //! where:
 //!
 //! * The first line is the native language name.
-//! * Linse starting with a hash sign `#` are considered comments and are
+//! * Lines starting with a hash sign `#` are considered comments and are
 //!   ignored when loading the file.
 //! * Empty lines are ignored when loading the file.
 //! * The translation entries consist of an key followed by a newline, followed
@@ -132,7 +133,7 @@ public:
     //! @param  fallback
     //!     A StringTable that should be used look up unknown translation
     //!     entries.
-    explicit StringTable(std::string filename, std::shared_ptr<const StringTable> fallback = nullptr);
+    explicit StringTable(std::filesystem::path filename, std::shared_ptr<const StringTable> fallback = nullptr);
 
     ~StringTable() = default;
 
@@ -165,7 +166,7 @@ public:
     [[nodiscard]] const std::string& Language() const noexcept { return m_language; }
 
     //! Returns the translation file name this StringTable was loaded from.
-    [[nodiscard]] const std::string& Filename() const noexcept { return m_filename; }
+    [[nodiscard]] const std::filesystem::path& Filename() const noexcept { return m_filename; }
 
     [[nodiscard]] const auto& AllStrings() const noexcept { return m_strings; }
 
@@ -192,7 +193,7 @@ private:
     void Load(std::shared_ptr<const StringTable> fallback = nullptr);
 
     //! The filename this StringTable was loaded from.
-    std::string m_filename;
+    std::filesystem::path m_filename;
 
     //! The native language name of the StringTable translations.
     std::string m_language;

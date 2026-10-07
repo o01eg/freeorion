@@ -22,19 +22,19 @@ namespace {
     // command-line options
     void AddOptions(OptionsDB& db) {
 #ifdef FREEORION_ANDROID
-        db.Add<std::string>("resource.path",                UserStringNop("OPTIONS_DB_RESOURCE_DIR"),           "default");
+        db.Add<std::filesystem::path>("resource.path",      UserStringNop("OPTIONS_DB_RESOURCE_DIR"),           {"default"});
 #else
-        db.Add<std::string>("resource.path",                UserStringNop("OPTIONS_DB_RESOURCE_DIR"),           PathToString(GetRootDataDir() / "default"));
+        db.Add<std::filesystem::path>("resource.path",      UserStringNop("OPTIONS_DB_RESOURCE_DIR"),           GetRootDataDir() / "default");
 #endif
-        db.Add<std::string>('S', "save.path",               UserStringNop("OPTIONS_DB_SAVE_DIR"),               PathToString(GetUserDataDir() / "save"));
-        db.Add<std::string>("save.server.path",             UserStringNop("OPTIONS_DB_SERVER_SAVE_DIR"),        PathToString(GetUserDataDir() / "save"));
+        db.Add<std::filesystem::path>('S', "save.path",     UserStringNop("OPTIONS_DB_SAVE_DIR"),               GetUserDataDir() / "save");
+        db.Add<std::filesystem::path>("save.server.path",   UserStringNop("OPTIONS_DB_SERVER_SAVE_DIR"),        GetUserDataDir() / "save");
         db.Add<std::string>("log-level",                    UserStringNop("OPTIONS_DB_LOG_LEVEL"),              "",
                             OrValidator<std::string>(LogLevelValidator(), std::make_unique<DiscreteValidator<std::string>>("")),
                             OptionsDB::Storable::UNSTORABLE);
         db.Add<std::string>("log-file",                     UserStringNop("OPTIONS_DB_LOG_FILE"),               "",
                             Validator<std::string>(),                                                           OptionsDB::Storable::UNSTORABLE);
         // Default stringtable filename is deferred to i18n.cpp::InitStringtableFileName
-        db.Add<std::string>("resource.stringtable.path",        UserStringNop("OPTIONS_DB_STRINGTABLE_FILENAME"),   "");
+        db.Add<std::filesystem::path>("resource.stringtable.path", UserStringNop("OPTIONS_DB_STRINGTABLE_FILENAME"), {});
         db.Add<bool>("save.format.binary.enabled",              UserStringNop("OPTIONS_DB_BINARY_SERIALIZATION"),   false);
         db.Add<bool>("save.format.xml.zlib.enabled",            UserStringNop("OPTIONS_DB_XML_ZLIB_SERIALIZATION"), true);
         db.Add<bool>("save.auto.hostless.enabled",              UserStringNop("OPTIONS_DB_AUTOSAVE_HOSTLESS"),      true);
@@ -56,7 +56,11 @@ namespace {
         db.Add<GSOG>("setup.starlane.frequency",    UserStringNop("OPTIONS_DB_GAMESETUP_STARLANE_FREQUENCY"), GALAXY_SETUP_MEDIUM,  RangedValidator(GALAXY_SETUP_LOW, GALAXY_SETUP_RANDOM));
         db.Add<GSOG>("setup.specials.frequency",    UserStringNop("OPTIONS_DB_GAMESETUP_SPECIALS_FREQUENCY"), GALAXY_SETUP_MEDIUM,  RangedValidator(GALAXY_SETUP_NONE, GALAXY_SETUP_RANDOM));
         db.Add<GSOG>("setup.native.frequency",      UserStringNop("OPTIONS_DB_GAMESETUP_NATIVE_FREQUENCY"),   GALAXY_SETUP_MEDIUM,  RangedValidator(GALAXY_SETUP_NONE, GALAXY_SETUP_RANDOM));
+#ifdef FREEORION_ANDROID
+        db.Add<int>("setup.ai.player.count",        UserStringNop("OPTIONS_DB_GAMESETUP_NUM_AI_PLAYERS"),     2,                    RangedValidator<int>(0, IApp::MAX_AI_PLAYERS()));
+#else
         db.Add<int>("setup.ai.player.count",        UserStringNop("OPTIONS_DB_GAMESETUP_NUM_AI_PLAYERS"),     6,                    RangedValidator<int>(0, IApp::MAX_AI_PLAYERS()));
+#endif
         db.Add<Aggression>("setup.ai.aggression",   UserStringNop("OPTIONS_DB_GAMESETUP_AI_MAX_AGGRESSION"),  Aggression::MANIACAL, RangedValidator(Aggression::BEGINNER, Aggression::MANIACAL));
         using enum GalaxySetupOptionMonsterFreq;
         using GSOMF = GalaxySetupOptionMonsterFreq;
@@ -189,6 +193,7 @@ const std::string& TextForGalaxyShape(Shape shape) {
         case Shape::IRREGULAR:  return UserString("GSETUP_IRREGULAR");
         case Shape::RING:       return UserString("GSETUP_RING");
         case Shape::RANDOM:     return UserString("GSETUP_RANDOM");
+        case Shape::SPIRAL_PLAYER: return UserString("GSETUP_PLAYER_ARM");
         default:                return EMPTY_STRING;
     }
 }

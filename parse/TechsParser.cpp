@@ -106,21 +106,9 @@ namespace {
         auto short_description = boost::python::extract<std::string>(kw["short_description"])();
         auto category = boost::python::extract<std::string>(kw["category"])();
 
-        std::unique_ptr<ValueRef::ValueRef<double>> researchcost;
-        auto researchcost_args = boost::python::extract<value_ref_wrapper<double>>(kw["researchcost"]);
-        if (researchcost_args.check()) {
-            researchcost = ValueRef::CloneUnique(researchcost_args().value_ref);
-        } else {
-            researchcost = std::make_unique<ValueRef::Constant<double>>(boost::python::extract<double>(kw["researchcost"])());
-        }
+        auto researchcost = pyobject_to_vref_or_cast<double, int>(kw["researchcost"]);
 
-        std::unique_ptr<ValueRef::ValueRef<int>> researchturns;
-        auto researchturns_args = boost::python::extract<value_ref_wrapper<int>>(kw["researchturns"]);
-        if (researchturns_args.check()) {
-            researchturns = ValueRef::CloneUnique(researchturns_args().value_ref);
-        } else {
-            researchturns = std::make_unique<ValueRef::Constant<int>>(boost::python::extract<int>(kw["researchturns"])());
-        }
+        auto researchturns = pyobject_to_vref_or_cast<int, double>(kw["researchturns"]);
 
         bool researchable = true;
         if (kw.has_key("researchable"))
@@ -223,13 +211,14 @@ namespace parse {
 
         ScopedTimer timer("Techs Parsing");
 
-        bool file_success = py_parse::detail::parse_file<py_grammar_categories>(
-            parser, path / "Categories.inf.py", py_grammar_categories(parser));
+        auto p_categories = py_grammar_categories(parser);
+        bool file_success = py_parse::detail::parse_file(
+            parser, path / "Categories.inf.py");
 
         py_grammar p = py_grammar(parser, techs_);
 
         for (const auto& file : ListDir(path, IsFOCPyScript))
-            file_success = py_parse::detail::parse_file<py_grammar>(parser, file, p) && file_success;
+            file_success = py_parse::detail::parse_file(parser, file) && file_success;
 
         TechManager::TechCategoryContainer cats;
         cats.reserve(categories.size());

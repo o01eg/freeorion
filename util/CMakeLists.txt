@@ -1,5 +1,6 @@
 target_sources(freeorioncommon
     PUBLIC
+        $<$<PLATFORM_ID:Android>:${CMAKE_CURRENT_LIST_DIR}/AndroidEnvironment.h>
         ${CMAKE_CURRENT_LIST_DIR}/AppInterface.h
         ${CMAKE_CURRENT_LIST_DIR}/base64_filter.h
         ${CMAKE_CURRENT_LIST_DIR}/blocking_combiner.h
@@ -16,7 +17,7 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/Order.h
         ${CMAKE_CURRENT_LIST_DIR}/OrderSet.h
         ${CMAKE_CURRENT_LIST_DIR}/Pending.h
-        ${CMAKE_CURRENT_LIST_DIR}/Process.h
+        $<$<NOT:$<PLATFORM_ID:Android>>:${CMAKE_CURRENT_LIST_DIR}/Process.h>
         ${CMAKE_CURRENT_LIST_DIR}/PythonCommon.h
         ${CMAKE_CURRENT_LIST_DIR}/Random.h
         ${CMAKE_CURRENT_LIST_DIR}/SaveGamePreviewUtils.h
@@ -29,6 +30,7 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/Version.h
         ${CMAKE_CURRENT_LIST_DIR}/XMLDoc.h
     PRIVATE
+        $<$<PLATFORM_ID:Android>:${CMAKE_CURRENT_LIST_DIR}/AndroidEnvironment.cpp>
         ${CMAKE_CURRENT_LIST_DIR}/AppInterface.cpp
         ${CMAKE_CURRENT_LIST_DIR}/CheckSums.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Directories.cpp
@@ -41,7 +43,7 @@ target_sources(freeorioncommon
         ${CMAKE_CURRENT_LIST_DIR}/OptionsDB.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Order.cpp
         ${CMAKE_CURRENT_LIST_DIR}/OrderSet.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/Process.cpp
+        $<$<NOT:$<PLATFORM_ID:Android>>:${CMAKE_CURRENT_LIST_DIR}/Process.cpp>
         ${CMAKE_CURRENT_LIST_DIR}/PythonCommon.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Random.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SaveGamePreviewUtils.cpp
@@ -83,7 +85,7 @@ if(BUILD_CLIENT_GG)
     )
 endif()
 
-if(BUILD_CLIENT_GODOT EQUAL "3")
+if(NOT BUILD_CLIENT_GODOT STREQUAL "OFF")
     target_sources(freeoriongodot
         PRIVATE
             ${CMAKE_CURRENT_LIST_DIR}/DependencyVersions.cpp

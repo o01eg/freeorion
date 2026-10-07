@@ -7,6 +7,8 @@ on:
 jobs:
   android:
     uses: ./.github/workflows/_build-android.yml
+  android-godot4:
+    uses: ./.github/workflows/_build-android-godot4.yml
   macos:
     strategy:
       matrix:
@@ -25,7 +27,7 @@ jobs:
   snapcraft:
     uses: ./.github/workflows/_build_snapcraft.yml
   code-ql:
-    uses: ./.github/workflows/_codeql-analysis.yml
+    uses: ./.github/workflows/codeql-analysis.yml
   lint-py-focs:
     uses: ./.github/workflows/_lint_py_focs.yml
   lint-python:

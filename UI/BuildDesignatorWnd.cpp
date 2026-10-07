@@ -180,7 +180,7 @@ namespace {
                     name_text = design->Name(true);
                     texture = ClientUI::ShipDesignIcon(*design);
                 } else {
-                    texture = ClientUI::ShipDesignIcon(INVALID_OBJECT_ID, context.ContextUniverse());
+                    texture = ClientUI::ShipDesignIcon(INVALID_DESIGN_ID, context.ContextUniverse());
                 }
                 break;
             }
@@ -192,7 +192,7 @@ namespace {
             }
             default:
                 ErrorLogger() << "ProductionItemPanel::Init got invalid item type";
-                texture = ui.GetTexture("");
+                texture = ui.GetMissingTexture();
             }
 
             float local_pp_output = 0.0f;

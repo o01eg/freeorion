@@ -3,6 +3,7 @@
 #include "parse/Parse.h"
 #include "parse/PythonParser.h"
 #include "universe/BuildingType.h"
+#include "universe/ShipHull.h"
 #include "universe/Conditions.h"
 #include "universe/Effects.h"
 #include "universe/Encyclopedia.h"
@@ -28,6 +29,7 @@ namespace {
         if (filename != nullptr) {
             std::ofstream f(filename);
             const auto dump = t.Dump(0);
+            f << "// CheckSum: " << std::to_string(t.GetCheckSum()) << std::endl;
             f.write(dump.c_str(), dump.size());
             f.flush();           
         } else {
@@ -63,7 +65,7 @@ BOOST_FIXTURE_TEST_SUITE(TestDefaultPythonParser, DefaultParserAppFixture)
 
 /**
  * Checks count of techs and tech categories in real scripts
- * FO_CHECKSUM_TECH_NAME determines tech name to be check for FO_CHECKSUM_TECH_VALUE checksum
+ * FO_CHECKSUM_TECHS_NAME determines tech name to be check for FO_CHECKSUM_TECHS_VALUE checksum
  */
 
 BOOST_AUTO_TEST_CASE(parse_techs_full) {
@@ -98,7 +100,7 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
     }
 
     DumpEntitiesList(techs);
-    if (const char* tech_name = std::getenv("FO_CHECKSUM_TECH_NAME")) {
+    if (const char* tech_name = std::getenv("FO_CHECKSUM_TECHS_NAME")) {
         const auto tech_it = techs.find(tech_name);
         BOOST_REQUIRE_MESSAGE(techs.end() != tech_it, "Missing " << tech_name);
         BOOST_REQUIRE_EQUAL(tech_name, tech_it->second.Name());
@@ -106,7 +108,7 @@ BOOST_AUTO_TEST_CASE(parse_techs_full) {
         BOOST_TEST_MESSAGE("Dump " << tech_name << ":");
         DumpEntity(tech_it->second);
 
-        if (const char *tech_checksum_str = std::getenv("FO_CHECKSUM_TECH_VALUE")) {
+        if (const char *tech_checksum_str = std::getenv("FO_CHECKSUM_TECHS_VALUE")) {
             unsigned int tech_checksum = boost::lexical_cast<unsigned int>(tech_checksum_str);
             unsigned int value{0};
             CheckSums::CheckSumCombine(value, *tech_it);
@@ -210,7 +212,7 @@ BOOST_AUTO_TEST_CASE(parse_buildings_full) {
 
 /**
  * Checks count of empire statistics in real scripts
- * FO_CHECKSUM_EMPIRE_STATISTIC_NAME determines building name to be check for FO_CHECKSUM_EMPIRE_STATISTIC_VALUE checksum
+ * FO_CHECKSUM_EMPIRE_STATISTICS_NAME determines building name to be check for FO_CHECKSUM_EMPIRE_STATISTICS_VALUE checksum
  */
 
 BOOST_AUTO_TEST_CASE(parse_empire_statistics_full) {
@@ -230,14 +232,14 @@ BOOST_AUTO_TEST_CASE(parse_empire_statistics_full) {
     BOOST_REQUIRE_EQUAL(22, empire_statistics.size());
 
     DumpEntitiesList(empire_statistics);
-    if (const char *empire_statistic_name = std::getenv("FO_CHECKSUM_EMPIRE_STATISTIC_NAME")) {
+    if (const char *empire_statistic_name = std::getenv("FO_CHECKSUM_EMPIRE_STATISTICS_NAME")) {
         const auto empire_statistic_it = empire_statistics.find(empire_statistic_name);
         BOOST_REQUIRE_MESSAGE(empire_statistics.end() != empire_statistic_it, "Missing " << empire_statistic_name);
 
         BOOST_TEST_MESSAGE("Dump " << empire_statistic_name << ":");
         DumpEntity(*(empire_statistic_it->second));
 
-        if (const char *empire_statistic_checksum_str = std::getenv("FO_CHECKSUM_EMPIRE_STATISTIC_VALUE")) {
+        if (const char *empire_statistic_checksum_str = std::getenv("FO_CHECKSUM_EMPIRE_STATISTICS_VALUE")) {
             uint32_t empire_statistic_checksum = boost::lexical_cast<uint32_t>(empire_statistic_checksum_str);
             uint32_t value{0};
             CheckSums::CheckSumCombine(value, empire_statistic_it->second);
@@ -251,7 +253,7 @@ BOOST_AUTO_TEST_CASE(parse_empire_statistics_full) {
  * FO_COUNT_ENCYCLOPEDIA_CATEGORY_NAME determines encyclopedia artclies' category name to be check for FO_COUNT_ENCYCLOPEDIA_CATEGORY_VALUE count
  */
 
-BOOST_AUTO_TEST_CASE(parse_encyclopedia_articles_full) {
+BOOST_AUTO_TEST_CASE(parse_encyclopedia_articles_counts) {
     PythonParser parser(m_python);
 
     auto encyclopedia_articles_p = Pending::ParseSynchronously(parse::encyclopedia_articles, parser, m_scripting_dir / "encyclopedia");
@@ -278,7 +280,7 @@ BOOST_AUTO_TEST_CASE(parse_encyclopedia_articles_full) {
 
 /**
  * Checks count of field in real scripts
- * FO_CHECKSUM_FIELD_NAME determines field name to be check for FO_CHECKSUM_FIELD_VALUE checksum
+ * FO_CHECKSUM_FIELDS_NAME determines field name to be check for FO_CHECKSUM_FIELDS_VALUE checksum
  */
 
 BOOST_AUTO_TEST_CASE(parse_fields_full) {
@@ -295,14 +297,14 @@ BOOST_AUTO_TEST_CASE(parse_fields_full) {
     BOOST_CHECK_EQUAL(10, fields.size());
 
     DumpEntitiesList(fields);
-    if (const char *field_name = std::getenv("FO_CHECKSUM_FIELD_NAME")) {
+    if (const char *field_name = std::getenv("FO_CHECKSUM_FIELDS_NAME")) {
         const auto field_it = fields.find(field_name);
         BOOST_REQUIRE_MESSAGE(fields.end() != field_it, "Missing " << field_name);
 
         BOOST_TEST_MESSAGE("Dump " << field_name << ":");
         DumpEntity(*(field_it->second));
 
-        if (const char *field_checksum_str = std::getenv("FO_CHECKSUM_FIELD_VALUE")) {
+        if (const char *field_checksum_str = std::getenv("FO_CHECKSUM_FIELDS_VALUE")) {
             uint32_t field_checksum = boost::lexical_cast<uint32_t>(field_checksum_str);
             uint32_t value{0};
             CheckSums::CheckSumCombine(value, field_it->second);
@@ -314,7 +316,7 @@ BOOST_AUTO_TEST_CASE(parse_fields_full) {
 
 /**
  * Checks count of named values in real scripts
- * FO_CHECKSUM_NAMED_VALUE_NAME determines named value name to be check for FO_CHECKSUM_NAMED_VALUE_VALUE checksum
+ * FO_CHECKSUM_NAMED_VALUES_NAME determines named value name to be check for FO_CHECKSUM_NAMED_VALUES_VALUE checksum
  */
 
 BOOST_AUTO_TEST_CASE(parse_named_values_full) {
@@ -332,18 +334,55 @@ BOOST_AUTO_TEST_CASE(parse_named_values_full) {
     BOOST_WARN_EQUAL(73, named_values.size()); // Can have named values from other sources
 
     DumpEntitiesList(named_values);
-    if (const char *named_value_name = std::getenv("FO_CHECKSUM_NAMED_VALUE_NAME")) {
+    if (const char *named_value_name = std::getenv("FO_CHECKSUM_NAMED_VALUES_NAME")) {
         const auto named_value_it = named_values.find(named_value_name);
         BOOST_REQUIRE_MESSAGE(named_values.end() != named_value_it, "Missing " << named_value_name);
 
         BOOST_TEST_MESSAGE("Dump " << named_value_name << ":");
         DumpEntity(named_value_it->second.get());
 
-        if (const char *named_value_checksum_str = std::getenv("FO_CHECKSUM_NAMED_VALUE_VALUE")) {
+        if (const char *named_value_checksum_str = std::getenv("FO_CHECKSUM_NAMED_VALUES_VALUE")) {
             uint32_t named_value_checksum = boost::lexical_cast<uint32_t>(named_value_checksum_str);
             uint32_t value{0};
             CheckSums::CheckSumCombine(value, named_value_it->second.get());
             BOOST_REQUIRE_EQUAL(named_value_checksum, value);
+        }
+    }
+}
+
+/**
+ * Checks count of ship hulls in real scripts
+ * FO_CHECKSUM_SHIP_HULLS_NAME determines ship hull name to be check for FO_CHECKSUM_SHIP_HULLS_VALUE checksum
+ */
+
+BOOST_AUTO_TEST_CASE(parse_ship_hulls_full) {
+    PythonParser parser(m_python);
+
+    auto named_values = Pending::ParseSynchronously(parse::named_value_refs, parser, m_scripting_dir / "macros");
+
+    auto ship_hulls_p = Pending::ParseSynchronously(parse::ship_hulls, parser, m_scripting_dir / "ship_hulls");
+    auto ship_hulls_opt = Pending::WaitForPendingUnlocked(std::move(ship_hulls_p));
+
+    BOOST_REQUIRE(ship_hulls_opt);
+
+    const auto ship_hulls = *std::move(ship_hulls_opt);
+    BOOST_CHECK(!ship_hulls.empty());
+    BOOST_REQUIRE_EQUAL(68, ship_hulls.size());
+
+    DumpEntitiesList(ship_hulls);
+    if (const char *ship_hull_name = std::getenv("FO_CHECKSUM_SHIP_HULLS_NAME")) {
+        const auto ship_hull_it = ship_hulls.find(ship_hull_name);
+        BOOST_REQUIRE_MESSAGE(ship_hulls.end() != ship_hull_it, "Missing " << ship_hull_name);
+        BOOST_REQUIRE_EQUAL(ship_hull_name, ship_hull_it->second->Name());
+
+        BOOST_TEST_MESSAGE("Dump " << ship_hull_name << ":");
+        DumpEntity(*(ship_hull_it->second));
+
+        if (const char *ship_hull_checksum_str = std::getenv("FO_CHECKSUM_SHIP_HULLS_VALUE")) {
+            uint32_t ship_hull_checksum = boost::lexical_cast<uint32_t>(ship_hull_checksum_str);
+            uint32_t value{0};
+            CheckSums::CheckSumCombine(value, ship_hull_it->second);
+            BOOST_REQUIRE_EQUAL(ship_hull_checksum, value);
         }
     }
 }

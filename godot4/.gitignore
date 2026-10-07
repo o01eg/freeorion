@@ -1,0 +1,15 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# FreeOrion Android plugin build outputs
+/android-plugin/build/
+/android-plugin/.gradle/
+/android-plugin/*.aar
+/android-plugin/**/*.aar
+
+# Linked resources
+/assets/art
+/assets/fonts
+/assets/sound
+

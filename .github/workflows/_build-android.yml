@@ -3,7 +3,7 @@ name: "Android"
 on:
   workflow_call:
 env:
-  GODOT_VERSION: "3.6.2"
+  GODOT_VERSION: "3.6.3"
 jobs:
   generate-godot-api:
     name: Generate Godot API
@@ -31,7 +31,7 @@ jobs:
     needs: generate-godot-api
     strategy:
       matrix:
-        arch: [x86, x86_64, armeabi-v7a, arm64-v8a]
+        arch: [x86_64, armeabi-v7a, arm64-v8a]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
@@ -58,15 +58,23 @@ jobs:
           mkdir build
           pushd build
           FO_SDK=$(realpath ../..)
-          cmake -DANDROID_ABI=${{ matrix.arch }} -DANDROID_PLATFORM=24 -DANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake -DCMAKE_CXX_FLAGS=-std=c++14 -DANDROID_ALLOW_UNDEFINED_SYMBOLS=Off -DBUILD_SERVER=ON -DBUILD_AI=ON -DBUILD_CLIENT_GG=OFF -DBoost_INCLUDE_DIR=${FO_SDK}/include/ -DBoost_USE_STATIC_LIBS=On -DBoost_LIBRARY_DIR=${FO_SDK}/lib/ -DBUILD_CLIENT_GODOT=3 -DICUI18N_LIBRARY=${FO_SDK}/lib/libicui18n.a -DICUUC_LIBRARY=${FO_SDK}/lib/libicuuc.a -DICUDATA_LIBRARY=${FO_SDK}/lib/libicudata.a -DICONV_LIBRARY=${FO_SDK}/lib/libiconv.so -DPython3_LIBRARY=${FO_SDK}/lib/libpython3.11.a -DPython3_INCLUDE_DIR=${FO_SDK}/include/python3.11/ -DGODOT_CUSTOM_API_FILE=${GODOT_API_JSON} ..
+          cmake -DANDROID_ABI=${{ matrix.arch }} -DANDROID_PLATFORM=24 -DANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake -DCMAKE_CXX_FLAGS=-std=c++14 -DANDROID_ALLOW_UNDEFINED_SYMBOLS=Off -DBUILD_SERVER=OFF -DBUILD_AI=OFF -DBUILD_CLIENT_GG=OFF -DBoost_INCLUDE_DIR=${FO_SDK}/include/ -DBoost_USE_STATIC_LIBS=On -DBoost_LIBRARY_DIR=${FO_SDK}/lib/ -DBUILD_CLIENT_GODOT=3 -DICUI18N_LIBRARY=${FO_SDK}/lib/libicui18n.a -DICUUC_LIBRARY=${FO_SDK}/lib/libicuuc.a -DICUDATA_LIBRARY=${FO_SDK}/lib/libicudata.a -DICONV_LIBRARY=${FO_SDK}/lib/libiconv.so -DPython3_LIBRARY=${FO_SDK}/lib/libpython3.11.a -DPython3_INCLUDE_DIR=${FO_SDK}/include/python3.11/ -DGODOT_CUSTOM_API_FILE=${GODOT_API_JSON} ..
       - name: Build
         run: |
           pushd build
-          cmake --build . -- -j4
+          cmake --build . -- -j5
+      - name: Extract symbols and strip binaries
+        run: |
+          NDK_BIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          find godot/bin -name "*.so" | while read -r SO_FILE; do
+            echo "::group::Process library ${SO_FILE}"
+            "$NDK_BIN/llvm-strip" --strip-all "$SO_FILE"
+            echo "::endgroup::"
+          done
       - name: Upload binaries
         uses: actions/upload-artifact@v7
         with:
-          name: android-binaries-${{ matrix.arch }}
+          name: android-binaries-godot3-${{ matrix.arch }}
           path: godot/bin/
           if-no-files-found: error
           retention-days: 1
@@ -78,8 +86,8 @@ jobs:
       - name: Merge binaries
         uses: actions/upload-artifact/merge@v7
         with:
-          name: android-binaries
-          pattern: android-binaries-*
+          name: android-binaries-godot3
+          pattern: android-binaries-godot3-*
           delete-merged: true
           retention-days: 1
   export-android:
@@ -108,7 +116,7 @@ jobs:
       - name: Dowload binaries
         uses: actions/download-artifact@v8
         with:
-          name: android-binaries
+          name: android-binaries-godot3
           path: godot/bin/
       - name: Install Godot and Templates
         run: |
@@ -123,6 +131,8 @@ jobs:
           mv templates/* ~/.local/share/godot/templates/${{ env.GODOT_VERSION }}.stable/
       - name: Set up Java and Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
       - name: Install Android Build Tools
         run: |
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
@@ -160,7 +170,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: export-android
     steps:
-      - uses: actions/cache@v5
+      - uses: actions/cache/restore@v5
         id: avd-cache
         with:
           path: |
@@ -190,6 +200,14 @@ jobs:
           working-directory: ./
           channel: beta
           script: echo "Generated AVD snapshot for caching."
+      - uses: actions/cache/save@v5
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+            ~/.android/debug.keystore
+          key: avd-test-godot-v2
       - name: Checkout sources
         uses: actions/checkout@v6
         with:
@@ -214,7 +232,7 @@ jobs:
           disable-animations: false
           working-directory: ./
           channel: beta
-          script: bash .github/android-apk-launch.sh
+          script: bash .github/android-apk-launch.sh 3
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v7

@@ -15,6 +15,8 @@
 #include <boost/thread/thread.hpp>
 #include <boost/test/unit_test.hpp>
 
+#include <cstdlib>
+
 ClientAppFixture::ClientAppFixture() :
     m_cookie(boost::uuids::nil_uuid())
 {
@@ -35,7 +37,7 @@ ClientAppFixture::ClientAppFixture() :
     // Dirty hack to output log to console.
     InitLoggingSystem("/proc/self/fd/1", "Test");
 #else
-    InitLoggingSystem((GetUserDataDir() / "test.log").string(), "Test");
+    InitLoggingSystem(PathToString(GetUserDataDir() / "test.log"), "Test");
 #endif
     //InitLoggingOptionsDBSystem();
 
@@ -47,14 +49,24 @@ ClientAppFixture::ClientAppFixture() :
         "freeoriond";
 #endif
     if (!GetOptionsDB().OptionExists(server_path_option)) {
-        auto server_path = PathToString(GetBinDir() / server_filename);
-        GetOptionsDB().Add<std::string>(server_path_option, UserStringNop("OPTIONS_DB_FREEORIOND_PATH"), std::move(server_path));
+        auto server_path = GetBinDir() / server_filename;
+        GetOptionsDB().Add<std::filesystem::path>(server_path_option, UserStringNop("OPTIONS_DB_FREEORIOND_PATH"), std::move(server_path));
     }
 
     InfoLogger() << FreeOrionVersionString();
     DebugLogger() << "Test client initialized";
 
-    GetOptionsDB().Set<std::string>("resource.path", PathToString(GetBinDir() / "default"));
+    std::filesystem::path resource_dir = GetBinDir() / "default";
+
+#if defined(FREEORION_WIN32)
+    if (const wchar_t* resource_path_env = _wgetenv(L"FO_TEST_RESOURCE_PATH"))
+        resource_dir = std::filesystem::path(resource_path_env);
+#else
+    if (const char* resource_path_env = std::getenv("FO_TEST_RESOURCE_PATH"))
+        resource_dir = FilenameToPath(resource_path_env);
+#endif
+
+    GetOptionsDB().Set<std::filesystem::path>("resource.path", std::move(resource_dir));
 
     std::thread background([this] () {
         DebugLogger() << "Started background parser thread";
@@ -314,8 +326,9 @@ void ClientAppFixture::SaveGame() {
                                                % m_current_turn % FilenameTimestamp() % SP_SAVE_FILE_EXTENSION);
     std::filesystem::path save_dir_path(GetSaveDir() / "test");
     std::filesystem::path save_path(save_dir_path / save_filename);
-    if (!exists(save_dir_path))
-        std::filesystem::create_directories(save_dir_path);
+    std::error_code ec;
+    if (!exists(save_dir_path, ec))
+        std::filesystem::create_directories(save_dir_path, ec);
 
     auto path_string = PathToString(save_path);
     m_save_completed = false;

@@ -134,6 +134,9 @@ ServerApp::ServerApp() :
         boost::bind(&ServerApp::UpdateEmpireTurnReceived, this, ph::_1, ph::_2, ph::_3));
 
     m_signals.async_wait(boost::bind(&ServerApp::SignalHandler, this, ph::_1, ph::_2));
+
+    if (!m_python_server.InitModules())
+        throw std::runtime_error("Python modules not initialized");
 }
 
 ServerApp::~ServerApp() {
@@ -176,14 +179,14 @@ void ServerApp::SignalHandler(const boost::system::error_code& error, int signal
 }
 
 namespace {
-    std::string AIClientExe() {
+    std::filesystem::path AIClientExe() {
         static constexpr auto ai_client_exe_filename =
 #ifdef FREEORION_WIN32
             "freeorionca.exe";
 #else
             "freeorionca";
 #endif
-        return PathToString(GetBinDir() / ai_client_exe_filename);
+        return GetBinDir() / ai_client_exe_filename;
     }
 
     static constexpr auto non_empty_name = [](const auto& thing) { return !thing.player_name.empty(); };
@@ -197,30 +200,30 @@ void ServerApp::StartBackgroundParsing(const PythonParser& python) {
     parse::StartBackgroundParsing(python, m_species_manager);
     const auto& rdir = GetResourceDir();
 
-    if (fs::exists(rdir / "scripting/starting_unlocks/items.inf"))
+    if (IsExistingFile(rdir / "scripting/starting_unlocks/items.inf"))
         m_universe.SetInitiallyUnlockedItems(Pending::StartAsyncParsing(parse::items, rdir / "scripting/starting_unlocks/items.inf"));
     else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/starting_unlocks/items.inf").string();
+        ErrorLogger() << "Background parse path doesn't exist: " << PathToString(rdir / "scripting/starting_unlocks/items.inf");
 
-    if (fs::exists(rdir / "scripting/starting_unlocks/buildings.inf"))
+    if (IsExistingFile(rdir / "scripting/starting_unlocks/buildings.inf"))
         m_universe.SetInitiallyUnlockedBuildings(Pending::StartAsyncParsing(parse::starting_buildings, rdir / "scripting/starting_unlocks/buildings.inf"));
     else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/starting_unlocks/buildings.inf").string();
+        ErrorLogger() << "Background parse path doesn't exist: " << PathToString(rdir / "scripting/starting_unlocks/buildings.inf");
 
-    if (fs::exists(rdir / "scripting/starting_unlocks/fleets.inf"))
+    if (IsExistingFile(rdir / "scripting/starting_unlocks/fleets.inf"))
         m_universe.SetInitiallyUnlockedFleetPlans(Pending::StartAsyncParsing(parse::fleet_plans, rdir / "scripting/starting_unlocks/fleets.inf"));
     else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/starting_unlocks/fleets.inf").string();
+        ErrorLogger() << "Background parse path doesn't exist: " << PathToString(rdir / "scripting/starting_unlocks/fleets.inf");
 
-    if (fs::exists(rdir / "scripting/monster_fleets.inf"))
+    if (IsExistingFile(rdir / "scripting/monster_fleets.inf"))
         m_universe.SetMonsterFleetPlans(Pending::StartAsyncParsing(parse::monster_fleet_plans, rdir / "scripting/monster_fleets.inf"));
     else
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/monster_fleets.inf").string();
+        ErrorLogger() << "Background parse path doesn't exist: " << PathToString(rdir / "scripting/monster_fleets.inf");
 
-    if (fs::exists(rdir / "scripting/empire_statistics"))
+    if (IsExistingDir(rdir / "scripting/empire_statistics"))
         m_universe.SetEmpireStats(Pending::ParseSynchronously(parse::statistics, python, rdir / "scripting/empire_statistics"));
     else {
-        ErrorLogger() << "Background parse path doesn't exist: " << (rdir / "scripting/empire_statistics").string();
+        ErrorLogger() << "Background parse path doesn't exist: " << PathToString(rdir / "scripting/empire_statistics");
     }
 }
 
@@ -249,22 +252,31 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
     setenv("DYLD_LIBRARY_PATH", library_path.c_str(), 1);
 #endif
 
+#ifdef FREEORION_ANDROID
+    int slot_id = 1;
+    std::vector<std::string> args;
+    args.reserve(4);
+    args.push_back("\"\"");
+    args.push_back("place_holder");
+    const std::size_t player_name_in_vec_idx = args.size()-1;
+    args.push_back(std::to_string(max_aggression));
+#else
     // binary / executable to run for AI clients
-    auto force_ai_executable = GetOptionsDB().Get<std::string>("ai-executable");
-    const std::string AI_CLIENT_EXE = force_ai_executable.empty() ? AIClientExe() : force_ai_executable;
+    auto force_ai_executable = GetOptionsDB().Get<std::filesystem::path>("ai-executable");
+    const std::filesystem::path AI_CLIENT_EXE = force_ai_executable.empty() ? AIClientExe() : force_ai_executable;
 
 
     // TODO: add other command line args to AI client invocation as needed
     std::vector<std::string> args;
     args.reserve(16);
-    args.push_back("\"" + AI_CLIENT_EXE + "\"");
+    args.push_back("\"" + PathToString(AI_CLIENT_EXE) + "\"");
 
     args.push_back("place_holder");
     const std::size_t player_name_in_vec_idx = args.size()-1;
 
     args.push_back(std::to_string(max_aggression));
     args.push_back("--resource.path");
-    args.push_back("\"" + GetOptionsDB().Get<std::string>("resource.path") + "\"");
+    args.push_back("\"" + PathToString(GetOptionsDB().Get<std::filesystem::path>("resource.path")) + "\"");
 
     const auto force_log_level = GetOptionsDB().Get<std::string>("log-level");
     if (!force_log_level.empty()) {
@@ -283,7 +295,7 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
 
     args.push_back("--ai-path");
     args.push_back(GetOptionsDB().Get<std::string>("ai-path"));
-    DebugLogger() << "starting AIs with " << AI_CLIENT_EXE ;
+    DebugLogger() << "starting AIs with " << PathToString(AI_CLIENT_EXE);
     DebugLogger() << "ai-aggression set to " << max_aggression;
     DebugLogger() << "ai-path set to '" << GetOptionsDB().Get<std::string>("ai-path") << "'";
     {
@@ -306,6 +318,7 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
             DebugLogger() << "ai-log-dir not set.";
         }
     }
+#endif
 
     // for each AI client player, create a new AI client process
     for (const auto& ai_psd : player_setup_data | range_filter(Networking::is_ai)) {
@@ -320,8 +333,11 @@ void ServerApp::CreateAIClients(const std::vector<PlayerSetupData>& player_setup
                       << " player id: " << ai_psd.player_id
                       << " empire name:" << ai_psd.empire_name
                       << " save empire id: " << ai_psd.save_game_empire_id;
-
-        m_ai_client_processes.emplace(ai_psd, Process(m_io_context, AI_CLIENT_EXE, args));
+#ifdef FREEORION_ANDROID
+        m_ai_client_processes.emplace(ai_psd, AndroidAIService(slot_id++, args));
+#else
+        m_ai_client_processes.emplace(ai_psd, Process(m_io_context, PathToString(AI_CLIENT_EXE), args));
+#endif
     }
 
     // set initial AI process priority to low
@@ -438,18 +454,20 @@ void ServerApp::CleanupAIs() {
 }
 
 void ServerApp::SetAIsProcessPriorityToLow(bool set_to_low) {
+#ifndef FREEORION_ANDROID
     for (auto& process : m_ai_client_processes) {
         if(!(process.second.SetLowPriority(set_to_low))) {
             if (set_to_low)
                 ErrorLogger() << "ServerApp::SetAIsProcessPriorityToLow : failed to lower priority for AI process";
             else
-#ifdef FREEORION_WIN32
+#  ifdef FREEORION_WIN32
                 ErrorLogger() << "ServerApp::SetAIsProcessPriorityToLow : failed to raise priority for AI process";
-#else
+#  else
                 ErrorLogger() << "ServerApp::SetAIsProcessPriorityToLow : cannot raise priority for AI process, requires superuser privileges on this system";
-#endif
+#  endif
         }
     }
+#endif
 }
 
 void ServerApp::HandleMessage(const Message& msg, PlayerConnectionPtr player_connection) {
@@ -955,26 +973,30 @@ namespace {
     /** Check that \p path is a file or directory in the server save
     directory. */
     bool IsInServerSaveDir(const fs::path& path) {
-        if (!fs::exists(path))
+        std::error_code ec;
+        if (!fs::exists(path, ec))
             return false;
 
         return IsInDir(GetServerSaveDir(),
-                       (fs::is_regular_file(path) ? path.parent_path() : path));
+                       (fs::is_regular_file(path, ec) ? path.parent_path() : path));
     }
+    bool IsInServerSaveDir(auto) = delete;
 
     /// Generates information on the subdirectories of \p directory
     std::vector<std::string> ListSaveSubdirectories(const fs::path& directory) {
         std::vector<std::string> list;
-        if (!fs::is_directory(directory))
+        std::error_code ec;
+        if (!fs::is_directory(directory, ec))
             return list;
 
-        auto server_dir_str = PathToString(fs::canonical(GetServerSaveDir()));
+        auto server_dir_str = PathToString(fs::canonical(GetServerSaveDir(), ec));
 
         // Adds \p subdir to the list
         auto add_to_list = [&list, &server_dir_str](const fs::path& subdir) {
-            auto subdir_str = PathToString(fs::canonical(subdir));
+            std::error_code ec;
+            auto subdir_str = PathToString(fs::canonical(subdir, ec));
             auto rel_path = subdir_str.substr(server_dir_str.length()); // .erase(0, server_dir_str.length()) might avoid an allocation, but I suppose this is safer...
-            TraceLogger() << "Added relative path " << rel_path << " in " << subdir
+            TraceLogger() << "Added relative path " << rel_path << " in " << PathToString(subdir)
                           << " to save preview directories";
             list.push_back(std::move(rel_path));
         };
@@ -986,12 +1008,13 @@ namespace {
 
         // Add all directories to list
         fs::directory_iterator end;
-        for (fs::directory_iterator it(fs::canonical(directory)); it != end; ++it) {
-            if (fs::is_directory(it->path()) && IsInServerSaveDir(it->path()))
+        for (fs::directory_iterator it(fs::canonical(directory, ec)); it != end; ++it) {
+            if (fs::is_directory(it->path(), ec) && IsInServerSaveDir(it->path()))
                 add_to_list(it->path());
         }
         return list;
     }
+    void ListSaveSubdirectories(auto) = delete;
 }
 
 void ServerApp::UpdateSavePreviews(const Message& msg, PlayerConnectionPtr player_connection) {

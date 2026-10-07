@@ -809,22 +809,26 @@ def calc_star_system_positions(gsd, total_players: int):
     adjacency_grid = AdjacencyGrid(width)
 
     print(f"Creating {gsd.shape} galaxy shape")
-    if gsd.shape == fo.galaxyShape.spiral2:
-        spiral_galaxy_calc_positions(positions, adjacency_grid, total_players, gsd.size, width)
-    elif gsd.shape == fo.galaxyShape.spiral3:
-        spiral_galaxy_calc_positions(positions, adjacency_grid, total_players, gsd.size, width)
-    elif gsd.shape == fo.galaxyShape.spiral4:
-        spiral_galaxy_calc_positions(positions, adjacency_grid, total_players, gsd.size, width)
-    elif gsd.shape == fo.galaxyShape.elliptical:
-        elliptical_galaxy_calc_positions(positions, adjacency_grid, gsd.size, width)
-    elif gsd.shape == fo.galaxyShape.disc:
-        disc_galaxy_calc_positions(positions, adjacency_grid, gsd.size, width)
-    elif gsd.shape == fo.galaxyShape.cluster:
-        cluster_galaxy_calc_positions(positions, adjacency_grid, gsd.size, width)
-    elif gsd.shape == fo.galaxyShape.ring:
-        ring_galaxy_calc_positions(positions, adjacency_grid, gsd.size, width)
-    elif gsd.shape == fo.galaxyShape.irregular:
-        irregular_galaxy_calc_positions(positions, adjacency_grid, gsd.size, width)
+    galaxy_shape_spiral_arms = {
+        fo.galaxyShape.spiral2: 2,
+        fo.galaxyShape.spiral3: 3,
+        fo.galaxyShape.spiral4: 4,
+        fo.galaxyShape.spiralPlayer: total_players,
+    }
+    spiral_arms = galaxy_shape_spiral_arms.get(gsd.shape)
+    if spiral_arms:
+        spiral_galaxy_calc_positions(positions, adjacency_grid, spiral_arms, gsd.size, width)
+    else:
+        galaxy_calculators = {
+            fo.galaxyShape.elliptical: elliptical_galaxy_calc_positions,
+            fo.galaxyShape.disc: disc_galaxy_calc_positions,
+            fo.galaxyShape.cluster: cluster_galaxy_calc_positions,
+            fo.galaxyShape.ring: ring_galaxy_calc_positions,
+            fo.galaxyShape.irregular: irregular_galaxy_calc_positions,
+        }
+        calculator = galaxy_calculators.get(gsd.shape)
+        if calculator:
+            calculator(positions, adjacency_grid, gsd.size, width)
 
     # Check if any positions have been calculated...
     if not positions:

@@ -30,6 +30,7 @@ namespace {
 # endif
     }
 #endif
+    wchar_t* GetFilePath(auto) = delete; // disable implicit conversions to path
 
     auto GetLoggableString(const wchar_t* const original)
     {
@@ -53,9 +54,7 @@ namespace {
             raw_py_str = PyUnicode_FromWideChar(filename.c_str(), filename.size());
         else
             raw_py_str = PyUnicode_FromStringAndSize(filename.c_str(), filename.size());
-        if (!raw_py_str)
-            return py::object();
-        return py::object(py::handle<>(raw_py_str));
+        return raw_py_str ? py::object(py::handle<>(raw_py_str)) : py::object();
     }
 
     template<typename T = std::filesystem::path::value_type>
@@ -133,6 +132,22 @@ bool PythonCommon::Initialize() {
     DebugLogger() << "Initializing FreeOrion Python interface";
 
     try {
+        PyPreConfig preconfig;
+        PyPreConfig_InitIsolatedConfig(&preconfig);
+
+        PyStatus status = Py_PreInitialize(&preconfig);
+        if (PyStatus_Exception(status)) {
+            ErrorLogger() << "Unable to pre-initialize Python from pre-config:";
+            if (status.err_msg)
+                ErrorLogger() << " Python error message: " << status.err_msg;
+            if (status.func)
+                ErrorLogger() << " Python function: " << status.func;
+            if (PyStatus_IsExit(status))
+                ErrorLogger() << " Python exit code: " << status.exitcode;
+            return false;
+        }
+        PyConfig config;
+        PyConfig_InitIsolatedConfig(&config);
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32) || defined(FREEORION_ANDROID)
         // There have been recurring issues on Windows and OSX to get FO to use the
         // Python framework shipped with the app (instead of falling back on the ones
@@ -141,12 +156,12 @@ bool PythonCommon::Initialize() {
         // than sorry... ;)
 
         m_home_dir = GetFilePath(GetPythonHome());
-        Py_SetPythonHome(m_home_dir);
-        DebugLogger() << "Python home set to " << GetLoggableString(Py_GetPythonHome());
+        PyConfig_SetString(&config, &config.home, m_home_dir);
+        DebugLogger() << "Python home set to " << GetLoggableString(m_home_dir);
 
         m_program_name = GetFilePath(GetPythonHome() / "Python");
-        Py_SetProgramName(m_program_name);
-        DebugLogger() << "Python program name set to " << GetLoggableString(Py_GetProgramName());
+        PyConfig_SetString(&config, &config.program_name, m_program_name);
+        DebugLogger() << "Python program name set to " << GetLoggableString(m_program_name);
 #endif
 
 #if defined(FREEORION_ANDROID)
@@ -163,7 +178,19 @@ bool PythonCommon::Initialize() {
             return false;
         }
         // initializes Python interpreter, allowing Python functions to be called from C++
-        Py_Initialize();
+        status = Py_InitializeFromConfig(&config);
+        PyConfig_Clear(&config);
+
+        if (PyStatus_Exception(status)) {
+            ErrorLogger() << "Unable to initialize Python interpreter from config:";
+            if (status.err_msg)
+                ErrorLogger() << " Python error message: " << status.err_msg;
+            if (status.func)
+                ErrorLogger() << " Python function: " << status.func;
+            if (PyStatus_IsExit(status))
+                ErrorLogger() << " Python exit code: " << status.exitcode;
+            return false;
+        }
         DebugLogger() << "Python initialized";
         DebugLogger() << "Python program: " << GetPythonExecutable();
         DebugLogger() << "Python version: " << Py_GetVersion();
@@ -184,7 +211,7 @@ bool PythonCommon::InitModuleLoader() {
         try {
             py::import("freeorion_loader");
             m_meta_path = py::extract<py::list>(py::import("sys").attr("meta_path"))();
-            m_meta_path->append(boost::cref(*this));
+            m_meta_path->insert(0, boost::cref(*this));
             m_meta_path_len = static_cast<int>(py::len(*m_meta_path));
         } catch (const py::error_already_set&) {
             HandleErrorAlreadySet();
@@ -225,8 +252,7 @@ void PythonCommon::HandleErrorAlreadySet() {
     }
 
     // Matches system exit
-    if (PyErr_ExceptionMatches(m_system_exit.ptr()))
-    {
+    if (PyErr_ExceptionMatches(m_system_exit.ptr())) {
         Finalize();
         ErrorLogger() << "Python interpreter exited with SystemExit(), sys.exit(), exit, quit or some other alias.";
         return;
@@ -263,11 +289,11 @@ void PythonCommon::Finalize() {
         try {
             // According to boost.python 1.69 docs python Py_Finalize must not be called
 #if defined(FREEORION_MACOSX) || defined(FREEORION_WIN32)
-            if (m_home_dir != nullptr) {
+            if (m_home_dir) {
                 PyMem_RawFree(m_home_dir);
                 m_home_dir = nullptr;
             }
-            if (m_program_name != nullptr) {
+            if (m_program_name) {
                 PyMem_RawFree(m_program_name);
                 m_program_name = nullptr;
             }
@@ -285,7 +311,7 @@ void PythonCommon::FinalizeModuleLoader() {
     if (Py_IsInitialized()) {
         if (m_meta_path) {
             try {
-                m_meta_path->pop(m_meta_path_len - 1);
+                m_meta_path->pop(0);
                 m_meta_path = boost::none;
             } catch (const py::error_already_set&) {
                 ErrorLogger() << "Python parser destructor throw exception";
@@ -295,7 +321,7 @@ void PythonCommon::FinalizeModuleLoader() {
     }
 }
 
-void PythonCommon::CompileEval(const char* code, const std::filesystem::path& filename, const py::object& globals) {
+void PythonCommon::CompileEval(const char* code, const std::filesystem::path& filename, const py::dict& globals) {
     py::object o_filename_str = path_to_pyobject(filename.native());
     if (o_filename_str.is_none()) {
         ErrorLogger() << "Failed to convert path to str: " << PathToString(filename);
@@ -315,12 +341,27 @@ void PythonCommon::CompileEval(const char* code, const std::filesystem::path& fi
     py::object o_result{py::handle<>(result)};
 }
 
-void PythonCommon::SetModulesDirs(const std::vector<std::filesystem::path>& modules_dirs) {
-    m_modules_dirs = modules_dirs;
+py::object PythonCommon::CompileEvalExpression(const char* expression, const py::dict& globals) {
+    py::object o_filename_str = py::str("<string>");
+    PyObject* compiled_code = Py_CompileStringObject(expression, o_filename_str.ptr(), Py_eval_input, nullptr, 2);
+    if (!compiled_code) {
+        ErrorLogger() << "Failed to compile expression: " << expression;
+        py::throw_error_already_set();
+    }
+    py::object o_code{py::handle<>(compiled_code)};
+    PyObject* result = PyEval_EvalCode(o_code.ptr(), globals.ptr(), globals.ptr());
+    if (!result) {
+        ErrorLogger() << "Failed to eval expression: " << expression;
+        py::throw_error_already_set();
+    }
+    return py::object{py::handle<>(result)};
 }
 
-void PythonCommon::SetModulesDirs(std::vector<std::filesystem::path>&& modules_dirs) {
+void PythonCommon::SetModulesDirs(std::vector<std::filesystem::path> modules_dirs) {
     m_modules_dirs = std::move(modules_dirs);
+    DebugLogger() << "Set Python Modules Directories (" << m_modules_dirs.size() << "):";
+    for (const auto& dir : m_modules_dirs)
+        DebugLogger() << "   " << PathToString(dir) << (IsExistingDir(dir) ? " exists" : " does not exist");
 }
 
 py::object PythonCommon::find_spec(const std::string& fullname, const py::object& path, const py::object& target) const {
@@ -387,7 +428,7 @@ py::object PythonCommon::find_spec(const std::string& fullname, const py::object
         });
     }
 
-    WarnLogger() << "Couldn't find file for module spec " << fullname;
+    DebugLogger() << "Couldn't find file for module spec " << fullname;
     return py::object();
 }
 
@@ -410,7 +451,7 @@ py::object PythonCommon::exec_module(py::object& module) {
         std::string file_contents;
         bool read_success = ReadFile(module_path, file_contents);
         if (!read_success) {
-            ErrorLogger() << "Unable to open data file " << module_path.string();
+            ErrorLogger() << "Unable to open data file " << PathToString(module_path);
             throw import_error("Unreadable module " + fullname);
         }
 
@@ -430,18 +471,18 @@ py::object PythonCommon::exec_module(py::object& module) {
                     globals["__package__"] = spec.parent;
                 }
             } else {
-                WarnLogger() << "Wrong spec in module " << module_path.string();
+                WarnLogger() << "Wrong spec in module " << PathToString(module_path);
             }
         } else {
-            WarnLogger() << "No spec in module " << module_path.string();
+            WarnLogger() << "No spec in module " << PathToString(module_path);
         }
 
         // store globals content in module namespace
         // it is required so functions in the same module will see each other
         // and still import will work
-        DebugLogger() << "Executing module file " << module_path.string();
+        DebugLogger() << "Executing module file " << PathToString(module_path);
         try {
-            CompileEval(file_contents.c_str(), module_path.native(), globals);
+            CompileEval(file_contents.c_str(), module_path, globals);
         } catch (const boost::python::error_already_set&) {
             HandleErrorAlreadySet();
             ErrorLogger() << "Unable to parse module file " << PathToString(module_path);

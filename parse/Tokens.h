@@ -18,13 +18,10 @@
     (All)                                       \
     (AllyOf)                                    \
     (And)                                       \
-    (annexationcondition)                       \
-    (annexationcost)                            \
     (AnyEmpire)                                 \
     (Armed)                                     \
     (Armour)                                    \
     (ArrivedOnTurn)                             \
-    (Article)                                   \
     (Asteroids)                                 \
     (Barren)                                    \
     (Basic)                                     \
@@ -49,14 +46,12 @@
     (Capital)                                   \
     (Capture)                                   \
     (carrier)                                   \
-    (captureresult)                             \
     (category)                                  \
     (ceil)                                      \
     (class)                                     \
     (ClockwiseNextPlanetType)                   \
     (closeto)                                   \
     (Colony)                                    \
-    (colour)                                    \
     (CombatBout)                                \
     (combatTargets)                             \
     (condition)                                 \
@@ -88,7 +83,6 @@
     (DamageStructurePerBattleMax)               \
     (data)                                      \
     (default)                                   \
-    (defaultfocus)                              \
     (DefaultFocus)                              \
     (Defense)                                   \
     (Described)                                 \
@@ -108,7 +102,6 @@
     (DestroyFightersPerBattleMax)               \
     (Detection)                                 \
     (DirectDistanceBetween)                     \
-    (dislikes)                                  \
     (distance)                                  \
     (DistanceFromOriginalType)                  \
     (effects)                                   \
@@ -131,7 +124,6 @@
     (enqueuelocation)                           \
     (environment)                               \
     (Environment)                               \
-    (environments)                              \
     (ETA)                                       \
     (ExploredByEmpire)                          \
     (exclusions)                                \
@@ -148,7 +140,6 @@
     (Fleet)                                     \
     (FleetID)                                   \
     (floor)                                     \
-    (foci)                                      \
     (focus)                                     \
     (Focus)                                     \
     (from)                                      \
@@ -165,7 +156,6 @@
     (GalaxySize)                                \
     (GalaxySpecialFrequency)                    \
     (GalaxyStarlaneFrequency)                   \
-    (gameplay_description)                      \
     (GameRule)                                  \
     (GasGiant)                                  \
     (General)
@@ -187,8 +177,8 @@
     (HighestCostResearchableTech)               \
     (HighestCostTransferrableTech)              \
     (HistogramMax)                              \
-    (HistogramMin)                              \
-    (HistogramSpread)                           \
+ /* (HistogramMin) */                           \
+ /* (HistogramSpread) */                        \
     (Homeworld)                                 \
     (Hostile)                                   \
     (Huge)                                      \
@@ -230,7 +220,6 @@
     (LastTurnResupplied)                        \
     (LaunchedFrom)                              \
     (LeastHappySpecies)                         \
-    (likes)                                     \
     (LocalCandidate)                            \
     (location)                                  \
     (Location)                                  \
@@ -254,7 +243,7 @@
     (MaxStructure)                              \
     (MaxSupply)                                 \
     (MaxTroops)                                 \
-    (Mean)                                      \
+ /* (Mean) */                                   \
     (Medium)                                    \
     (message)                                   \
     (meter)                                     \
@@ -366,7 +355,7 @@
     (ProducedByEmpire)                          \
     (ProducedByEmpireID)                        \
     (Producible)                                \
-    (Product)                                   \
+ /* (Product) */                                \
     (ProductionCenter)                          \
     (ProductionLocation)                        \
     (PropagatedSupplyRange)                     \
@@ -391,13 +380,11 @@
     (RemoveSpecial)                             \
     (RemoveStarlanes)                           \
     (Research)                                  \
-    (researchcost)                              \
-    (researchturns)                             \
     (resource)                                  \
     (ResourceSupplyConnected)                   \
     (ResupplyableBy)                            \
     (Retain)                                    \
-    (RMS)                                       \
+ /* (RMS) */                                    \
     (RootCandidate)                             \
     (round)                                     \
     (scope)                                     \
@@ -508,7 +495,6 @@
     (SpecialCapacity)                           \
     (species)                                   \
     (Species)                                   \
-    (SpeciesCensusOrdering)                     \
     (SpeciesColoniesOwned)                      \
     (SpeciesContentOpinion)                     \
     (SpeciesDislikes)                           \
@@ -529,7 +515,7 @@
     (SpeciesShipsScrapped)                      \
     (speed)                                     \
     (Speed)                                     \
-    (Spread)                                    \
+ /* (Spread) */                                 \
     (stackinggroup)                             \
     (Star)                                      \
     (StarlaneToWouldBeAngularlyCloseToExistingStarlane) \
@@ -538,7 +524,7 @@
     (StarType)                                  \
     (Stationary)                                \
     (Statistic)                                 \
-    (StDev)                                     \
+ /* (StDev) */                                  \
     (stealth)                                   \
     (Stealth)                                   \
     (Stockpile)                                 \

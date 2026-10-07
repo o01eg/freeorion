@@ -376,7 +376,7 @@ void GGHumanClientApp::Initialize() {
             Sound::GetSound().Enable();
 
         if ((GetOptionsDB().Get<bool>("audio.music.enabled")))
-            Sound::GetSound().PlayMusic(GetOptionsDB().Get<std::string>("audio.music.path"), -1);
+            Sound::GetSound().PlayMusic(GetOptionsDB().Get<std::filesystem::path>("audio.music.path"), -1);
 
         Sound::GetSound().SetMusicVolume(GetOptionsDB().Get<int>("audio.music.volume"));
         Sound::GetSound().SetUISoundsVolume(GetOptionsDB().Get<int>("audio.effects.volume"));
@@ -512,8 +512,8 @@ void GGHumanClientApp::StartServer() {
         throw LocalServerAlreadyRunningException();
     }
 
-    std::string SERVER_CLIENT_EXE = GetOptionsDB().Get<std::string>("misc.server-local-binary.path");
-    DebugLogger() << "GGHumanClientApp::StartServer: " << SERVER_CLIENT_EXE;
+    std::filesystem::path SERVER_CLIENT_EXE = GetOptionsDB().Get<std::filesystem::path>("misc.server-local-binary.path");
+    DebugLogger() << "GGHumanClientApp::StartServer: " << PathToString(SERVER_CLIENT_EXE);
 
 #ifdef FREEORION_MACOSX
     // On OSX set environment variable DYLD_LIBRARY_PATH to python framework folder
@@ -529,9 +529,9 @@ void GGHumanClientApp::StartServer() {
     std::vector<std::string> args;
     std::string ai_config = GetOptionsDB().Get<std::string>("ai-config");
     std::string ai_path = GetOptionsDB().Get<std::string>("ai-path");
-    args.push_back("\"" + SERVER_CLIENT_EXE + "\"");
+    args.push_back("\"" + PathToString(SERVER_CLIENT_EXE) + "\"");
     args.push_back("--resource.path");
-    args.push_back("\"" + GetOptionsDB().Get<std::string>("resource.path") + "\"");
+    args.push_back("\"" + PathToString(GetOptionsDB().Get<std::filesystem::path>("resource.path")) + "\"");
 
     auto force_log_level = GetOptionsDB().Get<std::string>("log-level");
     if (!force_log_level.empty()) {
@@ -558,7 +558,7 @@ void GGHumanClientApp::StartServer() {
     DebugLogger() << "Launching server process with args: ";
     for (const auto& arg : args)
         DebugLogger() << arg;
-    m_server_process = Process(Networking().IoContext(), SERVER_CLIENT_EXE, args);
+    m_server_process = Process(Networking().IoContext(), PathToString(SERVER_CLIENT_EXE), args);
     DebugLogger() << "... finished launching server process.";
 }
 
@@ -820,7 +820,8 @@ void GGHumanClientApp::LoadSinglePlayerGame(std::string filename) {
     DebugLogger() << "GGHumanClientApp::LoadSinglePlayerGame";
 
     if (!filename.empty()) {
-        if (!exists(FilenameToPath(filename))) {
+        std::error_code ec;
+        if (!exists(FilenameToPath(filename)), ec) {
             std::string msg = "GGHumanClientApp::LoadSinglePlayerGame() given a nonexistent file \""
                             + filename + "\" to load. Aborting load.";
             DebugLogger() << msg;
@@ -1279,7 +1280,8 @@ namespace {
 
                 for (directory_iterator dir_it(path); dir_it != directory_iterator(); ++dir_it) {
                     const auto& file_path = dir_it->path();
-                    if (!is_regular_file(file_path))
+                    std::error_code ec;
+                    if (!is_regular_file(file_path, ec))
                         continue;
                     if (file_path.extension() != SP_SAVE_FILE_EXTENSION)
                         continue;
@@ -1325,7 +1327,8 @@ namespace {
 
             for (directory_iterator dir_it(p); dir_it != directory_iterator(); ++dir_it) {
                 const path& file_path = dir_it->path();
-                if (!is_regular_file(file_path))
+                std::error_code ec;
+                if (!is_regular_file(file_path, ec))
                     continue;
                 if (file_path.extension() != SP_SAVE_FILE_EXTENSION &&
                     file_path.extension() != MP_SAVE_FILE_EXTENSION)
@@ -1397,9 +1400,10 @@ namespace {
         std::filesystem::path save_path(autosave_dir_path / save_filename);
 
         try {
+            std::error_code ec;
             // ensure autosave directory exists
-            if (!exists(autosave_dir_path))
-                std::filesystem::create_directories(autosave_dir_path);
+            if (!exists(autosave_dir_path, ec))
+                std::filesystem::create_directories(autosave_dir_path); // allow throw
         } catch (const std::exception& e) {
             ErrorLogger() << "Autosave unable to check / create autosave directory: " << e.what();
         }
@@ -1728,8 +1732,8 @@ void GGHumanClientApp::BrowsePath(const std::filesystem::path& browse_path) {
     std::filesystem::path full_path(browse_path);
 
     try {
-        std::filesystem::file_status status = std::filesystem::status(full_path);
-        if (!std::filesystem::exists(status)) {
+        std::error_code ec;
+        if (!std::filesystem::exists(full_path, ec)) {
             std::string exists_debug_msg("Non-existant path: " + PathToString(full_path));
             if (full_path.has_parent_path()) {
                 DebugLogger() << exists_debug_msg << ", trying parent directory";
@@ -1741,37 +1745,46 @@ void GGHumanClientApp::BrowsePath(const std::filesystem::path& browse_path) {
         }
 
         // Validate as a canonical path
-        if (std::filesystem::is_directory(status)) {
-            full_path = std::filesystem::canonical(full_path);
+        if (std::filesystem::is_directory(full_path, ec)) {
+            full_path = std::filesystem::canonical(full_path, ec);
         } else {
             // If given a file, use the files containing directory
             DebugLogger() << "Non-directory target: " << PathToString(full_path) << ", using parent directory";
-            full_path = std::filesystem::canonical(full_path.parent_path());
+            full_path = std::filesystem::canonical(full_path.parent_path(), ec);
         }
 
         // Verify not a regular file
-        if (std::filesystem::is_regular_file(full_path)) {
+        if (std::filesystem::is_regular_file(full_path, ec)) {
             ErrorLogger() << "Target directory " << PathToString(full_path) << " is a regular file, given path argument: "
                           << PathToString(browse_path);
             return;
         }
 
-    } catch (const std::filesystem::filesystem_error& ec) {
+    } catch (const std::filesystem::filesystem_error& e) {
         ErrorLogger() << "Filesystem error when attempting to browse directory " << PathToString(full_path)
-                      << ": " << ec.what();
+                      << ": " << e.what();
         return;
     }
 
     if (full_path.empty()) {
-        ErrorLogger() << "Unable to determine directory for path " << PathToString(full_path);
+        ErrorLogger() << "Unable to determine directory for empty path " << PathToString(full_path);
         return;
     }
 
-    full_path.make_preferred();
+    if constexpr (noexcept(full_path.make_preferred())) {
+        full_path.make_preferred();
+    } else {
+        try {
+            full_path.make_preferred();
+        } catch (...) {}
+    }
     // Trailing slash post-fixed to prevent executing a file with same name(minus extension) as folder
     full_path += std::filesystem::path::preferred_separator;
-    auto target(full_path.native());
-    decltype(target) command;
+
+    static_assert(noexcept(full_path.native()));
+    const auto& target{full_path.native()};
+    if (target.empty())
+        return;
 
     // Double quotes around target to support paths containing spaces
     // Non-Windows platforms: Post-fix ampersand to prevent blocking until process exits
@@ -1783,12 +1796,13 @@ void GGHumanClientApp::BrowsePath(const std::filesystem::path& browse_path) {
     //    Contrary to official documentation for start, the first argument (title) is not always optional.
     //    The argument for window title is left as an empty string.
     //    see https://ss64.com/nt/start.html
+    const std::filesystem::path::string_type command =
 #ifdef _WIN32
-    command = L"start \"\" \"" + target + L"\\\\\"";
+    L"start \"\" \"" + target + L"\\\\\"";
 #elif __APPLE__
-    command = "open \"" + target + "\" &";
+    "open \"" + target + "\" &";
 #else
-    command = "xdg-open \"" + target + "\" &";
+    "xdg-open \"" + target + "\" &";
 #endif
 
 #ifdef _WIN32

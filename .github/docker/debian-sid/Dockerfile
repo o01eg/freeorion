@@ -34,6 +34,7 @@ RUN apt-get -t=experimental install --assume-yes g++ binutils # broken binutils 
 #RUN apt-get install --assume-yes g++ binutils
 RUN apt-get install --assume-yes \
         git \
+        ca-certificates \
         make \
         cmake \
         python3 \
@@ -50,10 +51,11 @@ RUN apt-get install --assume-yes \
         mesa-common-dev \
         libpng-dev \
 	libboost-all-dev \
-	godot3-server \
+	godot \
 	libjpeg-dev \
 	libtiff-dev \
     && rm -rf \
         /var/lib/apt/lists/*
 
+RUN git config --global --add safe.directory '*'
 

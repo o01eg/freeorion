@@ -16,7 +16,7 @@
  </save>
  <setup>
   <game>
-    <uid>FO0031</uid>
+    <uid>FO0032</uid>
   </game>
   <ai>
    <player>
@@ -36,7 +36,7 @@
     <density>GALAXY_SETUP_MEDIUM</density>
   </planet>
   <galaxy>
-   <shape>SPIRAL_2</shape>
+   <shape>SPIRAL_PLAYER</shape>
    <age>GALAXY_SETUP_MEDIUM</age>
   </galaxy>
   <seed>RANDOM</seed>

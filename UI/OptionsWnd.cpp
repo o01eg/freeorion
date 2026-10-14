@@ -104,7 +104,7 @@ namespace {
                     dlg->SelectDirectories(true);
                 dlg->Run();
                 if (!dlg->Result().empty()) {
-                    auto dlg_result_path = FilenameToPath(*dlg->Result().begin());
+                    auto dlg_result_path = StringToPath(*dlg->Result().begin());
                     auto path = m_return_relative_path ? fs::relative(dlg_result_path, m_path) : fs::absolute(dlg_result_path);
                     *m_edit << PathToString(path);
                     m_edit->EditedSignal(m_edit->Text());
@@ -125,7 +125,7 @@ namespace {
         // putting this in try-catch block prevents crash with error output along the lines of:
         // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
-            fs::path path = FilenameToPath(file);
+            fs::path path = StringToPath(file);
             std::error_code ec;
             return boost::algorithm::ends_with(file, STRINGTABLE_FILE_SUFFIX) &&
                 fs::exists(path, ec) && !fs::is_directory(path, ec);
@@ -138,7 +138,7 @@ namespace {
         // putting this in try-catch block prevents crash with error output along the lines of:
         // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
-            fs::path path = FilenameToPath(file);
+            fs::path path = StringToPath(file);
             std::error_code ec;
             return boost::algorithm::ends_with(file, FONT_FILE_SUFFIX) &&
                 fs::exists(path, ec) && !fs::is_directory(path, ec);
@@ -151,7 +151,7 @@ namespace {
         // putting this in try-catch block prevents crash with error output along the lines of:
         // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
-            fs::path path = FilenameToPath(file);
+            fs::path path = StringToPath(file);
             std::error_code ec;
             return boost::algorithm::ends_with(file, MUSIC_FILE_SUFFIX) &&
                 fs::exists(path, ec) && !fs::is_directory(path, ec);
@@ -164,7 +164,7 @@ namespace {
         // putting this in try-catch block prevents crash with error output along the lines of:
         // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
-            fs::path path = FilenameToPath(file);
+            fs::path path = StringToPath(file);
             std::error_code ec;
             return boost::algorithm::ends_with(file, SOUND_FILE_SUFFIX) &&
                 fs::exists(path, ec) && !fs::is_directory(path, ec);
@@ -177,7 +177,7 @@ namespace {
         // putting this in try-catch block prevents crash with error output along the lines of:
         // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
-            fs::path path = FilenameToPath(file);
+            fs::path path = StringToPath(file);
             std::error_code ec;
             return fs::exists(path, ec) && fs::is_directory(path, ec);
         } catch (...) {
@@ -189,7 +189,7 @@ namespace {
         // putting this in try-catch block prevents crash with error output along the lines of:
         // main() caught exception(std::exception): filesystem::path: invalid name ":" in path: ":\FreeOrion\default"
         try {
-            fs::path path = FilenameToPath(file);
+            fs::path path = StringToPath(file);
 #ifdef FREEORION_WIN32
             if (!boost::algorithm::ends_with(file, EXE_FILE_SUFFIX))
                 return false;
@@ -408,7 +408,7 @@ void OptionsWnd::CompleteConstruction() {
     CreateSectionHeader(current_page, 0, UserString("OPTIONS_VOLUME_AND_MUSIC"));
     MusicVolumeOption(current_page, 0, m_sound_feedback);
     VolumeOption(current_page, 0, "audio.effects.enabled", "audio.effects.volume", UserString("OPTIONS_UI_SOUNDS"), UI_sound_enabled, m_sound_feedback);
-    FileOption2(current_page, 0, "audio.music.path", UserString("OPTIONS_BACKGROUND_MUSIC"), ClientUI::SoundDir(),
+    FileOption(current_page, 0, "audio.music.path", UserString("OPTIONS_BACKGROUND_MUSIC"), ClientUI::SoundDir(),
                {UserString("OPTIONS_MUSIC_FILE"), "*" + MUSIC_FILE_SUFFIX},
                ValidMusicFile);
 
@@ -463,7 +463,7 @@ void OptionsWnd::CompleteConstruction() {
     current_page->Insert(row);
     window_reset_button->LeftClickedSignal.connect(GetApp().RepositionWindowsSignal);
 
-    FileOption2(current_page, 0, "resource.stringtable.path",    UserString("OPTIONS_LANGUAGE"),
+    FileOption(current_page, 0, "resource.stringtable.path",    UserString("OPTIONS_LANGUAGE"),
                GetRootDataDir() / "default" / "stringtables",
                {UserString("OPTIONS_LANGUAGE_FILE"), "*" + STRINGTABLE_FILE_SUFFIX},
                &ValidStringtableFile);
@@ -656,7 +656,7 @@ void OptionsWnd::CompleteConstruction() {
     DirectoryOption(current_page, 0, "save.path",                       UserString("OPTIONS_FOLDER_SAVE"),          GetUserDataDir());
     DirectoryOption(current_page, 0, "save.server.path",                UserString("OPTIONS_SERVER_FOLDER_SAVE"),   GetUserDataDir());
     PathDisplay(    current_page, 0,                                    UserString("OPTIONS_FOLDER_CONFIG_LOG"),    GetUserConfigDir());
-    FileOption2(     current_page, 0, "misc.server-local-binary.path",   UserString("OPTIONS_SERVER_EXE"),           GetBinDir(),
+    FileOption(     current_page, 0, "misc.server-local-binary.path",   UserString("OPTIONS_SERVER_EXE"),           GetBinDir(),
 #ifdef FREEORION_WIN32
                     {std::string("misc.server-local-binary.path"), "*" + EXE_FILE_SUFFIX},
 #endif
@@ -1067,64 +1067,6 @@ void OptionsWnd::FileOptionImpl(GG::ListBox* page, int indentation_level, std::s
 {
     auto text_control = GG::Wnd::Create<CUILabel>(std::move(text),
                                                   GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
-    auto edit = GG::Wnd::Create<CUIEdit>(GetOptionsDB().Get<std::string>(option_name));
-    edit->Resize(GG::Pt(50*SPIN_WIDTH, edit->Height())); // won't resize within layout bigger than its initial size, so giving a big initial size here
-    auto button = Wnd::Create<CUIButton>("...");
-    if (disabled) {
-        edit->Disable();
-        button->Disable();
-    }
-
-    const auto& desc = UserString(GetOptionsDB().GetDescription(option_name));
-    const auto delay = GetOptionsDB().Get<int>("ui.tooltip.delay");
-    edit->SetBrowseModeTime(delay);
-    edit->SetBrowseText(desc);
-    button->SetBrowseModeTime(delay);
-    button->SetBrowseText(desc);
-    text_control->SetBrowseModeTime(delay);
-    text_control->SetBrowseText(desc);
-
-    auto layout = GG::Wnd::Create<GG::Layout>(GG::X0, GG::Y0, ROW_WIDTH, button->MinUsableSize().y,
-                                              1, 3, 0, 5);
-
-    layout->Add(std::move(text_control), 0, 0, GG::ALIGN_VCENTER | GG::ALIGN_LEFT);
-    layout->Add(edit, 0, 1, GG::ALIGN_VCENTER | GG::ALIGN_LEFT);
-    layout->Add(button, 0, 2, GG::ALIGN_VCENTER | GG::ALIGN_LEFT);
-    layout->SetMinimumColumnWidth(0, SPIN_WIDTH);
-    layout->SetMinimumColumnWidth(1, SPIN_WIDTH);
-    layout->SetMinimumColumnWidth(2, button->Width());
-    layout->SetColumnStretch(0, 0.5);
-    layout->SetColumnStretch(1, 1.0);
-    layout->SetColumnStretch(2, 0.0);
-
-    const auto layout_height = layout->Height() + 6;
-    auto row = GG::Wnd::Create<OptionsListRow>(ROW_WIDTH, layout_height, std::move(layout), indentation_level);
-    page->Insert(std::move(row));
-
-    edit->EditedSignal.connect(
-        [on{std::move(option_name)}, edit, string_validator](const std::string& str) {
-            if (string_validator && !string_validator(str)) {
-                edit->SetTextColor(GG::CLR_RED);
-            } else {
-                edit->SetTextColor(ClientUI::TextColor());
-                GetOptionsDB().Set(on, str);
-            }
-        }
-    );
-    button->LeftClickedSignal.connect(
-        BrowseForPathButtonFunctor(std::move(path), std::move(filters), edit, directory, relative_path));
-    if (string_validator && !string_validator(edit->Text()))
-        edit->SetTextColor(GG::CLR_RED);
-}
-
-void OptionsWnd::FileOptionImpl2(GG::ListBox* page, int indentation_level, std::string option_name,
-                                std::string text, fs::path path,
-                                std::vector<std::pair<std::string, std::string>> filters,
-                                std::function<bool (const std::string&)> string_validator,
-                                bool directory, bool relative_path, bool disabled)
-{
-    auto text_control = GG::Wnd::Create<CUILabel>(std::move(text),
-                                                  GG::FORMAT_LEFT | GG::FORMAT_NOWRAP, GG::INTERACTIVE);
     auto edit = GG::Wnd::Create<CUIEdit>(PathToString(GetOptionsDB().Get<fs::path>(option_name)));
     edit->Resize(GG::Pt(50*SPIN_WIDTH, edit->Height())); // won't resize within layout bigger than its initial size, so giving a big initial size here
     auto button = Wnd::Create<CUIButton>("...");
@@ -1165,7 +1107,7 @@ void OptionsWnd::FileOptionImpl2(GG::ListBox* page, int indentation_level, std::
                 edit->SetTextColor(GG::CLR_RED);
             } else {
                 edit->SetTextColor(ClientUI::TextColor());
-                GetOptionsDB().Set(on, FilenameToPath(str));
+                GetOptionsDB().Set(on, StringToPath(str));
             }
         }
     );
@@ -1200,42 +1142,17 @@ void OptionsWnd::FileOption(GG::ListBox* page, int indentation_level, std::strin
                    std::move(filters), std::move(string_validator), false, false, false);
 }
 
-void OptionsWnd::FileOption2(GG::ListBox* page, int indentation_level, std::string option_name,
-                            std::string text, std::filesystem::path path,
-                            std::function<bool (const std::string&)> string_validator)
-{
-    FileOption2(page, indentation_level, std::move(option_name), std::move(text), std::move(path),
-               std::vector<std::pair<std::string, std::string>>(), std::move(string_validator)); }
-
-void OptionsWnd::FileOption2(GG::ListBox* page, int indentation_level, std::string option_name,
-                            std::string text, std::filesystem::path path,
-                            std::pair<std::string, std::string> filter,
-                            std::function<bool (const std::string&)> string_validator)
-{
-    FileOption2(page, indentation_level, std::move(option_name), std::move(text), std::move(path),
-               std::vector<std::pair<std::string, std::string>>(1, filter), std::move(string_validator));
-}
-
-void OptionsWnd::FileOption2(GG::ListBox* page, int indentation_level, std::string option_name,
-                            std::string text, std::filesystem::path path,
-                            std::vector<std::pair<std::string, std::string>> filters,
-                            std::function<bool (const std::string&)> string_validator)
-{
-    FileOptionImpl2(page, indentation_level, std::move(option_name), std::move(text), std::move(path),
-                   std::move(filters), std::move(string_validator), false, false, false);
-}
-
 void OptionsWnd::SoundFileOption(GG::ListBox* page, int indentation_level, std::string option_name,
                                  std::string text)
 {
-    FileOption2(page, indentation_level, std::move(option_name), std::move(text), ClientUI::SoundDir(),
+    FileOption(page, indentation_level, std::move(option_name), std::move(text), ClientUI::SoundDir(),
                {UserString("OPTIONS_SOUND_FILE"), "*" + SOUND_FILE_SUFFIX}, ValidSoundFile);
 }
 
 void OptionsWnd::DirectoryOption(GG::ListBox* page, int indentation_level, std::string option_name,
                                  std::string text, fs::path path, bool disabled)
 {
-    FileOptionImpl2(page, indentation_level, std::move(option_name), std::move(text),
+    FileOptionImpl(page, indentation_level, std::move(option_name), std::move(text),
                    std::move(path), std::vector<std::pair<std::string, std::string>>(),
                    ValidDirectory, true, false, disabled);
 }

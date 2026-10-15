@@ -57,7 +57,7 @@ def execute_turn_events():
                         NOW()::timestamp)
                                 ON CONFLICT (game_uid, turn) DO UPDATE SET turn_ts =
                                 EXCLUDED.turn_ts""",
-                    (fo.get_galaxy_setup_data().gameUID, fo.current_turn()),
+                    (fo.get_galaxy_setup_data().gameUID.lower(), fo.current_turn()),
                 )
     except Exception:
         exctype, value = sys.exc_info()[:2]

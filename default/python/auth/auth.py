@@ -131,7 +131,7 @@ class AuthProvider:
                 with self.conn.cursor() as curs:
                     curs.execute(
                         """ SELECT * FROM auth.check_contact(%s, %s, %s) """,
-                        (player_name, otp, fo.get_galaxy_setup_data().gameUID),
+                        (player_name.lower(), otp, fo.get_galaxy_setup_data().gameUID.lower()),
                     )
                     for r in curs:
                         if r[0] == "xmpp":
@@ -182,7 +182,7 @@ class AuthProvider:
                 with self.conn.cursor() as curs:
                     curs.execute(
                         """ SELECT * FROM auth.check_otp(%s, %s, %s) """,
-                        (player_name, auth, fo.get_galaxy_setup_data().gameUID),
+                        (player_name.lower(), auth, fo.get_galaxy_setup_data().gameUID.lower()),
                     )
                     for r in curs:
                         authenticated = not not r[0]
@@ -218,7 +218,7 @@ class AuthProvider:
                             AND p.client_type = 'p'
                             AND g.game_uid = %s
                             GROUP BY u.player_name """,
-                        (fo.get_galaxy_setup_data().gameUID,),
+                        (fo.get_galaxy_setup_data().gameUID.lower(),),
                     )
                     for r in curs:
                         psd = fo.PlayerSetupData()
@@ -261,7 +261,7 @@ class AuthProvider:
                             AND c.is_active
                             AND c.delete_ts IS NULL
                             """,
-                        (player_name, player_name, fo.get_galaxy_setup_data().gameUID),
+                        (player_name.lower(), player_name.lower(), fo.get_galaxy_setup_data().gameUID.lower()),
                     )
                     for r in curs:
                         if r[0] == "xmpp":
@@ -300,7 +300,7 @@ class AuthProvider:
                             FROM games.players p
                             WHERE p.game_uid = %s
                             AND p.delegate_name = %s """,
-                        (fo.get_galaxy_setup_data().gameUID, player_name),
+                        (fo.get_galaxy_setup_data().gameUID.lower(), player_name.lower()),
                     )
                     for r in curs:
                         players.append(r[0])

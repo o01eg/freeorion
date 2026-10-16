@@ -370,7 +370,8 @@ jobs:
             exit 1
           fi
           echo "::group::Preparing symbols for ndk-stack"
-          find symbols/ -name "*.debug" | while read -r DEBUG_FILE; do
+          find symbols/ -type f
+          find symbols/ -type f -name "*.debug" | while read -r DEBUG_FILE; do
             ORIGINAL_SO="${DEBUG_FILE%.debug}"
             if [ ! -f "$ORIGINAL_SO" ]; then
               mv "$DEBUG_FILE" "$ORIGINAL_SO"
@@ -380,7 +381,7 @@ jobs:
           for STACK_FILE in server-stack-*.log; do
             if [ ! -f "$STACK_FILE" ]; then continue; fi
             echo "::group::Decoding $STACK_FILE"
-            "$NDK_STACK" -sym symbols/ -dump "$STACK_FILE" | tee "decoded-$STACK_FILE"
+            "$NDK_STACK" -sym symbols/ -dump "$STACK_FILE" 2>&1 | tee "decoded-$STACK_FILE"
             echo "::endgroup::"
           done
       - name: Upload logs

@@ -1318,7 +1318,7 @@ namespace {
 
             };
 
-            futures.emplace_back(i, std::async(std::launch::async, eval_active_sources));
+            futures.emplace_back(i, std::async(std::launch::deferred, eval_active_sources));
 
             // save evaluation lookup index in cache
             already_evaluated_activation_condition_idx.emplace_back(effects_group.Activation(), i);

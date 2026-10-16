@@ -364,8 +364,7 @@ jobs:
       - name: Decode stack trace
         if: always() && inputs.debug_sanitize
         run: |
-          NDK_BIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          NDK_STACK="$NDK_BIN/ndk-stack"
+          NDK_STACK="${{ steps.setup-ndk.outputs.ndk-path }}/ndk-stack"
           if [ ! -f "$NDK_STACK" ]; then
             echo "::error::ndk-stack not found at $NDK_STACK"
             exit 1

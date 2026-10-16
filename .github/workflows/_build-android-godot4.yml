@@ -369,6 +369,14 @@ jobs:
             echo "::error::ndk-stack not found at $NDK_STACK"
             exit 1
           fi
+          echo "::group::Preparing symbols for ndk-stack"
+          find symbols/ -name "*.debug" | while read -r DEBUG_FILE; do
+            ORIGINAL_SO="${DEBUG_FILE%.debug}"
+            if [ ! -f "$ORIGINAL_SO" ]; then
+              mv "$DEBUG_FILE" "$ORIGINAL_SO"
+            fi
+          done
+          echo "::endgroup::"
           for STACK_FILE in server-stack-*.log; do
             if [ ! -f "$STACK_FILE" ]; then continue; fi
             echo "::group::Decoding $STACK_FILE"

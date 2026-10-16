@@ -370,12 +370,10 @@ jobs:
             exit 1
           fi
           echo "::group::Preparing symbols for ndk-stack"
-          find symbols/ -type f
-          find symbols/ -type f -name "*.debug" | while read -r DEBUG_FILE; do
-            ORIGINAL_SO="${DEBUG_FILE%.debug}"
-            if [ ! -f "$ORIGINAL_SO" ]; then
-              mv "$DEBUG_FILE" "$ORIGINAL_SO"
-            fi
+          mkdir -p symbols/lib/x86_64
+          find symbols/ -type f \( -name "*.debug" -o -name "*.so" \) ! -path "symbols/lib/x86_64/*" | while read -r FILE; do
+            BASENAME=$(basename "$FILE" | sed 's/\.debug$//')
+            mv "$FILE" "symbols/lib/x86_64/$BASENAME"
           done
           echo "::endgroup::"
           for STACK_FILE in server-stack-*.log; do

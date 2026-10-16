@@ -379,7 +379,7 @@ jobs:
           for STACK_FILE in server-stack-*.log; do
             if [ ! -f "$STACK_FILE" ]; then continue; fi
             echo "::group::Decoding $STACK_FILE"
-            "$NDK_STACK" -sym symbols/ -dump "$STACK_FILE" 2>&1 | tee "decoded-$STACK_FILE"
+            "$NDK_STACK" -sym symbols/lib/x86_64/ -dump "$STACK_FILE" 2>&1 | tee "decoded-$STACK_FILE"
             echo "::endgroup::"
           done
       - name: Upload logs

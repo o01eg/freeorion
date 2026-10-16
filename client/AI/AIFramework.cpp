@@ -140,7 +140,7 @@ void PythonAI::GenerateOrders()
 
     AIClientApp* app = AIClientApp::GetApp();
     const Universe& universe = app->GetUniverse();
-    for (const Planet* planet : universe.Objects().allExistingRaw<Planet>())
+    for (const Planet* planet : universe.Objects().allRaw<Planet>())
         InfoLogger() << " Known planet id=" << planet->ID() << ": " << planet->Name();
 
     ScopedTimer order_timer;

@@ -3,6 +3,7 @@
 #include "AIClientApp.h"
 #include "AIWrapper.h"
 #include "../../universe/BuildingType.h"
+#include "../../universe/Planet.h"
 #include "../../universe/Universe.h"
 #include "../../util/Directories.h"
 #include "../../util/Logger.h"
@@ -137,6 +138,11 @@ void PythonAI::GenerateOrders()
 {
     DebugLogger() << "PythonAI::GenerateOrders : initializing turn";
 
+    AIClientApp* app = AIClientApp::GetApp();
+    const Universe& universe = app->GetUniverse();
+    for (const Planet* planet : universe.Objects().allExistingRaw<Planet>())
+        InfoLogger() << " Known planet id=" << planet->ID() << ": " << planet->Name();
+
     ScopedTimer order_timer;
     try {
         // call Python function that generates orders for current turn
@@ -152,7 +158,6 @@ void PythonAI::GenerateOrders()
         ErrorLogger() << "PythonAI::GenerateOrders : Python error caught.  Partial orders sent to server";
     }
 
-    AIClientApp* app = AIClientApp::GetApp();
     // encodes order sets and sends turn orders message.  "done" the turn for the client, but "starts" the turn for the server
     app->StartTurn(app->GetAI()->GetSaveStateString());
 

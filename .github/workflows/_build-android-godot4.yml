@@ -379,7 +379,12 @@ jobs:
           for STACK_FILE in server-stack-*.log; do
             if [ ! -f "$STACK_FILE" ]; then continue; fi
             echo "::group::Decoding $STACK_FILE"
-            "$NDK_STACK" -sym symbols/lib/x86_64/ -dump "$STACK_FILE" 2>&1 | tee "decoded-$STACK_FILE"
+            # Add tombstone signature to each thread
+            PREPARED="$(mktemp)"
+            awk '/^".*" sysTid=/ { print "*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***" } { print }' \
+              "$STACK_FILE" > "$PREPARED"
+            "$NDK_STACK" -sym symbols/lib/x86_64/ -dump "$PREPARED" 2>&1 | tee "decoded-$STACK_FILE"
+            rm -f "$PREPARED"
             echo "::endgroup::"
           done
       - name: Upload logs

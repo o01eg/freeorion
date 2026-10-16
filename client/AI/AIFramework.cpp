@@ -142,6 +142,8 @@ void PythonAI::GenerateOrders()
     const Universe& universe = app->GetUniverse();
     for (const Planet* planet : universe.Objects().allRaw<Planet>())
         InfoLogger() << " Known planet id=" << planet->ID() << ": " << planet->Name();
+    for (const auto& p : universe.Objects().allWithIDs<Planet>() | range_keys | range_to_vec)
+        InfoLogger() << " Ranged known planet id=" << p;
 
     ScopedTimer order_timer;
     try {

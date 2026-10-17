@@ -376,7 +376,7 @@ jobs:
             mv "$FILE" "symbols/lib/x86_64/$BASENAME"
           done
           echo "::endgroup::"
-          for STACK_FILE in server-stack-*.log; do
+          for STACK_FILE in server-stack-*.log tombstone-*.log; do
             if [ ! -f "$STACK_FILE" ]; then continue; fi
             echo "::group::Decoding $STACK_FILE"
             # Add tombstone signature to each thread
@@ -399,5 +399,7 @@ jobs:
             android-screenshot.png
             server-stack-*.log
             decoded-server-stack-*.log
+            tombstone-*.log
+            decoded-tombstone-*.log
           if-no-files-found: error
           retention-days: 1

@@ -81,6 +81,12 @@ if [ "$1" = "4" ]; then
 fi
 echo "::endgroup::"
 
+for T in $(grep "F DEBUG \+: \*" logcat.log  | tr -s ' ' | cut -d' ' -f3); do
+  echo "::group::Extract tombstone $T"
+
+  echo "::endgroup::"
+done
+
 echo "::group::List logs"
 adb exec-out run-as org.godotengine.freeoriongodotclient ls -l files/
 echo "::endgroup::"

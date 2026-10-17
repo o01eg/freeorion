@@ -83,7 +83,7 @@ echo "::endgroup::"
 
 for T in $(grep "F DEBUG \+: \*" logcat.log  | tr -s ' ' | cut -d' ' -f3); do
   echo "::group::Extract tombstone $T"
-
+  awk -v tombstone=$T ' $0 ~ tombstone && /F[[:space:]]*DEBUG[[:space:]]*:/ { sub(/^.*DEBUG[[:space:]]*:[[:space:]]/, ""); print } { }' logcat.log >tombstone-$T.log
   echo "::endgroup::"
 done
 

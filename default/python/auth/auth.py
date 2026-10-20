@@ -109,7 +109,7 @@ class AuthProvider:
                 with self.conn.cursor() as curs:
                     curs.execute(
                         """ SELECT game_password IS NOT NULL FROM auth.users WHERE player_name = %s """,
-                        (player_name,),
+                        (player_name.lower(),),
                     )
                     for r in curs:
                         have_password = not not r[0]

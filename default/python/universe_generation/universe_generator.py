@@ -238,7 +238,7 @@ def create_universe(psd_map):  # noqa: C901
                         NOW()::timestamp)
                                 ON CONFLICT (game_uid, turn) DO UPDATE SET turn_ts =
                                 EXCLUDED.turn_ts""",
-                    (fo.get_galaxy_setup_data().gameUID,),
+                    (fo.get_galaxy_setup_data().gameUID.lower(),),
                 )
     except Exception:
         exctype, value = sys.exc_info()[:2]

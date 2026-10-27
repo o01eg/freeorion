@@ -31,7 +31,7 @@ public:
 
         HandleErrorAlreadySet is idempotent, calling it multiple times
         won't crash or hang the process. */
-    void HandleErrorAlreadySet();
+    void HandleErrorAlreadySet() noexcept;
 
     bool Initialize();        // initializes and runs the Python interpreter, prepares the Python environment
 

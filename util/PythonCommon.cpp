@@ -245,7 +245,7 @@ bool PythonCommon::InitErrorHandler() {
 bool PythonCommon::InitCommonImports()
 { return true; }
 
-void PythonCommon::HandleErrorAlreadySet() {
+void PythonCommon::HandleErrorAlreadySet() noexcept {
     if (!Py_IsInitialized()) {
         ErrorLogger() << "Python interpreter not initialized and exception handler called.";
         return;

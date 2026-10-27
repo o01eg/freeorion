@@ -1,3 +1,9 @@
+freeorion (0.5.1.9999.fo0032+git20261020.10c0d79ppa3~noble) noble; urgency=medium
+
+  * Capture Python error again.
+
+ -- FreeOrion Bot <freeorionorg@gmail.com>  Tue, 27 Oct 2026 08:44:18 +0400
+
 freeorion (0.5.1.9999.fo0032+git20261020.10c0d79ppa2~noble) noble; urgency=medium
 
   * Capture Python error.

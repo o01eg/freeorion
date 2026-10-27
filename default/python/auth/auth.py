@@ -190,10 +190,10 @@ class AuthProvider:
                         if role is not None:
                             roles.append(role)
                         info(f"Player {player_name} was accepted {authenticated!r}")
-        except psycopg2.InterfaceError:
-            self.conn = psycopg2.connect(self.dsn)
+        except Exception:
             exctype, value = sys.exc_info()[:2]
             error(f"Cann't check OTP {player_name}: {exctype} {value}")
+            self.conn = psycopg2.connect(self.dsn)
 
         if authenticated:
             return roles

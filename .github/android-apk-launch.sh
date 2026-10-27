@@ -73,16 +73,22 @@ echo "::endgroup::"
 
 echo "::group::Getting logs"
 adb logcat -d >logcat.log
-adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeorion-godot.log >freeorion-godot.log 2>&1
+adb exec-out run-as org.godotengine.freeoriongodotclient cat cache/freeorion-godot.log >freeorion-godot.log 2>&1
 if [ "$1" = "4" ]; then
-  adb exec-out run-as org.godotengine.freeoriongodotclient cat files/freeoriond.log >freeoriond.log 2>&1
-  adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_1.log >AI_1.log 2>&1
-  adb exec-out run-as org.godotengine.freeoriongodotclient cat files/AI_2.log >AI_2.log 2>&1
+  adb exec-out run-as org.godotengine.freeoriongodotclient cat cache/freeoriond.log >freeoriond.log 2>&1
+  adb exec-out run-as org.godotengine.freeoriongodotclient cat cache/AI_1.log >AI_1.log 2>&1
+  adb exec-out run-as org.godotengine.freeoriongodotclient cat cache/AI_2.log >AI_2.log 2>&1
 fi
 echo "::endgroup::"
 
+for T in $(grep "F DEBUG \+: \*" logcat.log  | tr -s ' ' | cut -d' ' -f3); do
+  echo "::group::Extract tombstone $T"
+  awk -v tombstone=$T ' $0 ~ tombstone && /F[[:space:]]*DEBUG[[:space:]]*:/ { sub(/^.*DEBUG[[:space:]]*:[[:space:]]/, ""); print } { }' logcat.log >tombstone-$T.log
+  echo "::endgroup::"
+done
+
 echo "::group::List logs"
-adb exec-out run-as org.godotengine.freeoriongodotclient ls -l files/
+adb exec-out run-as org.godotengine.freeoriongodotclient ls -l cache/
 echo "::endgroup::"
 
 echo "::group::Checking errors"

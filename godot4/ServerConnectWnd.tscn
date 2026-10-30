@@ -1,13 +1,166 @@
-[gd_scene load_steps=2 format=3 uid="uid://cmev1o4xqk6yo"]
+[gd_scene load_steps=15 format=3 uid="uid://cmev1o4xqk6yo"]
 
-[ext_resource type="StyleBox" uid="uid://mo35a1kan85v" path="res://assets/resources/WndInner.tres" id="1_pmgsy"]
+[ext_resource type="Script" path="res://ServerConnectWnd.gd" id="1_scw"]
+[ext_resource type="Script" path="res://CUIRadioButton.gd" id="2_radio"]
+[ext_resource type="Script" path="res://CUIDropDown.gd" id="3_dropdown"]
+[ext_resource type="StyleBox" uid="uid://cbitightinner" path="res://assets/resources/WndInnerTight.tres" id="4_inner"]
+[ext_resource type="StyleBox" uid="uid://cbxradioflat" path="res://assets/resources/RadioStyle.tres" id="5_radio_style"]
+[ext_resource type="StyleBox" uid="uid://dbxeditnormal" path="res://assets/resources/EditNormal.tres" id="6_edit_normal"]
+[ext_resource type="StyleBox" uid="uid://dbxeditdisabled" path="res://assets/resources/EditDisabled.tres" id="7_edit_disabled"]
+[ext_resource type="StyleBox" uid="uid://dbxeditfocus" path="res://assets/resources/EditFocus.tres" id="8_edit_focus"]
+[ext_resource type="StyleBox" uid="uid://cbxlistnormal" path="res://assets/resources/ListNormal.tres" id="9_list_normal"]
+[ext_resource type="StyleBox" uid="uid://cbxlistdisabled" path="res://assets/resources/ListDisabled.tres" id="10_list_disabled"]
+[ext_resource type="StyleBox" uid="uid://cbxdropdownnormal" path="res://assets/resources/DropDownNormal.tres" id="11_drop_normal"]
+[ext_resource type="StyleBox" uid="uid://cbxdropdowndisabled" path="res://assets/resources/DropDownDisabled.tres" id="12_drop_disabled"]
+[ext_resource type="PackedScene" uid="uid://bx4bc46ask5n6" path="res://CUIButton.tscn" id="13_cuibtn"]
+[ext_resource type="StyleBox" uid="uid://cbxdropdownfocus" path="res://assets/resources/DropDownFocus.tres" id="14_drop_focus"]
 
 [node name="ServerConnectWnd" type="VBoxContainer"]
+auto_translate_mode = 1
+custom_minimum_size = Vector2(387, 521)
+script = ExtResource("1_scw")
 
-[node name="Label" type="Label" parent="."]
+[node name="Title" type="Label" parent="."]
 layout_mode = 2
 text = "SCONNECT_WINDOW_TITLE"
 
-[node name="PanelContainer" type="PanelContainer" parent="."]
+[node name="Panel" type="PanelContainer" parent="."]
 layout_mode = 2
-theme_override_styles/panel = ExtResource("1_pmgsy")
+size_flags_vertical = 3
+theme_override_styles/panel = ExtResource("4_inner")
+
+[node name="Rows" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="NameRow" type="HBoxContainer" parent="Panel/Rows"]
+layout_mode = 2
+valign = 1
+theme_override_constants/separation = 5
+
+[node name="NameLabel" type="Label" parent="Panel/Rows/NameRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(90, 0)
+text = "PLAYER_NAME_LABEL"
+
+[node name="NameEdit" type="LineEdit" parent="Panel/Rows/NameRow"]
+auto_translate_mode = 2
+layout_mode = 2
+custom_minimum_size = Vector2(0, 30)
+size_flags_horizontal = 3
+theme_override_styles/normal = ExtResource("6_edit_normal")
+theme_override_styles/focus = ExtResource("8_edit_focus")
+theme_override_styles/read_only = ExtResource("7_edit_disabled")
+
+[node name="ModeRow" type="HBoxContainer" parent="Panel/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="RadioGroup" type="VBoxContainer" parent="Panel/Rows/ModeRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(165, 0)
+theme_override_constants/separation = 4
+
+[node name="Host" type="Button" parent="Panel/Rows/ModeRow/RadioGroup"]
+auto_translate_mode = 2
+layout_mode = 2
+custom_minimum_size = Vector2(0, 24)
+text = "HOST_GAME_BN"
+theme_override_styles/normal = ExtResource("5_radio_style")
+theme_override_styles/hover = ExtResource("5_radio_style")
+theme_override_styles/pressed = ExtResource("5_radio_style")
+theme_override_styles/disabled = ExtResource("5_radio_style")
+theme_override_styles/focus = ExtResource("5_radio_style")
+script = ExtResource("2_radio")
+
+[node name="Join" type="Button" parent="Panel/Rows/ModeRow/RadioGroup"]
+auto_translate_mode = 2
+layout_mode = 2
+custom_minimum_size = Vector2(0, 24)
+text = "JOIN_GAME_BN"
+theme_override_styles/normal = ExtResource("5_radio_style")
+theme_override_styles/hover = ExtResource("5_radio_style")
+theme_override_styles/pressed = ExtResource("5_radio_style")
+theme_override_styles/disabled = ExtResource("5_radio_style")
+theme_override_styles/focus = ExtResource("5_radio_style")
+script = ExtResource("2_radio")
+
+[node name="ClientTypeBox" type="VBoxContainer" parent="Panel/Rows/ModeRow"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="ClientTypeSpacer" type="Control" parent="Panel/Rows/ModeRow/ClientTypeBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 29)
+
+[node name="ClientType" type="OptionButton" parent="Panel/Rows/ModeRow/ClientTypeBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(205, 23)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_styles/normal = ExtResource("11_drop_normal")
+theme_override_styles/hover = ExtResource("11_drop_normal")
+theme_override_styles/pressed = ExtResource("11_drop_normal")
+theme_override_styles/disabled = ExtResource("12_drop_disabled")
+theme_override_styles/focus = ExtResource("14_drop_focus")
+script = ExtResource("3_dropdown")
+
+[node name="LanLabel" type="Label" parent="Panel/Rows"]
+layout_mode = 2
+text = "LAN_GAME_LABEL"
+
+[node name="ServerList" type="PanelContainer" parent="Panel/Rows"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 242)
+size_flags_vertical = 3
+theme_override_styles/panel = ExtResource("10_list_disabled")
+
+[node name="List" type="VBoxContainer" parent="Panel/Rows/ServerList"]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="RefreshRow" type="HBoxContainer" parent="Panel/Rows"]
+layout_mode = 2
+
+[node name="RefreshSpacer" type="Control" parent="Panel/Rows/RefreshRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Refresh" parent="Panel/Rows/RefreshRow" instance=ExtResource("13_cuibtn")]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 25)
+disabled = true
+text = "REFRESH_LIST_BN"
+
+[node name="InternetLabel" type="Label" parent="Panel/Rows"]
+layout_mode = 2
+text = "INTERNET_GAME_LABEL"
+
+[node name="IPEdit" type="LineEdit" parent="Panel/Rows"]
+auto_translate_mode = 2
+layout_mode = 2
+custom_minimum_size = Vector2(0, 30)
+text = "localhost"
+theme_override_styles/normal = ExtResource("6_edit_normal")
+theme_override_styles/focus = ExtResource("8_edit_focus")
+theme_override_styles/read_only = ExtResource("7_edit_disabled")
+theme_override_colors/font_uneditable_color = Color(0.623529, 0.623529, 0.623529, 1)
+
+[node name="OkCancelRow" type="HBoxContainer" parent="Panel/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="OkSpacer" type="Control" parent="Panel/Rows/OkCancelRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Ok" parent="Panel/Rows/OkCancelRow" instance=ExtResource("13_cuibtn")]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 28)
+disabled = true
+text = "OK"
+
+[node name="Cancel" parent="Panel/Rows/OkCancelRow" instance=ExtResource("13_cuibtn")]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 28)
+text = "CANCEL"

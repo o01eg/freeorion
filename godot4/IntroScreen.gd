@@ -82,5 +82,23 @@ func _on_freeorion_start_game(_is_new_game: bool) -> void:
 
 func _on_multi_player_pressed() -> void:
 	$Menu/VBoxContainer/MenuButtons/VBoxContainer/MultiPlayer.disabled = true
-	$Popup.add_child(preload("res://ServerConnectWnd.tscn").instantiate())
+	var scw = preload("res://ServerConnectWnd.tscn").instantiate()
+	scw.cancel_pressed.connect(_on_server_connect_cancelled)
+	scw.ok_pressed.connect(_on_server_connect_ok)
+	# Show the frame first so the window can take focus in its _ready()
+	# (GG does this in ServerConnectWnd::ModalInit).
 	$Popup.visible = true
+	$Popup.add_child(scw)
+
+
+func _on_server_connect_cancelled() -> void:
+	for child in $Popup.get_children():
+		child.queue_free()
+	$Popup.visible = false
+	var multi_player: Button = $Menu/VBoxContainer/MenuButtons/VBoxContainer/MultiPlayer
+	multi_player.disabled = false
+	multi_player.grab_focus()
+
+
+func _on_server_connect_ok() -> void:
+	_on_server_connect_cancelled()

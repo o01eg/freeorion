@@ -407,7 +407,7 @@ def spiral_galaxy_calc_positions(positions, adjacency_grid, arms, size, width):
     arm_length = 2.0 * pi * spiral_tightness
 
     # radius of the core circular region
-    r_core = 0.3
+    r_core = 0.5
 
     logarithmic_pitch_degrees = 50
     k = tan(logarithmic_pitch_degrees * pi/180)

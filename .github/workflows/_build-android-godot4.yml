@@ -13,13 +13,18 @@ env:
   # Matches NDK for Godot4
   # https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/platform/android/java/app/config.gradle#L16
   NDK_VERSION: "r29"
+  # Matches default for Godot4
+  # https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/platform/android/java/app/config.gradle#L14
+  JAVA_VERSION: "17"
+  # https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/platform/android/java/gradle/wrapper/gradle-wrapper.properties#L4
+  GRADLE_VERSION: "8.11.1"
 jobs:
   android:
     name: ${{ matrix.arch }} (${{ inputs.debug_sanitize && 'RelWithDebInfo_ASan' || 'MinSizeRel' }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [x86_64, armeabi-v7a, arm64-v8a]
+        arch: ${{ inputs.debug_sanitize && fromJSON('["x86_64"]') || fromJSON('["x86_64", "armeabi-v7a", "arm64-v8a"]') }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v6
@@ -60,6 +65,7 @@ jobs:
             -DCMAKE_CXX_FLAGS="${{ env.CONF_CMAKE_CXX_FLAGS }}" \
             -DCMAKE_SHARED_LINKER_FLAGS="${{ env.CONF_CMAKE_SHARED_LINKER_FLAGS }}" \
             -DANDROID_ALLOW_UNDEFINED_SYMBOLS=Off \
+            -DBUILD_UNIVERSE_EVAL_SOURCES_DEFERRED="${{ inputs.debug_sanitize && 'On' || 'Off' }}" \
             -DBUILD_SERVER=On \
             -DBUILD_AI=On \
             -DBUILD_CLIENT_GG=Off \
@@ -162,10 +168,15 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "8.11.1"
+          gradle-version: ${{ env.GRADLE_VERSION }}
       - name: Build FreeOrion Android plugin
         run: |
           cd godot4/android-plugin
@@ -231,10 +242,15 @@ jobs:
       - name: Install Android Build Tools
         run: |
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "8.11.1"
+          gradle-version: ${{ env.GRADLE_VERSION }}
       - name: Download FreeOrion Android plugin
         uses: actions/download-artifact@v8
         with:
@@ -349,6 +365,44 @@ jobs:
           working-directory: ./
           channel: beta
           script: bash .github/android-apk-launch.sh 4 "${{ inputs.debug_sanitize }}"
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        if: always() && inputs.debug_sanitize
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+      - name: Download debug symbols
+        if: always() && inputs.debug_sanitize
+        uses: actions/download-artifact@v8
+        with:
+          name: android-debug-binaries-godot4-x86_64
+          path: symbols/
+      - name: Decode stack trace
+        if: always() && inputs.debug_sanitize
+        run: |
+          NDK_STACK="${{ steps.setup-ndk.outputs.ndk-path }}/ndk-stack"
+          if [ ! -f "$NDK_STACK" ]; then
+            echo "::error::ndk-stack not found at $NDK_STACK"
+            exit 1
+          fi
+          echo "::group::Preparing symbols for ndk-stack"
+          mkdir -p symbols/lib/x86_64
+          find symbols/ -type f \( -name "*.debug" -o -name "*.so" \) ! -path "symbols/lib/x86_64/*" | while read -r FILE; do
+            BASENAME=$(basename "$FILE" | sed 's/\.debug$//')
+            mv "$FILE" "symbols/lib/x86_64/$BASENAME"
+          done
+          echo "::endgroup::"
+          for STACK_FILE in server-stack-*.log tombstone-*.log; do
+            if [ ! -f "$STACK_FILE" ]; then continue; fi
+            echo "::group::Decoding $STACK_FILE"
+            # Add tombstone signature to each thread
+            PREPARED="$(mktemp)"
+            awk '/^".*" sysTid=/ { print "*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***" } { print }' \
+              "$STACK_FILE" > "$PREPARED"
+            "$NDK_STACK" -sym symbols/lib/x86_64/ -dump "$PREPARED" 2>&1 | tee "decoded-$STACK_FILE"
+            rm -f "$PREPARED"
+            echo "::endgroup::"
+          done
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v7
@@ -361,5 +415,7 @@ jobs:
             android-screenshot.png
             server-stack-*.log
             tombstone-*.log
+            decoded-server-stack-*.log
+            decoded-tombstone-*.log
           if-no-files-found: error
           retention-days: 1

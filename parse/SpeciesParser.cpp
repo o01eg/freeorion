@@ -37,10 +37,35 @@ namespace {
         std::vector<std::string> // census ordering
     >;
 
+    // Constructor arguments for Species, assembled while a species definition is
+    // parsed.  Species can't be moved or copied, so the object itself can only be
+    // built when the final storage is allocated; keeping the arguments (rather than
+    // the parsed python dict) means the python objects are released right away.
+    using species_init_type = std::tuple<std::string,
+                                         std::string,
+                                         std::string,
+                                         std::vector<FocusType>,
+                                         std::string,
+                                         std::map<PlanetType, PlanetEnvironment>,
+                                         std::vector<std::unique_ptr<Effect::EffectsGroup>>,
+                                         std::unique_ptr<Condition::Condition>,
+                                         bool,
+                                         bool,
+                                         bool,
+                                         bool,
+                                         std::set<std::string>,
+                                         std::set<std::string>,
+                                         std::set<std::string>,
+                                         std::unique_ptr<Condition::Condition>,
+                                         std::unique_ptr<ValueRef::ValueRef<double>>,
+                                         std::string,
+                                         double,
+                                         int>;
+
     struct py_grammar {
         const PythonParser& parser;
         boost::python::object module;
-        std::unordered_map<std::string, boost::python::dict> species_args;
+        std::vector<std::pair<std::string, species_init_type>> species_args;
 
         py_grammar(const PythonParser& parser_) :
             parser(parser_),
@@ -59,7 +84,7 @@ namespace {
             parser.UnloadModule(module);
         }
 
-        auto make_species(std::string species_name, const boost::python::dict& kw) {
+        species_init_type make_species(std::string species_name, const boost::python::dict& kw) {
             auto description{boost::python::extract<std::string>(kw["description"])()};
             auto gameplay_description{boost::python::extract<std::string>(kw["gameplay_description"])()};
             boost::python::stl_input_iterator<FocusType> foci_begin(kw["foci"]), foci_end;
@@ -144,12 +169,7 @@ namespace {
         }
 
         continious_const_map<std::string, Species> to_species() {
-            std::vector<std::pair<std::string, decltype(make_species("", std::declval<boost::python::dict>()))>> species_init_vector;
-            species_init_vector.reserve(species_args.size());
-            for (auto&& [name, kw] : species_args) {
-                species_init_vector.emplace_back(name, make_species(name, kw));
-            }
-            return continious_const_map<std::string, Species>{species_init_vector};
+            return continious_const_map<std::string, Species>{species_args};
         }
     };
 
@@ -185,9 +205,7 @@ namespace {
 
         py_grammar& p = boost::python::extract<py_grammar&>(scope.attr("__grammar"))();
 
-        p.species_args.emplace(std::piecewise_construct,
-                               std::forward_as_tuple(species_name),
-                               std::forward_as_tuple(kw));
+        p.species_args.emplace_back(species_name, p.make_species(species_name, kw));
 
         return boost::python::object();
     }

@@ -33,7 +33,7 @@ namespace {
 
 namespace {
     using start_rule_payload = std::pair<
-        continious_const_map<std::string, Species>, // species_by_name
+        continious_const_map<Species>, // species_by_name
         std::vector<std::string> // census ordering
     >;
 
@@ -132,7 +132,7 @@ namespace {
     struct py_grammar {
         const PythonParser& parser;
         boost::python::object module;
-        std::vector<std::pair<std::string, species_init_type>> species_args;
+        std::vector<species_init_type> species_args;
 
         py_grammar(const PythonParser& parser_) :
             parser(parser_),
@@ -151,8 +151,8 @@ namespace {
             parser.UnloadModule(module);
         }
 
-        continious_const_map<std::string, Species> to_species() {
-            return continious_const_map<std::string, Species>{species_args};
+        continious_const_map<Species> to_species() {
+            return continious_const_map<Species>{species_args};
         }
     };
 
@@ -188,7 +188,7 @@ namespace {
 
         py_grammar& p = boost::python::extract<py_grammar&>(scope.attr("__grammar"))();
 
-        p.species_args.emplace_back(species_name, make_species(species_name, kw));
+        p.species_args.push_back(make_species(species_name, kw));
 
         return boost::python::object();
     }

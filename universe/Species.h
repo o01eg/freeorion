@@ -240,7 +240,7 @@ private:
 /** Holds all FreeOrion species.  Types may be looked up by name. */
 class FO_COMMON_API SpeciesManager {
 public:
-    using SpeciesTypeMap = continious_const_map<std::string, Species>;
+    using SpeciesTypeMap = continious_const_map<Species>;
 
     static constexpr auto is_playable = [](const auto& species_entry) noexcept { return species_entry.second.Playable(); };
     static constexpr auto is_native = [](const auto& species_entry) noexcept { return species_entry.second.Native(); };

@@ -1,61 +1,59 @@
 #ifndef _continious_const_map_h_
 #define _continious_const_map_h_
 
+#include <compare>
 #include <cstddef>
-#include <functional>
 #include <iterator>
 #include <memory>
 #include <new>
 #include <stdexcept>
+#include <string>
 #include <string_view>
+#include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 
-/** Stores values of type T in one contiguous block of memory, indexed by key.
-  * Values are never moved once constructed, so pointers/references to them stay
-  * valid for the lifetime of the container (moving the container keeps the block
-  * address intact). Keys are held in a hash index; iteration order is unspecified. */
-template <typename Key, typename T>
+/** Stores values of type T in one contiguous block of memory, indexed by
+  * T::Name().  Values are constructed in place and never moved, so pointers and
+  * references to them stay valid for the lifetime of the container (moving the
+  * container keeps the block address intact).  T may therefore be immobile and
+  * may hold self-referential state.
+  *
+  * T must be constructible in place from the tuple yielded by the source range
+  * and expose a stable `const std::string& Name() const`.  The name is used as
+  * the key, so the key is stored only once (inside T itself).  If several values
+  * share a name, the first one wins and the later ones are destroyed.
+  *
+  * Iteration follows the order of the source range and walks the contiguous
+  * buffer directly; the hash index is only used for lookups. */
+template <typename T>
 class continious_const_map {
-private:
-    struct transparent_string_hash {
-        using is_transparent = void;
-
-        std::size_t operator()(std::string_view sv) const noexcept {
-            return std::hash<std::string_view>{}(sv);
-        }
-    };
-
-    using MapType = std::unordered_map<Key, const T*, transparent_string_hash, std::equal_to<>>;
-
 public:
-    using key_type = Key;
+    // The name is used as the key and is not copied into the container, so it
+    // has to stay alive inside the value.  Returning it by value would leave the
+    // index pointing at a destroyed temporary.
+    static_assert(std::is_lvalue_reference_v<decltype(std::declval<const T&>().Name())>,
+                  "continious_const_map requires T::Name() to return a reference "
+                  "to a string that lives as long as the T instance");
+
+    using key_type = std::string;
     using mapped_type = const T;
-    using value_type = std::pair<const Key, const T>;
+    using value_type = std::pair<const key_type&, const T&>;
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
 
     class const_iterator {
     public:
-        // std::unordered_map iterators are forward-only. Claiming bidirectional here
-        // makes std::ranges instantiate operator-- on them, which does not compile.
-        using iterator_category = std::forward_iterator_tag;
-        // Both the key and the value are handed out as references to objects that
-        // live in the container (a prvalue pair here would copy the key and leave
-        // callers holding a reference into a dead temporary).  value_type is kept
-        // identical to reference so the range satisfies the std::ranges concepts.
-        using reference = std::pair<const Key&, const T&>;
+        using iterator_category = std::random_access_iterator_tag;
+        // Both the key and the value are handed out as references to objects
+        // that live in the container (a prvalue pair here would copy the key
+        // and leave callers holding a reference into a dead temporary).
+        // value_type is kept identical to reference so the range satisfies the
+        // std::ranges iterator concepts.
+        using reference = continious_const_map::value_type;
         using value_type = reference;
         using difference_type = continious_const_map::difference_type;
-
-        const_iterator() = default;
-
-        explicit const_iterator(typename MapType::const_iterator it) :
-            m_it(it)
-        { }
-
-        reference operator*() const
-        { return { m_it->first, *(m_it->second) }; }
 
         class pointer_proxy {
             reference m_val;
@@ -70,38 +68,86 @@ public:
 
         using pointer = pointer_proxy;
 
-        pointer_proxy operator->() const {
-            return pointer_proxy{ **this };
-        }
+        const_iterator() = default;
+
+        explicit const_iterator(const T* ptr) :
+            m_ptr(ptr)
+        { }
+
+        reference operator*() const
+        { return { m_ptr->Name(), *m_ptr }; }
+
+        pointer operator->() const
+        { return pointer{ **this }; }
 
         const_iterator& operator++() {
-            ++m_it;
+            ++m_ptr;
             return *this;
         }
 
         const_iterator operator++(int) {
             auto tmp = *this;
-            ++m_it;
+            ++m_ptr;
             return tmp;
         }
 
-        friend bool operator==(const const_iterator& a, const const_iterator& b) {
-            return a.m_it == b.m_it;
+        const_iterator& operator--() {
+            --m_ptr;
+            return *this;
         }
 
-        friend bool operator!=(const const_iterator& a, const const_iterator& b) {
-            return a.m_it != b.m_it;
+        const_iterator operator--(int) {
+            auto tmp = *this;
+            --m_ptr;
+            return tmp;
         }
+
+        const_iterator& operator+=(difference_type n) {
+            m_ptr += n;
+            return *this;
+        }
+
+        const_iterator& operator-=(difference_type n) {
+            m_ptr -= n;
+            return *this;
+        }
+
+        friend const_iterator operator+(const_iterator it, difference_type n) {
+            it += n;
+            return it;
+        }
+
+        friend const_iterator operator+(difference_type n, const_iterator it) {
+            it += n;
+            return it;
+        }
+
+        friend const_iterator operator-(const_iterator it, difference_type n) {
+            it -= n;
+            return it;
+        }
+
+        friend difference_type operator-(const const_iterator& a, const const_iterator& b)
+        { return (a.m_ptr && b.m_ptr) ? a.m_ptr - b.m_ptr : difference_type{0}; }
+
+        reference operator[](difference_type n) const
+        { return *(*this + n); }
+
+        friend bool operator==(const const_iterator& a, const const_iterator& b)
+        { return a.m_ptr == b.m_ptr; }
+
+        friend auto operator<=>(const const_iterator& a, const const_iterator& b)
+        { return a.m_ptr <=> b.m_ptr; }
+
     private:
-        typename MapType::const_iterator m_it;
+        const T* m_ptr = nullptr;
     };
 
     using iterator = const_iterator;
 
-    continious_const_map()
-    { }
+    continious_const_map() = default;
 
-    /** Builds the container from a range of {key, constructor-args-tuple} pairs. */
+    /** Builds the container from a range of constructor-argument tuples. */
     template <typename Rng>
     explicit continious_const_map(Rng&& source) {
         const size_type capacity = std::size(source);
@@ -113,7 +159,7 @@ public:
         m_data = std::allocator_traits<std::allocator<T>>::allocate(m_alloc, capacity);
 
         try {
-            for (auto& [key, init_args_tuple] : source) {
+            for (auto& init_args_tuple : source) {
                 if (m_size == capacity) { // source yielded more elements than std::size() reported
                     throw std::length_error("continious_const_map: source range exceeded its size()");
                 }
@@ -125,8 +171,9 @@ public:
 
                 ++m_size; // from here on the cleanup code owns this element
 
-                auto [it, inserted] = m_index_map.emplace(std::move(key), m_data + index);
-                if (!inserted) { // duplicate key: drop the freshly constructed value
+                const T& value = m_data[index];
+                auto [it, inserted] = m_index_map.emplace(std::string_view{value.Name()}, &value);
+                if (!inserted) { // duplicate name: drop the freshly constructed value
                     std::destroy_at(m_data + index);
                     --m_size;
                 }
@@ -179,10 +226,10 @@ public:
     continious_const_map& operator=(const continious_const_map&) = delete;
 
     const_iterator begin() const noexcept
-    { return const_iterator(m_index_map.begin()); }
+    { return const_iterator(m_data); }
 
     const_iterator end() const noexcept
-    { return const_iterator(m_index_map.end()); }
+    { return const_iterator(m_data ? m_data + m_size : nullptr); }
 
     const_iterator cbegin() const noexcept
     { return begin(); }
@@ -190,12 +237,10 @@ public:
     const_iterator cend() const noexcept
     { return end(); }
 
-    const_iterator find(const Key& key) const
-    { return const_iterator(m_index_map.find(key)); }
-
-    template<typename K>
-    const_iterator find(const K& key) const
-    { return const_iterator(m_index_map.find(key)); }
+    const_iterator find(std::string_view key) const {
+        const auto it = m_index_map.find(key);
+        return it == m_index_map.end() ? end() : const_iterator(it->second);
+    }
 
     size_type size() const noexcept
     { return m_size; }
@@ -208,7 +253,7 @@ private:
     size_type m_capacity = 0;   // T slots allocated for m_data
     T* m_data = nullptr;
     std::allocator<T> m_alloc;
-    MapType m_index_map;
+    std::unordered_map<std::string_view, const T*> m_index_map;
 };
 
 #endif // _continious_const_map_h_

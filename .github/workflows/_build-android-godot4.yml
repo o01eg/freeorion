@@ -47,8 +47,8 @@ jobs:
             echo "CONF_CMAKE_SHARED_LINKER_FLAGS=-fsanitize=address" >> $GITHUB_ENV
           else
             echo "CONF_CMAKE_BUILD_TYPE=MinSizeRel" >> $GITHUB_ENV
-            echo "CONF_CMAKE_CXX_FLAGS=-std=c++20" >> $GITHUB_ENV
-            echo "CONF_CMAKE_SHARED_LINKER_FLAGS=" >> $GITHUB_ENV
+            echo "CONF_CMAKE_CXX_FLAGS=-std=c++20 -flto=thin" >> $GITHUB_ENV
+            echo "CONF_CMAKE_SHARED_LINKER_FLAGS=-flto=thin" >> $GITHUB_ENV
           fi
       - name: Configure
         run: |
@@ -210,6 +210,7 @@ jobs:
           mv default/scripting godot4/default/
           mv default/stringtables godot4/default/
           mv default/python godot4/default/
+          mv default/credits.xml godot4/default/
           mkdir -p godot4/default/python/lib/
           cp ../${{ steps.download-python-lib.outputs.filename }} godot4/default/python/lib/python311.zip
           unzip -t godot4/default/python/lib/python311.zip

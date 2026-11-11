@@ -1,12 +1,23 @@
-[gd_scene load_steps=5 format=3 uid="uid://cmev1o4xqk6yo"]
+[gd_scene load_steps=12 format=3 uid="uid://cmev1o4xqk6yo"]
 
 [ext_resource type="StyleBox" uid="uid://mo35a1kan85v" path="res://assets/resources/WndInner.tres" id="1_pmgsy"]
 [ext_resource type="StyleBox" uid="uid://dax41f3qka5ho" path="res://assets/resources/EditDisabled.tres" id="2_p1mh8"]
 [ext_resource type="StyleBox" uid="uid://cosc8rw8j2h0n" path="res://assets/resources/EditFocus.tres" id="2_qj1oa"]
 [ext_resource type="StyleBox" uid="uid://b4jh7tjgkkiip" path="res://assets/resources/EditNormal.tres" id="2_van7o"]
+[ext_resource type="Script" uid="uid://dmtsypvld1fnd" path="res://ServerConnectWnd.gd" id="3_scw"]
+[ext_resource type="Script" uid="uid://cxaoit53tescs" path="res://CUIRadioButton.gd" id="4_radio"]
+[ext_resource type="Script" uid="uid://dcpanuasaoopb" path="res://CUIDropDown.gd" id="5_dropdown"]
+[ext_resource type="StyleBox" uid="uid://cbxradioflat" path="res://assets/resources/RadioStyle.tres" id="6_radio_style"]
+[ext_resource type="StyleBox" uid="uid://egb7q2d2c2ul" path="res://assets/resources/ListDisabled.tres" id="7_list_disabled"]
+[ext_resource type="PackedScene" uid="uid://bx4bc46ask5n6" path="res://CUIButton.tscn" id="8_cuibtn"]
+[ext_resource type="StyleBox" uid="uid://cu5l4buq8pui2" path="res://assets/resources/DropDownNormal.tres" id="9_drop_normal"]
+[ext_resource type="StyleBox" uid="uid://d3il5d60fmij4" path="res://assets/resources/DropDownDisabled.tres" id="10_drop_disabled"]
+[ext_resource type="StyleBox" uid="uid://klydbfo1douk" path="res://assets/resources/DropDownFocus.tres" id="11_drop_focus"]
 
 [node name="ServerConnectWnd" type="VBoxContainer"]
 auto_translate_mode = 1
+custom_minimum_size = Vector2(387, 521)
+script = ExtResource("3_scw")
 
 [node name="Label" type="Label" parent="."]
 layout_mode = 2
@@ -26,13 +37,128 @@ layout_mode = 2
 theme_override_constants/separation = 5
 
 [node name="PlayerNameLabel" type="Label" parent="PanelContainer/VBoxContainer/HBoxContainer"]
+custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "PLAYER_NAME_LABEL"
 
 [node name="PlayerNameEdit" type="LineEdit" parent="PanelContainer/VBoxContainer/HBoxContainer"]
 auto_translate_mode = 2
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/focus = ExtResource("2_qj1oa")
 theme_override_styles/read_only = ExtResource("2_p1mh8")
 theme_override_styles/normal = ExtResource("2_van7o")
+
+[node name="ModeRow" type="HBoxContainer" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="RadioGroup" type="VBoxContainer" parent="PanelContainer/VBoxContainer/ModeRow"]
+custom_minimum_size = Vector2(165, 0)
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Host" type="Button" parent="PanelContainer/VBoxContainer/ModeRow/RadioGroup"]
+auto_translate_mode = 2
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+theme_override_styles/disabled = ExtResource("6_radio_style")
+theme_override_styles/focus = ExtResource("6_radio_style")
+theme_override_styles/hover = ExtResource("6_radio_style")
+theme_override_styles/normal = ExtResource("6_radio_style")
+theme_override_styles/pressed = ExtResource("6_radio_style")
+text = "HOST_GAME_BN"
+script = ExtResource("4_radio")
+
+[node name="Join" type="Button" parent="PanelContainer/VBoxContainer/ModeRow/RadioGroup"]
+auto_translate_mode = 2
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+theme_override_styles/disabled = ExtResource("6_radio_style")
+theme_override_styles/focus = ExtResource("6_radio_style")
+theme_override_styles/hover = ExtResource("6_radio_style")
+theme_override_styles/normal = ExtResource("6_radio_style")
+theme_override_styles/pressed = ExtResource("6_radio_style")
+text = "JOIN_GAME_BN"
+script = ExtResource("4_radio")
+
+[node name="ClientTypeBox" type="VBoxContainer" parent="PanelContainer/VBoxContainer/ModeRow"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="ClientTypeSpacer" type="Control" parent="PanelContainer/VBoxContainer/ModeRow/ClientTypeBox"]
+custom_minimum_size = Vector2(0, 29)
+layout_mode = 2
+
+[node name="ClientType" type="OptionButton" parent="PanelContainer/VBoxContainer/ModeRow/ClientTypeBox"]
+custom_minimum_size = Vector2(205, 23)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_styles/disabled = ExtResource("10_drop_disabled")
+theme_override_styles/focus = ExtResource("11_drop_focus")
+theme_override_styles/hover = ExtResource("9_drop_normal")
+theme_override_styles/normal = ExtResource("9_drop_normal")
+theme_override_styles/pressed = ExtResource("9_drop_normal")
+script = ExtResource("5_dropdown")
+
+[node name="LanLabel" type="Label" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "LAN_GAME_LABEL"
+
+[node name="ServerList" type="PanelContainer" parent="PanelContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 242)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = ExtResource("7_list_disabled")
+
+[node name="List" type="VBoxContainer" parent="PanelContainer/VBoxContainer/ServerList"]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="RefreshRow" type="HBoxContainer" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="RefreshSpacer" type="Control" parent="PanelContainer/VBoxContainer/RefreshRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Refresh" parent="PanelContainer/VBoxContainer/RefreshRow" instance=ExtResource("8_cuibtn")]
+custom_minimum_size = Vector2(100, 25)
+layout_mode = 2
+disabled = true
+text = "REFRESH_LIST_BN"
+
+[node name="InternetLabel" type="Label" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "INTERNET_GAME_LABEL"
+
+[node name="IPEdit" type="LineEdit" parent="PanelContainer/VBoxContainer"]
+auto_translate_mode = 2
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_colors/font_uneditable_color = Color(0.623529, 0.623529, 0.623529, 1)
+theme_override_styles/focus = ExtResource("2_qj1oa")
+theme_override_styles/read_only = ExtResource("2_p1mh8")
+theme_override_styles/normal = ExtResource("2_van7o")
+text = "localhost"
+
+[node name="OkCancelRow" type="HBoxContainer" parent="PanelContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="OkSpacer" type="Control" parent="PanelContainer/VBoxContainer/OkCancelRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Ok" parent="PanelContainer/VBoxContainer/OkCancelRow" instance=ExtResource("8_cuibtn")]
+custom_minimum_size = Vector2(100, 28)
+layout_mode = 2
+disabled = true
+text = "OK"
+
+[node name="Cancel" parent="PanelContainer/VBoxContainer/OkCancelRow" instance=ExtResource("8_cuibtn")]
+custom_minimum_size = Vector2(100, 28)
+layout_mode = 2
+text = "CANCEL"

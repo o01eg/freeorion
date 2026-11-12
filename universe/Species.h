@@ -15,6 +15,7 @@
 #include "ConstantsFwd.h"
 #include "EnumsFwd.h"
 #include "Meter.h"
+#include "../util/continious_const_map.h"
 #include "../util/Enum.h"
 #include "../util/Export.h"
 #include "../util/Pending.h"
@@ -239,7 +240,7 @@ private:
 /** Holds all FreeOrion species.  Types may be looked up by name. */
 class FO_COMMON_API SpeciesManager {
 public:
-    using SpeciesTypeMap = std::map<std::string, const Species, std::less<>>;
+    using SpeciesTypeMap = continious_const_map<Species>;
 
     static constexpr auto is_playable = [](const auto& species_entry) noexcept { return species_entry.second.Playable(); };
     static constexpr auto is_native = [](const auto& species_entry) noexcept { return species_entry.second.Native(); };

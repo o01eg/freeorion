@@ -33,63 +33,16 @@ namespace {
 
 namespace {
     using start_rule_payload = std::pair<
-        std::map<std::string, const Species, std::less<>>, // species_by_name
+        continious_const_map<Species>, // species_by_name
         std::vector<std::string> // census ordering
     >;
 
-    struct py_grammar {
-        const PythonParser& parser;
-        boost::python::object module;
-        start_rule_payload::first_type& species;
-
-        py_grammar(const PythonParser& parser_, start_rule_payload::first_type& species_) :
-            parser(parser_),
-            module(parser_.LoadModule(&PyInit__species)),
-            species(species_)
-        {
-            parser.LoadValueRefsModule();
-            parser.LoadEffectsModule();
-            parser.LoadConditionsModule();
-            parser.LoadSourcesModule();
-            parser.LoadEnumsModule();
-
-            module.attr("__grammar") = boost::cref(*this);
-        }
-
-        ~py_grammar() {
-            parser.UnloadModule(module);
-        }
-    };
-
-    struct py_manifest_grammar {
-        const PythonParser& parser;
-        boost::python::object module;
-        start_rule_payload::second_type& ordering;
-
-        py_manifest_grammar(const PythonParser& parser_, start_rule_payload::second_type& ordering_) :
-            parser(parser_),
-            module(parser_.LoadModule(&PyInit__species_census_ordering)),
-            ordering(ordering_)
-        {
-            module.attr("__grammar") = boost::cref(*this);
-        }
-
-        ~py_manifest_grammar() {
-            parser.UnloadModule(module);
-        }
-    };
-
-    void insert_species_census_ordering_(boost::python::object scope, const boost::python::list& tags) {
-        boost::python::stl_input_iterator<std::string> tags_begin(tags), tags_end;
-        py_manifest_grammar& p = boost::python::extract<py_manifest_grammar&>(scope.attr("__grammar"))();
-        for (auto it = tags_begin; it != tags_end; ++it)
-            p.ordering.push_back(*it);
-    }
-
-    boost::python::object py_insert_species_(boost::python::object scope,
-                                             const boost::python::dict& kw)
-    {
-        const auto species_name{boost::python::extract<std::string>(kw["name"])()};
+    // Builds the constructor arguments for Species while a species definition is
+    // parsed.  Species can't be moved or copied, so the object itself can only be
+    // built when the final storage is allocated; keeping the arguments (rather than
+    // the parsed python dict) means the python objects are released right away.
+    auto make_species(const boost::python::dict& kw) {
+        auto species_name{boost::python::extract<std::string>(kw["name"])()};
         auto description{boost::python::extract<std::string>(kw["description"])()};
         auto gameplay_description{boost::python::extract<std::string>(kw["gameplay_description"])()};
         boost::python::stl_input_iterator<FocusType> foci_begin(kw["foci"]), foci_end;
@@ -151,30 +104,91 @@ namespace {
             pyobject_to_vref_or_cast<double, int>(kw["annexation_cost"]) :
             nullptr;
 
+        return std::make_tuple(std::move(species_name),
+                               std::move(description),
+                               std::move(gameplay_description),
+                               std::move(foci),
+                               std::move(defaultfocus),
+                               std::move(environments),
+                               std::move(effectsgroups),
+                               std::move(combat_targets),
+                               playable,
+                               native,
+                               can_colonize,
+                               can_produce_ships,
+                               tags,    // intentionally not moved
+                               std::move(likes),
+                               std::move(dislikes),
+                               std::move(annexation_condition),
+                               std::move(annexation_cost),
+                               std::move(graphic),
+                               spawn_rate,
+                               spawn_limit);
+    }
+
+    using species_init_type = decltype(make_species(std::declval<const boost::python::dict&>()));
+
+
+    struct py_grammar {
+        const PythonParser& parser;
+        boost::python::object module;
+        std::vector<species_init_type> species_args;
+
+        py_grammar(const PythonParser& parser_) :
+            parser(parser_),
+            module(parser_.LoadModule(&PyInit__species))
+        {
+            parser.LoadValueRefsModule();
+            parser.LoadEffectsModule();
+            parser.LoadConditionsModule();
+            parser.LoadSourcesModule();
+            parser.LoadEnumsModule();
+
+            module.attr("__grammar") = boost::cref(*this);
+        }
+
+        ~py_grammar() {
+            parser.UnloadModule(module);
+        }
+
+        continious_const_map<Species> to_species() {
+            return continious_const_map<Species>{species_args};
+        }
+    };
+
+    struct py_manifest_grammar {
+        const PythonParser& parser;
+        boost::python::object module;
+        start_rule_payload::second_type& ordering;
+
+        py_manifest_grammar(const PythonParser& parser_, start_rule_payload::second_type& ordering_) :
+            parser(parser_),
+            module(parser_.LoadModule(&PyInit__species_census_ordering)),
+            ordering(ordering_)
+        {
+            module.attr("__grammar") = boost::cref(*this);
+        }
+
+        ~py_manifest_grammar() {
+            parser.UnloadModule(module);
+        }
+    };
+
+    void insert_species_census_ordering_(boost::python::object scope, const boost::python::list& tags) {
+        boost::python::stl_input_iterator<std::string> tags_begin(tags), tags_end;
+        py_manifest_grammar& p = boost::python::extract<py_manifest_grammar&>(scope.attr("__grammar"))();
+        for (auto it = tags_begin; it != tags_end; ++it)
+            p.ordering.push_back(*it);
+    }
+
+    boost::python::object py_insert_species_(boost::python::object scope,
+                                             const boost::python::dict& kw)
+    {
+        const ;
+
         py_grammar& p = boost::python::extract<py_grammar&>(scope.attr("__grammar"))();
 
-        p.species.emplace(std::piecewise_construct,
-                         std::forward_as_tuple(species_name),
-                         std::forward_as_tuple(std::string{species_name},
-                                               std::move(description),
-                                               std::move(gameplay_description),
-                                               std::move(foci),
-                                               std::move(defaultfocus),
-                                               std::move(environments),
-                                               std::move(effectsgroups),
-                                               std::move(combat_targets),
-                                               playable,
-                                               native,
-                                               can_colonize,
-                                               can_produce_ships,
-                                               tags,    // intentionally not moved
-                                               std::move(likes),
-                                               std::move(dislikes),
-                                               std::move(annexation_condition),
-                                               std::move(annexation_cost),
-                                               std::move(graphic),
-                                               spawn_rate,
-                                               spawn_limit));
+        p.species_args.push_back(make_species(kw));
 
         return boost::python::object();
     }
@@ -227,7 +241,7 @@ namespace parse {
         ScopedTimer timer("Species Parsing");
 
         bool file_success = true;
-        py_grammar p = py_grammar(parser, species_);
+        py_grammar p = py_grammar(parser);
         for (const auto& file : ListDir(path, IsFOCPyScript)) {
             if (file.filename() == "SpeciesCensusOrdering.focs.py" ) {
                 manifest_file = file;
@@ -236,6 +250,7 @@ namespace parse {
 
             file_success = py_parse::detail::parse_file(parser, file) && file_success;
         }
+        species_ = std::move(p.to_species());
 
         TraceLogger(parsing) << "Start parsing FOCS for Species: " << species_.size();
         for (const auto& [sp_name, sp] : species_)

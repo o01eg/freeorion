@@ -76,4 +76,5 @@ func _on_multi_player_pressed() -> void:
 
 func _on_credits_pressed() -> void:
 	var credits_wnd := preload("res://CreditsWnd.tscn").instantiate()
+	credits_wnd.menu_left = $Menu.get_global_rect().position.x
 	add_child(credits_wnd)

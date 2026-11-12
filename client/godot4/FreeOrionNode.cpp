@@ -17,6 +17,7 @@
 #include "../../util/i18n.h"
 #include "../../util/OptionsDB.h"
 #include "../../util/Version.h"
+#include "../../util/XMLDoc.h"
 
 std::atomic_bool quit(false);
 
@@ -26,6 +27,7 @@ void FreeOrionNode::_bind_methods() {
     godot::ClassDB::bind_method(godot::D_METHOD("get_user_config_dir"), &FreeOrionNode::get_user_config_dir);
     godot::ClassDB::bind_method(godot::D_METHOD("get_current_turn"), &FreeOrionNode::get_current_turn);
     godot::ClassDB::bind_method(godot::D_METHOD("get_single_player_game"), &FreeOrionNode::get_single_player_game);
+    godot::ClassDB::bind_method(godot::D_METHOD("get_credits"), &FreeOrionNode::get_credits);
     godot::ClassDB::bind_method(godot::D_METHOD("network_thread"), &FreeOrionNode::network_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("parsing_thread"), &FreeOrionNode::parsing_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("start_network_thread"), &FreeOrionNode::start_network_thread);
@@ -173,6 +175,50 @@ int FreeOrionNode::get_current_turn() const
 
 bool FreeOrionNode::get_single_player_game() const
 { return m_app ? m_app->SinglePlayerGame() : false; }
+
+godot::Array FreeOrionNode::get_credits() const {
+    const auto path = GetResourceDir() / "credits.xml";
+    std::string contents;
+    if (!ReadFile(path, contents)) {
+        ErrorLogger() << "Unable to read " << PathToString(path);
+        return godot::Array();
+    }
+
+    XMLDoc doc;
+    doc.ReadDoc(contents);
+    if (!doc.root_node.ContainsChild("CREDITS"))
+        return godot::Array();
+
+    godot::Array groups;
+    for (const XMLElement& group_element : doc.root_node.Child("CREDITS").Children()) {
+        if (group_element.Tag() != "GROUP")
+            continue;
+
+        godot::Dictionary group;
+        if (group_element.HasAttribute("name"))
+            group["name"] = godot::String::utf8(group_element.Attribute("name").c_str());
+
+        godot::Array items;
+        for (const XMLElement& item_element : group_element.Children()) {
+            const auto& tag = item_element.Tag();
+            if (tag != "PERSON" && tag != "RESOURCE")
+                continue;
+
+            godot::Dictionary item;
+            item["type"] = godot::String::utf8(tag.c_str());
+            for (const char* attribute : {"name", "nick", "task", "author", "title",
+                                          "license", "source", "notes"}) {
+                if (item_element.HasAttribute(attribute))
+                    item[godot::String(attribute)] =
+                        godot::String::utf8(item_element.Attribute(attribute).c_str());
+            }
+            items.push_back(item);
+        }
+        group["items"] = items;
+        groups.push_back(group);
+    }
+    return groups;
+}
 
 void FreeOrionNode::network_thread() {
     DebugLogger() << "FreeOrionNode::network_thread(): Freeorion networking started";

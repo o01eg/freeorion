@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/thread.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 
 class GodotClientApp;
@@ -31,6 +32,8 @@ private:
     int get_current_turn() const; ///< Returns the current turn number, or INVALID_GAME_TURN if no game is running
 
     bool get_single_player_game() const; ///< Returns true if this game is a single-player game
+
+    godot::Array get_credits() const; ///< Returns the groups from default/credits.xml
 
     void network_thread(); ///< Function called in a separate networking thread
 

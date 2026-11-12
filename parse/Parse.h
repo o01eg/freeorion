@@ -17,6 +17,7 @@
 #include <set>
 #include <vector>
 #include <unordered_map>
+#include "../util/continious_const_map.h"
 
 class BuildingType;
 class FieldType;
@@ -57,7 +58,7 @@ namespace parse {
         species_by_name. If a file exists called SpeciesCensusOrdering.focs.txt, parse it and
         store the census order in \p ordering. */
     using species_type = std::pair<
-        std::map<std::string, const Species, std::less<>>, // species_by_name,
+        continious_const_map<Species>, // species_by_name,
         std::vector<std::string> // ordering
     >;
     FO_PARSE_API species_type species(const PythonParser& parser, const std::filesystem::path& path, bool& success);

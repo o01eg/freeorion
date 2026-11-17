@@ -9,7 +9,7 @@
     (accountinglabel)                           \
     (activation)                                \
     (AddSpecial)                                \
-    (AddStarlanes)                              \
+ /* (AddStarlanes) */                           \
     (Adequate)                                  \
     (adoptioncost)                              \
     (affiliation)                               \
@@ -24,7 +24,7 @@
     (ArrivedOnTurn)                             \
     (Asteroids)                                 \
     (Barren)                                    \
-    (Basic)                                     \
+ /* (Basic) */                                  \
     (BlackHole)                                 \
     (Blue)                                      \
     (Bombard)                                   \
@@ -199,7 +199,7 @@
     (InSystem)                                  \
     (Integer)                                   \
     (Internal)                                  \
-    (Invisible)                                 \
+ /* (Invisible) */                              \
     (Item)                                      \
     (jumps)                                     \
     (JumpsBetween)
@@ -263,7 +263,7 @@
     (MostSpentResearchableTech)                 \
     (MostSpentTransferrableTech)                \
     (mountableSlotTypes)                        \
-    (MoveInOrbit)                               \
+ /* (MoveInOrbit) */                            \
     (MoveTo)                                    \
     (MoveTowards)                               \
     (name)                                      \
@@ -325,7 +325,7 @@
     (Part)                                      \
     (PartCapacity)                              \
     (PartClass)                                 \
-    (Partial)                                   \
+ /* (Partial) */                                \
     (partname)                                  \
     (PartSecondaryStat)
 

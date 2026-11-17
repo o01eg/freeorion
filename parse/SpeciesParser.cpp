@@ -86,7 +86,7 @@ namespace {
             p.ordering.push_back(*it);
     }
 
-    boost::python::object py_insert_species_(boost::python::object scope, const boost::python::tuple& args,
+    boost::python::object py_insert_species_(boost::python::object scope,
                                              const boost::python::dict& kw)
     {
         const auto species_name{boost::python::extract<std::string>(kw["name"])()};
@@ -200,8 +200,8 @@ BOOST_PYTHON_MODULE(_species) {
     boost::python::object current_module = boost::python::scope();
 
     def("Species", boost::python::raw_function(
-        [current_module](const boost::python::tuple& args, const boost::python::dict& kw)
-        { return py_insert_species_(current_module, args, kw); }));
+        [current_module](const boost::python::tuple&, const boost::python::dict& kw)
+        { return py_insert_species_(current_module, kw); }));
     def("FocusType", boost::python::raw_function(insert_focus_type_));
 }
 
@@ -238,16 +238,14 @@ namespace parse {
         }
 
         TraceLogger(parsing) << "Start parsing FOCS for Species: " << species_.size();
-        for (auto& [sp_name, sp] : species_)
+        for (const auto& [sp_name, sp] : species_)
             TraceLogger(parsing) << "Species " << sp_name << " : " << sp.GetCheckSum() << "\n" << sp.Dump();
         TraceLogger(parsing) << "End parsing FOCS for Species" << species_.size();
 
         if (!manifest_file.empty()) {
             try {
                 auto p_grammar = py_manifest_grammar(parser, ordering);
-                file_success = py_parse::detail::parse_file(
-                    parser, manifest_file) && file_success;
-
+                file_success = py_parse::detail::parse_file(parser, manifest_file) && file_success;
             } catch (const std::runtime_error& e) {
                 ErrorLogger() << "Failed to species census manifest in " << manifest_file << " from " << path
                               << " because " << e.what();

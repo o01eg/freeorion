@@ -34,6 +34,16 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg", "res://addons/android-e
 theme/custom_font="res://assets/fonts/Roboto-Regular.ttf"
 theme/custom_font_size=16
 
+[input]
+
+ui_gamemenu={
+"devices": [
+],
+"events": [
+"Key(F10, None)"
+]
+}
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

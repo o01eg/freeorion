@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=3 uid="uid://du0pgvwu7m8xe"]
+
+[ext_resource type="Script" uid="uid://ddxsfwqmnveig" path="res://CUIRadioStateButton.gd" id="1_radio"]
+[ext_resource type="AudioStream" uid="uid://by5iw4qhrsbwk" path="res://assets/sound/button_rollover.ogg" id="2_rollover"]
+[ext_resource type="AudioStream" uid="uid://p03v0smrp5ln" path="res://assets/sound/button_click.ogg" id="3_click"]
+[ext_resource type="StyleBox" uid="uid://dlyu78mpvt8cf" path="res://assets/resources/RadioStateButton.tres" id="5_feyjp"]
+
+[node name="CUIRadioStateButton" type="Button"]
+theme_override_styles/disabled = ExtResource("5_feyjp")
+theme_override_styles/focus = ExtResource("5_feyjp")
+theme_override_styles/hover = ExtResource("5_feyjp")
+theme_override_styles/normal = ExtResource("5_feyjp")
+theme_override_styles/pressed = ExtResource("5_feyjp")
+script = ExtResource("1_radio")
+
+[node name="Rollover" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("2_rollover")
+
+[node name="Click" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_click")

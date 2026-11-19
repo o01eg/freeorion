@@ -1,8 +1,42 @@
-[gd_scene load_steps=5 format=3 uid="uid://bbmlrg7wbu7cs"]
+[gd_scene load_steps=39 format=3 uid="uid://bbmlrg7wbu7cs"]
 
 [ext_resource type="Script" uid="uid://bhqrk7g1l6rwf" path="res://MapWnd.gd" id="1_gm06g"]
 [ext_resource type="AudioStream" uid="uid://3a4jg0i7pgkb" path="res://assets/sound/artificial_intelligence_v3.ogg" id="1_vno04"]
 [ext_resource type="PackedScene" uid="uid://bx4bc46ask5n6" path="res://CUIButton.tscn" id="2_jir7t"]
+[ext_resource type="PackedScene" uid="uid://cpqot0kfi83v6" path="res://CUIIconButton.tscn" id="4_iconbtn"]
+[ext_resource type="Texture2D" uid="uid://cv5qegvxp6uns" path="res://assets/art/icons/buttons/menu.png" id="5_menu"]
+[ext_resource type="Texture2D" uid="uid://33c8y57np6fc" path="res://assets/art/icons/buttons/menu_mouseover.png" id="6_menu_hover"]
+[ext_resource type="Texture2D" uid="uid://damhrmy6ye4gh" path="res://assets/art/icons/buttons/menu_clicked.png" id="7_menu_pressed"]
+[ext_resource type="Texture2D" uid="uid://cri36bgctujj0" path="res://assets/art/icons/buttons/pedia.png" id="8_pedia"]
+[ext_resource type="Texture2D" uid="uid://coqfttnre0hp6" path="res://assets/art/icons/buttons/pedia_mouseover.png" id="9_pedia_hover"]
+[ext_resource type="Texture2D" uid="uid://c3qc4si7vi6y" path="res://assets/art/icons/buttons/pedia_clicked.png" id="10_pedia_pressed"]
+[ext_resource type="Texture2D" uid="uid://db0ryd4i4fdxx" path="res://assets/art/icons/buttons/charts.png" id="11_charts"]
+[ext_resource type="Texture2D" uid="uid://bb1kskgftx5ud" path="res://assets/art/icons/buttons/charts_mouseover.png" id="12_charts_hover"]
+[ext_resource type="Texture2D" uid="uid://kmayp85wace7" path="res://assets/art/icons/buttons/charts_clicked.png" id="13_charts_pressed"]
+[ext_resource type="Texture2D" uid="uid://ie84ub8jyno3" path="res://assets/art/icons/buttons/government.png" id="14_government"]
+[ext_resource type="Texture2D" uid="uid://qsne644xea7i" path="res://assets/art/icons/buttons/government_mouseover.png" id="15_government_hover"]
+[ext_resource type="Texture2D" uid="uid://dman0swyt5ht5" path="res://assets/art/icons/buttons/government_clicked.png" id="16_government_pressed"]
+[ext_resource type="Texture2D" uid="uid://ci0jghcitwslm" path="res://assets/art/icons/buttons/design.png" id="17_design"]
+[ext_resource type="Texture2D" uid="uid://ddpr2lcav6jd" path="res://assets/art/icons/buttons/design_mouseover.png" id="18_design_hover"]
+[ext_resource type="Texture2D" uid="uid://cwyicbniofwcr" path="res://assets/art/icons/buttons/design_clicked.png" id="19_design_pressed"]
+[ext_resource type="Texture2D" uid="uid://bn2q1pwrycccc" path="res://assets/art/icons/buttons/production.png" id="20_production"]
+[ext_resource type="Texture2D" uid="uid://uywiqffxj7sf" path="res://assets/art/icons/buttons/production_mouseover.png" id="21_production_hover"]
+[ext_resource type="Texture2D" uid="uid://cjqgwl5id4135" path="res://assets/art/icons/buttons/production_clicked.png" id="22_production_pressed"]
+[ext_resource type="Texture2D" uid="uid://clshl6x0cp7gp" path="res://assets/art/icons/buttons/research.png" id="23_research"]
+[ext_resource type="Texture2D" uid="uid://cijikc5c11c73" path="res://assets/art/icons/buttons/research_mouseover.png" id="24_research_hover"]
+[ext_resource type="Texture2D" uid="uid://cvllg3gc7lq0v" path="res://assets/art/icons/buttons/research_clicked.png" id="25_research_pressed"]
+[ext_resource type="Texture2D" uid="uid://di6l7jwcmafun" path="res://assets/art/icons/buttons/objects.png" id="26_objects"]
+[ext_resource type="Texture2D" uid="uid://bisfujt4ulm2v" path="res://assets/art/icons/buttons/objects_mouseover.png" id="27_objects_hover"]
+[ext_resource type="Texture2D" uid="uid://borwyfhlxh4sw" path="res://assets/art/icons/buttons/objects_clicked.png" id="28_objects_pressed"]
+[ext_resource type="Texture2D" uid="uid://bpkf4uiomvcqu" path="res://assets/art/icons/buttons/empires.png" id="29_empires"]
+[ext_resource type="Texture2D" uid="uid://b4wffge0b0irf" path="res://assets/art/icons/buttons/empires_mouseover.png" id="30_empires_hover"]
+[ext_resource type="Texture2D" uid="uid://bjf2pe71t10jl" path="res://assets/art/icons/buttons/empires_clicked.png" id="31_empires_pressed"]
+[ext_resource type="Texture2D" uid="uid://o8byo6nf2xa4" path="res://assets/art/icons/buttons/sitrep.png" id="32_sitrep"]
+[ext_resource type="Texture2D" uid="uid://5i7l7jmx7bu8" path="res://assets/art/icons/buttons/sitrep_mouseover.png" id="33_sitrep_hover"]
+[ext_resource type="Texture2D" uid="uid://cmrd2sauttxon" path="res://assets/art/icons/buttons/sitrep_clicked.png" id="34_sitrep_pressed"]
+[ext_resource type="Texture2D" uid="uid://fd73op57qqhm" path="res://assets/art/icons/buttons/messages.png" id="35_messages"]
+[ext_resource type="Texture2D" uid="uid://cos70fwn34u6e" path="res://assets/art/icons/buttons/messages_mouseover.png" id="36_messages_hover"]
+[ext_resource type="Texture2D" uid="uid://dlf8ixr81sv6b" path="res://assets/art/icons/buttons/messages_clicked.png" id="37_messages_pressed"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toolbar"]
 content_margin_left = 5.0
@@ -40,7 +74,184 @@ auto_translate_mode = 2
 layout_mode = 0
 offset_left = 5.0
 offset_top = 8.0
-offset_right = 13.0
-offset_bottom = 14.0
+offset_right = 116.0
+offset_bottom = 33.0
+text = "MAP_BTN_TURN_UPDATE"
+
+[node name="BtnMessages" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -407.0
+offset_top = 5.0
+offset_right = -375.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("35_messages")
+texture_hover = ExtResource("36_messages_hover")
+texture_pressed = ExtResource("37_messages_pressed")
+texture_disabled = ExtResource("35_messages")
+
+[node name="BtnSitRep" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -370.0
+offset_top = 5.0
+offset_right = -338.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("32_sitrep")
+texture_hover = ExtResource("33_sitrep_hover")
+texture_pressed = ExtResource("34_sitrep_pressed")
+texture_disabled = ExtResource("32_sitrep")
+
+[node name="BtnEmpires" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -333.0
+offset_top = 5.0
+offset_right = -301.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("29_empires")
+texture_hover = ExtResource("30_empires_hover")
+texture_pressed = ExtResource("31_empires_pressed")
+texture_disabled = ExtResource("29_empires")
+
+[node name="BtnObjects" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -296.0
+offset_top = 5.0
+offset_right = -264.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("26_objects")
+texture_hover = ExtResource("27_objects_hover")
+texture_pressed = ExtResource("28_objects_pressed")
+texture_disabled = ExtResource("26_objects")
+
+[node name="BtnResearch" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -259.0
+offset_top = 5.0
+offset_right = -227.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("23_research")
+texture_hover = ExtResource("24_research_hover")
+texture_pressed = ExtResource("25_research_pressed")
+texture_disabled = ExtResource("23_research")
+
+[node name="BtnProduction" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -222.0
+offset_top = 5.0
+offset_right = -190.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("20_production")
+texture_hover = ExtResource("21_production_hover")
+texture_pressed = ExtResource("22_production_pressed")
+texture_disabled = ExtResource("20_production")
+
+[node name="BtnDesign" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -185.0
+offset_top = 5.0
+offset_right = -153.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("17_design")
+texture_hover = ExtResource("18_design_hover")
+texture_pressed = ExtResource("19_design_pressed")
+texture_disabled = ExtResource("17_design")
+
+[node name="BtnGovernment" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -148.0
+offset_top = 5.0
+offset_right = -116.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("14_government")
+texture_hover = ExtResource("15_government_hover")
+texture_pressed = ExtResource("16_government_pressed")
+texture_disabled = ExtResource("14_government")
+
+[node name="BtnGraphs" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -111.0
+offset_top = 5.0
+offset_right = -79.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("11_charts")
+texture_hover = ExtResource("12_charts_hover")
+texture_pressed = ExtResource("13_charts_pressed")
+texture_disabled = ExtResource("11_charts")
+
+[node name="BtnPedia" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -74.0
+offset_top = 5.0
+offset_right = -42.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("8_pedia")
+texture_hover = ExtResource("9_pedia_hover")
+texture_pressed = ExtResource("10_pedia_pressed")
+texture_disabled = ExtResource("8_pedia")
+
+[node name="BtnMenu" parent="ToolBar" instance=ExtResource("4_iconbtn")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -37.0
+offset_top = 5.0
+offset_right = -5.0
+offset_bottom = 37.0
+grow_horizontal = 0
+texture_normal = ExtResource("5_menu")
+texture_hover = ExtResource("6_menu_hover")
+texture_pressed = ExtResource("7_menu_pressed")
+texture_disabled = ExtResource("5_menu")
 
 [connection signal="pressed" from="ToolBar/BtnTurn" to="." method="_on_btn_turn_pressed"]
+[connection signal="pressed" from="ToolBar/BtnMenu" to="." method="_on_btn_menu_pressed"]
+[connection signal="pressed" from="ToolBar/BtnPedia" to="." method="_on_btn_pedia_pressed"]
+[connection signal="pressed" from="ToolBar/BtnGraphs" to="." method="_on_btn_graphs_pressed"]
+[connection signal="pressed" from="ToolBar/BtnGovernment" to="." method="_on_btn_government_pressed"]
+[connection signal="pressed" from="ToolBar/BtnDesign" to="." method="_on_btn_design_pressed"]
+[connection signal="pressed" from="ToolBar/BtnProduction" to="." method="_on_btn_production_pressed"]
+[connection signal="pressed" from="ToolBar/BtnResearch" to="." method="_on_btn_research_pressed"]
+[connection signal="pressed" from="ToolBar/BtnObjects" to="." method="_on_btn_objects_pressed"]
+[connection signal="pressed" from="ToolBar/BtnEmpires" to="." method="_on_btn_empires_pressed"]
+[connection signal="pressed" from="ToolBar/BtnSitRep" to="." method="_on_btn_sitrep_pressed"]
+[connection signal="pressed" from="ToolBar/BtnMessages" to="." method="_on_btn_messages_pressed"]

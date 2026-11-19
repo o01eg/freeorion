@@ -1,0 +1,16 @@
+[gd_scene load_steps=5 format=3 uid="uid://crsxuwogrwfse"]
+
+[ext_resource type="Script" uid="uid://dcpanuasaoopb" path="res://CUIDropDown.gd" id="1_dropdown"]
+[ext_resource type="StyleBox" uid="uid://cu5l4buq8pui2" path="res://assets/resources/DropDownNormal.tres" id="2_normal"]
+[ext_resource type="StyleBox" uid="uid://d3il5d60fmij4" path="res://assets/resources/DropDownDisabled.tres" id="3_disabled"]
+[ext_resource type="StyleBox" uid="uid://klydbfo1douk" path="res://assets/resources/DropDownFocus.tres" id="4_focus"]
+
+[node name="CUIDropDown" type="OptionButton"]
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 1)
+theme_override_styles/disabled = ExtResource("3_disabled")
+theme_override_styles/focus = ExtResource("4_focus")
+theme_override_styles/hover = ExtResource("2_normal")
+theme_override_styles/normal = ExtResource("2_normal")
+theme_override_styles/pressed = ExtResource("2_normal")
+script = ExtResource("1_dropdown")

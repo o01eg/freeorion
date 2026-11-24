@@ -7,6 +7,10 @@
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 
+#include <boost/format.hpp>
+
+#include <sstream>
+
 #include "GodotClientApp.h"
 #include "GodotI18n.h"
 
@@ -17,8 +21,25 @@
 #include "../../util/i18n.h"
 #include "../../util/OptionsDB.h"
 #include "../../util/Version.h"
+#include "../../util/XMLDoc.h"
 
 std::atomic_bool quit(false);
+
+namespace {
+    auto escape_bbcode(const std::string& text) {
+        std::string escaped;
+        escaped.reserve(text.size());
+        for (char c : text) {
+            if (c == '[')
+                escaped += "[lb]";
+            else if (c == ']')
+                escaped += "[rb]";
+            else
+                escaped += c;
+        }
+        return escaped;
+    }
+}
 
 void FreeOrionNode::_bind_methods() {
     godot::ClassDB::bind_method(godot::D_METHOD("get_version"), &FreeOrionNode::get_version);
@@ -26,22 +47,14 @@ void FreeOrionNode::_bind_methods() {
     godot::ClassDB::bind_method(godot::D_METHOD("get_user_config_dir"), &FreeOrionNode::get_user_config_dir);
     godot::ClassDB::bind_method(godot::D_METHOD("get_current_turn"), &FreeOrionNode::get_current_turn);
     godot::ClassDB::bind_method(godot::D_METHOD("get_single_player_game"), &FreeOrionNode::get_single_player_game);
+    godot::ClassDB::bind_method(godot::D_METHOD("get_credits_bbcode"), &FreeOrionNode::get_credits_bbcode);
     godot::ClassDB::bind_method(godot::D_METHOD("network_thread"), &FreeOrionNode::network_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("parsing_thread"), &FreeOrionNode::parsing_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("start_network_thread"), &FreeOrionNode::start_network_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("start_parsing_thread"), &FreeOrionNode::start_parsing_thread);
     godot::ClassDB::bind_method(godot::D_METHOD("new_single_player_game"), &FreeOrionNode::new_single_player_game);
     godot::ClassDB::bind_method(godot::D_METHOD("start_turn"), &FreeOrionNode::start_turn);
-    godot::ClassDB::bind_method(godot::D_METHOD("options_get_bool"), &FreeOrionNode::options_get_bool);
-    godot::ClassDB::bind_method(godot::D_METHOD("options_get_string"), &FreeOrionNode::options_get_string);
-    godot::ClassDB::bind_method(godot::D_METHOD("options_find_options", "prefix", "allow_unrecognized"), &FreeOrionNode::options_find_options, DEFVAL(false));
-    godot::ClassDB::bind_method(godot::D_METHOD("options_exists"), &FreeOrionNode::options_exists);
-    godot::ClassDB::bind_method(godot::D_METHOD("options_add_string"), &FreeOrionNode::options_add_string);
-    godot::ClassDB::bind_method(godot::D_METHOD("options_set_string"), &FreeOrionNode::options_set_string);
-    godot::ClassDB::bind_method(godot::D_METHOD("options_commit", "only_if_dirty", "only_non_default"),
-                                &FreeOrionNode::options_commit,
-                                DEFVAL(true),
-                                DEFVAL(true));
+
 
     ADD_SIGNAL(godot::MethodInfo("parsing_completed"));
     ADD_SIGNAL(godot::MethodInfo("start_game", godot::PropertyInfo(godot::Variant::BOOL, "is_new_game")));
@@ -174,6 +187,67 @@ int FreeOrionNode::get_current_turn() const
 bool FreeOrionNode::get_single_player_game() const
 { return m_app ? m_app->SinglePlayerGame() : false; }
 
+godot::String FreeOrionNode::get_credits_bbcode() const {
+    std::string file_contents;
+    if (!ReadFile(GetResourceDir() / "credits.xml", file_contents))
+        return {};
+
+    XMLDoc doc;
+    doc.ReadDoc(file_contents);
+
+    if (!doc.root_node.ContainsChild("CREDITS"))
+        return {};
+
+    const auto& credits_node = doc.root_node.Child("CREDITS");
+
+    std::ostringstream credits;
+    credits << "[center]";
+
+    auto group_format = boost::format("%1%\n\n");
+    auto nick_format = boost::format(" [color=#999999](%1%)[/color]");
+    auto task_format = boost::format(" - [color=#cccccc]%1%[/color]");
+    auto resource_format = boost::format("%1% - [color=#999999]%2%[/color]\n%3% %4%%5%\n");
+    auto source_format = boost::format(" - [color=#999999]%1%[/color]");
+    auto note_format = boost::format("[color=#cccccc](%1%)[/color]\n");
+
+    for (const XMLElement& group : credits_node.Children()) {
+        if (0 == group.Tag().compare("GROUP")) {
+            credits << group_format % escape_bbcode(group.Attribute("name"));
+            for (const XMLElement& item : group.Children()) {
+                if (0 == item.Tag().compare("PERSON")) {
+                    if (item.HasAttribute("name"))
+                        credits << escape_bbcode(item.Attribute("name"));
+                    if (item.HasAttribute("nick") && !item.Attribute("nick").empty())
+                        credits << nick_format % escape_bbcode(item.Attribute("nick"));
+                    if (item.HasAttribute("task"))
+                        credits << task_format % escape_bbcode(item.Attribute("task"));
+                }
+
+                if (0 == item.Tag().compare("RESOURCE")) {
+                    credits << resource_format
+                        % escape_bbcode(item.Attribute("author"))
+                        % escape_bbcode(item.Attribute("title"))
+                        % UserString("INTRO_CREDITS_LICENSE")
+                        % escape_bbcode(item.Attribute("license"))
+                        % ((item.HasAttribute("source"))
+                            ? boost::str(source_format % escape_bbcode(item.Attribute("source")))
+                            : std::string{});
+                    if (item.HasAttribute("notes"))
+                        credits << note_format % escape_bbcode(item.Attribute("notes"));
+                }
+
+                credits << "\n";
+            }
+
+            credits << "\n\n";
+        }
+    }
+
+    credits << "[/center]";
+
+    return godot::String::utf8(credits.str().c_str());
+}
+
 void FreeOrionNode::network_thread() {
     DebugLogger() << "FreeOrionNode::network_thread(): Freeorion networking started";
     while(!quit) {
@@ -206,34 +280,6 @@ void FreeOrionNode::start_turn() {
     SaveGameUIData ui_data;
     m_app->StartTurn(ui_data);
 }
-
-bool FreeOrionNode::options_get_bool(godot::String option) const
-{ return GetOptionsDB().Get<bool>(option.utf8().get_data()); }
-
-godot::String FreeOrionNode::options_get_string(godot::String option) const
-{ return godot::String(GetOptionsDB().Get<std::string>(option.utf8().get_data()).c_str()); }
-
-godot::PackedStringArray FreeOrionNode::options_find_options(godot::String prefix, bool allow_unrecognized) const {
-    godot::PackedStringArray options;
-    for (const auto& option : GetOptionsDB().FindOptions(prefix.utf8().get_data(), allow_unrecognized))
-        options.push_back(godot::String::utf8(option.data(), option.size()));
-    return options;
-}
-
-bool FreeOrionNode::options_exists(godot::String option) const
-{ return GetOptionsDB().OptionExists(option.utf8().get_data()); }
-
-void FreeOrionNode::options_add_string(godot::String option, godot::String description, godot::String value) {
-    GetOptionsDB().Add<std::string>(option.utf8().get_data(),
-        description.utf8().get_data(),
-        value.utf8().get_data());
-}
-
-void FreeOrionNode::options_set_string(godot::String option, godot::String value)
-{ GetOptionsDB().Set<std::string>(option.utf8().get_data(), value.utf8().get_data()); }
-
-bool FreeOrionNode::options_commit(bool only_if_dirty, bool only_non_default)
-{ return GetOptionsDB().Commit(only_if_dirty, only_non_default); }
 
 void FreeOrionNode::HandleMessage(Message&& msg) {
     try {

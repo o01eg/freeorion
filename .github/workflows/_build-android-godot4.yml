@@ -221,8 +221,16 @@ jobs:
           path: godot4/
       - name: Install Godot and Templates
         run: |
-          wget --content-disposition "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=${{ env.GODOT_FLAVOR }}&slug=linux.x86_64.zip&platform=linux.64"
-          wget --content-disposition "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=${{ env.GODOT_FLAVOR }}&slug=export_templates.tpz&platform=templates"
+          curl -sSL -D headers_1.txt \
+            -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
+            "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=${{ env.GODOT_FLAVOR }}&slug=linux.x86_64.zip&platform=linux.64" \
+            -o Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_linux.x86_64.zip
+          unzip -t Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_linux.x86_64.zip
+          curl -sSL -D headers_2.txt \
+            -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
+            "https://downloads.godotengine.org/?version=${{ env.GODOT_VERSION }}&flavor=${{ env.GODOT_FLAVOR }}&slug=export_templates.tpz&platform=templates" \
+            -o Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_export_templates.tpz
+          unzip -t Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_export_templates.tpz
 
           unzip Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_linux.x86_64.zip
           sudo mv Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_linux.x86_64 /usr/local/bin/godot
@@ -230,6 +238,15 @@ jobs:
           mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.${{ env.GODOT_FLAVOR }}
           unzip Godot_v${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}_export_templates.tpz
           mv templates/* ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.${{ env.GODOT_FLAVOR }}/
+      - name: Check downloads logs
+        if: always()
+        run: |
+          echo "::group::Output Godot download headers"
+          cat headers_1.txt
+          echo "::endgroup::"
+          echo "::group::Output export templates headers"
+          cat headers_2.txt
+          echo "::endgroup::"
       - name: Install Android build template into project
         run: |
           mkdir -p godot4/android/build
